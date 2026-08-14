@@ -99,7 +99,7 @@ class Database:
         self._initialize()
 
     def _connect(self) -> sqlite3.Connection:
-        conn = sqlite3.connect(self.db_file)
+        conn = sqlite3.connect(self.db_file, timeout=10)
         conn.row_factory = sqlite3.Row
         conn.execute("PRAGMA foreign_keys = ON")
         return conn
@@ -181,11 +181,20 @@ class Database:
             ).fetchone()
             if row is not None:
                 return int(row["id"])
-            cursor = conn.execute(
-                "INSERT INTO clients (name) VALUES (?)",
-                (cleaned,),
-            )
-            return int(cursor.lastrowid)
+            try:
+                cursor = conn.execute(
+                    "INSERT INTO clients (name) VALUES (?)",
+                    (cleaned,),
+                )
+                return int(cursor.lastrowid)
+            except sqlite3.IntegrityError:
+                row = conn.execute(
+                    "SELECT id FROM clients WHERE name = ? COLLATE NOCASE",
+                    (cleaned,),
+                ).fetchone()
+                if row is None:
+                    raise
+                return int(row["id"])
 
     def record_document(
         self,

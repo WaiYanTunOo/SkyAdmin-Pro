@@ -651,7 +651,10 @@ class ClientsExpiryPanel(ctk.CTkFrame):
             f"Workspace ready: {folder.name}/01_Company_Setup, 02_Accounting, 03_Visa"
         )
         self.refresh()
-        open_in_file_manager(folder)
+        try:
+            open_in_file_manager(folder)
+        except Exception as exc:
+            self.feedback.info(str(exc))
 
     def _delete_client(self) -> None:
         iid = self.client_tree.selected_iid()

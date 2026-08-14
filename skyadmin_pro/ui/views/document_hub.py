@@ -22,12 +22,20 @@ from skyadmin_pro.ui.views.base import BaseView
 from skyadmin_pro.ui.widgets import DropZone, FeedbackLabel, OrderedPathList, SelectableFileList
 
 
+def _open_folder(path: Path) -> None:
+    try:
+        file_ops.open_in_file_manager(path)
+    except Exception as exc:
+        messagebox.showerror("SkyAdmin Pro", str(exc))
+
+
 class DocumentHubView(BaseView):
     title = "Document Hub"
     subtitle = "Rename, convert, merge, and archive client documents."
 
     def build(self) -> None:
         self._polling = False
+        self._poll_after: str | None = None
         self.body.grid_columnconfigure(0, weight=1)
         self.body.grid_rowconfigure(0, weight=1)
 
@@ -75,14 +83,24 @@ class DocumentHubView(BaseView):
 
     def on_hide(self) -> None:
         self._polling = False
+        if self._poll_after is not None:
+            try:
+                self.after_cancel(self._poll_after)
+            except Exception:
+                pass
+            self._poll_after = None
 
     def _poll(self) -> None:
-        if not self._polling:
+        if not self._polling or not self.winfo_exists():
             return
-        self.renamer.refresh(files_only=True)
-        self.portal.refresh()
-        self.archive.refresh()
-        self.after(2000, self._poll)
+        try:
+            self.renamer.refresh(files_only=True)
+            self.portal.refresh()
+            self.archive.refresh()
+        except Exception:
+            pass
+        if self._polling and self.winfo_exists():
+            self._poll_after = self.after(2000, self._poll)
 
 
 class SmartRenamerPanel(ctk.CTkFrame):
@@ -123,7 +141,7 @@ class SmartRenamerPanel(ctk.CTkFrame):
             width=110,
             fg_color="transparent",
             border_width=1,
-            command=lambda: file_ops.open_in_file_manager(self.app.paths.staging),
+            command=lambda: _open_folder(self.app.paths.staging),
         ).pack(side="left", padx=(8, 0))
 
         self.file_list = SelectableFileList(left, on_select=lambda _: self._update_preview())
@@ -511,7 +529,7 @@ class PortalUploadPanel(ctk.CTkFrame):
             width=110,
             fg_color="transparent",
             border_width=1,
-            command=lambda: file_ops.open_in_file_manager(self.app.paths.ready_to_upload),
+            command=lambda: _open_folder(self.app.paths.ready_to_upload),
         ).grid(row=0, column=1, sticky="e")
 
         card = ctk.CTkFrame(self, corner_radius=12)
@@ -632,7 +650,7 @@ class ArchivePanel(ctk.CTkFrame):
             text="Open archive folder",
             fg_color="transparent",
             border_width=1,
-            command=lambda: file_ops.open_in_file_manager(self.app.paths.archive),
+            command=lambda: _open_folder(self.app.paths.archive),
         ).pack(side="left", padx=(8, 0))
 
         self.feedback = FeedbackLabel(card)

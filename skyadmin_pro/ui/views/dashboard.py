@@ -225,4 +225,7 @@ class DashboardView(BaseView):
         )
         self.app.set_status(f"Created client workspace at {folder}")
         self.refresh()
-        open_in_file_manager(folder)
+        try:
+            open_in_file_manager(folder)
+        except Exception as exc:
+            self.workflow_feedback.info(str(exc))

@@ -6,6 +6,7 @@ import re
 import webbrowser
 from datetime import date
 from pathlib import Path
+from urllib.parse import urlparse
 
 from skyadmin_pro.config import CLIENT_WORKSPACE_FOLDERS, DEFAULT_PORTAL_URL
 
@@ -22,7 +23,10 @@ def sanitize_folder_name(name: str) -> str:
 
 def create_client_workspace(clients_root: Path, client_name: str) -> Path:
     """Create Clients/[Name]/01_Company_Setup, 02_Accounting, 03_Visa. Idempotent."""
-    folder = Path(clients_root) / sanitize_folder_name(client_name)
+    root = Path(clients_root).resolve()
+    folder = (root / sanitize_folder_name(client_name)).resolve()
+    if folder == root or not folder.is_relative_to(root):
+        raise ValueError("Enter a valid client name for the folder.")
     for subfolder in CLIENT_WORKSPACE_FOLDERS:
         (folder / subfolder).mkdir(parents=True, exist_ok=True)
     return folder
@@ -30,8 +34,14 @@ def create_client_workspace(clients_root: Path, client_name: str) -> Path:
 
 def normalize_portal_url(url: str | None) -> str:
     text = (url or "").strip() or DEFAULT_PORTAL_URL
+    raw_scheme = text.split(":", 1)[0].lower() if ":" in text else ""
+    if raw_scheme.isalpha() and raw_scheme not in {"http", "https"}:
+        raise ValueError("Portal URL must start with http:// or https://")
     if "://" not in text:
         text = "https://" + text
+    parsed = urlparse(text)
+    if parsed.scheme not in {"http", "https"} or not parsed.netloc:
+        raise ValueError("Portal URL must start with http:// or https://")
     return text
 
 

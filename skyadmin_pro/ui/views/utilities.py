@@ -198,12 +198,25 @@ class UtilitiesView(BaseView):
         self.translator_feedback.info("Translating…")
 
         def worker() -> None:
+            error: str | None = None
+            result = ""
             try:
                 result = translate_text(source_text, source, target)
             except Exception as exc:
-                self.after(0, lambda: self._translate_failed(str(exc)))
+                error = str(exc)
+
+            def done() -> None:
+                if not self.winfo_exists():
+                    return
+                if error:
+                    self._translate_failed(error)
+                else:
+                    self._translate_ok(result)
+
+            try:
+                self.after(0, done)
+            except Exception:
                 return
-            self.after(0, lambda: self._translate_ok(result))
 
         threading.Thread(target=worker, daemon=True).start()
 

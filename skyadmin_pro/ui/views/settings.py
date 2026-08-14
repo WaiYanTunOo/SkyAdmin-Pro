@@ -6,6 +6,7 @@ import customtkinter as ctk
 
 from skyadmin_pro.config import DEFAULT_PORTAL_URL, SETTING_APPEARANCE_MODE, SETTING_PORTAL_URL
 from skyadmin_pro.paths import database_path
+from skyadmin_pro.services.workflow import normalize_portal_url
 from skyadmin_pro.ui.views.base import BaseView
 from skyadmin_pro.ui.widgets import FeedbackLabel
 
@@ -117,7 +118,11 @@ class SettingsView(BaseView):
         self.app.db.set_setting(SETTING_APPEARANCE_MODE, mode)
 
     def _save_portal(self) -> None:
-        url = self.portal_var.get().strip() or DEFAULT_PORTAL_URL
+        try:
+            url = normalize_portal_url(self.portal_var.get())
+        except ValueError as exc:
+            self.feedback.error(str(exc))
+            return
         self.app.db.set_setting(SETTING_PORTAL_URL, url)
         self.portal_var.set(url)
         self.feedback.success("Portal URL saved.")

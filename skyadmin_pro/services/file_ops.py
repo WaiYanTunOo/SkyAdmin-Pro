@@ -121,12 +121,15 @@ def move_file(source: Path, dest_dir: Path, new_name: str | None = None) -> Path
 
 def open_in_file_manager(path: Path) -> None:
     resolved = path.resolve()
-    if sys.platform == "win32":
-        os.startfile(resolved)  # type: ignore[attr-defined]
-    elif sys.platform == "darwin":
-        subprocess.Popen(["open", str(resolved)])
-    else:
-        subprocess.Popen(["xdg-open", str(resolved)])
+    try:
+        if sys.platform == "win32":
+            os.startfile(resolved)  # type: ignore[attr-defined]
+        elif sys.platform == "darwin":
+            subprocess.Popen(["open", str(resolved)])
+        else:
+            subprocess.Popen(["xdg-open", str(resolved)])
+    except OSError as exc:
+        raise RuntimeError(f"Could not open folder: {resolved}") from exc
 
 
 def _as_rgb(image):
@@ -189,21 +192,27 @@ def merge_pdfs(sources: list[Path], output: Path) -> Path:
         raise ValueError("Select at least one PDF to merge.")
 
     writer = PdfWriter()
-    for source in sources:
-        reader = PdfReader(str(source))
-        if getattr(reader, "is_encrypted", False):
-            try:
-                reader.decrypt("")
-            except Exception as exc:
-                raise RuntimeError(f"Cannot read encrypted PDF: {source.name}") from exc
-        for page in reader.pages:
-            writer.add_page(page)
+    try:
+        for source in sources:
+            reader = PdfReader(str(source))
+            if getattr(reader, "is_encrypted", False):
+                try:
+                    reader.decrypt("")
+                except Exception as exc:
+                    raise RuntimeError(f"Cannot read encrypted PDF: {source.name}") from exc
+            for page in reader.pages:
+                writer.add_page(page)
 
-    output.parent.mkdir(parents=True, exist_ok=True)
-    final_path = unique_path(output)
-    with final_path.open("wb") as handle:
-        writer.write(handle)
-    return final_path
+        output.parent.mkdir(parents=True, exist_ok=True)
+        final_path = unique_path(output)
+        with final_path.open("wb") as handle:
+            writer.write(handle)
+        return final_path
+    finally:
+        try:
+            writer.close()
+        except Exception:
+            pass
 
 
 def month_archive_folder(archive_root: Path, when: date | None = None) -> Path:
