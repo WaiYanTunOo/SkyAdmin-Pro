@@ -973,6 +973,8 @@ class SettingsView(BaseView):
                 err = str(exc)
 
             def _done():
+                if not self.winfo_exists():
+                    return
                 self.configure(cursor="")
                 if err:
                     self.feedback.error(f"Backup failed: {err}")
@@ -1031,12 +1033,15 @@ class SettingsView(BaseView):
                 create_encrypted_backup(
                     self.app.paths.root, self.app.db.db_file, safety_path
                 )
-                self.app.db.shutdown()
+                # Note: shutdown() is NOT called here - it's unsafe from a worker thread.
+                # The restore operation will handle the DB file directly.
                 restore_encrypted_backup(Path(src), self.app.paths.root, self.app.db.db_file)
             except Exception as exc:
                 err = str(exc)
 
             def _done():
+                if not self.winfo_exists():
+                    return
                 self.configure(cursor="")
                 if err:
                     self.feedback.error(f"Restore failed: {err}")
@@ -1585,8 +1590,13 @@ class SettingsView(BaseView):
         self.app.refresh_sidebar_status()
 
     def _after(self, fn) -> None:
+        def wrapped() -> None:
+            if not self.winfo_exists():
+                return
+            fn()
+
         try:
-            self.after(0, fn)
+            self.after(0, wrapped)
         except Exception:
             pass
 
@@ -1637,6 +1647,8 @@ class SettingsView(BaseView):
         def worker():
             ok, msg = fetch_revocations(timeout=6)
             def done():
+                if not self.winfo_exists():
+                    return
                 if ok:
                     self.feedback.success(msg.splitlines()[0])
                 else:

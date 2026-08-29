@@ -73,13 +73,6 @@ WRAP_CARD = 760
 WRAP_PREVIEW = 420
 WRAP_TOOLBAR = 720
 
-# Spacing scale
-SPACE_XS = 4
-SPACE_SM = 8
-SPACE_MD = 12
-SPACE_LG = 16
-SPACE_XL = 20
-
 # Accent used for the active nav item and primary actions.
 ACCENT_HOVER = ("#1e40af", "#1d4ed8")
 TABLE_ROW_HEIGHT = 30
