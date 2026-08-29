@@ -21,14 +21,6 @@ _SEED_B = bytes([
     0x8A, 0x2F, 0x57, 0x14, 0xBE, 0x60, 0xD9, 0x3C,
 ])
 
-# Decoy secrets — look real, produce garbage signatures.
-# An attacker who finds these first wastes time analyzing dead ends.
-_DECOY_SECRETS = [
-    b"FakeSecret-2024-DONT-USE-ME",
-    b"SkyAdmin-Decoy-v1-IGNORE-THIS",
-    b"Debug-Backdoor-DoNotShip-1234",
-]
-
 # Integrity seal key (derived, not stored)
 _SEAL_KEY = None
 

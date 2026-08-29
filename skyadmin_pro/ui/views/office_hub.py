@@ -19,6 +19,7 @@ from skyadmin_pro.services.office_hub_rollout import (
     seed_liaison_contacts,
 )
 from skyadmin_pro.services.workflow import copy_to_clipboard
+from skyadmin_pro.ui.setup_rollout import RolloutAction, SetupRolloutPanel
 from skyadmin_pro.ui.theme import CARD_TITLE_SIZE, TEXT_MUTED
 from skyadmin_pro.ui.treeview import ThemedTreeview
 from skyadmin_pro.ui.views.base import BaseView
@@ -46,7 +47,6 @@ class OfficeHubView(BaseView):
         self.tabs.add("Notebook")
 
         self._selected_contact_id: int | None = None
-        self._selected_setup_client_id: int | None = None
         self._selected_client_cred_id: int | None = None
         self._selected_office_cred_id: int | None = None
         self._selected_note_id: int | None = None
@@ -64,46 +64,15 @@ class OfficeHubView(BaseView):
 
     def _build_setup_tab(self, parent: ctk.CTkFrame) -> None:
         parent.grid_columnconfigure(0, weight=1)
-        parent.grid_rowconfigure(3, weight=1)
-        self._office_setup_rows: dict[str, dict] = {}
+        parent.grid_rowconfigure(0, weight=1)
 
-        ctk.CTkLabel(
+        self._office_setup_panel = SetupRolloutPanel(
             parent,
-            text="Office Hub rollout — contacts & portal logins per client",
-            font=ctk.CTkFont(size=CARD_TITLE_SIZE, weight="bold"),
-            anchor="w",
-        ).grid(row=0, column=0, sticky="w", padx=16, pady=(14, 4))
-        ctk.CTkLabel(
-            parent,
-            text=(
+            title="Office Hub rollout — contacts & portal logins per client",
+            description=(
                 "Import director contacts from Company Details, migrate legacy IRD passwords "
                 "to Client DBD/RD, then add DBD/RD portal logins per company."
             ),
-            wraplength=760,
-            justify="left",
-            text_color=TEXT_MUTED,
-            anchor="w",
-        ).grid(row=1, column=0, sticky="ew", padx=16, pady=(0, 8))
-
-        toolbar = ctk.CTkFrame(parent, fg_color="transparent")
-        toolbar.grid(row=2, column=0, sticky="ew", padx=16, pady=(0, 8))
-        ctk.CTkLabel(toolbar, text="Show", anchor="w").grid(row=0, column=0, padx=(0, 8))
-        self.office_setup_filter = ctk.CTkOptionMenu(
-            toolbar,
-            values=["All", "Needs setup", "Ready"],
-            command=lambda _c: self.refresh_setup(),
-            width=140,
-        )
-        self.office_setup_filter.set("All")
-        self.office_setup_filter.grid(row=0, column=1, sticky="w")
-        self.office_setup_summary = ctk.CTkLabel(
-            toolbar, text="", text_color=TEXT_MUTED, anchor="w"
-        )
-        self.office_setup_summary.grid(row=0, column=2, sticky="ew", padx=(16, 0))
-        toolbar.grid_columnconfigure(2, weight=1)
-
-        self.office_setup_tree = ThemedTreeview(
-            parent,
             columns=(
                 ("company", "Company", 220),
                 ("status", "Setup", 90),
@@ -112,100 +81,60 @@ class OfficeHubView(BaseView):
                 ("missing", "Missing", 220),
                 ("director", "Director / contact", 180),
             ),
-            on_select=self._on_office_setup_select,
+            actions=(
+                RolloutAction("Open portal logins", self._open_selected_office_credentials, width=140),
+                RolloutAction("Open contacts", self._open_selected_office_contacts, width=120),
+                RolloutAction("Import liaison contact", self._import_selected_liaison_contact, width=160),
+                RolloutAction(
+                    "Import all liaisons",
+                    self._import_all_liaison_contacts,
+                    width=140,
+                    fg_color="transparent",
+                    border_width=1,
+                ),
+                RolloutAction(
+                    "Migrate legacy IRD",
+                    self._migrate_all_legacy_ird,
+                    width=140,
+                    fg_color="transparent",
+                    border_width=1,
+                ),
+            ),
             on_double_click=self._open_selected_office_credentials,
             showheight=12,
+            use_card=False,
+            tree_sticky="nsew",
+            tree_row_weight=1,
         )
-        self.office_setup_tree.grid(row=3, column=0, sticky="nsew", padx=16, pady=(0, 8))
+        self._office_setup_panel.grid(row=0, column=0, sticky="nsew")
+        self._office_setup_panel.configure_data(
+            list_rows=lambda: list_office_setup_rows(self.app.db),
+            row_cells=self._office_setup_cells,
+            summary=lambda ready, total: (
+                f"{ready} of {total} client(s) have contacts and portal logins"
+            ),
+        )
 
-        actions = ctk.CTkFrame(parent, fg_color="transparent")
-        actions.grid(row=4, column=0, sticky="w", padx=16, pady=(0, 14))
-        ctk.CTkButton(
-            actions,
-            text="Open portal logins",
-            width=140,
-            command=self._open_selected_office_credentials,
-        ).grid(row=0, column=0, padx=(0, 8))
-        ctk.CTkButton(
-            actions,
-            text="Open contacts",
-            width=120,
-            command=self._open_selected_office_contacts,
-        ).grid(row=0, column=1, padx=(0, 8))
-        ctk.CTkButton(
-            actions,
-            text="Import liaison contact",
-            width=160,
-            command=self._import_selected_liaison_contact,
-        ).grid(row=0, column=2, padx=(0, 8))
-        ctk.CTkButton(
-            actions,
-            text="Import all liaisons",
-            width=140,
-            fg_color="transparent",
-            border_width=1,
-            command=self._import_all_liaison_contacts,
-        ).grid(row=0, column=3, padx=(0, 8))
-        ctk.CTkButton(
-            actions,
-            text="Migrate legacy IRD",
-            width=140,
-            fg_color="transparent",
-            border_width=1,
-            command=self._migrate_all_legacy_ird,
-        ).grid(row=0, column=4)
+    def _office_setup_cells(self, row: dict) -> tuple:
+        missing = ", ".join(row.get("setup_missing") or []) or "—"
+        director = row.get("director") or row.get("contact_name") or "—"
+        return (
+            row.get("name") or "",
+            row.get("setup_status") or "",
+            str(int(row.get("contact_count") or 0)),
+            str(int(row.get("credential_count") or 0)),
+            missing,
+            director,
+        )
 
     def refresh_setup(self) -> None:
-        if not hasattr(self, "office_setup_tree"):
-            return
-        self.office_setup_tree.apply_theme()
-        rows = list_office_setup_rows(self.app.db)
-        ready = sum(1 for row in rows if not row.get("setup_missing"))
-        self.office_setup_summary.configure(
-            text=f"{ready} of {len(rows)} client(s) have contacts and portal logins"
-        )
-        filt = self.office_setup_filter.get()
-        if filt == "Needs setup":
-            rows = [row for row in rows if row.get("setup_missing")]
-        elif filt == "Ready":
-            rows = [row for row in rows if not row.get("setup_missing")]
-
-        self._office_setup_rows = {}
-        tree_rows = []
-        iids = []
-        tags = []
-        for row in rows:
-            iid = str(row["id"])
-            self._office_setup_rows[iid] = row
-            iids.append(iid)
-            missing = ", ".join(row.get("setup_missing") or []) or "—"
-            director = (row.get("director") or row.get("contact_name") or "—")
-            tree_rows.append(
-                (
-                    row.get("name") or "",
-                    row.get("setup_status") or "",
-                    str(int(row.get("contact_count") or 0)),
-                    str(int(row.get("credential_count") or 0)),
-                    missing,
-                    director,
-                )
-            )
-            status = row.get("setup_status")
-            if status == "Ready":
-                tags.append(("done",))
-            elif status == "Almost":
-                tags.append(("watch",))
-            else:
-                tags.append(("urgent",))
-        self.office_setup_tree.set_rows(tree_rows, iids=iids, tags=tags)
-
-    def _on_office_setup_select(self, iid: str | None) -> None:
-        self._selected_setup_client_id = int(iid) if iid else None
+        if hasattr(self, "_office_setup_panel"):
+            self._office_setup_panel.refresh()
 
     def _selected_office_setup_row(self) -> dict | None:
-        if self._selected_setup_client_id is None:
+        if not hasattr(self, "_office_setup_panel"):
             return None
-        return self._office_setup_rows.get(str(self._selected_setup_client_id))
+        return self._office_setup_panel.selected_row()
 
     def _open_selected_office_credentials(self, _iid: str | None = None) -> None:
         row = self._selected_office_setup_row()

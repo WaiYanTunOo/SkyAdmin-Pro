@@ -3,8 +3,8 @@
 const enc = new TextEncoder();
 const dec = new TextDecoder();
 
-function b64url(buf: ArrayBuffer): string {
-  return btoa(String.fromCharCode(...new Uint8Array(buf)))
+function b64url(data: Uint8Array): string {
+  return btoa(String.fromCharCode(...data))
     .replace(/\+/g, "-").replace(/\//g, "_").replace(/=+$/, "");
 }
 

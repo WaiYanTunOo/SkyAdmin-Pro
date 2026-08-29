@@ -16,7 +16,8 @@ if [[ ! -x "$VENV_PY" ]]; then
     exit 1
 fi
 
-"$VENV_PY" -m pip install pyinstaller
+"$VENV_PY" -m pip install "pyinstaller>=6.0.0"
+"$VENV_PY" -m pytest tests/ -v --tb=short
 "$VENV_PY" "$ROOT/packaging/make_icon.py"
 "$VENV_PY" -m PyInstaller "$ROOT/packaging/SkyAdminPro-linux.spec" --noconfirm --log-level WARN
 

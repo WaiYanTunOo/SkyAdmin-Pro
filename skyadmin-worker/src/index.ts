@@ -25,7 +25,7 @@ app.use("*", async (c, next) => {
   c.header("Access-Control-Allow-Headers", "Content-Type, Authorization");
   c.header("Access-Control-Max-Age", "86400");
   if (c.req.method === "OPTIONS") {
-    return c.text("", 204);
+    return new Response(null, { status: 204 });
   }
   await next();
 });

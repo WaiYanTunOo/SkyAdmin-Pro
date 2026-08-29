@@ -1,6 +1,5 @@
 """Offscreen UI smoke: main window builds, sidebar, settings, data flows."""
 
-import shutil
 import sys
 from pathlib import Path
 
@@ -21,14 +20,6 @@ def app(tmp_path_factory):
 
     tmp = tmp_path_factory.mktemp("ui")
     db = Database(tmp / "test.db")
-
-    # Copy the developer's real DB when present so data-dependent asserts run.
-    real_db = Path.home() / ".skyadmin_pro" / "skyadmin_pro.db"
-    if real_db.exists():
-        db.shutdown()
-        shutil.copy2(real_db, tmp / "test.db")
-        db = Database(tmp / "test.db")
-
     paths = WorkspacePaths(tmp / "workspace")
     paths.ensure()
     ctk.set_appearance_mode("dark")
@@ -70,3 +61,29 @@ def test_settings_license_controls(app):
     walk(settings)
     assert sum("Activate / Manage" in t for t in texts) == 1
     assert any("Disclaimer" in t for t in texts)
+
+
+def test_document_hub_lazy_tabs(app):
+    app.show_view("document_hub")
+    app.update()
+    view = app._views["document_hub"]
+    assert view.title == "Document Hub"
+    for tab in (
+        "Smart Renamer",
+        "Image to PDF",
+        "Agent Bundle",
+        "Portal Upload",
+        "Archive & Clean",
+        "Financial Docs",
+    ):
+        view.tabs.set(tab)
+        app.update()
+        assert view.tabs.get() == tab
+
+
+def test_settings_workspace_field(app):
+    app.show_view("settings")
+    app.update()
+    settings = app._views["settings"]
+    assert hasattr(settings, "workspace_var")
+    assert settings.workspace_var.get().strip()

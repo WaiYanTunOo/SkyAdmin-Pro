@@ -17,74 +17,7 @@ import uuid
 from datetime import date, datetime, timedelta, timezone
 from pathlib import Path
 
-# ---------------------------------------------------------------------------
-# SECRET derivation — anti-extraction hardening
-#
-# The secret is NEVER stored as plaintext. It is split into 7 blocks,
-# XOR-encoded with a rolling key, and stored as integer lists. At runtime the
-# blocks are decoded, interleaved, and verified with a SHA-256 digest.
-#
-# A `strings` dump or naive bytecode reader sees only unrelated integers;
-# reconstructing requires understanding the decode+interleave algorithm AND
-# having all 7 blocks in correct order with the correct XOR key.
-# ---------------------------------------------------------------------------
-
-_XK = [0x5B, 0x2E]  # rolling XOR key (2 bytes)
-
-_XF = [
-    ([8, 48, 34, 24], [41, 62, 58, 47]),
-    ([71, 65, 64, 103], [64, 64, 65, 88]),
-    ([58, 47, 50, 52], [53, 40, 118, 105]),
-    ([30, 28, 24, 3], [125, 69, 87, 111]),
-    ([63, 54, 50, 53], [11, 41, 52, 120]),
-    ([126, 92, 65, 94], [92, 71, 75, 90]),
-    ([58, 41], [34, 122]),
-]
-
-_SECRET_CHECK = "e86108ca6a82c8026ac57ed7556f466576a903a626b45e40e0b1b8d70267a2ce"
-
-_SECRET = None  # lazy — computed on first use
-_SECRET_LOCK = __import__("threading").Lock()
-
-
-def _derive_secret() -> bytes:
-    """Derive the signing secret from XOR-interleaved fragments.
-
-    Includes integrity verification (CRC check on fragments) so bytecode
-    tampering — patching the XOR key, fragment values, or hash — produces
-    garbage that won't match any legitimate license.
-    """
-    global _SECRET
-    if _SECRET is not None:
-        return _SECRET
-    with _SECRET_LOCK:
-        if _SECRET is not None:
-            return _SECRET
-
-        # --- integrity: CRC32 of _XF + _XK must match the embedded value ---
-        import binascii as _binascii
-
-        crc_data = repr(_XF).encode() + repr(_XK).encode()
-        expected_crc = 0x868E28D8
-        actual_crc = _binascii.crc32(crc_data) & 0xFFFFFFFF
-        if actual_crc != expected_crc:
-            # Fragments were tampered with — return garbage
-            _SECRET = b"\x00" * 32
-            return _SECRET
-
-        parts_a = []
-        parts_b = []
-        for block_idx, (ea, eb) in enumerate(_XF):
-            k = _XK[block_idx % len(_XK)]
-            parts_a.append(bytes(c ^ k for c in ea))
-            parts_b.append(bytes(c ^ k for c in eb))
-        raw = b"".join(a + b for a, b in zip(parts_a, parts_b))
-        import hashlib as _hl
-
-        if _hl.sha256(raw).hexdigest() != _SECRET_CHECK:
-            raw = b"\x00" * 32  # tampered — return garbage
-        _SECRET = raw
-        return _SECRET
+from skyadmin_pro.services._secret import _derive_secret
 
 
 def _verify_integrity() -> bool:
@@ -1281,31 +1214,3 @@ def activation_request_message(customer_email: str = "") -> str:
         lines.append(f"Reply to email: {customer_email.strip()}")
     lines.append(f"Date: {date.today().isoformat()}")
     return "\n".join(lines)
-
-
-# ---------------------------------------------------------------------------
-# Decoy functions — waste reverse-engineering time.
-#
-# These look like real secret derivation functions but produce garbage output.
-# An attacker who finds these first may spend hours analyzing dead ends
-# before discovering the actual _derive_secret() function above.
-# ---------------------------------------------------------------------------
-
-def _DECOY_derive_backup_key() -> bytes:
-    """DECOY — looks like a key derivation but produces wrong output."""
-    import hashlib as _hl
-    fake = b"SkyAdminBackupSalt2026-Decoy-v2-DO-NOT-USE"
-    return _hl.pbkdf2_hmac("sha256", fake, b"decoy-salt", 10_000, dklen=32)
-
-
-def _DECOY_verify_hmac(payload: str) -> str:
-    """DECOY — computes HMAC with a fake secret."""
-    fake_secret = b"ThisIsAFakeSecretForDecoyPurposes"
-    return hmac.new(fake_secret, payload.encode(), hashlib.sha256).hexdigest()
-
-
-def _DECOY_generate_key(machine_id: str) -> str:
-    """DECOY — generates a key that always fails verification."""
-    import base64 as _b64
-    data = {"mid": machine_id, "exp": "2099-01-01", "sig": "DECOY", "n": "0"}
-    return _b64.urlsafe_b64encode(str(data).encode()).decode()

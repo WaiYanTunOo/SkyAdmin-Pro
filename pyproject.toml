@@ -1,0 +1,39 @@
+[build-system]
+requires = ["setuptools>=68.0", "wheel"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "skyadmin-pro"
+version = "0.3.0"
+description = "Offline desktop workflow for corporate services administrators"
+readme = "README.md"
+requires-python = ">=3.10"
+license = {text = "Proprietary"}
+authors = [
+    {name = "Wai Yan Tun Oo", email = "dev.skycreation@gmail.com"},
+]
+
+[project.optional-dependencies]
+dev = [
+    "pytest>=8.0.0",
+    "ruff>=0.4.0",
+    "pyinstaller>=6.0.0",
+]
+
+[tool.setuptools.packages.find]
+where = ["."]
+include = ["skyadmin_pro*"]
+
+[tool.ruff]
+target-version = "py310"
+line-length = 120
+
+[tool.ruff.lint]
+select = ["E", "F", "W", "I", "N", "UP", "B", "SIM"]
+ignore = ["E501"]
+
+[tool.ruff.lint.isort]
+known-first-party = ["skyadmin_pro"]
+
+[tool.pytest.ini_options]
+testpaths = ["tests"]

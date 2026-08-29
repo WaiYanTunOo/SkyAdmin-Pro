@@ -17,6 +17,7 @@ from skyadmin_pro.config import (
     NAV_OFFICE_HUB,
     SETTING_WINDOW_GEOMETRY,
 )
+from skyadmin_pro.services.i18n import tr
 from skyadmin_pro.ui.dnd import dnd_base_class, init_dnd
 from skyadmin_pro.ui.theme import (
     SIDEBAR_ACTIVE_BG,
@@ -117,7 +118,6 @@ class MainWindow(dnd_base_class()):
 
         for index, (key, label) in enumerate(NAV_ITEMS, start=1):
             icon = SIDEBAR_ICONS.get(key, "•")
-            from skyadmin_pro.services.i18n import tr
 
             button = ctk.CTkButton(
                 self.sidebar,

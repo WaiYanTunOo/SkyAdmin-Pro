@@ -260,7 +260,7 @@ def _startup_license_sync(on_result=None) -> None:
     threading.Thread(target=worker, daemon=True).start()
 
 
-def bootstrap() -> MainWindow:
+def bootstrap() -> "MainWindow":
     from skyadmin_pro.config import (
         DEFAULT_APPEARANCE_MODE,
         DEFAULT_COLOR_THEME,
@@ -429,13 +429,25 @@ def _check_bytecode_integrity() -> None:
 def main() -> None:
     _setup_logging()
     _check_bytecode_integrity()
+
+    # Acquire single-instance lock BEFORE license check to prevent
+    # two instances from simultaneously performing license verification.
+    lock = _SingleInstance()
+    if not lock.acquire():
+        _fatal_error(
+            "SkyAdmin Pro",
+            "SkyAdmin Pro is already running.\n\n"
+            "Close the other window first — running two copies at once can "
+            "corrupt the database.",
+        )
+        raise SystemExit(1)
+
     # --- Proprietary lock — hardware-bound license required ---
     try:
         from skyadmin_pro.services.license import (
             banned_machines,
             fetch_revocations,
             get_machine_id,
-            is_daily_sync_stale,
             verify_license,
         )
 
@@ -489,15 +501,6 @@ def main() -> None:
         _fatal_error("SkyAdmin Pro — License error", f"License verification failed:\n{exc}")
         raise SystemExit(1) from exc
 
-    lock = _SingleInstance()
-    if not lock.acquire():
-        _fatal_error(
-            "SkyAdmin Pro",
-            "SkyAdmin Pro is already running.\n\n"
-            "Close the other window first — running two copies at once can "
-            "corrupt the database.",
-        )
-        raise SystemExit(1)
     try:
         import customtkinter as ctk  # noqa: F401  (theme set inside bootstrap)
 

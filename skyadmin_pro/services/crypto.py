@@ -10,50 +10,20 @@ import base64
 import hashlib
 from pathlib import Path
 
+from skyadmin_pro.services._secret import _derive_secret
+
 MAGIC = b"SKYENCRYPTED_v1\n"
-
-# Derive SECRET using the same anti-extraction scheme as license.py
-_XK = [0x5B, 0x2E]
-_XF = [
-    ([8, 48, 34, 24], [41, 62, 58, 47]),
-    ([71, 65, 64, 103], [64, 64, 65, 88]),
-    ([58, 47, 50, 52], [53, 40, 118, 105]),
-    ([30, 28, 24, 3], [125, 69, 87, 111]),
-    ([63, 54, 50, 53], [11, 41, 52, 120]),
-    ([126, 92, 65, 94], [92, 71, 75, 90]),
-    ([58, 41], [34, 122]),
-]
-
-_SECRET_CACHE = None
-_SECRET_LOCK = __import__("threading").Lock()
-
-
-def _get_secret():
-    global _SECRET_CACHE
-    if _SECRET_CACHE is not None:
-        return _SECRET_CACHE
-    with _SECRET_LOCK:
-        if _SECRET_CACHE is not None:
-            return _SECRET_CACHE
-        parts_a = []
-        parts_b = []
-        for block_idx, (ea, eb) in enumerate(_XF):
-            k = _XK[block_idx % len(_XK)]
-            parts_a.append(bytes(c ^ k for c in ea))
-            parts_b.append(bytes(c ^ k for c in eb))
-        _SECRET_CACHE = b"".join(a + b for a, b in zip(parts_a, parts_b))
-        return _SECRET_CACHE
 
 
 def _derive_fernet_key(machine_id: str) -> bytes:
     """32-byte urlsafe base64 key for Fernet — machine-bound."""
-    raw = hashlib.pbkdf2_hmac("sha256", _get_secret(), machine_id.encode(), 100_000, dklen=32)
+    raw = hashlib.pbkdf2_hmac("sha256", _derive_secret(), machine_id.encode(), 100_000, dklen=32)
     return base64.urlsafe_b64encode(raw)
 
 
 def _derive_backup_key() -> bytes:
     """Universal key for encrypted backups — same on every licensed copy."""
-    raw = hashlib.pbkdf2_hmac("sha256", _get_secret(), b"SkyAdminBackupSalt2026", 100_000, dklen=32)
+    raw = hashlib.pbkdf2_hmac("sha256", _derive_secret(), b"SkyAdminBackupSalt2026", 100_000, dklen=32)
     return base64.urlsafe_b64encode(raw)
 
 

@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import os
 import threading
 from datetime import date
 from pathlib import Path
@@ -20,6 +21,7 @@ from skyadmin_pro.config import (
     SETTING_PORTAL_URL,
 )
 from skyadmin_pro.services import file_ops
+from skyadmin_pro.services.file_ops import open_in_file_manager
 from skyadmin_pro.services.workflow import open_portal_and_copy_path
 from skyadmin_pro.ui.theme import CARD_TITLE_SIZE, FEEDBACK_ERROR, TEXT_MUTED, TEXT_SUBTLE, WRAP_CARD
 from skyadmin_pro.ui.views.base import BaseView
@@ -437,6 +439,8 @@ class SmartRenamerPanel(ctk.CTkFrame):
                 error = f"Could not record the document: {exc}"
 
             def _done():
+                if not self.winfo_exists():
+                    return
                 self._busy = False
                 self.configure(cursor="")
                 self._rename_btn.configure(state="normal")
@@ -536,6 +540,8 @@ class ImageToPdfPanel(ctk.CTkFrame):
                 error = str(exc)
 
             def _done():
+                if not self.winfo_exists():
+                    return
                 self._busy = False
                 self.configure(cursor="")
                 if error:
@@ -663,6 +669,8 @@ class AgentBundlePanel(ctk.CTkFrame):
                 error = str(exc)
 
             def _done():
+                if not self.winfo_exists():
+                    return
                 self._busy = False
                 self.configure(cursor="")
                 self._merge_btn.configure(state="normal")
@@ -915,6 +923,8 @@ class ArchivePanel(ctk.CTkFrame):
                 error = str(exc)
 
             def _done():
+                if not self.winfo_exists():
+                    return
                 self._busy = False
                 self.configure(cursor="")
                 self._archive_btn.configure(state="normal")
@@ -1119,9 +1129,6 @@ class FinancialDocsPanel(ctk.CTkFrame):
         doc = self.app.db.get_financial_document(doc_id)
         if not doc:
             return
-        import os
-        from pathlib import Path
-        from skyadmin_pro.services.file_ops import open_in_file_manager
         path = doc.get("stored_path") or doc.get("file_path") or ""
         if not path or not os.path.exists(path):
             messagebox.showwarning("SkyAdmin Pro", f"File not found:\n{path}")

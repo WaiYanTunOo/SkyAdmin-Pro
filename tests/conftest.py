@@ -1,6 +1,5 @@
 """Shared fixtures: sandboxed app-data dir so tests never touch real data."""
 
-import os
 import sys
 from pathlib import Path
 
@@ -8,6 +7,8 @@ import pytest
 
 ROOT = Path(__file__).resolve().parents[1]
 sys.path.insert(0, str(ROOT))
+
+from skyadmin_pro.database import Database
 
 
 @pytest.fixture
@@ -26,3 +27,8 @@ def real_app_dir():
     from skyadmin_pro.paths import app_data_dir
 
     return app_data_dir()
+
+
+@pytest.fixture
+def db(tmp_path) -> Database:
+    return Database(tmp_path / "test.db")
