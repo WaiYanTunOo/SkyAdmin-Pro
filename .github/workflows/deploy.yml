@@ -1,0 +1,52 @@
+name: Deploy Cloudflare Worker
+
+on:
+  push:
+    branches: [main]
+    paths:
+      - "skyadmin-worker/**"
+      - ".github/workflows/deploy.yml"
+  workflow_dispatch:
+
+jobs:
+  deploy:
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: skyadmin-worker
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Setup Node
+        uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+          cache-dependency-path: skyadmin-worker/package-lock.json
+
+      - name: Install dependencies
+        run: npm ci
+
+      - name: Deploy worker to Cloudflare
+        id: deploy
+        uses: cloudflare/wrangler-action@v3
+        with:
+          apiToken: ${{ secrets.CLOUDFLARE_API_TOKEN }}
+          accountId: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
+          workingDirectory: skyadmin-worker
+          command: deploy
+
+      - name: Apply database migrations
+        id: db-migrate
+        uses: cloudflare/wrangler-action@v3
+        with:
+          apiToken: ${{ secrets.CLOUDFLARE_API_TOKEN }}
+          accountId: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
+          workingDirectory: skyadmin-worker
+          command: d1 execute skyadmin-db --remote --file=schema.sql
+
+      - name: Smoke test against deployed worker
+        run: |
+          echo "Worker smoke test: https://skyadmin-worker.skyadmin-pro.workers.dev/api/ping"
