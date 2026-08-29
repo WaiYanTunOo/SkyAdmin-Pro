@@ -1,0 +1,43 @@
+# Python
+__pycache__/
+*.py[cod]
+*$py.class
+*.so
+.Python
+.venv/
+venv/
+env/
+*.egg-info/
+.eggs/
+dist/
+build/
+.pytest_cache/
+
+# Secrets and local env
+.env
+.env.*
+.dev.vars
+!.dev.vars.example
+
+# Cloudflare Worker local dev
+.wrangler/
+node_modules/
+
+# Tooling logs
+pyarmor.bug.log
+*.log
+
+# App data (local SQLite and generated files)
+*.db
+*.db-journal
+*.xlsx
+
+# OS
+.DS_Store
+Thumbs.db
+desktop.ini
+
+# IDE
+.idea/
+.vscode/
+*.swp

@@ -1,0 +1,12 @@
+{
+  "name": "skyadmin-worker",
+  "main": "src/index.ts",
+  "compatibility_date": "2024-01-01",
+  "d1_databases": [
+    {
+      "binding": "DB",
+      "database_name": "skyadmin-db",
+      "database_id": "2ae5a00e-0312-4a36-9da9-265956915296"
+    }
+  ]
+}

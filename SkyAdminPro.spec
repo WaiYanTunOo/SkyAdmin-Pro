@@ -1,0 +1,56 @@
+# -*- mode: python ; coding: utf-8 -*-
+"""PyInstaller spec for the SkyAdmin Pro single-file portable build.
+
+pyinstaller-hooks-contrib ships hook-tkinterdnd2, which bundles the tkdnd
+platform dir matching the *build* machine. We additionally bundle win-arm64
+so drag & drop also works on native ARM64 Windows.
+"""
+
+import os
+
+import tkinterdnd2
+
+datas = []
+for dirpath, dirnames, filenames in os.walk(os.path.join(os.path.dirname(tkinterdnd2.__file__), "tkdnd", "win-arm64")):
+    for filename in filenames:
+        src = os.path.join(dirpath, filename)
+        rel = os.path.relpath(dirpath, os.path.dirname(tkinterdnd2.__file__))
+        datas.append((src, rel))
+
+a = Analysis(
+    ["main.py"],
+    pathex=[],
+    binaries=[],
+    datas=datas,
+    hiddenimports=[],
+    hookspath=[],
+    hooksconfig={},
+    runtime_hooks=[],
+    excludes=[],
+    noarchive=False,
+    optimize=0,
+)
+
+pyz = PYZ(a.pure)
+
+exe = EXE(
+    pyz,
+    a.scripts,
+    a.binaries,
+    a.datas,
+    [],
+    name="SkyAdminPro",
+    debug=False,
+    bootloader_ignore_signals=False,
+    strip=False,
+    upx=False,
+    upx_exclude=[],
+    runtime_tmpdir=None,
+    console=False,
+    disable_windowed_traceback=False,
+    argv_emulation=False,
+    target_arch=None,
+    codesign_identity=None,
+    entitlements_file=None,
+    icon="icon.ico",
+)

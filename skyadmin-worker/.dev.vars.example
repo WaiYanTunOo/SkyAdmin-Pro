@@ -1,0 +1,5 @@
+# Local development secrets (gitignored)
+# Copy to .dev.vars and fill in your values.
+
+LICENSE_SECRET="SkyCreationInnovations-2026-SkyAdminPro#Proprietary!"
+API_TOKEN="your-owner-api-token-here"

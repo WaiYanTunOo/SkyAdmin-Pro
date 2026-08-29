@@ -1,0 +1,365 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>SkyAdmin Pro — License Generator</title>
+<style>
+ body{font-family:-apple-system,Helvetica,Arial,sans-serif;max-width:680px;margin:0 auto;padding:24px;background:#f8f9fa;color:#1f2937}
+ h1{font-size:22px;margin:0 0 6px} h2{font-size:18px;margin:26px 0 8px}
+ .sub{color:#6b7280;font-size:13px;margin-bottom:18px}
+ label{font-weight:600;font-size:14px;display:block;margin:14px 0 6px}
+ input,select{width:100%;padding:12px;border:1px solid #d1d5db;border-radius:10px;font-size:16px;box-sizing:border-box}
+ button{margin-top:16px;width:100%;padding:14px;border:0;border-radius:12px;background:#2563eb;color:white;font-size:16px;font-weight:700}
+ button:active{background:#1d4ed8} button:disabled{background:#9ca3af}
+ button.small{width:auto;padding:8px 12px;font-size:13px;border-radius:9px;margin-top:0}
+ .gray{background:#f3f4f6;color:#1f2937;border:1px solid #d1d5db}
+ .red{background:#dc2626}
+ .out{margin-top:10px;padding:14px;background:white;border-radius:12px;border:1px solid #e5e7eb;word-break:break-all;font-family:monospace;font-size:13px}
+ .hint{font-size:12px;color:#6b7280;margin-top:8px}
+ .warn{margin-top:12px;padding:12px;background:#fffbeb;border:1px solid #fcd34d;border-radius:10px;font-size:13px;color:#92400e}
+ .ok-msg{margin-top:10px;padding:10px;background:#ecfdf5;border:1px solid #6ee7b7;border-radius:10px;font-size:13px;color:#065f46}
+ .rec{background:white;border:1px solid #e5e7eb;border-radius:12px;padding:12px;margin:8px 0;font-size:13px}
+ .rec.revoked{border-color:#fca5a5;background:#fef2f2}
+ .rec .row{margin:2px 0} .rec b{font-size:13px}
+ .tag{display:inline-block;padding:2px 8px;border-radius:99px;font-size:11px;font-weight:700}
+ .tag.ok{background:#d1fae5;color:#065f46}.tag.exp{background:#fee2e2;color:#991b1b}.tag.rev{background:#e5e7eb;color:#374151}
+ .btns{display:flex;gap:8px;flex-wrap:wrap;margin-top:8px}
+ .chip{display:inline-flex;align-items:center;gap:6px;background:#fee2e2;color:#991b1b;padding:4px 10px;border-radius:99px;font-size:12px;font-weight:600;margin:4px 4px 0 0}
+ .chip button{background:none;border:0;color:#991b1b;font-weight:800;padding:0 2px;margin:0;width:auto;font-size:13px}
+ .card{background:white;border:1px solid #e5e7eb;border-radius:14px;padding:16px;margin-top:10px}
+</style>
+</head>
+<body>
+<h1>SkyAdmin Pro — License Generator</h1>
+<div class="sub">Sky Creation Innovations · Online signing · unique keys · remote control<br>
+Open in Safari or any modern browser.</div>
+
+<h2>API Connection</h2>
+<div class="card">
+ <label>API URL</label>
+ <input id="apiUrl" placeholder="https://skyadmin-api.your-subdomain.workers.dev">
+ <label>API Token (Bearer)</label>
+ <input id="apiToken" type="password" placeholder="Your owner API token" spellcheck="false">
+ <div class="btns" style="margin-top:12px">
+  <button class="small" onclick="saveApiSettings()">Save</button>
+  <button class="small gray" onclick="testApi()">Test connection</button>
+ </div>
+ <div id="apiStatus" class="hint"></div>
+</div>
+
+<h2>Generate License</h2>
+<label>Machine ID (from the customer's activation dialog)</label>
+<input id="mid" placeholder="e.g. 72FA00DC6B64525F" autocomplete="off" autocapitalize="characters" spellcheck="false">
+
+<label>Package / Duration</label>
+<select id="days" onchange="toggleCustom()">
+ <option value="1">1 Day — 50 Baht (expires in exactly 24h)</option>
+ <option value="7" selected>7 Days — 500 Baht</option>
+ <option value="30">30 Days — 800 Baht</option>
+ <option value="365">1 Year — 9,000 Baht</option>
+ <option value="__custom__">Custom days…</option>
+ <option value="">Never expires (owner only)</option>
+</select>
+<div id="customWrap" style="display:none">
+ <label>Custom number of days</label>
+ <input id="customDays" type="number" min="1" max="36500" placeholder="e.g. 60">
+</div>
+
+<button id="genBtn" onclick="generate()">Generate Signed License + Passcode</button>
+
+<div id="result" style="display:none">
+ <label>License Key — send this whole line</label>
+ <div id="license" class="out"></div>
+ <div id="meta" class="out" style="font-family:inherit"></div>
+ <div class="btns"><button class="small gray" onclick="copyText('license')">Copy Key</button>
+ <button class="small gray" onclick="copyText('passcodeTxt')">Copy Passcode</button></div>
+ <label>Passcode (alternative)</label>
+ <div id="passcode" class="out" style="font-size:22px;letter-spacing:4px;text-align:center"></div>
+</div>
+
+<h2>Remote Control</h2>
+<div class="card">
+ <div class="hint" style="margin-top:0">
+ Changes are synced to the API instantly. The app fetches the control list
+ daily and enforces revokes/bans. Use the buttons below or the per-record buttons.
+ </div>
+ <label>Ban a machine entirely (Machine ID)</label>
+ <div style="display:flex;gap:8px">
+  <input id="banInput" placeholder="72FA00DC6B64525F" spellcheck="false" style="flex:1">
+  <button class="small red" style="margin:0" onclick="addBan()">Ban</button>
+ </div>
+ <div id="banList"></div>
+ <div class="btns" style="margin-top:12px">
+  <button class="small gray" onclick="syncBansToApi()">Sync bans to API</button>
+ </div>
+</div>
+
+<h2>Issued Licenses <span id="recCount" style="color:#6b7280;font-size:13px"></span></h2>
+<div class="btns">
+ <button class="small gray" onclick="exportCSV()">Export CSV</button>
+ <button class="small gray" onclick="backupAll()">Backup data</button>
+ <button class="small gray" onclick="document.getElementById('restoreFile').click()">Restore</button>
+ <input type="file" id="restoreFile" style="display:none" onchange="restoreAll(this)">
+</div>
+<input id="search" placeholder="Search machine ID…" oninput="renderRecords()">
+<div id="records"></div>
+<div class="hint">Each record's Revoke/Mark USED buttons sync to the API immediately.</div>
+
+<script>
+const PRICES = {1:50, 7:500, 30:800, 365:9000};
+
+const _mem = {};
+function storeGet(k){ try{return localStorage.getItem(k);}catch(e){return _mem[k]??null;} }
+function storeSet(k,v){ try{localStorage.setItem(k,v);}catch(e){_mem[k]=v;} }
+
+function loadRecs(){ try{return JSON.parse(storeGet("sky_licenses")||"[]");}catch(e){return[];} }
+function saveRecs(r){ storeSet("sky_licenses", JSON.stringify(r)); }
+function loadBans(){ try{return JSON.parse(storeGet("sky_bans")||"[]");}catch(e){return[];} }
+function saveBans(b){ storeSet("sky_bans", JSON.stringify(b)); }
+
+function getApiUrl(){ return (document.getElementById('apiUrl').value||"").trim().replace(/\/+$/,""); }
+function getApiToken(){ return (document.getElementById('apiToken').value||"").trim(); }
+
+function saveApiSettings(){
+  storeSet("sky_api_url", getApiUrl());
+  storeSet("sky_api_token", getApiToken());
+  document.getElementById('apiStatus').textContent = "Settings saved.";
+  document.getElementById('apiStatus').style.color = "#065f46";
+}
+function fillApiSettings(){
+  document.getElementById('apiUrl').value = storeGet("sky_api_url")||"";
+  document.getElementById('apiToken').value = storeGet("sky_api_token")||"";
+}
+
+async function apiCall(method, path, body){
+  const url = getApiUrl();
+  const token = getApiToken();
+  if(!url) throw new Error("Set the API URL first.");
+  const init = {
+    method,
+    headers: { "Content-Type": "application/json" },
+  };
+  if(token) init.headers["Authorization"] = "Bearer " + token;
+  if(body) init.body = JSON.stringify(body);
+  const resp = await fetch(url + path, init);
+  const data = await resp.json();
+  if(!resp.ok || !data.ok) throw new Error(data.error || "API error " + resp.status);
+  return data;
+}
+
+async function testApi(){
+  const st = document.getElementById('apiStatus');
+  st.textContent = "Testing…"; st.style.color="#6b7280";
+  try{
+    const url = getApiUrl();
+    if(!url){ st.textContent="Enter API URL first."; st.style.color="#b91c1c"; return; }
+    const resp = await fetch(url + "/api/ping");
+    const data = await resp.json();
+    if(data.ok){ st.textContent="✓ Connected to "+data.service+" at "+data.ts; st.style.color="#065f46"; }
+    else{ st.textContent="✗ Unexpected response"; st.style.color="#b91c1c"; }
+  }catch(e){ st.textContent="✗ "+e.message; st.style.color="#b91c1c"; }
+}
+
+/* ---------------- Generation (API) ---------------- */
+function toggleCustom(){
+  document.getElementById('customWrap').style.display =
+    document.getElementById('days').value === "__custom__" ? "block" : "none";
+}
+
+async function generate(){
+  const mid = document.getElementById('mid').value.trim().toUpperCase();
+  if(!mid){alert('Enter the Machine ID.');return;}
+  if(!/^[0-9A-F]{16}$/.test(mid)){alert('Machine ID must be 16 hex characters.');return;}
+  let days;
+  const sel = document.getElementById('days').value;
+  if(sel === "__custom__"){
+    days = parseInt(document.getElementById('customDays').value, 10);
+    if(!days || days < 1 || days > 36500){alert('Enter valid days (1–36500).');return;}
+  } else {
+    days = sel === "" ? null : parseInt(sel, 10);
+  }
+  const btn = document.getElementById('genBtn');
+  btn.disabled = true; btn.textContent = 'Generating…';
+  try{
+    const data = await apiCall("POST", "/api/generate", {
+      mid, days, price: PRICES[days] !== undefined ? PRICES[days] : 0,
+    });
+    document.getElementById('license').textContent = data.license_key;
+    document.getElementById('meta').textContent =
+      `Expires: ${data.expires_at||'never'}  ·  Package: ${data.package_days?data.package_days+' day(s)':'unlimited'}  ·  Issued: ${data.issued_at}`;
+    document.getElementById('passcode').textContent = data.passcode;
+    document.getElementById('result').style.display='block';
+
+    const recs = loadRecs();
+    recs.unshift({ts:data.issued_at, mid:mid, pkg:data.package_days?String(data.package_days):"∞",
+                  exp:data.expires_at||"never", price:PRICES[days]||null,
+                  nonce:data.nonce, pass:data.passcode, key:data.license_key, revoked:false});
+    saveRecs(recs); renderRecords();
+  }catch(e){ alert('Generation failed: '+e.message); }
+  finally{ btn.disabled=false; btn.textContent='Generate Signed License + Passcode'; }
+}
+
+/* ---------------- Records ---------------- */
+function isExpired(rec){ return rec.exp!=="never" && new Date(rec.exp) < new Date(); }
+
+function renderRecords(){
+  const recs = loadRecs();
+  const q = (document.getElementById('search').value||"").toUpperCase();
+  const box = document.getElementById('records'); box.innerHTML="";
+  document.getElementById('recCount').textContent = `(${recs.length})`;
+  for(const r of recs){
+    if(q && !r.mid.includes(q)) continue;
+    const div = document.createElement('div');
+    div.className = 'rec' + (r.revoked?' revoked':'');
+    const expired = r.exp!=='never' && new Date(r.exp) < new Date();
+    const tag = r.revoked ? '<span class="tag rev">REVOKED</span>'
+              : r.used    ? '<span class="tag rev">USED</span>'
+              : expired   ? '<span class="tag exp">EXPIRED</span>'
+                          : '<span class="tag ok">ACTIVE</span>';
+    div.innerHTML =
+      `<div class="row"><b>${r.mid}</b> ${tag}</div>`+
+      `<div class="row">Package: ${r.pkg==='∞'?'Unlimited':r.pkg+' day(s)'}${r.price?` · ${r.price.toLocaleString()} ฿`:''}`+
+      ` · Issued: ${r.ts}<br>Expires: ${r.exp} · Nonce: ${r.nonce}</div>`;
+    const btns = document.createElement('div'); btns.className='btns';
+    const mk=(txt,cls,fn)=>{const b=document.createElement('button');b.className='small '+cls;b.textContent=txt;b.onclick=fn;return b;};
+    btns.appendChild(mk('Copy key','gray',()=>navigator.clipboard.writeText(r.key)));
+    btns.appendChild(mk('Copy passcode','gray',()=>navigator.clipboard.writeText(r.pass)));
+    btns.appendChild(mk('+7d','green',()=>quickRenew(r.mid,7,500)));
+    btns.appendChild(mk('+30d','green',()=>quickRenew(r.mid,30,800)));
+    btns.appendChild(mk('+1yr','green',()=>quickRenew(r.mid,365,9000)));
+    if(!r.revoked && !r.used)
+      btns.appendChild(mk('Mark USED','red',()=>markUsed(r.nonce)));
+    if(!r.revoked) btns.appendChild(mk('Revoke','red',()=>revoke(r.nonce)));
+    else btns.appendChild(mk('Un-revoke','gray',()=>unrevoke(r.nonce)));
+    div.appendChild(btns);
+    box.appendChild(div);
+  }
+  if(!box.children.length) box.innerHTML='<div class="hint">No records yet.</div>';
+}
+
+async function quickRenew(mid, days, price){
+  try{
+    const data = await apiCall("POST", "/api/generate", { mid, days, price });
+    const recs = loadRecs();
+    recs.unshift({ts:data.issued_at, mid:mid, pkg:String(days), exp:data.expires_at, price:price,
+                  nonce:data.nonce, pass:data.passcode, key:data.license_key, revoked:false});
+    saveRecs(recs); renderRecords();
+    navigator.clipboard.writeText(data.license_key);
+    alert(`${days}-day renewal (${price.toLocaleString()} Baht) generated and copied to clipboard.`);
+  }catch(e){ alert('Renewal failed: '+e.message); }
+}
+
+async function markUsed(nonce){
+  const recs = loadRecs(); const r = recs.find(x=>x.nonce===nonce);
+  if(!r) return;
+  if(!confirm(`Mark code as USED for ${r.mid}?`)) return;
+  try{ await apiCall("POST", "/api/used", { nonce }); }catch(e){}
+  r.used = true; saveRecs(recs); renderRecords();
+}
+
+async function revoke(nonce){
+  const recs = loadRecs(); const r = recs.find(x=>x.nonce===nonce);
+  if(!r) return;
+  if(!confirm(`Revoke license for ${r.mid}?`)) return;
+  try{ await apiCall("POST", "/api/revoke", { nonce }); }catch(e){}
+  r.revoked = true; saveRecs(recs); renderRecords();
+}
+
+async function unrevoke(nonce){
+  const recs = loadRecs(); const r = recs.find(x=>x.nonce===nonce);
+  if(!r) return;
+  try{ await apiCall("POST", "/api/unrevoke", { nonce }); }catch(e){}
+  r.revoked = false; saveRecs(recs); renderRecords();
+}
+
+/* ---------------- Bans ---------------- */
+function addBan(){
+  const inp = document.getElementById('banInput');
+  const mid = inp.value.trim().toUpperCase();
+  if(!/^[0-9A-F]{16}$/.test(mid)){ alert('Machine ID must be 16 hex characters.'); return; }
+  const bans = loadBans();
+  if(!bans.includes(mid)){
+    bans.push(mid); saveBans(bans);
+    apiCall("POST", "/api/ban", { mid }).catch(e=>alert('Ban sync failed: '+e.message));
+  }
+  inp.value=""; renderBans();
+}
+function removeBan(mid){
+  saveBans(loadBans().filter(m=>m!==mid)); renderBans();
+  apiCall("POST", "/api/unban", { mid }).catch(e=>{});
+}
+function renderBans(){
+  const box = document.getElementById('banList'); box.innerHTML="";
+  const bans = loadBans();
+  if(!bans.length){ box.innerHTML='<div class="hint">No banned machines.</div>'; return; }
+  for(const m of bans){
+    const chip=document.createElement('span'); chip.className='chip';
+    chip.textContent = m+" ";
+    const x=document.createElement('button'); x.textContent='\u2715'; x.onclick=()=>removeBan(m);
+    chip.appendChild(x); box.appendChild(chip);
+  }
+}
+async function syncBansToApi(){
+  const bans = loadBans();
+  for(const mid of bans){
+    try{ await apiCall("POST", "/api/ban", { mid }); }catch(e){}
+  }
+  alert(`Synced ${bans.length} ban(s) to API.`);
+}
+
+/* ---------------- misc ---------------- */
+function backupAll(){
+  const data = {
+    format: "skyadmin-generator-backup", version: 2,
+    exported: new Date().toISOString(),
+    records: loadRecs(), bans: loadBans(),
+    apiUrl: storeGet("sky_api_url")||"",
+  };
+  downloadFile("skyadmin_generator_backup.json", JSON.stringify(data, null, 2), "application/json");
+}
+function restoreAll(input){
+  const f = input.files && input.files[0];
+  if(!f) return;
+  const reader = new FileReader();
+  reader.onload = () => {
+    try{
+      const d = JSON.parse(reader.result);
+      if(d.format !== "skyadmin-generator-backup") throw new Error("Not a backup file.");
+      if(!confirm(`Restore ${(d.records||[]).length} record(s) from ${d.exported}?`)) return;
+      const cur = loadRecs(); const have = new Set(cur.map(r=>r.nonce));
+      for(const r of d.records||[]) if(!have.has(r.nonce)) cur.push(r);
+      saveRecs(cur);
+      const bans = loadBans();
+      for(const m of d.bans||[]) if(!bans.includes(m)) bans.push(m);
+      saveBans(bans);
+      if(d.apiUrl) storeSet("sky_api_url", d.apiUrl);
+      fillApiSettings(); renderRecords(); renderBans();
+      alert('Restore complete.');
+    }catch(e){ alert('Restore failed: '+e.message); }
+    finally{ input.value=''; }
+  };
+  reader.readAsText(f);
+}
+function exportCSV(){
+  const rows = [["issued","machine_id","package_days","price_baht","expires","nonce","passcode","status","license_key"]];
+  for(const r of loadRecs()){
+    rows.push([r.ts,r.mid,r.pkg,r.price??"",r.exp,r.nonce,r.pass,
+               r.revoked?"REVOKED":(isExpired(r)?"EXPIRED":"ACTIVE"),r.key]);
+  }
+  downloadFile("skyadmin_licenses.csv",
+    rows.map(r=>r.map(v=>'"'+String(v).replaceAll('"','""')+'"').join(",")).join("\n"), "text/csv");
+}
+function downloadFile(name, content, type){
+  const a=document.createElement('a');
+  a.href=URL.createObjectURL(new Blob([content],{type}));
+  a.download=name; a.click();
+}
+function copyText(id){
+  const full=document.getElementById(id).textContent.split("\n")[0];
+  navigator.clipboard.writeText(full).then(()=>alert('Copied!'));
+}
+fillApiSettings(); renderRecords(); renderBans();
+</script>
+</body>
+</html>
