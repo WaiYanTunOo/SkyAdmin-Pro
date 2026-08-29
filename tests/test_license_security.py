@@ -73,6 +73,26 @@ def test_expired_rejected(mid):
     assert not ok and "expire" in msg.lower()
 
 
+def test_utc_expiry_parses_full_duration(mid):
+  from datetime import timezone
+
+  exp = (datetime.now(timezone.utc) + timedelta(days=1)).strftime("%Y-%m-%dT%H:%M:%SZ")
+  payload = f"{mid}|{exp}|x|nonceutc01|1"
+  obj = {"mid": mid, "exp": exp, "sig": _sign(payload), "iat": "x", "n": "nonceutc01", "pkg": "1"}
+  ok, _msg, _n = lic.check_activation_usable(_wrap(obj))
+  assert ok
+  parsed = lic._parse_expiry(exp)
+  assert parsed > datetime.now()
+
+
+def test_never_expire_key_has_no_exp(mid):
+  payload = f"{mid}||x|noncenever01|"
+  obj = {"mid": mid, "exp": None, "sig": _sign(payload), "iat": "x", "n": "noncenever01", "pkg": ""}
+  ok, msg, _n = lic.check_activation_usable(_wrap(obj))
+  assert ok
+  assert "never" in msg.lower()
+
+
 # --- one-time use ---------------------------------------------------------
 
 def test_burn_blocks_redemption(mid, fake_app_dir, monkeypatch):
@@ -228,3 +248,15 @@ def test_update_info_roundtrip_and_compare(fake_app_dir):
     assert not is_newer_version("0.2.0", "0.2.0")
     assert not is_newer_version("0.1.9", "0.2.0")
     assert APP_VERSION  # sanity
+
+
+def test_requires_online_check_respects_config(monkeypatch):
+    import skyadmin_pro.config as config
+    from skyadmin_pro.services.license import requires_online_check
+
+    monkeypatch.setattr(config, "API_BASE_URL", "")
+    monkeypatch.setattr(config, "REVOCATION_URL", "")
+    assert requires_online_check() is False
+
+    monkeypatch.setattr(config, "API_BASE_URL", "https://example.test")
+    assert requires_online_check() is True

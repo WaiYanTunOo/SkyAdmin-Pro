@@ -9,11 +9,21 @@ Disclaimer).
 
 ## 1. Requirements
 
-- Windows 10 / 11 (64-bit)
-- No Python, no installation — single portable-style exe
-- Internet **only** for activation and remote license sync; daily use is offline
+### End users (packaged app)
 
-## 2. Install (new PC)
+- Windows 10 / 11 (64-bit)
+- No Python required — run the packaged `SkyAdminPro.exe`
+- Internet for **activation**, **daily license sync** (once per 24 hours when
+  remote control is enabled), and optional online tools (e.g. translation)
+
+### Developers (this source repo)
+
+- Python 3.11+ recommended
+- Dependencies: `pip install -r requirements.txt`
+- Run from project root: `python main.py`
+- Optional: Cloudflare Worker in `skyadmin-worker/` for API-based license control
+
+## 2. Install (new PC — packaged exe)
 
 1. Copy `SkyAdminPro.exe` into any folder
 2. Double-click → the **Pricing & Activation** window appears, showing your
@@ -25,10 +35,22 @@ Disclaimer).
 
 | Location | Contents |
 |---|---|
-| `<exe folder>\Workspace\` | **Customer documents**: Clients\…\01_Company_Setup, 02_Accounting, 03_Visa, 04_Financial_Docs, Suppliers, Staging, Ready_to_Upload, Z_Archive_Backup |
-| `C:\Users\<you>\.skyadmin_pro\` | **Software data**: skyadmin_pro.db (all records), backups\ (7 daily snapshots), license.key, app.log |
+| `<exe folder>\Workspace\` | **Customer documents**: `Clients\…\01_Company_Setup`, `02_Accounting`, `03_Visa`, `04_Financial_Docs`, `Suppliers`, `00_Staging_Area`, `02_Ready_to_Upload`, `Z_Archive_Backup` |
+| `C:\Users\<you>\.skyadmin_pro\` | **Software data**: `skyadmin_pro.db` (all records), `backups\` (7 daily snapshots), `license.key`, `app.log` |
 
-## 3. Pricing
+## 3. Online vs offline use
+
+| Mode | When | What you need |
+|---|---|---|
+| **Daily work** | Records, documents, tasks, exports | Works offline after a successful sync |
+| **License sync** | API or Gist control URL is configured in the build | Connect at least **once every 24 hours** so revocations/bans apply |
+| **Activation** | First run or renewal | Internet required to download the signed control list |
+| **Fully offline builds** | No API/Gist URL configured | No daily sync requirement |
+
+The sidebar shows **Online OK**, **Sync needed**, or **Offline mode** depending
+on your build and last sync time.
+
+## 4. Pricing
 
 | Package | Price |
 |---|---|
@@ -41,15 +63,15 @@ Disclaimer).
 Tap **💳 Show Payment QR** in the activation window, transfer, send your
 Machine ID — the owner replies with a code.
 
-## 4. Activating / Renewing
+## 5. Activating / Renewing
 
 - Launch unlicensed/expired → Pricing & Activation opens automatically
 - Paste the **License Key** (long) **or** the **8-digit Passcode** → Activate Now
-- Requires internet once (the app downloads the owner's control list)
-- Renew any time: Settings → Activate / Manage License…, or type an 8-digit
-  passcode directly under Appearance → License
+- Requires internet once (the app downloads the owner's signed control list)
+- Renew any time: Settings → Activate / Manage License…, or paste a key/passcode
+  under Settings → License
 
-## 5. Moving Data to Another PC
+## 6. Moving Data to Another PC
 
 **Only supported method — encrypted backup:**
 
@@ -63,7 +85,10 @@ Machine ID — the owner replies with a code.
 automatic database snapshots** (7 days) in `.skyadmin_pro\backups\`, but those
 contain only records, not PDFs.
 
-## 6. Owner Only — Generating Licenses
+Restore creates a **safety backup** first, closes the database cleanly, then
+overwrites data — restart the app when prompted.
+
+## 7. Owner Only — Generating Licenses
 
 Open `LicenseGenerator_iPhone.html` on your phone (Files → Safari, offline):
 
@@ -76,18 +101,47 @@ hardware-bound, and cannot be forged, edited, extended, or moved.
 
 ### Remote control (internet)
 
-In the generator's 🌐 Remote Control section (one-time setup: username, Gist
-ID, filename `skyadmin-control.txt`, classic token with *gist* scope):
+Two supported backends (configured at build time):
+
+1. **Cloudflare Worker API** (`skyadmin-worker/`) — recommended; signed
+   `/api/control` endpoint
+2. **Legacy GitHub Gist** — `skyadmin-control.txt` with `SKYCTRL1` envelope
+
+In the generator's 🌐 Remote Control section:
 
 - **Revoke** a record / **Ban** a machine → **⬆ Publish**
-- Customer apps pull the list at next launch (and during activation) — banned
-  machines get a hard error, revoked keys stop working
+- Customer apps pull the list at launch, during activation, and via Settings →
+  **Sync Now** — banned machines get a hard error, revoked keys stop working
 - **Un-revoke / remove ban**: change the list → Publish again (sync replaces
   local state exactly)
-- **Backup all data / Restore** buttons move your whole registry between
-  devices
 
-## 7. Self-Protection Features
+## 8. Security & privacy notes
+
+- **IRD portal passwords** are encrypted at rest in SQLite (machine-bound;
+  not included in Excel export)
+- **Encrypted backups** (`.skybackup`) use a universal app key — still safer
+  than copying raw folders, but treat backup files as sensitive
+- **Translation tool** (Utilities) may send text to Google — avoid pasting
+  confidential client data without consent
+
+## 8. Office Hub (v0.3+)
+
+Sidebar → **Office Hub** with these areas:
+
+| Area | Purpose |
+|---|---|
+| **Contacts** | Office, government, bank, vendor, senior directory |
+| **Passwords → Client DBD / RD** | Per-client portal logins: DBD, RD, IRD, SSO, etc. (encrypted, separate table) |
+| **Passwords → Office accounts** | Internal office username/email & passwords (encrypted, separate table) |
+| **Notebook** | Daily/weekly reports, customer & senior instructions |
+
+Legacy IRD passwords saved under Company Details are auto-imported into **Client DBD / RD** (type RD) on upgrade. **Company Details → Tax IDs** lists all client portal logins read-only (DBD, RD, IRD, etc.); edit them in Office Hub.
+
+**Directory lists (hybrid):** Settings → **Department list** maintains the Department picker for Office Hub → Contacts. **Company** names come from your **Clients** list (not a separate organizations list). Use **Import from data** to merge departments from existing contacts.
+
+See `docs/PLATFORM.md` for the Windows / Linux / macOS / Android / iOS roadmap.
+
+## 9. Self-Protection Features
 
 - Hardware-locked: keys work on one machine only
 - Signed opaque control list (`SKYCTRL1`): even a leaked gist URL reveals
@@ -95,18 +149,73 @@ ID, filename `skyadmin-control.txt`, classic token with *gist* scope):
 - Self-healing: if `license.key` is deleted by a cleaner tool, the app
   restores it from its shadow copy automatically
 
-## 8. Troubleshooting
+## 10. Troubleshooting
 
 | Problem | Fix |
 |---|---|
 | "No license file found" | Activate via the dialog (needs internet) |
+| "Daily online verification required" | Connect to the internet and restart, or use Settings → Sync Now |
 | "This machine has been blocked" | Contact owner — machine was banned |
 | "License expired" | Buy/renew a package, then paste the new code |
-| Data looks empty after moving PCs | You copied folders instead of using Encrypted Backup — Restore from your `.skybackup` |
+| Data looks empty after moving PCs | You copied folders instead of Encrypted Backup — Restore from your `.skybackup` |
 | Workspace not in exe folder | It auto-migrates at launch; check Settings → Local paths |
 | Deleted license.key by accident | App restores it automatically; if not, request a new code |
+| IRD password field empty after update | Open **Office Hub → Passwords → Client DBD / RD** (type RD) — legacy values are auto-imported on upgrade |
 
-## 9. Contacts
+## 11. Developer commands
+
+```bash
+python -m venv .venv
+.venv\Scripts\activate          # Windows
+# source .venv/bin/activate       # Linux/macOS
+pip install -r requirements.txt
+python main.py
+pytest tests/ -v
+```
+
+### Ubuntu / Linux (easy launch — like double-clicking the `.exe`)
+
+**One-time setup** (installs `python3-tk`, creates venv, adds app-menu shortcut):
+
+```bash
+chmod +x packaging/setup-linux.sh SkyAdminPro.sh
+./packaging/setup-linux.sh
+```
+
+**Every day** — any of these:
+
+| Method | Action |
+|---|---|
+| **Applications menu** | Search **SkyAdmin Pro** |
+| **Desktop** | Double-click **SkyAdmin Pro** (if setup created it) |
+| **Project folder** | Double-click `SkyAdminPro.sh` (Properties → Allow executing) |
+| **Terminal** | `./SkyAdminPro.sh` |
+
+`SkyAdminPro.sh` auto-creates `.venv`, installs pip deps when `requirements.txt` changes, then starts the app.
+
+**Optional — single-file binary** (closest to Windows `.exe`):
+
+```bash
+./packaging/build-linux.sh
+./dist/SkyAdminPro
+```
+
+Data locations on Linux:
+
+| Path | Contents |
+|---|---|
+| `~/.skyadmin_pro/` | Database, license, backups, logs |
+| `~/Documents/SkyAdmin Pro/` | Client workspace (dev / script launch) |
+
+Build Worker (optional):
+
+```bash
+cd skyadmin-worker
+npm install
+npx wrangler dev
+```
+
+## 12. Contacts
 
 - Email: dev.skycreation@gmail.com
 - WhatsApp: +66 8383 23134

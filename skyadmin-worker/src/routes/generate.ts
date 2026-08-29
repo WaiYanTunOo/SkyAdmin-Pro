@@ -13,7 +13,7 @@ interface GenerateBody {
 export async function generateHandler(c: Context<{ Bindings: Env }>) {
   const body = await c.req.json<GenerateBody>();
   const mid = (body.mid || "").trim().toUpperCase();
-  const days = body.days ?? 30;
+  const days = "days" in body ? body.days : 30;
   const price = body.price ?? 0;
 
   // Validate machine ID

@@ -4,7 +4,7 @@ from __future__ import annotations
 
 APP_NAME = "SkyAdmin Pro"
 APP_TAGLINE = "Wai Yan Tun Oo (SKY)"
-APP_VERSION = "0.2.0"
+APP_VERSION = "0.3.0"
 
 # Default appearance — Settings will override from SQLite.
 DEFAULT_APPEARANCE_MODE = "dark"  # "dark" | "light" | "system"
@@ -15,12 +15,14 @@ NAV_DASHBOARD = "dashboard"
 NAV_DOCUMENT_HUB = "document_hub"
 NAV_DATABASE_TASKS = "database_tasks"
 NAV_UTILITIES = "utilities"
+NAV_OFFICE_HUB = "office_hub"
 NAV_SETTINGS = "settings"
 
 NAV_ITEMS: tuple[tuple[str, str], ...] = (
     (NAV_DASHBOARD, "Dashboard"),
     (NAV_DOCUMENT_HUB, "Document Hub"),
     (NAV_DATABASE_TASKS, "Database & Tasks"),
+    (NAV_OFFICE_HUB, "Office Hub"),
     (NAV_UTILITIES, "Utilities"),
     (NAV_SETTINGS, "Settings"),
 )
@@ -32,6 +34,57 @@ FOLDER_ARCHIVE = "Z_Archive_Backup"
 FOLDER_CLIENTS = "Clients"
 FOLDER_SUPPLIERS = "Suppliers"
 FOLDER_PORTAL_BACKUP = "Portal_Backups"
+
+# Office Hub — contacts, vault categories, notebook entry types
+CONTACT_CATEGORIES: tuple[str, ...] = (
+    "Office",
+    "Government",
+    "Bank",
+    "Vendor",
+    "Client liaison",
+    "Senior",
+    "Other",
+)
+
+VAULT_CATEGORIES: tuple[str, ...] = (
+    "Portal",
+    "Email",
+    "VPN",
+    "Wi-Fi",
+    "Database",
+    "Device",
+    "Other",
+)
+
+# Client password manager — government / portal logins per company
+CLIENT_CREDENTIAL_TYPES: tuple[str, ...] = (
+    "DBD",
+    "RD",
+    "IRD",
+    "SSO",
+    "Customs",
+    "Bank portal",
+    "Other",
+)
+
+# Office internal accounts (username/email + password)
+OFFICE_SYSTEM_TYPES: tuple[str, ...] = (
+    "Email",
+    "Portal",
+    "VPN",
+    "Wi-Fi",
+    "Cloud",
+    "Device",
+    "Other",
+)
+
+NOTEBOOK_ENTRY_TYPES: tuple[tuple[str, str], ...] = (
+    ("daily_report", "Daily report"),
+    ("weekly_report", "Weekly report"),
+    ("customer_note", "Customer instruction"),
+    ("senior_note", "Senior / manager note"),
+    ("general", "General note"),
+)
 
 DEFAULT_PORTAL_URL = "https://example.com/portal"
 
@@ -243,6 +296,8 @@ SETTING_PORTAL_URL = "portal_url"
 SETTING_WINDOW_GEOMETRY = "window_geometry"
 SETTING_SNIPPET_OVERRIDES = "snippet_overrides"
 SETTING_SERVICE_TYPES = "service_types"
+SETTING_ORGANIZATION_LIST = "organization_list"
+SETTING_DEPARTMENT_LIST = "department_list"
 SETTING_APP_TAGLINE = "app_tagline"  # sidebar subtitle — user-editable
 SETTING_LAST_ENCRYPTED_BACKUP = "last_encrypted_backup"  # ISO date of last .skybackup
 
@@ -451,6 +506,22 @@ MONTHLY_TAX_TYPES: tuple[str, ...] = (
     "Company Monthly Accounting Service",
 )
 
+# Document types used to discover VO / CSH clients and infer renewal dates.
+VO_DOCUMENT_TYPES: tuple[str, ...] = (
+    "Virtual Office Rental",
+    "VAT Registered Office Rental",
+)
+CSH_DOCUMENT_TYPES: tuple[str, ...] = (
+    "CSH (Company Thai Shareholder) Rental",
+)
+VO_CSH_DOCUMENT_TYPES: tuple[str, ...] = VO_DOCUMENT_TYPES + CSH_DOCUMENT_TYPES
+
+DOCUMENT_TO_VO_CSH_RENEWAL: dict[str, str] = {
+    "Virtual Office Rental": "vo",
+    "VAT Registered Office Rental": "vo",
+    "CSH (Company Thai Shareholder) Rental": "csh",
+}
+
 # Tax filing status options (text fields on clients table).
 TAX_FILING_STATUSES: tuple[str, ...] = (
     "Complete",
@@ -485,6 +556,87 @@ TRANSACTION_RANGES: tuple[str, ...] = (
     "200+ Transactions",
 )
 
+# Company Details → Tax IDs service contract types (pricing matrix rows).
+ACCOUNTING_PRICING_SERVICES: tuple[str, ...] = (
+    "Yearly Accounting",
+    "Monthly Accounting",
+    "Monthly Tax Filing",
+    "Mid-Year Tax Filing",
+    "Annual Audit",
+)
+
+# Document types that indicate an accounting / tax-filing client (Wave C rollout).
+ACCOUNTING_DOCUMENT_TYPES: tuple[str, ...] = (
+    "Company Annual Accounting Service",
+    "Company Monthly Accounting Service",
+    "Company Mid Year Accounting and Tax Submission (PND 51) Service",
+    "Company Annual Auditing Service",
+    "Monthly Tax Filing Service",
+    "Financial Statement and BOJ 5.5 Filing Service",
+)
+
+DOCUMENT_TO_ACCOUNTING_SERVICE: dict[str, str] = {
+    "Company Annual Accounting Service": "Yearly Accounting",
+    "Company Monthly Accounting Service": "Monthly Accounting",
+    "Company Mid Year Accounting and Tax Submission (PND 51) Service": "Mid-Year Tax Filing",
+    "Monthly Tax Filing Service": "Monthly Tax Filing",
+    "Company Annual Auditing Service": "Annual Audit",
+    "Financial Statement and BOJ 5.5 Filing Service": "Yearly Accounting",
+}
+
+# When multiple accounting documents exist, pick the most specific contract type.
+ACCOUNTING_SERVICE_INFER_PRIORITY: tuple[str, ...] = (
+    "Monthly Accounting",
+    "Monthly Tax Filing",
+    "Yearly Accounting",
+    "Mid-Year Tax Filing",
+    "Annual Audit",
+)
+
+PRICING_DEFAULT_SERVICE = "General"
+
+# One-time / fixed-price services (not tied to monthly transaction volume).
+# Each charge is stored as its own row; ``transaction_range`` holds the charge label.
+FLAT_FEE_TRANSACTION_RANGE = "Flat fee"
+
+TRANSACTION_RANGE_PRICING_SERVICES: frozenset[str] = frozenset(
+    {PRICING_DEFAULT_SERVICE, *ACCOUNTING_PRICING_SERVICES}
+)
+
+# Default charge lines for common flat-fee services (name, monthly, annual, sla, hc, docs).
+DEFAULT_SERVICE_CHARGE_LINES: dict[str, tuple[tuple[str, int, int, int, int, str], ...]] = {
+    "Company Setup Basic Package": (
+        ("Package base fee", 0, 0, 0, 0, ""),
+        ("DBD fee", 0, 0, 0, 0, ""),
+        ("Registration fee", 0, 0, 0, 0, ""),
+        ("VAT service charge", 0, 0, 0, 0, ""),
+    ),
+}
+
+
+def pricing_uses_transaction_ranges(service_type: str) -> bool:
+    """Accounting-style services use the 5-tier transaction volume grid."""
+    return (service_type or "").strip() in TRANSACTION_RANGE_PRICING_SERVICES
+
+
+def default_charge_lines_for(
+    service_type: str,
+) -> tuple[tuple[str, int, int, int, int, str], ...]:
+    """Named charge rows for a flat-fee service (multiple fees allowed)."""
+    clean = (service_type or "").strip()
+    if clean in DEFAULT_SERVICE_CHARGE_LINES:
+        return DEFAULT_SERVICE_CHARGE_LINES[clean]
+    low = clean.casefold()
+    if "company setup" in low:
+        return DEFAULT_SERVICE_CHARGE_LINES["Company Setup Basic Package"]
+    if "medical certificate" in low:
+        return (("Medical certificate fee", 0, 0, 0, 0, ""),)
+    return (("Service fee", 0, 0, 0, 0, ""),)
+
+
+def is_transaction_volume_tier(label: str) -> bool:
+    return (label or "").strip() in TRANSACTION_RANGES
+
 PAYMENT_STATUSES: tuple[str, ...] = ("Paid", "Pending", "N/A")
 
 DEFAULT_PRICING_MATRIX: tuple[tuple[str, int, int, int, int, str], ...] = (
@@ -493,6 +645,10 @@ DEFAULT_PRICING_MATRIX: tuple[tuple[str, int, int, int, int, str], ...] = (
     ("51 to 100 Transactions", 18000, 216000, 16, 2, "Bank Statement, Service Invoices, Purchase Invoice/BL, Tax Invoice/Receipt, Sale Invoices/DN"),
     ("101 to 200 Transactions", 24000, 288000, 24, 2, "Bank Statement, Service Invoices, Purchase Invoice/BL, Tax Invoice/Receipt, Sale Invoices/DN, Warehouse Receipt"),
     ("200+ Transactions", 30000, 360000, 24, 3, "Bank Statement, Service Invoices, Purchase Invoice/BL, Tax Invoice/Receipt, Sale Invoices/DN, Warehouse Receipt, Transport Documents"),
+)
+
+DEFAULT_FLAT_FEE_PRICING: tuple[tuple[str, int, int, int, int, str], ...] = (
+    ("Service fee", 0, 0, 0, 0, ""),
 )
 
 # Annual year-end services: the stored expiry date is the previous year's

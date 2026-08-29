@@ -18,6 +18,7 @@ SIDEBAR_ICONS = {
     "dashboard": "◧",
     "document_hub": "⧉",
     "database_tasks": "▦",
+    "office_hub": "☎",
     "utilities": "✦",
     "settings": "⚙",
 }
@@ -60,6 +61,11 @@ ACCENT_STRONG = ("#1d4ed8", "#1e40af")
 
 # Status bar
 STATUS_BAR_HEIGHT = 32
+
+# Chart / canvas (tk.Canvas is not theme-aware by default)
+CANVAS_BG = ("#f4f4f5", "#2b2b2b")
+CANVAS_TEXT = ("#6b7280", "#9ca3af")
+CANVAS_VALUE_TEXT = ("#111827", "#f4f4f5")
 
 # Wrapping — prefer dynamic (bind <Configure>) over these, but they are
 # the fallback when a label is created before layout.

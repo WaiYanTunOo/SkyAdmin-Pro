@@ -24,7 +24,13 @@ from skyadmin_pro.services.workflow import (
     format_eod_report,
 )
 from skyadmin_pro.ui.treeview import ThemedTreeview
-from skyadmin_pro.ui.theme import CARD_TITLE_SIZE, TEXT_MUTED
+from skyadmin_pro.ui.theme import (
+    CANVAS_BG,
+    CANVAS_TEXT,
+    CANVAS_VALUE_TEXT,
+    CARD_TITLE_SIZE,
+    TEXT_MUTED,
+)
 from skyadmin_pro.ui.views.base import BaseView
 from skyadmin_pro.ui.widgets import FeedbackLabel, MonthStatusPanel
 
@@ -86,7 +92,10 @@ class DashboardView(BaseView):
             anchor="w",
         ).grid(row=0, column=0, sticky="w", padx=16, pady=(14, 4))
         self.timeline_canvas = tk.Canvas(
-            timeline_card, height=120, bg="#2b2b2b", highlightthickness=0,
+            timeline_card,
+            height=120,
+            bg=ctk.ThemeManager.theme["CTkFrame"]["fg_color"][1 if ctk.get_appearance_mode() == "Dark" else 0],
+            highlightthickness=0,
         )
         self.timeline_canvas.grid(row=1, column=0, sticky="ew", padx=16, pady=(0, 14))
 
@@ -197,7 +206,7 @@ class DashboardView(BaseView):
         header.grid_columnconfigure(0, weight=1)
         ctk.CTkLabel(
             header,
-            text="Expiry alerts — documents & services",
+            text="Expiry alerts — documents & supplier services",
             font=ctk.CTkFont(size=CARD_TITLE_SIZE, weight="bold"),
             anchor="w",
         ).grid(row=0, column=0, sticky="w")
@@ -430,6 +439,22 @@ class DashboardView(BaseView):
         ).grid(row=0, column=0, sticky="w")
         ctk.CTkButton(
             tax_header,
+            text="Accounting setup",
+            width=130,
+            fg_color="transparent",
+            border_width=1,
+            command=self._open_accounting_setup,
+        ).grid(row=0, column=3, sticky="e", padx=(8, 0))
+        ctk.CTkButton(
+            tax_header,
+            text="VO/CSH setup",
+            width=110,
+            fg_color="transparent",
+            border_width=1,
+            command=self._open_vo_csh_setup,
+        ).grid(row=0, column=4, sticky="e", padx=(8, 0))
+        ctk.CTkButton(
+            tax_header,
             text="Open details",
             width=110,
             command=lambda: self.app.show_view(NAV_DATABASE_TASKS),
@@ -479,6 +504,12 @@ class DashboardView(BaseView):
         """Draw a bar-per-day expiry timeline for the next 45 days."""
         canvas = self.timeline_canvas
         canvas.delete("all")
+        mode = ctk.get_appearance_mode()
+        is_dark = mode == "Dark"
+        bg = CANVAS_BG[1 if is_dark else 0]
+        text_color = CANVAS_TEXT[1 if is_dark else 0]
+        value_color = CANVAS_VALUE_TEXT[1 if is_dark else 0]
+        canvas.configure(bg=bg)
         width = canvas.winfo_width()
         if width < 10:
             canvas.update_idletasks()
@@ -486,11 +517,16 @@ class DashboardView(BaseView):
         height = int(canvas.cget("height"))
 
         expiring = self.app.db.list_expiring_documents()
+        supplier_expiring = self.app.db.list_expiring_supplier_services()
         # Bucket by days-left
         buckets = {}
         for item in expiring:
             eff = effective_expiry_date(item.get("expiry_date"), item.get("document_type"))
             left = days_until(eff)
+            if left is not None and 0 <= left <= 45:
+                buckets[left] = buckets.get(left, 0) + 1
+        for item in supplier_expiring:
+            left = days_until(item.get("expiry_date"))
             if left is not None and 0 <= left <= 45:
                 buckets[left] = buckets.get(left, 0) + 1
 
@@ -502,7 +538,7 @@ class DashboardView(BaseView):
         # Day labels
         for day in range(0, 46, 15):
             x = x0 + day * bar_w
-            canvas.create_text(x, height - 8, text=f"d{day}", fill="gray", font=("Segoe UI", 8))
+            canvas.create_text(x, height - 8, text=f"d{day}", fill=text_color, font=("Segoe UI", 8))
 
         # Bars
         colors = {0: "#dc2626", 1: "#ea580c", 2: "#d97706"}
@@ -525,13 +561,13 @@ class DashboardView(BaseView):
             if count > 1:
                 canvas.create_text(
                     x, baseline - bh - 10, text=str(count),
-                    fill="#f4f4f5", font=("Segoe UI", 8),
+                    fill=value_color, font=("Segoe UI", 8),
                 )
         # Legend
         lx = width - 180
         for txt, col in [("≤7d", "#dc2626"), ("≤14d", "#ea580c"), ("≤30d", "#d97706"), ("31-45d", "#16a34a")]:
             canvas.create_rectangle(lx, 6, lx + 8, 14, fill=col, outline="")
-            canvas.create_text(lx + 12, 10, text=txt, anchor="w", fill="gray", font=("Segoe UI", 8))
+            canvas.create_text(lx + 12, 10, text=txt, anchor="w", fill=text_color, font=("Segoe UI", 8))
             lx += 45
 
     def on_show(self) -> None:
@@ -593,12 +629,15 @@ class DashboardView(BaseView):
         self.next_tree.apply_theme()
 
         expiring = self.app.db.list_expiring_documents()
+        supplier_expiring = self.app.db.list_expiring_supplier_services()
         overdue = self.app.db.list_overdue_services()
         supplier_due = self.app.db.list_pending_supplier_payments()
         pending = self.app.db.list_tasks(status="pending")
         ongoing = self.app.db.list_ongoing_services()
         renewal_due = self.app.db.list_renewal_items_due()
-        self._refresh_next_actions(overdue, supplier_due, expiring, pending, ongoing, renewal_due)
+        self._refresh_next_actions(
+            overdue, supplier_due, expiring, supplier_expiring, pending, ongoing, renewal_due
+        )
 
         rows = []
         tags = []
@@ -621,6 +660,23 @@ class DashboardView(BaseView):
             )
             tags.append((tag,) if tag else ())
             iids.append(str(item["id"]))
+        for item in supplier_expiring:
+            left = days_until(item.get("expiry_date"))
+            if left is None:
+                continue
+            tag = classify_expiry(left)
+            company = item.get("company_name") or "—"
+            service = item.get("service_type") or "—"
+            rows.append(
+                (
+                    item.get("supplier_name") or "—",
+                    f"{company} · {service}",
+                    item.get("expiry_date") or "—",
+                    expiry_label(left),
+                )
+            )
+            tags.append((tag,) if tag else ())
+            iids.append(f"ss-{item['id']}")
         self.expiry_tree.set_rows(rows, iids=iids, tags=tags)
 
         self.overdue_tree.set_rows(
@@ -683,6 +739,7 @@ class DashboardView(BaseView):
         overdue=None,
         supplier_due=None,
         expiring=None,
+        supplier_expiring=None,
         pending_tasks=None,
         ongoing=None,
         renewal_due=None,
@@ -696,6 +753,11 @@ class DashboardView(BaseView):
         )
         expiring = (
             self.app.db.list_expiring_documents() if expiring is None else expiring
+        )
+        supplier_expiring = (
+            self.app.db.list_expiring_supplier_services()
+            if supplier_expiring is None
+            else supplier_expiring
         )
         pending_tasks = (
             self.app.db.list_tasks(status="pending")
@@ -765,6 +827,33 @@ class DashboardView(BaseView):
             )
             if client:
                 self._next_targets[iid] = ("renewal", client)
+        for item in supplier_expiring:
+            left = days_until(item.get("expiry_date"))
+            if left is None:
+                continue
+            if left < 0:
+                tag, priority = "expired", 1
+            elif left <= 14:
+                tag, priority = "urgent", 2
+            else:
+                tag, priority = "watch", 4
+            supplier = item.get("supplier_name") or "—"
+            service = item.get("service_type") or "service"
+            company = item.get("company_name") or ""
+            when = f"{company} · {expiry_label(left)}" if company else expiry_label(left)
+            iid = f"ss-{item['id']}"
+            actions.append(
+                (
+                    priority,
+                    tag,
+                    (
+                        f"Renew supplier service: {service}",
+                        supplier,
+                        when,
+                    ),
+                    iid,
+                )
+            )
         for item in ongoing:
             client = item.get("client_name") or ""
             iid = f"ongoing-{item['id']}"
@@ -1011,6 +1100,20 @@ class DashboardView(BaseView):
             self.workflow_feedback.error(str(exc))
             return
         self.workflow_feedback.success(f"Report exported: {path}")
+
+    def _open_accounting_setup(self) -> None:
+        open_setup = getattr(self.app, "open_accounting_setup", None)
+        if callable(open_setup):
+            open_setup()
+        else:
+            self.app.show_view(NAV_DATABASE_TASKS)
+
+    def _open_vo_csh_setup(self) -> None:
+        open_setup = getattr(self.app, "open_vo_csh_setup", None)
+        if callable(open_setup):
+            open_setup()
+        else:
+            self.app.show_view(NAV_DATABASE_TASKS)
 
     def _run_monthly_cycle(self) -> None:
         pending = self.app.db.count_pending_filings()

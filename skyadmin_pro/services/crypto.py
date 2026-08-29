@@ -65,10 +65,10 @@ def is_encrypted(path: Path) -> bool:
         return False
 
 
-def encrypt_file(path: Path, machine_id: str) -> None:
-    """Encrypt file in-place (adds MAGIC header). No-op if already encrypted."""
+def encrypt_file(path: Path, machine_id: str) -> bool:
+    """Encrypt file in-place (adds MAGIC header). Returns True when encrypted."""
     if is_encrypted(path):
-        return
+        return True
     try:
         from cryptography.fernet import Fernet
 
@@ -77,9 +77,14 @@ def encrypt_file(path: Path, machine_id: str) -> None:
         data = path.read_bytes()
         token = f.encrypt(data)
         path.write_bytes(MAGIC + token)
-    except Exception:
-        # If cryptography missing or fails, leave file as-is — app still locks via license gate
-        pass
+        return True
+    except Exception as exc:
+        import logging
+
+        logging.getLogger(__name__).warning(
+            "encrypt_file failed for %s: %s", path, exc, exc_info=True
+        )
+        return False
 
 
 def decrypt_file(path: Path, machine_id: str) -> bool:
@@ -161,13 +166,13 @@ def restore_encrypted_backup(archive: Path, workspace_root: Path, db_file: Path)
         tmp_path.write_bytes(data)
     try:
         with zipfile.ZipFile(tmp_path, "r") as z:
-            # Restore DB
-            try:
-                db_data = z.read("skyadmin_pro.db")
-                db_file.parent.mkdir(parents=True, exist_ok=True)
-                db_file.write_bytes(db_data)
-            except KeyError:
-                pass
+            if "skyadmin_pro.db" not in z.namelist():
+                raise ValueError(
+                    "Backup archive is missing skyadmin_pro.db — restore aborted."
+                )
+            db_data = z.read("skyadmin_pro.db")
+            db_file.parent.mkdir(parents=True, exist_ok=True)
+            db_file.write_bytes(db_data)
             # Restore Workspace
             ws = Path(workspace_root)
             for info in z.infolist():

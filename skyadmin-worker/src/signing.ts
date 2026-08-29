@@ -37,7 +37,7 @@ export async function generateLicenseKey(
   let exp: string | null = null;
   if (daysValid !== null) {
     const d = new Date(now.getTime() + daysValid * 86400000);
-    exp = `${d.getFullYear()}-${pad(d.getMonth() + 1)}-${pad(d.getDate())}T${pad(d.getHours())}:${pad(d.getMinutes())}:${pad(d.getSeconds())}`;
+    exp = d.toISOString().replace(/\.\d{3}Z$/, "Z");
   }
 
   const nonce = [...crypto.getRandomValues(new Uint8Array(6))]

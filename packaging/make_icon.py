@@ -7,6 +7,7 @@ from PIL import Image, ImageDraw
 
 ROOT = Path(__file__).resolve().parent.parent
 OUT = ROOT / "icon.ico"
+OUT_PNG = ROOT / "icon.png"
 
 ICON_SIZES = (16, 24, 32, 48, 64, 128, 256)
 
@@ -110,7 +111,9 @@ def write_ico(path: Path, images: list[Image.Image]) -> None:
 def main() -> None:
     images = [draw(size) for size in ICON_SIZES]
     write_ico(OUT, images)
+    images[-1].save(OUT_PNG, format="PNG")
     print(f"Wrote {OUT} ({OUT.stat().st_size} bytes, {len(images)} sizes)")
+    print(f"Wrote {OUT_PNG}")
 
 
 if __name__ == "__main__":

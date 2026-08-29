@@ -15,6 +15,7 @@ _TRANSLATIONS = {
         "Dashboard": "ဒက်ရှ်ဘုတ်",
         "Document Hub": "စာတင်ရန်",
         "Database & Tasks": "ဒေတာနှင့်လုပ်ငန်း",
+        "Office Hub": "ရုံးဆက်သွယ်ရန်",
         "Utilities": "ကိရိယာများ",
         "Settings": "ဆက်တင်များ",
         # Common actions
@@ -36,6 +37,7 @@ _TRANSLATIONS = {
         "Dashboard": "แดชบอร์ด",
         "Document Hub": "ศูนย์เอกสาร",
         "Database & Tasks": "ฐานข้อมูลและงาน",
+        "Office Hub": "สำนักงานและบันทึก",
         "Utilities": "เครื่องมือ",
         "Settings": "ตั้งค่า",
         # Common actions

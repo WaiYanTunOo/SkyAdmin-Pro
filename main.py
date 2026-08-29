@@ -8,9 +8,13 @@ Run from the project root:
 from __future__ import annotations
 
 import logging
-import msvcrt
 import sys
 from pathlib import Path
+
+if sys.platform == "win32":
+    import msvcrt
+else:
+    msvcrt = None  # type: ignore[assignment]
 
 # Allow `python main.py` without installing the package.
 ROOT = Path(__file__).resolve().parent
@@ -48,10 +52,20 @@ class _SingleInstance:
         try:
             self._path.parent.mkdir(parents=True, exist_ok=True)
             self._handle = open(self._path, "a+b")
+            if sys.platform == "win32" and msvcrt is not None:
+                try:
+                    msvcrt.locking(self._handle.fileno(), msvcrt.LK_NBLCK, 1)
+                    return True
+                except OSError:
+                    self._handle.close()
+                    self._handle = None
+                    return False
             try:
-                msvcrt.locking(self._handle.fileno(), msvcrt.LK_NBLCK, 1)
+                import fcntl
+
+                fcntl.flock(self._handle.fileno(), fcntl.LOCK_EX | fcntl.LOCK_NB)
                 return True
-            except OSError:
+            except (ImportError, OSError):
                 self._handle.close()
                 self._handle = None
                 return False
@@ -61,11 +75,19 @@ class _SingleInstance:
 
     def release(self) -> None:
         if self._handle is not None:
-            try:
-                self._handle.seek(0)
-                msvcrt.locking(self._handle.fileno(), msvcrt.LK_UNLCK, 1)
-            except OSError:
-                pass
+            if sys.platform == "win32" and msvcrt is not None:
+                try:
+                    self._handle.seek(0)
+                    msvcrt.locking(self._handle.fileno(), msvcrt.LK_UNLCK, 1)
+                except OSError:
+                    pass
+            else:
+                try:
+                    import fcntl
+
+                    fcntl.flock(self._handle.fileno(), fcntl.LOCK_UN)
+                except (ImportError, OSError):
+                    pass
             try:
                 self._handle.close()
             except OSError:

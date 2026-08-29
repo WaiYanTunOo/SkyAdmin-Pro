@@ -54,6 +54,14 @@ def export_to_excel(db: Database, dest: Path) -> Path:
     financial_docs = db.all_financial_documents()
 
     def build(target: Path) -> None:
+        payments_frame = pd.DataFrame(supplier_payments)
+        if not payments_frame.empty and "paid" in payments_frame.columns:
+            payments_frame = payments_frame.copy()
+            payments_frame["paid"] = (
+                payments_frame["paid"]
+                .map({1: "Yes", 0: "No", True: "Yes", False: "No"})
+                .fillna(payments_frame["paid"])
+            )
         with pd.ExcelWriter(target, engine="openpyxl") as writer:
             for sheet_name, frame, mapping in (
                 ("Tasks", pd.DataFrame(tasks), _TASK_COLUMNS),
@@ -61,7 +69,7 @@ def export_to_excel(db: Database, dest: Path) -> Path:
                 ("Documents", pd.DataFrame(documents), _DOCUMENT_COLUMNS),
                 ("Courier", pd.DataFrame(courier), _COURIER_COLUMNS),
                 ("Suppliers", pd.DataFrame(suppliers), _SUPPLIER_COLUMNS),
-                ("Supplier Payments", pd.DataFrame(supplier_payments), _SUPPLIER_PAYMENT_COLUMNS),
+                ("Supplier Payments", payments_frame, _SUPPLIER_PAYMENT_COLUMNS),
                 ("Supplier Services", pd.DataFrame(supplier_services), _SUPPLIER_SERVICE_COLUMNS),
                 ("Pipeline", pd.DataFrame(pipeline), _PIPELINE_COLUMNS),
                 ("Renewals", pd.DataFrame(renewals), _RENEWAL_COLUMNS),
@@ -126,12 +134,11 @@ _COURIER_COLUMNS = {
 _SUPPLIER_COLUMNS = {
     "id": "ID",
     "name": "Supplier",
-    "contact_person": "Contact person",
-    "phone": "Phone",
-    "email": "Email",
-    "service_category": "Service category",
+    "company_name": "Company",
+    "contact": "Contact",
     "notes": "Notes",
     "created_at": "Created at",
+    "updated_at": "Updated at",
 }
 _SUPPLIER_PAYMENT_COLUMNS = {
     "id": "ID",
@@ -141,6 +148,7 @@ _SUPPLIER_PAYMENT_COLUMNS = {
     "due_date": "Due date",
     "paid_date": "Paid date",
     "paid": "Paid",
+    "notes": "Notes",
 }
 _SUPPLIER_SERVICE_COLUMNS = {
     "supplier_name": "Supplier",

@@ -10,9 +10,11 @@ from tkinter import filedialog, messagebox
 import customtkinter as ctk
 
 from skyadmin_pro.config import (
+    ACCOUNTING_PRICING_SERVICES,
     COURIER_DRIVERS,
     GENERAL_RENEWAL_TEMPLATE_NAME,
     IMPORTANT_DOC_TYPES,
+    NAV_OFFICE_HUB,
     PIPELINE_MAX_STEP,
     PIPELINE_STEPS,
     SERVICE_PROGRESS,
@@ -41,7 +43,23 @@ from skyadmin_pro.services.tracking import (
     effective_expiry_date,
     expiry_label,
 )
-from skyadmin_pro.services.workflow import copy_to_clipboard, create_client_workspace, sanitize_folder_name
+from skyadmin_pro.services.tax_ids_rollout import (
+    apply_pricing_tier,
+    infer_service_types,
+    list_accounting_setup_rows,
+    parse_document_types,
+)
+from skyadmin_pro.services.vo_csh_rollout import (
+    infer_client_vo_csh_renewal_dates,
+    infer_vo_csh_renewal_dates,
+    list_vo_csh_setup_rows,
+)
+from skyadmin_pro.services.workflow import (
+    copy_to_clipboard,
+    create_client_workspace,
+    repair_client_workspaces,
+    resolve_client_folder,
+)
 from skyadmin_pro.ui.treeview import ThemedTreeview
 from skyadmin_pro.ui.theme import CARD_CONTENT_PADX, CARD_RADIUS, CARD_TITLE_SIZE, TEXT_FAINT, TEXT_MUTED
 from skyadmin_pro.ui.views.base import BaseView
@@ -144,6 +162,28 @@ class DatabaseTasksView(BaseView):
     def open_company_details(self, client_name: str) -> None:
         self.tabs.set("Company Details")
         self.company_panel.select_client(client_name)
+        self.company_panel.refresh()
+
+    def open_company_tax_ids(self, client_name: str) -> None:
+        self.tabs.set("Company Details")
+        self.company_panel.select_client(client_name)
+        self.company_panel.tabs.set("Tax IDs")
+        self.company_panel.refresh()
+
+    def open_accounting_setup(self) -> None:
+        self.tabs.set("Company Details")
+        self.company_panel.tabs.set("Accounting Setup")
+        self.company_panel.refresh_accounting_setup()
+
+    def open_vo_csh_setup(self) -> None:
+        self.tabs.set("Company Details")
+        self.company_panel.tabs.set("VO/CSH Setup")
+        self.company_panel.refresh_vo_csh_setup()
+
+    def open_company_vo_csh(self, client_name: str) -> None:
+        self.tabs.set("Company Details")
+        self.company_panel.select_client(client_name)
+        self.company_panel.tabs.set("VO & CSH")
         self.company_panel.refresh()
 
     def open_task(self, task_id: int) -> None:
@@ -1061,6 +1101,7 @@ class CompanyDetailsPanel(ctk.CTkFrame):
         self.feedback = feedback
         self._editing_service_id: int | None = None
         self._editing_doc_id: int | None = None
+        self._filing_suspend_save = False
         self.grid_columnconfigure(0, weight=1)
         self.grid_rowconfigure(1, weight=1)
 
@@ -1085,12 +1126,27 @@ class CompanyDetailsPanel(ctk.CTkFrame):
 
         self.tabs = ctk.CTkTabview(self)
         self.tabs.grid(row=1, column=0, sticky="nsew")
-        for name in ("General", "Tax IDs", "Filing Statuses", "VO & CSH", "Financial Docs"):
+        for name in (
+            "Accounting Setup",
+            "General",
+            "Tax IDs",
+            "Filing Statuses",
+            "VO/CSH Setup",
+            "VO & CSH",
+            "Financial Docs",
+        ):
             self.tabs.add(name)
             tab = self.tabs.tab(name)
             tab.grid_columnconfigure(0, weight=1)
             tab.grid_rowconfigure(0, weight=1)
             tab.grid_propagate(False)
+
+        setup_tab = self.tabs.tab("Accounting Setup")
+        setup_scroll = ctk.CTkScrollableFrame(setup_tab, fg_color="transparent")
+        setup_scroll.grid(row=0, column=0, sticky="nsew")
+        setup_scroll.grid_columnconfigure(0, weight=1)
+        self._accounting_setup_frame = self._build_accounting_setup(setup_scroll)
+        self._accounting_setup_frame.grid(row=0, column=0, sticky="ew")
 
         # General tab — existing content
         general_tab = self.tabs.tab("General")
@@ -1119,6 +1175,13 @@ class CompanyDetailsPanel(ctk.CTkFrame):
         filing_scroll.grid_columnconfigure(0, weight=1)
         self._filing_frame = self._build_filing_statuses(filing_scroll)
         self._filing_frame.grid(row=0, column=0, sticky="ew")
+
+        vo_setup_tab = self.tabs.tab("VO/CSH Setup")
+        vo_setup_scroll = ctk.CTkScrollableFrame(vo_setup_tab, fg_color="transparent")
+        vo_setup_scroll.grid(row=0, column=0, sticky="nsew")
+        vo_setup_scroll.grid_columnconfigure(0, weight=1)
+        self._vo_csh_setup_frame = self._build_vo_csh_setup(vo_setup_scroll)
+        self._vo_csh_setup_frame.grid(row=0, column=0, sticky="ew")
 
         # VO & CSH tab
         vo_tab = self.tabs.tab("VO & CSH")
@@ -1445,6 +1508,228 @@ class CompanyDetailsPanel(ctk.CTkFrame):
         ).grid(row=0, column=1, sticky="ew", padx=(4, 0))
         return frame
 
+    def _build_accounting_setup(self, master) -> ctk.CTkFrame:
+        frame = ctk.CTkFrame(master, corner_radius=CARD_RADIUS)
+        frame.grid_columnconfigure(0, weight=1)
+        self._accounting_setup_rows: dict[str, dict] = {}
+        self._selected_accounting_setup_id: int | None = None
+
+        ctk.CTkLabel(
+            frame,
+            text="Accounting clients — Tax IDs rollout",
+            font=ctk.CTkFont(size=CARD_TITLE_SIZE, weight="bold"),
+        ).grid(row=0, column=0, sticky="w", padx=16, pady=(14, 4))
+        ctk.CTkLabel(
+            frame,
+            text=(
+                "Clients with annual/monthly accounting or tax-filing documents. "
+                "Infer service type from documents, then open Tax IDs to set transaction "
+                "volume, tax ID, and pricing."
+            ),
+            wraplength=760,
+            justify="left",
+            text_color=TEXT_MUTED,
+            anchor="w",
+        ).grid(row=1, column=0, sticky="ew", padx=16, pady=(0, 8))
+
+        toolbar = ctk.CTkFrame(frame, fg_color="transparent")
+        toolbar.grid(row=2, column=0, sticky="ew", padx=16, pady=(0, 8))
+        ctk.CTkLabel(toolbar, text="Show", anchor="w").grid(row=0, column=0, padx=(0, 8))
+        self.accounting_setup_filter = ctk.CTkOptionMenu(
+            toolbar,
+            values=["All", "Needs setup", "Ready"],
+            command=lambda _c: self.refresh_accounting_setup(),
+            width=140,
+        )
+        self.accounting_setup_filter.set("All")
+        self.accounting_setup_filter.grid(row=0, column=1, sticky="w")
+        self.accounting_setup_summary = ctk.CTkLabel(
+            toolbar, text="", text_color=TEXT_MUTED, anchor="w"
+        )
+        self.accounting_setup_summary.grid(row=0, column=2, sticky="ew", padx=(16, 0))
+        toolbar.grid_columnconfigure(2, weight=1)
+
+        self.accounting_setup_tree = ThemedTreeview(
+            frame,
+            columns=(
+                ("company", "Company", 220),
+                ("status", "Setup", 90),
+                ("service", "Service type", 140),
+                ("suggested", "Suggested", 140),
+                ("volume", "Txn volume", 170),
+                ("tax_id", "Tax ID", 120),
+                ("docs", "Accounting docs", 220),
+            ),
+            on_select=self._on_accounting_setup_select,
+            on_double_click=self._open_selected_accounting_tax_ids,
+            showheight=10,
+        )
+        self.accounting_setup_tree.grid(row=3, column=0, sticky="ew", padx=16, pady=(0, 8))
+
+        actions = ctk.CTkFrame(frame, fg_color="transparent")
+        actions.grid(row=4, column=0, sticky="w", padx=16, pady=(0, 14))
+        ctk.CTkButton(
+            actions,
+            text="Open Tax IDs",
+            width=120,
+            command=self._open_selected_accounting_tax_ids,
+        ).grid(row=0, column=0, padx=(0, 8))
+        ctk.CTkButton(
+            actions,
+            text="Infer service type",
+            width=140,
+            command=self._infer_selected_service_type,
+        ).grid(row=0, column=1, padx=(0, 8))
+        ctk.CTkButton(
+            actions,
+            text="Infer all missing",
+            width=130,
+            fg_color="transparent",
+            border_width=1,
+            command=self._infer_all_service_types,
+        ).grid(row=0, column=2, padx=(0, 8))
+        ctk.CTkButton(
+            actions,
+            text="Apply pricing tier",
+            width=140,
+            fg_color="transparent",
+            border_width=1,
+            command=self._apply_selected_pricing_tier,
+        ).grid(row=0, column=3)
+        return frame
+
+    def refresh_accounting_setup(self) -> None:
+        if not hasattr(self, "accounting_setup_tree"):
+            return
+        self.accounting_setup_tree.apply_theme()
+        rows = list_accounting_setup_rows(self.app.db)
+        ready = sum(1 for row in rows if not row.get("setup_missing"))
+        self.accounting_setup_summary.configure(
+            text=f"{ready} of {len(rows)} accounting client(s) ready for tax cycle"
+        )
+        filt = self.accounting_setup_filter.get()
+        if filt == "Needs setup":
+            rows = [row for row in rows if row.get("setup_missing")]
+        elif filt == "Ready":
+            rows = [row for row in rows if not row.get("setup_missing")]
+
+        self._accounting_setup_rows = {}
+        tree_rows = []
+        iids = []
+        tags = []
+        for row in rows:
+            iid = str(row["id"])
+            self._accounting_setup_rows[iid] = row
+            iids.append(iid)
+            docs = parse_document_types(row.get("document_types"))
+            short_docs = docs[0] if len(docs) == 1 else f"{len(docs)} doc type(s)" if docs else "—"
+            tree_rows.append(
+                (
+                    row.get("name") or "",
+                    row.get("setup_status") or "",
+                    row.get("service_type") or "—",
+                    row.get("suggested_service_type") or "—",
+                    row.get("num_transactions") or "—",
+                    row.get("tax_id") or "—",
+                    short_docs,
+                )
+            )
+            tag = ()
+            if row.get("setup_status") == "Ready":
+                tag = ("done",)
+            elif row.get("setup_status") == "Almost":
+                tag = ("watch",)
+            elif row.get("setup_status") == "Needs setup":
+                tag = ("urgent",)
+            tags.append(tag)
+        self.accounting_setup_tree.set_rows(tree_rows, iids=iids, tags=tags)
+
+    def _on_accounting_setup_select(self, iid: str | None) -> None:
+        self._selected_accounting_setup_id = int(iid) if iid else None
+
+    def _selected_accounting_setup_row(self) -> dict | None:
+        if self._selected_accounting_setup_id is None:
+            return None
+        return self._accounting_setup_rows.get(str(self._selected_accounting_setup_id))
+
+    def _open_selected_accounting_tax_ids(self, _iid: str | None = None) -> None:
+        row = self._selected_accounting_setup_row()
+        if not row:
+            self.feedback.error("Select an accounting client first.")
+            return
+        name = (row.get("name") or "").strip()
+        self.select_client(name)
+        self.tabs.set("Tax IDs")
+        self.refresh()
+
+    def _infer_selected_service_type(self) -> None:
+        row = self._selected_accounting_setup_row()
+        if not row:
+            self.feedback.error("Select an accounting client first.")
+            return
+        suggested = (row.get("suggested_service_type") or "").strip()
+        if not suggested:
+            self.feedback.error("No service type can be inferred from this client's documents.")
+            return
+        if (row.get("service_type") or "").strip() and (
+            row.get("service_type") or ""
+        ).strip() != suggested:
+            if not messagebox.askyesno(
+                "Overwrite service type",
+                f"Replace '{row.get('service_type')}' with inferred '{suggested}'?",
+                parent=self.winfo_toplevel(),
+            ):
+                return
+        self.app.db.update_client_fields(int(row["id"]), service_type=suggested)
+        self.feedback.success(f"Service type set to {suggested}.")
+        self.refresh_accounting_setup()
+        if self._selected_client_id() == int(row["id"]):
+            self.refresh()
+
+    def _infer_all_service_types(self) -> None:
+        pending = sum(
+            1
+            for row in list_accounting_setup_rows(self.app.db)
+            if not (row.get("service_type") or "").strip()
+            and (row.get("suggested_service_type") or "").strip()
+        )
+        if pending == 0:
+            self.feedback.info("No clients need service-type inference.")
+            return
+        if not messagebox.askyesno(
+            "Infer service types",
+            f"Infer service type from documents for {pending} client(s) "
+            "that do not have one yet?",
+            parent=self.winfo_toplevel(),
+        ):
+            return
+        updated = infer_service_types(self.app.db, only_missing=True)
+        self.feedback.success(f"Inferred service type for {updated} client(s).")
+        self.refresh_accounting_setup()
+        self.refresh()
+
+    def _apply_selected_pricing_tier(self) -> None:
+        row = self._selected_accounting_setup_row()
+        if not row:
+            self.feedback.error("Select an accounting client first.")
+            return
+        client_id = int(row["id"])
+        if not (row.get("service_type") or "").strip():
+            self.feedback.error("Set service type first (use Infer service type).")
+            return
+        if not (row.get("num_transactions") or "").strip():
+            self.feedback.error(
+                "Set transaction volume in Tax IDs before applying pricing."
+            )
+            return
+        if not apply_pricing_tier(self.app.db, client_id):
+            self.feedback.error("No pricing tier found for this service and volume.")
+            return
+        self.feedback.success("Pricing tier applied (fee, SLA, headcount).")
+        self.refresh_accounting_setup()
+        if self._selected_client_id() == client_id:
+            self.refresh()
+
     def _build_tax_ids(self, master) -> ctk.CTkFrame:
         frame = ctk.CTkFrame(master, corner_radius=CARD_RADIUS)
         frame.grid_columnconfigure(0, weight=1)
@@ -1459,21 +1744,15 @@ class CompanyDetailsPanel(ctk.CTkFrame):
         form.grid_columnconfigure((0, 1), weight=1)
 
         self.tax_id_var = ctk.StringVar()
-        self.ird_pw_var = ctk.StringVar()
+        self.cred_pw_var = ctk.StringVar()
         self.vat_reg_date_var = ctk.StringVar()
         self.service_fee_var = ctk.StringVar()
         self.sla_var = ctk.StringVar()
         self.headcount_var = ctk.StringVar()
 
-        ctk.CTkLabel(form, text="Tax ID").grid(row=0, column=0, sticky="w", pady=(2, 2))
+        ctk.CTkLabel(form, text="Tax ID").grid(row=0, column=0, columnspan=2, sticky="w", pady=(2, 2))
         ctk.CTkEntry(form, textvariable=self.tax_id_var).grid(
-            row=1, column=0, sticky="ew", padx=(0, 12), pady=(0, 4)
-        )
-        ctk.CTkLabel(form, text="IRD Password").grid(
-            row=0, column=1, sticky="w", pady=(2, 2)
-        )
-        ctk.CTkEntry(form, textvariable=self.ird_pw_var, show="*").grid(
-            row=1, column=1, sticky="ew", pady=(0, 4)
+            row=1, column=0, columnspan=2, sticky="ew", pady=(0, 4)
         )
 
         ctk.CTkLabel(form, text="VAT Registered").grid(
@@ -1494,8 +1773,7 @@ class CompanyDetailsPanel(ctk.CTkFrame):
             row=4, column=0, sticky="w", pady=(6, 2)
         )
         self.acct_service_type = ctk.CTkOptionMenu(
-            form, values=["", "Yearly Accounting", "Monthly Accounting",
-                          "Monthly Tax Filing", "Mid-Year Tax Filing", "Annual Audit"]
+            form, values=["", *ACCOUNTING_PRICING_SERVICES]
         )
         self.acct_service_type.grid(row=5, column=0, sticky="ew", padx=(0, 12), pady=(0, 4))
         ctk.CTkLabel(form, text="Transaction Volume").grid(
@@ -1529,16 +1807,144 @@ class CompanyDetailsPanel(ctk.CTkFrame):
             row=9, column=1, sticky="ew", pady=(0, 4)
         )
 
+        cred_card = ctk.CTkFrame(frame, corner_radius=12)
+        cred_card.grid(row=2, column=0, sticky="ew", padx=16, pady=(4, 8))
+        cred_card.grid_columnconfigure(0, weight=1)
+        self._client_cred_rows: dict[str, dict] = {}
+        self._selected_client_cred_id: int | None = None
+
+        ctk.CTkLabel(
+            cred_card,
+            text="Client portal logins (read-only)",
+            font=ctk.CTkFont(size=13, weight="bold"),
+        ).grid(row=0, column=0, sticky="w", padx=16, pady=(12, 6))
+        ctk.CTkLabel(
+            cred_card,
+            text="DBD, RD, IRD, and other types — edit in Office Hub → Passwords → Client DBD / RD.",
+            text_color=TEXT_MUTED,
+            font=ctk.CTkFont(size=11),
+        ).grid(row=1, column=0, sticky="w", padx=16, pady=(0, 8))
+
+        self.client_cred_tree = ThemedTreeview(
+            cred_card,
+            columns=(
+                ("type", "Type", 90),
+                ("login", "Login ID", 140),
+                ("portal", "Portal URL", 200),
+            ),
+            on_select=self._on_client_cred_select,
+            showheight=4,
+        )
+        self.client_cred_tree.grid(row=2, column=0, sticky="ew", padx=16, pady=(0, 8))
+
+        cred_detail = ctk.CTkFrame(cred_card, fg_color="transparent")
+        cred_detail.grid(row=3, column=0, sticky="ew", padx=16, pady=(0, 8))
+        cred_detail.grid_columnconfigure(1, weight=1)
+        ctk.CTkLabel(cred_detail, text="Password", anchor="w").grid(row=0, column=0, sticky="w", padx=(0, 8))
+        self.cred_pw_entry = ctk.CTkEntry(
+            cred_detail, textvariable=self.cred_pw_var, show="*", state="disabled"
+        )
+        self.cred_pw_entry.grid(row=0, column=1, sticky="ew")
+        ctk.CTkButton(
+            cred_detail, text="Copy", width=70, command=self._copy_client_cred_password
+        ).grid(row=0, column=2, padx=(8, 0))
+
+        cred_actions = ctk.CTkFrame(cred_card, fg_color="transparent")
+        cred_actions.grid(row=4, column=0, sticky="w", padx=16, pady=(0, 12))
+        ctk.CTkButton(
+            cred_actions,
+            text="Edit in Office Hub",
+            width=140,
+            command=self._open_office_hub_credentials,
+        ).pack(side="left")
+
         ctk.CTkButton(
             frame, text="Save Tax IDs & Service Info", width=200,
             command=self._save_tax_ids,
-        ).grid(row=2, column=0, sticky="w", padx=16, pady=(8, 14))
+        ).grid(row=3, column=0, sticky="w", padx=16, pady=(8, 14))
 
         self.acct_txn_volume.configure(command=self._on_txn_volume_change)
         return frame
 
+    def _set_cred_password_display(self, password: str = "") -> None:
+        self.cred_pw_entry.configure(state="normal")
+        self.cred_pw_var.set(password or "—")
+        self.cred_pw_entry.configure(state="disabled")
+
+    def _load_client_credentials_display(self, client_id: int | None) -> None:
+        self._selected_client_cred_id = None
+        self._client_cred_rows = {}
+        self._set_cred_password_display()
+        if client_id is None:
+            self.client_cred_tree.set_rows([])
+            return
+        rows = self.app.db.list_client_credentials(client_id=client_id)
+        tree_rows = []
+        iids = []
+        for row in rows:
+            iid = str(row["id"])
+            self._client_cred_rows[iid] = row
+            iids.append(iid)
+            tree_rows.append(
+                (
+                    row.get("credential_type") or "",
+                    row.get("login_id") or row.get("username") or row.get("registration_number") or "",
+                    row.get("portal_url") or "",
+                )
+            )
+        self.client_cred_tree.set_rows(tree_rows, iids=iids)
+        if iids:
+            self.client_cred_tree.tree.selection_set(iids[0])
+            self.client_cred_tree.tree.focus(iids[0])
+            self._on_client_cred_select(iids[0])
+
+    def _on_client_cred_select(self, iid: str | None) -> None:
+        if not iid:
+            self._selected_client_cred_id = None
+            self._set_cred_password_display()
+            return
+        row = self._client_cred_rows.get(str(iid))
+        if not row:
+            self._selected_client_cred_id = None
+            self._set_cred_password_display()
+            return
+        self._selected_client_cred_id = int(iid)
+        self._set_cred_password_display(row.get("password") or "")
+
+    def _copy_client_cred_password(self) -> None:
+        secret = self.cred_pw_var.get().strip()
+        if not secret or secret == "—":
+            self.feedback.error("No password stored for the selected login.")
+            return
+        copy_to_clipboard(secret)
+        self.feedback.success("Password copied.")
+
+    def _open_office_hub_credentials(self) -> None:
+        client_id = self._selected_client_id()
+        if client_id is None:
+            self.feedback.error("Select a company first.")
+            return
+        client = self.app.db.get_client(client_id)
+        name = (client or {}).get("name") or ""
+        if not name:
+            self.feedback.error("Select a company first.")
+            return
+        cred_type = None
+        cred_id = self._selected_client_cred_id
+        if cred_id is not None:
+            row = self._client_cred_rows.get(str(cred_id))
+            cred_type = (row or {}).get("credential_type")
+        open_hub = getattr(self.app, "open_office_hub_client_credentials", None)
+        if callable(open_hub):
+            open_hub(name, credential_type=cred_type, credential_id=cred_id)
+        else:
+            self.app.show_view(NAV_OFFICE_HUB)
+
     def _on_txn_volume_change(self, choice: str) -> None:
-        tier = self.app.db.lookup_pricing_by_range(choice)
+        tier = self.app.db.lookup_pricing_by_range(
+            choice,
+            service_type=self.acct_service_type.get().strip() or None,
+        )
         if not tier:
             return
         fee = tier.get("monthly_fee")
@@ -1562,7 +1968,7 @@ class CompanyDetailsPanel(ctk.CTkFrame):
                 return
         if fee is None and sla is None and hc is None:
             self.feedback.error(
-                f"No pricing configured for '{choice}' — set it in Settings → Pricing."
+                f"No pricing configured for '{choice}' — set it in Settings → Pricing matrix."
             )
             return
         if fee is not None:
@@ -1588,7 +1994,6 @@ class CompanyDetailsPanel(ctk.CTkFrame):
             self.app.db.update_client_fields(
                 client_id,
                 tax_id=self.tax_id_var.get().strip(),
-                ird_password=self.ird_pw_var.get().strip(),
                 vat_registered=1 if self.vat_registered_var.get() else 0,
                 vat_registered_date=vat_date,
                 service_type=self.acct_service_type.get() or None,
@@ -1658,6 +2063,7 @@ class CompanyDetailsPanel(ctk.CTkFrame):
 
             var = ctk.StringVar(value="Not Applicable")
             self.filing_vars[field] = var
+            var.trace_add("write", lambda *_a, f=field: self._on_filing_status_change(f))
             menu = ctk.CTkOptionMenu(frame, values=list(TAX_FILING_STATUSES), variable=var)
             menu.grid(row=row, column=1, sticky="ew", padx=(0, 8), pady=(4, 2))
 
@@ -1685,10 +2091,11 @@ class CompanyDetailsPanel(ctk.CTkFrame):
         # Save + Reset All buttons
         btn_row = ctk.CTkFrame(frame, fg_color="transparent")
         btn_row.grid(row=len(TAX_FILING_FIELDS) + 2, column=0, columnspan=2, sticky="w", padx=16, pady=(12, 8))
-        ctk.CTkButton(
-            btn_row, text="Save Filing Statuses", width=180,
-            command=self._save_filing_statuses,
-        ).pack(side="left", padx=(0, 8))
+        ctk.CTkLabel(
+            btn_row,
+            text="Changes save automatically when you pick a status.",
+            text_color=TEXT_MUTED,
+        ).pack(side="left", padx=(0, 12))
         ctk.CTkButton(
             btn_row, text="Reset All to N/A", width=140,
             fg_color=("#dc2626", "#b91c1c"),
@@ -1722,36 +2129,64 @@ class CompanyDetailsPanel(ctk.CTkFrame):
 
         return frame
 
+    def _on_filing_status_change(self, field: str) -> None:
+        if self._filing_suspend_save:
+            return
+        self._persist_filing_field(field)
+
+    def _persist_filing_field(self, field: str) -> None:
+        client_id = self._selected_client_id()
+        if client_id is None:
+            return
+        old = self.app.db.get_client_tax_summary(client_id)
+        new_val = self.filing_vars[field].get()
+        if old.get(field) == new_val:
+            return
+        client = self.app.db.get_client(client_id)
+        client_name = (client or {}).get("name") or "client"
+        self.app.db.log_tax_change(client_id, field, old.get(field), new_val)
+        if new_val in ("Pending", "On-Going"):
+            label = TAX_FILING_LABELS.get(field, field)
+            self.app.db.add_task(
+                title=f"Tax filing: {label} — {client_name}",
+                client_id=client_id,
+                category="General",
+                description=f"Status changed from {old.get(field, 'N/A')} to {new_val}.",
+            )
+        self.app.db.update_client_fields(client_id, **{field: new_val})
+        val = new_val if new_val in TAX_FILING_STATUSES else "Not Applicable"
+        self.filing_labels[field].configure(
+            text="\u2705" if val == "Complete"
+            else "\U0001f7e1" if val == "On-Going"
+            else "\u274c" if val == "Pending"
+            else "\u2b1c"
+        )
+        last_changed = self.app.db.get_filing_last_changed(client_id)
+        self.filing_last_changed_label.configure(
+            text=f"Last changed: {last_changed}" if last_changed else ""
+        )
+        history = self.app.db.get_filing_change_history(client_id, limit=20)
+        self.filing_history_tree.set_rows(
+            [
+                (
+                    row.get("changed_at") or "",
+                    TAX_FILING_LABELS.get(row.get("field") or "", row.get("field") or ""),
+                    row.get("old_value") or "",
+                    row.get("new_value") or "",
+                )
+                for row in history
+            ]
+        )
+        self.feedback.success(f"{TAX_FILING_LABELS.get(field, field)} saved.")
+
     def _save_filing_statuses(self) -> None:
         client_id = self._selected_client_id()
         if client_id is None:
             self.feedback.error("Select a company first.")
             return
-        old = self.app.db.get_client_tax_summary(client_id)
-        client = self.app.db.get_client(client_id)
-        client_name = (client or {}).get("name") or "client"
-        new_values = {}
-        tasks_created = 0
         for field in TAX_FILING_FIELDS:
-            new_val = self.filing_vars[field].get()
-            new_values[field] = new_val
-            if old.get(field) != new_val:
-                self.app.db.log_tax_change(client_id, field, old.get(field), new_val)
-                # Auto-create tasks when status moves to Pending or On-Going
-                if new_val in ("Pending", "On-Going"):
-                    label = TAX_FILING_LABELS.get(field, field)
-                    self.app.db.add_task(
-                        title=f"Tax filing: {label} — {client_name}",
-                        client_id=client_id,
-                        category="General",
-                        description=f"Status changed from {old.get(field, 'N/A')} to {new_val}.",
-                    )
-                    tasks_created += 1
-        self.app.db.update_client_fields(client_id, **new_values)
-        msg = "Filing statuses saved."
-        if tasks_created:
-            msg += f" {tasks_created} task(s) auto-created."
-        self.feedback.success(msg)
+            self._persist_filing_field(field)
+        self.feedback.success("All filing statuses saved.")
         self.refresh()
 
     def _edit_filing_status(self, field: str) -> None:
@@ -1828,6 +2263,192 @@ class CompanyDetailsPanel(ctk.CTkFrame):
             self.feedback.success(f"{len(updates)} filing status(es) reset to N/A.")
         else:
             self.feedback.info("All filing statuses already N/A.")
+        self.refresh()
+
+    def _build_vo_csh_setup(self, master) -> ctk.CTkFrame:
+        frame = ctk.CTkFrame(master, corner_radius=CARD_RADIUS)
+        frame.grid_columnconfigure(0, weight=1)
+        self._vo_csh_setup_rows: dict[str, dict] = {}
+        self._selected_vo_csh_setup_id: int | None = None
+
+        ctk.CTkLabel(
+            frame,
+            text="VO / CSH renewal rollout",
+            font=ctk.CTkFont(size=CARD_TITLE_SIZE, weight="bold"),
+        ).grid(row=0, column=0, sticky="w", padx=16, pady=(14, 4))
+        ctk.CTkLabel(
+            frame,
+            text=(
+                "Clients with Virtual Office or CSH rental documents. Infer renewal dates "
+                "from document expiry, then review providers and addresses on the VO & CSH tab."
+            ),
+            wraplength=760,
+            justify="left",
+            text_color=TEXT_MUTED,
+            anchor="w",
+        ).grid(row=1, column=0, sticky="ew", padx=16, pady=(0, 8))
+
+        toolbar = ctk.CTkFrame(frame, fg_color="transparent")
+        toolbar.grid(row=2, column=0, sticky="ew", padx=16, pady=(0, 8))
+        ctk.CTkLabel(toolbar, text="Show", anchor="w").grid(row=0, column=0, padx=(0, 8))
+        self.vo_csh_setup_filter = ctk.CTkOptionMenu(
+            toolbar,
+            values=["All", "Needs setup", "Ready"],
+            command=lambda _c: self.refresh_vo_csh_setup(),
+            width=140,
+        )
+        self.vo_csh_setup_filter.set("All")
+        self.vo_csh_setup_filter.grid(row=0, column=1, sticky="w")
+        self.vo_csh_setup_summary = ctk.CTkLabel(
+            toolbar, text="", text_color=TEXT_MUTED, anchor="w"
+        )
+        self.vo_csh_setup_summary.grid(row=0, column=2, sticky="ew", padx=(16, 0))
+        toolbar.grid_columnconfigure(2, weight=1)
+
+        self.vo_csh_setup_tree = ThemedTreeview(
+            frame,
+            columns=(
+                ("company", "Company", 200),
+                ("status", "Setup", 80),
+                ("vo_docs", "VO docs", 70),
+                ("vo_date", "VO renewal", 100),
+                ("vo_suggest", "Suggested VO", 100),
+                ("csh_docs", "CSH docs", 70),
+                ("csh_date", "CSH renewal", 100),
+                ("csh_suggest", "Suggested CSH", 100),
+            ),
+            on_select=self._on_vo_csh_setup_select,
+            on_double_click=self._open_selected_vo_csh_tab,
+            showheight=10,
+        )
+        self.vo_csh_setup_tree.grid(row=3, column=0, sticky="ew", padx=16, pady=(0, 8))
+
+        actions = ctk.CTkFrame(frame, fg_color="transparent")
+        actions.grid(row=4, column=0, sticky="w", padx=16, pady=(0, 14))
+        ctk.CTkButton(
+            actions,
+            text="Open VO & CSH",
+            width=130,
+            command=self._open_selected_vo_csh_tab,
+        ).grid(row=0, column=0, padx=(0, 8))
+        ctk.CTkButton(
+            actions,
+            text="Infer renewal dates",
+            width=150,
+            command=self._infer_selected_vo_csh_dates,
+        ).grid(row=0, column=1, padx=(0, 8))
+        ctk.CTkButton(
+            actions,
+            text="Infer all missing",
+            width=130,
+            fg_color="transparent",
+            border_width=1,
+            command=self._infer_all_vo_csh_dates,
+        ).grid(row=0, column=2)
+        return frame
+
+    def refresh_vo_csh_setup(self) -> None:
+        if not hasattr(self, "vo_csh_setup_tree"):
+            return
+        self.vo_csh_setup_tree.apply_theme()
+        rows = list_vo_csh_setup_rows(self.app.db)
+        ready = sum(1 for row in rows if not row.get("setup_missing"))
+        self.vo_csh_setup_summary.configure(
+            text=f"{ready} of {len(rows)} VO/CSH client(s) have renewal dates set"
+        )
+        filt = self.vo_csh_setup_filter.get()
+        if filt == "Needs setup":
+            rows = [row for row in rows if row.get("setup_missing")]
+        elif filt == "Ready":
+            rows = [row for row in rows if not row.get("setup_missing")]
+
+        self._vo_csh_setup_rows = {}
+        tree_rows = []
+        iids = []
+        tags = []
+        for row in rows:
+            iid = str(row["id"])
+            self._vo_csh_setup_rows[iid] = row
+            iids.append(iid)
+            tree_rows.append(
+                (
+                    row.get("name") or "",
+                    row.get("setup_status") or "",
+                    str(int(row.get("vo_doc_count") or 0)),
+                    row.get("vo_renewal_date") or "—",
+                    row.get("suggested_vo_renewal_date") or "—",
+                    str(int(row.get("csh_doc_count") or 0)),
+                    row.get("csh_renewal_date") or "—",
+                    row.get("suggested_csh_renewal_date") or "—",
+                )
+            )
+            status = row.get("setup_status")
+            if status == "Ready":
+                tags.append(("done",))
+            elif status == "Almost":
+                tags.append(("watch",))
+            else:
+                tags.append(("urgent",))
+        self.vo_csh_setup_tree.set_rows(tree_rows, iids=iids, tags=tags)
+
+    def _on_vo_csh_setup_select(self, iid: str | None) -> None:
+        self._selected_vo_csh_setup_id = int(iid) if iid else None
+
+    def _selected_vo_csh_setup_row(self) -> dict | None:
+        if self._selected_vo_csh_setup_id is None:
+            return None
+        return self._vo_csh_setup_rows.get(str(self._selected_vo_csh_setup_id))
+
+    def _open_selected_vo_csh_tab(self, _iid: str | None = None) -> None:
+        row = self._selected_vo_csh_setup_row()
+        if not row:
+            self.feedback.error("Select a client first.")
+            return
+        self.select_client((row.get("name") or "").strip())
+        self.tabs.set("VO & CSH")
+        self.refresh()
+
+    def _infer_selected_vo_csh_dates(self) -> None:
+        row = self._selected_vo_csh_setup_row()
+        if not row:
+            self.feedback.error("Select a client first.")
+            return
+        if not row.get("can_infer_vo") and not row.get("can_infer_csh"):
+            self.feedback.error("No document expiry dates available to infer.")
+            return
+        result = infer_client_vo_csh_renewal_dates(self.app.db, int(row["id"]))
+        total = int(result["vo"]) + int(result["csh"])
+        if not total:
+            self.feedback.info("Nothing to infer for this client.")
+            return
+        self.feedback.success(
+            f"Inferred {result['vo']} VO and {result['csh']} CSH renewal date(s)."
+        )
+        self.refresh_vo_csh_setup()
+        self.refresh()
+
+    def _infer_all_vo_csh_dates(self) -> None:
+        pending = sum(
+            1
+            for row in list_vo_csh_setup_rows(self.app.db)
+            if row.get("can_infer_vo") or row.get("can_infer_csh")
+        )
+        if pending == 0:
+            self.feedback.info("No clients need renewal date inference.")
+            return
+        if not messagebox.askyesno(
+            "Infer VO/CSH renewal dates",
+            f"Infer renewal dates from document expiry for {pending} client(s)?",
+            parent=self.winfo_toplevel(),
+        ):
+            return
+        result = infer_vo_csh_renewal_dates(self.app.db, only_missing=True)
+        total = int(result["vo"]) + int(result["csh"])
+        self.feedback.success(
+            f"Inferred {result['vo']} VO and {result['csh']} CSH renewal date(s) "
+            f"({total} total)."
+        )
+        self.refresh_vo_csh_setup()
         self.refresh()
 
     def _build_vo_csh(self, master) -> ctk.CTkFrame:
@@ -2100,7 +2721,14 @@ class CompanyDetailsPanel(ctk.CTkFrame):
             client = self.app.db.get_client(client_id)
             client_name = (client or {}).get("name") or "client"
             folder_name = FINANCIAL_DOC_FOLDER_MAP.get(category, "General_Expenses")
-            dest_dir = self.app.paths.clients / sanitize_folder_name(client_name) / "04_Financial_Docs" / folder_name
+            try:
+                client_folder = resolve_client_folder(
+                    self.app.paths.clients, client_name, create=True
+                )
+            except Exception as exc:
+                self.feedback.error(str(exc))
+                return
+            dest_dir = client_folder / "04_Financial_Docs" / folder_name
             try:
                 dest_dir.mkdir(parents=True, exist_ok=True)
             except OSError as exc:
@@ -2218,7 +2846,7 @@ class CompanyDetailsPanel(ctk.CTkFrame):
                 var.set("")
             self.info_objectives.delete("1.0", "end")
             self.tax_id_var.set("")
-            self.ird_pw_var.set("")
+            self._load_client_credentials_display(None)
             self.vat_registered_var.set(False)
             self.vat_reg_date_var.set("")
             self.acct_service_type.set("")
@@ -2232,6 +2860,8 @@ class CompanyDetailsPanel(ctk.CTkFrame):
                     self.filing_vars[field].set("Not Applicable")
             for key, lbl in self.filing_summary_labels.items():
                 lbl.configure(text="0")
+            self.refresh_accounting_setup()
+            self.refresh_vo_csh_setup()
             return
 
         services = self.app.db.list_client_services(client_id)
@@ -2254,7 +2884,7 @@ class CompanyDetailsPanel(ctk.CTkFrame):
 
         # Tax IDs sub-tab
         self.tax_id_var.set((client or {}).get("tax_id") or "")
-        self.ird_pw_var.set((client or {}).get("ird_password") or "")
+        self._load_client_credentials_display(client_id)
         self.vat_registered_var.set(bool((client or {}).get("vat_registered")))
         self.vat_reg_date_var.set((client or {}).get("vat_registered_date") or "")
         self.acct_service_type.set((client or {}).get("service_type") or "")
@@ -2271,25 +2901,29 @@ class CompanyDetailsPanel(ctk.CTkFrame):
 
         # Filing Statuses sub-tab
         counts = {"complete": 0, "ongoing": 0, "pending": 0, "na": 0}
-        for field in TAX_FILING_FIELDS:
-            val = (client or {}).get(field) or "Not Applicable"
-            if val not in TAX_FILING_STATUSES:
-                val = "Not Applicable"
-            self.filing_vars[field].set(val)
-            self.filing_labels[field].configure(
-                text="\u2705" if val == "Complete"
-                else "\U0001f7e1" if val == "On-Going"
-                else "\u274c" if val == "Pending"
-                else "\u2b1c"
-            )
-            if val == "Complete":
-                counts["complete"] += 1
-            elif val == "On-Going":
-                counts["ongoing"] += 1
-            elif val == "Pending":
-                counts["pending"] += 1
-            else:
-                counts["na"] += 1
+        self._filing_suspend_save = True
+        try:
+            for field in TAX_FILING_FIELDS:
+                val = (client or {}).get(field) or "Not Applicable"
+                if val not in TAX_FILING_STATUSES:
+                    val = "Not Applicable"
+                self.filing_vars[field].set(val)
+                self.filing_labels[field].configure(
+                    text="\u2705" if val == "Complete"
+                    else "\U0001f7e1" if val == "On-Going"
+                    else "\u274c" if val == "Pending"
+                    else "\u2b1c"
+                )
+                if val == "Complete":
+                    counts["complete"] += 1
+                elif val == "On-Going":
+                    counts["ongoing"] += 1
+                elif val == "Pending":
+                    counts["pending"] += 1
+                else:
+                    counts["na"] += 1
+        finally:
+            self._filing_suspend_save = False
         for key, lbl in self.filing_summary_labels.items():
             lbl.configure(text=str(counts[key]))
         # Last changed timestamp
@@ -2375,6 +3009,8 @@ class CompanyDetailsPanel(ctk.CTkFrame):
             iids.append(str(item["id"]))
             tags.append(tuple(row_tags))
         self.doc_tree.set_rows(rows, iids=iids, tags=tags)
+        self.refresh_accounting_setup()
+        self.refresh_vo_csh_setup()
 
     def _parse_date(self, var: ctk.StringVar) -> str | None:
         raw = var.get().strip()
@@ -3276,6 +3912,7 @@ class SuppliersPanel(ctk.CTkFrame):
         self.feedback = feedback
         self._selected_supplier_id: int | None = None
         self._editing_svc_id: int | None = None
+        self._editing_payment_id: int | None = None
         self.grid_columnconfigure(0, weight=1)
         self.grid_rowconfigure(0, weight=1)
 
@@ -3445,9 +4082,19 @@ class SuppliersPanel(ctk.CTkFrame):
         ctk.CTkLabel(pay_form, text="Notes").grid(row=2, column=2, sticky="w", padx=(12, 8), pady=4)
         self.pay_notes = ctk.CTkEntry(pay_form)
         self.pay_notes.grid(row=2, column=3, sticky="ew", pady=4)
+        pay_form_btns = ctk.CTkFrame(pay_card, fg_color="transparent")
+        pay_form_btns.grid(row=2, column=0, sticky="w", padx=16, pady=(8, 4))
+        self.pay_save_btn = ctk.CTkButton(
+            pay_form_btns, text="Add payment", width=120, command=self._save_payment
+        )
+        self.pay_save_btn.pack(side="left")
         ctk.CTkButton(
-            pay_card, text="Add payment", command=self._add_payment,
-        ).grid(row=2, column=0, sticky="ew", padx=16, pady=(8, 8))
+            pay_form_btns, text="Edit", width=70, command=self._edit_payment
+        ).pack(side="left", padx=(8, 0))
+        ctk.CTkButton(
+            pay_form_btns, text="New", width=70, fg_color="transparent", border_width=1,
+            command=self._new_payment,
+        ).pack(side="left", padx=(8, 0))
 
         self.pay_tree = ThemedTreeview(
             pay_card,
@@ -3591,7 +4238,7 @@ class SuppliersPanel(ctk.CTkFrame):
         self._new_supplier()
         self.refresh()
 
-    def _add_payment(self) -> None:
+    def _save_payment(self) -> None:
         supplier_name = self.pay_supplier.get().strip()
         if not supplier_name:
             self.feedback.error("Select or type a supplier name.")
@@ -3615,7 +4262,7 @@ class SuppliersPanel(ctk.CTkFrame):
         if self.pay_due_var.get().strip() and due_date is None:
             self.feedback.error("Enter a valid due date (YYYY-MM-DD or DD/MM/YYYY).")
             return
-        self.app.db.add_supplier_payment(
+        fields = dict(
             supplier_id=supplier_id,
             client_id=client_id,
             amount=sanitize_amount(raw_amount) if raw_amount else None,
@@ -3623,12 +4270,53 @@ class SuppliersPanel(ctk.CTkFrame):
             paid_date=pay_date,
             notes=self.pay_notes.get().strip() or None,
         )
-        self.feedback.success("Supplier payment recorded.")
+        if self._editing_payment_id:
+            self.app.db.update_supplier_payment(self._editing_payment_id, **fields)
+            self.feedback.success("Supplier payment updated.")
+        else:
+            self.app.db.add_supplier_payment(**fields)
+            self.feedback.success("Supplier payment recorded.")
+        self._new_payment()
+        self.refresh()
+
+    def _edit_payment(self) -> None:
+        iid = self.pay_tree.selected_iid()
+        if iid is None:
+            self.feedback.error("Select a payment to edit.")
+            return
+        payment = self.app.db.get_supplier_payment(int(iid))
+        if payment is None:
+            self.feedback.error("Payment record not found.")
+            return
+        self._editing_payment_id = int(iid)
+        self.pay_save_btn.configure(text="Save payment")
+        _fill_combo(
+            self.pay_supplier,
+            [s["name"] for s in self.app.db.list_suppliers()],
+            payment.get("supplier_name") or "",
+        )
+        _fill_combo(
+            self.pay_client,
+            self.app.db.list_client_names(),
+            payment.get("client_name") or "",
+        )
+        self.pay_amount.delete(0, "end")
+        if payment.get("amount"):
+            self.pay_amount.insert(0, format_thousands(payment["amount"]))
+        self.pay_due_var.set(payment.get("due_date") or "")
+        self.pay_date_var.set(payment.get("paid_date") or "")
+        self.pay_notes.delete(0, "end")
+        if payment.get("notes"):
+            self.pay_notes.insert(0, payment["notes"])
+
+    def _new_payment(self) -> None:
+        self._editing_payment_id = None
+        self.pay_save_btn.configure(text="Add payment")
+        self.pay_tree.tree.selection_remove(*self.pay_tree.tree.selection())
         self.pay_amount.delete(0, "end")
         self.pay_due_var.set("")
         self.pay_date_var.set("")
         self.pay_notes.delete(0, "end")
-        self.refresh()
 
     def _mark_paid(self) -> None:
         iid = self.pay_tree.selected_iid()

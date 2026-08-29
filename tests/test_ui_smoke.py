@@ -41,14 +41,19 @@ def app(tmp_path_factory):
         pass
 
 
-def test_sidebar_has_five_buttons(app):
-    assert len(app._nav_buttons) == 5
+def test_sidebar_has_six_nav_buttons(app):
+    assert len(app._nav_buttons) == 6
     for key, btn in app._nav_buttons.items():
         assert btn.cget("text").strip()
 
 
-def test_views_exist(app):
-    for key in ("dashboard", "document_hub", "database_tasks", "utilities", "settings"):
+def test_views_lazy_loaded(app):
+    assert len(app._views) == 1
+    assert "dashboard" in app._views
+    for key in ("document_hub", "database_tasks", "office_hub", "utilities", "settings"):
+        assert key not in app._views
+        app.show_view(key)
+        app.update()
         assert key in app._views
 
 

@@ -3,23 +3,30 @@
 from __future__ import annotations
 
 from pathlib import Path
-from tkinter import filedialog, messagebox
+from tkinter import filedialog, messagebox, simpledialog
 
 import customtkinter as ctk
 
 from skyadmin_pro.config import (
     CHECKLIST_TEMPLATES,
+    DEFAULT_COLOR_THEME,
     DEFAULT_PORTAL_URL,
     OWNER_EMAIL,
+    PRICING_DEFAULT_SERVICE,
     SERVICE_TYPES,
     SETTING_APPEARANCE_MODE,
+    SETTING_COLOR_THEME,
     SETTING_PORTAL_URL,
     SETTING_WORKSPACE_ROOT,
+    TRANSACTION_RANGES,
+    pricing_uses_transaction_ranges,
 )
 from skyadmin_pro.paths import WorkspacePaths
 from skyadmin_pro.services.file_ops import open_in_file_manager
-from skyadmin_pro.services.workflow import normalize_portal_url
+from skyadmin_pro.services.workflow import normalize_portal_url, repair_client_workspaces
+from skyadmin_pro.services.data_hygiene import run_data_hygiene
 from skyadmin_pro.ui.theme import TEXT_MUTED
+from skyadmin_pro.ui.treeview import ThemedTreeview
 from skyadmin_pro.ui.views.base import BaseView
 from skyadmin_pro.ui.widgets import FeedbackLabel
 
@@ -59,12 +66,23 @@ class SettingsView(BaseView):
         )
         self.appearance_menu.grid(row=1, column=1, sticky="w", padx=20, pady=(8, 0))
 
-        # Tagline (sidebar subtitle) — user-editable
-        ctk.CTkLabel(card, text="Tagline", anchor="w").grid(
+        ctk.CTkLabel(card, text="Accent", anchor="w").grid(
             row=2, column=0, sticky="w", padx=20, pady=(12, 0)
         )
+        self.color_theme_menu = ctk.CTkOptionMenu(
+            card,
+            values=["blue", "green", "dark-blue"],
+            command=self._on_color_theme_change,
+            width=160,
+        )
+        self.color_theme_menu.grid(row=2, column=1, sticky="w", padx=20, pady=(12, 0))
+
+        # Tagline (sidebar subtitle) — user-editable
+        ctk.CTkLabel(card, text="Tagline", anchor="w").grid(
+            row=3, column=0, sticky="w", padx=20, pady=(12, 0)
+        )
         tag_row = ctk.CTkFrame(card, fg_color="transparent")
-        tag_row.grid(row=2, column=1, sticky="ew", padx=20, pady=(12, 0))
+        tag_row.grid(row=3, column=1, sticky="ew", padx=20, pady=(12, 0))
         tag_row.grid_columnconfigure(0, weight=1)
         self.tagline_var = ctk.StringVar()
         ctk.CTkEntry(tag_row, textvariable=self.tagline_var).grid(
@@ -76,7 +94,7 @@ class SettingsView(BaseView):
 
         # Language
         ctk.CTkLabel(card, text="Language", anchor="w").grid(
-            row=3, column=0, sticky="w", padx=20, pady=(12, 0)
+            row=4, column=0, sticky="w", padx=20, pady=(12, 0)
         )
         from skyadmin_pro.services.i18n import available_languages
 
@@ -86,7 +104,7 @@ class SettingsView(BaseView):
             command=self._on_language_change,
             width=120,
         )
-        self.lang_menu.grid(row=3, column=1, sticky="w", padx=20, pady=(12, 0))
+        self.lang_menu.grid(row=4, column=1, sticky="w", padx=20, pady=(12, 0))
 
         # License — directly under Appearance
         ctk.CTkLabel(
@@ -94,18 +112,18 @@ class SettingsView(BaseView):
             text="License",
             font=ctk.CTkFont(size=13, weight="bold"),
             anchor="w",
-        ).grid(row=4, column=0, columnspan=2, sticky="w", padx=20, pady=(16, 4))
+        ).grid(row=5, column=0, columnspan=2, sticky="w", padx=20, pady=(16, 4))
         self.license_label = ctk.CTkLabel(
             card, text="License: checking…", anchor="w", text_color=TEXT_MUTED,
         )
-        self.license_label.grid(row=5, column=0, columnspan=2, sticky="ew", padx=20)
+        self.license_label.grid(row=6, column=0, columnspan=2, sticky="ew", padx=20)
         self.daily_sync_label = ctk.CTkLabel(
             card, text="", anchor="w", text_color=TEXT_MUTED, wraplength=500, justify="left",
         )
-        self.daily_sync_label.grid(row=6, column=0, sticky="w", padx=20, pady=(2, 0))
-        ctk.CTkButton(card, text="Sync Now", width=90, command=self._sync_now).grid(row=6, column=1, sticky="e", padx=20, pady=(2, 0))
+        self.daily_sync_label.grid(row=7, column=0, sticky="w", padx=20, pady=(2, 0))
+        ctk.CTkButton(card, text="Sync Now", width=90, command=self._sync_now).grid(row=7, column=1, sticky="e", padx=20, pady=(2, 0))
         lic_buttons = ctk.CTkFrame(card, fg_color="transparent")
-        lic_buttons.grid(row=7, column=0, columnspan=2, sticky="w", padx=20, pady=(6, 0))
+        lic_buttons.grid(row=8, column=0, columnspan=2, sticky="w", padx=20, pady=(6, 0))
         ctk.CTkButton(
             lic_buttons, text="Activate / Manage License…", width=200,
             command=self._open_activation,
@@ -124,9 +142,9 @@ class SettingsView(BaseView):
         # Full license key paste box
         ctk.CTkLabel(
             card, text="Paste License Key:", anchor="w",
-        ).grid(row=8, column=0, columnspan=2, sticky="w", padx=20, pady=(12, 2))
+        ).grid(row=9, column=0, columnspan=2, sticky="w", padx=20, pady=(12, 2))
         key_row = ctk.CTkFrame(card, fg_color="transparent")
-        key_row.grid(row=9, column=0, columnspan=2, sticky="ew", padx=20, pady=(0, 4))
+        key_row.grid(row=10, column=0, columnspan=2, sticky="ew", padx=20, pady=(0, 4))
         key_row.grid_columnconfigure(0, weight=1)
         self.key_paste_var = ctk.StringVar()
         key_entry = ctk.CTkEntry(
@@ -142,9 +160,9 @@ class SettingsView(BaseView):
         # Quick passcode activation (8-digit code from the owner)
         ctk.CTkLabel(
             card, text="Or enter 8-digit Passcode:", anchor="w",
-        ).grid(row=10, column=0, columnspan=2, sticky="w", padx=20, pady=(8, 2))
+        ).grid(row=11, column=0, columnspan=2, sticky="w", padx=20, pady=(8, 2))
         pass_row = ctk.CTkFrame(card, fg_color="transparent")
-        pass_row.grid(row=11, column=0, columnspan=2, sticky="ew", padx=20, pady=(0, 18))
+        pass_row.grid(row=12, column=0, columnspan=2, sticky="ew", padx=20, pady=(0, 18))
         self.passcode_var = ctk.StringVar()
         pc_entry = ctk.CTkEntry(
             pass_row, textvariable=self.passcode_var,
@@ -184,8 +202,164 @@ class SettingsView(BaseView):
             row=3, column=1, sticky="w", padx=20, pady=(0, 16)
         )
 
+        pricing = ctk.CTkFrame(scroll, corner_radius=12)
+        pricing.grid(row=3, column=0, sticky="ew", pady=(16, 0))
+        pricing.grid_columnconfigure(0, weight=1)
+        self._pricing_rows: dict[str, dict] = {}
+        self._selected_pricing_id: int | None = None
+
+        ctk.CTkLabel(
+            pricing,
+            text="Service pricing matrix",
+            font=ctk.CTkFont(size=16, weight="bold"),
+            anchor="w",
+        ).grid(row=0, column=0, sticky="w", padx=20, pady=(18, 4))
+        ctk.CTkLabel(
+            pricing,
+            text=(
+                "Fee, SLA, headcount, and required documents per service. "
+                "Accounting services use transaction-volume tiers; other services "
+                "use named charge lines (e.g. DBD fee, registration fee, package base). "
+                "Company Details → Tax IDs auto-fills accounting tiers when you change Transaction Volume."
+            ),
+            wraplength=720,
+            justify="left",
+            text_color=TEXT_MUTED,
+            anchor="w",
+        ).grid(row=1, column=0, sticky="ew", padx=20)
+
+        pricing_toolbar = ctk.CTkFrame(pricing, fg_color="transparent")
+        pricing_toolbar.grid(row=2, column=0, sticky="ew", padx=20, pady=(12, 8))
+        pricing_toolbar.grid_columnconfigure(1, weight=1)
+        ctk.CTkLabel(pricing_toolbar, text="Service", anchor="w").grid(row=0, column=0, padx=(0, 8))
+        self.pricing_service_menu = ctk.CTkOptionMenu(
+            pricing_toolbar,
+            values=[PRICING_DEFAULT_SERVICE],
+            command=self._on_pricing_service_change,
+            width=320,
+        )
+        self.pricing_service_menu.grid(row=0, column=1, sticky="w")
+        ctk.CTkButton(
+            pricing_toolbar,
+            text="Reset service",
+            width=110,
+            fg_color="transparent",
+            border_width=1,
+            command=self._reset_service_pricing,
+        ).grid(row=0, column=2, padx=(8, 0))
+        ctk.CTkButton(
+            pricing_toolbar,
+            text="Seed all services",
+            width=130,
+            fg_color="transparent",
+            border_width=1,
+            command=self._seed_all_service_pricing,
+        ).grid(row=0, column=3, padx=(8, 0))
+
+        self.pricing_tree = ThemedTreeview(
+            pricing,
+            columns=(
+                ("range", "Transaction range", 220),
+                ("monthly", "Monthly THB", 100),
+                ("annual", "Annual THB", 100),
+                ("sla", "SLA hrs", 70),
+                ("hc", "HC", 40),
+                ("docs", "Required docs", 260),
+            ),
+            on_select=self._on_pricing_row_select,
+            showheight=6,
+        )
+        self.pricing_tree.grid(row=3, column=0, sticky="ew", padx=20, pady=(0, 8))
+
+        pricing_form = ctk.CTkFrame(pricing, fg_color="transparent")
+        pricing_form.grid(row=4, column=0, sticky="ew", padx=20)
+        pricing_form.grid_columnconfigure((1, 3), weight=1)
+        self.pricing_range_var = ctk.StringVar()
+        self.pricing_monthly_var = ctk.StringVar()
+        self.pricing_annual_var = ctk.StringVar()
+        self.pricing_sla_var = ctk.StringVar()
+        self.pricing_headcount_var = ctk.StringVar()
+        self.pricing_docs_var = ctk.StringVar()
+
+        self.pricing_range_heading = ctk.CTkLabel(
+            pricing_form, text="Transaction range", anchor="w"
+        )
+        self.pricing_range_heading.grid(
+            row=0, column=0, sticky="w", padx=(0, 8), pady=4
+        )
+        self.pricing_charge_entry = ctk.CTkEntry(
+            pricing_form,
+            textvariable=self.pricing_range_var,
+            width=280,
+        )
+        self.pricing_range_menu = ctk.CTkOptionMenu(
+            pricing_form,
+            variable=self.pricing_range_var,
+            values=list(TRANSACTION_RANGES),
+            width=280,
+        )
+        self.pricing_range_menu.grid(row=0, column=1, sticky="w", pady=4)
+        self.pricing_monthly_label = ctk.CTkLabel(
+            pricing_form, text="Monthly fee (THB)", anchor="w"
+        )
+        self.pricing_monthly_label.grid(
+            row=0, column=2, sticky="w", padx=(16, 8), pady=4
+        )
+        ctk.CTkEntry(pricing_form, textvariable=self.pricing_monthly_var, width=120).grid(
+            row=0, column=3, sticky="w", pady=4
+        )
+        ctk.CTkLabel(pricing_form, text="Annual fee (THB)", anchor="w").grid(
+            row=1, column=0, sticky="w", padx=(0, 8), pady=4
+        )
+        self.pricing_annual_entry = ctk.CTkEntry(
+            pricing_form, textvariable=self.pricing_annual_var, width=120
+        )
+        self.pricing_annual_entry.grid(row=1, column=1, sticky="w", pady=4)
+        ctk.CTkLabel(pricing_form, text="SLA hours", anchor="w").grid(
+            row=1, column=2, sticky="w", padx=(16, 8), pady=4
+        )
+        ctk.CTkEntry(pricing_form, textvariable=self.pricing_sla_var, width=120).grid(
+            row=1, column=3, sticky="w", pady=4
+        )
+        ctk.CTkLabel(pricing_form, text="Headcount", anchor="w").grid(
+            row=2, column=0, sticky="w", padx=(0, 8), pady=4
+        )
+        self.pricing_headcount_entry = ctk.CTkEntry(
+            pricing_form, textvariable=self.pricing_headcount_var, width=120
+        )
+        self.pricing_headcount_entry.grid(row=2, column=1, sticky="w", pady=4)
+        ctk.CTkLabel(pricing_form, text="Required documents", anchor="w").grid(
+            row=2, column=2, sticky="nw", padx=(16, 8), pady=4
+        )
+        ctk.CTkEntry(pricing_form, textvariable=self.pricing_docs_var).grid(
+            row=2, column=3, sticky="ew", pady=4
+        )
+        pricing_buttons = ctk.CTkFrame(pricing, fg_color="transparent")
+        pricing_buttons.grid(row=5, column=0, sticky="w", padx=20, pady=(8, 16))
+        ctk.CTkButton(
+            pricing_buttons, text="Save pricing row", width=140, command=self._save_pricing_tier
+        ).grid(row=0, column=0, padx=(0, 8))
+        self.pricing_add_charge_btn = ctk.CTkButton(
+            pricing_buttons,
+            text="Add charge line",
+            width=130,
+            fg_color="transparent",
+            border_width=1,
+            command=self._add_pricing_charge_line,
+        )
+        self.pricing_add_charge_btn.grid(row=0, column=1, padx=(0, 8))
+        self.pricing_delete_charge_btn = ctk.CTkButton(
+            pricing_buttons,
+            text="Delete charge line",
+            width=140,
+            fg_color="transparent",
+            border_width=1,
+            command=self._delete_pricing_charge_line,
+        )
+        self.pricing_delete_charge_btn.grid(row=0, column=2)
+
         services = ctk.CTkFrame(scroll, corner_radius=12)
-        services.grid(row=3, column=0, sticky="ew", pady=(16, 0))
+        services.grid(row=4, column=0, sticky="ew", pady=(16, 0))
         services.grid_columnconfigure(0, weight=1)
         ctk.CTkLabel(
             services,
@@ -220,8 +394,49 @@ class SettingsView(BaseView):
             command=self._reset_services,
         ).grid(row=0, column=1, padx=(8, 0))
 
+        directory = ctk.CTkFrame(scroll, corner_radius=12)
+        directory.grid(row=5, column=0, sticky="ew", pady=(16, 0))
+        directory.grid_columnconfigure(0, weight=1)
+        ctk.CTkLabel(
+            directory,
+            text="Department list (Office Hub)",
+            font=ctk.CTkFont(size=16, weight="bold"),
+            anchor="w",
+        ).grid(row=0, column=0, sticky="w", padx=20, pady=(18, 4))
+        ctk.CTkLabel(
+            directory,
+            text=(
+                "Master list for Department in Office Hub → Contacts. "
+                "Company names come from your Clients list (Database & Tasks) — "
+                "the Organization field is a client company picker, not a separate list. "
+                "Type a new department in a contact form to add it automatically, or import "
+                "from existing contacts below."
+            ),
+            wraplength=720,
+            justify="left",
+            text_color=TEXT_MUTED,
+            anchor="w",
+        ).grid(row=1, column=0, sticky="ew", padx=20)
+
+        self.departments_text = ctk.CTkTextbox(directory, height=140)
+        self.departments_text.grid(row=2, column=0, sticky="ew", padx=20, pady=(12, 4))
+
+        dir_buttons = ctk.CTkFrame(directory, fg_color="transparent")
+        dir_buttons.grid(row=3, column=0, sticky="w", padx=20, pady=(8, 16))
+        ctk.CTkButton(
+            dir_buttons, text="Save departments", width=140, command=self._save_directory_lists
+        ).grid(row=0, column=0)
+        ctk.CTkButton(
+            dir_buttons,
+            text="Import from data",
+            width=140,
+            fg_color="transparent",
+            border_width=1,
+            command=self._import_directory_lists,
+        ).grid(row=0, column=1, padx=(8, 0))
+
         checklists = ctk.CTkFrame(scroll, corner_radius=12)
-        checklists.grid(row=4, column=0, sticky="ew", pady=(16, 0))
+        checklists.grid(row=6, column=0, sticky="ew", pady=(16, 0))
         checklists.grid_columnconfigure(0, weight=1)
 
         ctk.CTkLabel(
@@ -304,7 +519,7 @@ class SettingsView(BaseView):
         ).grid(row=0, column=1, padx=(8, 0))
 
         info = ctk.CTkFrame(scroll, corner_radius=12)
-        info.grid(row=5, column=0, sticky="ew", pady=(16, 0))
+        info.grid(row=7, column=0, sticky="ew", pady=(16, 0))
         info.grid_columnconfigure(1, weight=1)
 
         ctk.CTkLabel(
@@ -330,6 +545,20 @@ class SettingsView(BaseView):
         ctk.CTkButton(
             workspace_row, text="Save", width=70, command=self._save_workspace
         ).grid(row=0, column=2, padx=(8, 0))
+        ctk.CTkButton(
+            workspace_row,
+            text="Repair client folders",
+            width=150,
+            fg_color="transparent",
+            border_width=1,
+            command=self._repair_client_folders,
+        ).grid(row=1, column=0, sticky="w", pady=(8, 0))
+        ctk.CTkButton(
+            workspace_row,
+            text="Run data hygiene",
+            width=140,
+            command=self._run_data_hygiene,
+        ).grid(row=1, column=1, sticky="w", padx=(8, 0), pady=(8, 0))
 
         self.path_labels: dict[str, ctk.CTkLabel] = {}
         ctk.CTkLabel(info, text="Clients", anchor="w", text_color=TEXT_MUTED).grid(
@@ -359,7 +588,7 @@ class SettingsView(BaseView):
 
         # Encrypted backup — the ONLY supported way to copy data between PCs now
         backup = ctk.CTkFrame(scroll, corner_radius=12, border_color=("#bfdbfe", "#1e3a5f"), border_width=1)
-        backup.grid(row=6, column=0, sticky="ew", pady=(16, 0))
+        backup.grid(row=8, column=0, sticky="ew", pady=(16, 0))
         backup.grid_columnconfigure(0, weight=1)
         ctk.CTkLabel(
             backup,
@@ -452,6 +681,11 @@ class SettingsView(BaseView):
     def on_show(self) -> None:
         current = ctk.get_appearance_mode()
         self.appearance_menu.set(current)
+        theme = self.app.db.get_setting(SETTING_COLOR_THEME, DEFAULT_COLOR_THEME) or DEFAULT_COLOR_THEME
+        try:
+            self.color_theme_menu.set(theme)
+        except Exception:
+            pass
         self.workspace_var.set(str(self.app.paths.root))
         self.tagline_var.set(
             self.app.db.get_setting("app_tagline")
@@ -471,6 +705,9 @@ class SettingsView(BaseView):
         self.services_text.delete("1.0", "end")
         self.services_text.insert("1.0", "\n".join(self.app.db.list_service_types()))
         self._reload_checklists()
+        self._load_directory_lists()
+        self._refresh_pricing_services()
+        self._refresh_pricing_matrix()
         # Disclaimer license status
         self._refresh_license_label()
         self._refresh_backup_banner()
@@ -778,9 +1015,23 @@ class SettingsView(BaseView):
 
         def _worker():
             err = None
+            safety_path = None
             try:
-                from skyadmin_pro.services.crypto import restore_encrypted_backup
+                from datetime import datetime as _dt
 
+                from skyadmin_pro.services.crypto import (
+                    create_encrypted_backup,
+                    restore_encrypted_backup,
+                )
+
+                backup_dir = self.app.db.db_file.parent / "backups"
+                backup_dir.mkdir(parents=True, exist_ok=True)
+                stamp = _dt.now().strftime("%Y%m%d_%H%M%S")
+                safety_path = backup_dir / f"pre_restore_{stamp}.skybackup"
+                create_encrypted_backup(
+                    self.app.paths.root, self.app.db.db_file, safety_path
+                )
+                self.app.db.shutdown()
                 restore_encrypted_backup(Path(src), self.app.paths.root, self.app.db.db_file)
             except Exception as exc:
                 err = str(exc)
@@ -790,11 +1041,15 @@ class SettingsView(BaseView):
                 if err:
                     self.feedback.error(f"Restore failed: {err}")
                 else:
+                    extra = ""
+                    if safety_path is not None:
+                        extra = f"\n\nSafety backup saved:\n{safety_path}"
                     self.feedback.success("Restore complete — please restart the app.")
                     self.app.set_status("Restore complete — restart required")
                     messagebox.showinfo(
                         "Restore complete",
-                        "Backup restored successfully.\n\nPlease close and reopen SkyAdmin Pro.",
+                        "Backup restored successfully."
+                        f"{extra}\n\nPlease close and reopen SkyAdmin Pro.",
                         parent=self.winfo_toplevel(),
                     )
 
@@ -835,6 +1090,70 @@ class SettingsView(BaseView):
         self.feedback.success(f"Workspace changed to {root}")
         self.app.set_status(f"Workspace: {root}")
 
+    def _repair_client_folders(self) -> None:
+        names = self.app.db.list_client_names()
+        if not names:
+            self.feedback.error("No clients in the database.")
+            return
+        result = repair_client_workspaces(self.app.paths.clients, names)
+        linked = int(result["linked"])
+        created = int(result["created"])
+        failed = int(result["failed"])
+        if failed:
+            self.feedback.error(
+                f"Repaired {linked} linked, {created} created, {failed} failed. "
+                f"Check: {', '.join(result['failed_names'][:3])}"
+            )
+            return
+        self.feedback.success(
+            f"Client folders OK — {linked} linked to existing folders, {created} newly created."
+        )
+        self.app.set_status(
+            f"Client folders: {linked} linked, {created} created, {result['total']} total"
+        )
+
+    def _run_data_hygiene(self) -> None:
+        if not messagebox.askyesno(
+            "Run data hygiene",
+            "This will:\n"
+            "• Refresh service pricing (flat-fee vs transaction tiers)\n"
+            "• Import departments from contacts\n"
+            "• Link/create client workspace folders\n"
+            "• Roll forward stale annual expiry dates (31 Dec services)\n"
+            "• Migrate any legacy IRD passwords to Office Hub\n"
+            "• Infer accounting service types from documents (Tax IDs rollout)\n"
+            "• Import client liaison contacts into Office Hub\n"
+            "• Infer VO/CSH renewal dates from document expiry\n\n"
+            "Continue?",
+            parent=self.winfo_toplevel(),
+        ):
+            return
+        try:
+            result = run_data_hygiene(self.app.db, self.app.paths.clients)
+        except Exception as exc:
+            self.feedback.error(str(exc))
+            return
+        self._load_directory_lists()
+        self._refresh_pricing_services()
+        self._refresh_pricing_matrix()
+        failed = int(result["folders_failed"])
+        msg = (
+            f"Pricing refreshed · {result['departments_imported']} dept(s) imported · "
+            f"{result['expiry_dates_rolled']} expiry date(s) rolled forward · "
+            f"{result.get('service_types_inferred', 0)} service type(s) inferred · "
+            f"{result.get('liaison_contacts_created', 0)} liaison contact(s) imported · "
+            f"{result.get('vo_renewals_inferred', 0)} VO + "
+            f"{result.get('csh_renewals_inferred', 0)} CSH renewal(s) inferred · "
+            f"{result.get('ird_passwords_migrated', 0)} IRD password(s) migrated · "
+            f"{result['folders_linked']} folder(s) linked · "
+            f"{result['folders_created']} folder(s) created"
+        )
+        if failed:
+            self.feedback.error(f"{msg} · {failed} folder(s) failed")
+        else:
+            self.feedback.success(msg)
+        self.app.set_status("Data hygiene complete")
+
     def _open_clients(self) -> None:
         self._open_path(self.app.paths.clients)
 
@@ -851,6 +1170,280 @@ class SettingsView(BaseView):
         mode = choice.lower()
         ctk.set_appearance_mode(mode)
         self.app.db.set_setting(SETTING_APPEARANCE_MODE, mode)
+
+    def _on_color_theme_change(self, choice: str) -> None:
+        ctk.set_default_color_theme(choice)
+        self.app.db.set_setting(SETTING_COLOR_THEME, choice)
+        self.feedback.info(
+            f"Accent set to {choice}. Restart the app to fully apply button colors."
+        )
+
+    def _load_directory_lists(self) -> None:
+        self.departments_text.delete("1.0", "end")
+        self.departments_text.insert("1.0", "\n".join(self.app.db.list_departments()))
+
+    def _save_directory_lists(self) -> None:
+        depts = [
+            line.strip()
+            for line in self.departments_text.get("1.0", "end").splitlines()
+            if line.strip()
+        ]
+        try:
+            self.app.db.set_departments(depts)
+        except ValueError as exc:
+            self.feedback.error(str(exc))
+            return
+        self.feedback.success("Department list saved.")
+        self._load_directory_lists()
+
+    def _import_directory_lists(self) -> None:
+        new_clients, new_depts = self.app.db.import_directory_from_data()
+        self._load_directory_lists()
+        self.feedback.success(
+            f"Imported {new_clients} client company name(s) and {new_depts} department(s) from existing data."
+        )
+
+    def _refresh_pricing_services(self) -> None:
+        services = self.app.db.list_pricing_service_types()
+        if not services:
+            services = [PRICING_DEFAULT_SERVICE]
+        self.pricing_service_menu.configure(values=services)
+        current = self.pricing_service_menu.get()
+        if current not in services:
+            self.pricing_service_menu.set(services[0])
+
+    def _configure_pricing_form_for_service(self, service_type: str) -> None:
+        uses_ranges = pricing_uses_transaction_ranges(service_type)
+        if uses_ranges:
+            self.pricing_tree.tree.heading("range", text="Transaction range")
+            self.pricing_range_heading.configure(text="Transaction range")
+            self.pricing_range_menu.grid(row=0, column=1, sticky="w", pady=4)
+            self.pricing_charge_entry.grid_remove()
+            self.pricing_add_charge_btn.grid_remove()
+            self.pricing_delete_charge_btn.grid_remove()
+            self.pricing_monthly_label.configure(text="Monthly fee (THB)")
+            self.pricing_annual_entry.grid(row=1, column=1, sticky="w", pady=4)
+            self.pricing_headcount_entry.grid(row=2, column=1, sticky="w", pady=4)
+        else:
+            self.pricing_tree.tree.heading("range", text="Charge line")
+            self.pricing_range_heading.configure(text="Charge line")
+            self.pricing_range_menu.grid_remove()
+            self.pricing_charge_entry.grid(row=0, column=1, sticky="w", pady=4)
+            self.pricing_add_charge_btn.grid()
+            self.pricing_delete_charge_btn.grid()
+            self.pricing_monthly_label.configure(text="Fee (THB)")
+            self.pricing_annual_entry.grid_remove()
+            self.pricing_headcount_entry.grid_remove()
+            self.pricing_annual_var.set("")
+            self.pricing_headcount_var.set("")
+
+    def _refresh_pricing_matrix(self) -> None:
+        service_type = self.pricing_service_menu.get().strip() or PRICING_DEFAULT_SERVICE
+        self._configure_pricing_form_for_service(service_type)
+        rows = self.app.db.get_pricing_matrix(service_type=service_type)
+        self._pricing_rows = {str(row["id"]): row for row in rows}
+        tree_rows = [
+            (
+                row.get("transaction_range") or "",
+                f"{(row.get('monthly_fee') or 0):,}",
+                f"{(row.get('annual_fee') or 0):,}",
+                str(row.get("sla_hours") or ""),
+                str(row.get("headcount") or ""),
+                row.get("required_docs") or "",
+            )
+            for row in rows
+        ]
+        self.pricing_tree.set_rows(tree_rows, iids=[str(row["id"]) for row in rows])
+        if rows:
+            first = str(rows[0]["id"])
+            self.pricing_tree.tree.selection_set(first)
+            self.pricing_tree.tree.focus(first)
+            self._on_pricing_row_select(first)
+
+    def _on_pricing_service_change(self, _choice: str) -> None:
+        self._refresh_pricing_matrix()
+
+    def _on_pricing_row_select(self, iid: str | None) -> None:
+        if not iid:
+            self._selected_pricing_id = None
+            return
+        row = self._pricing_rows.get(str(iid))
+        if not row:
+            self._selected_pricing_id = None
+            return
+        self._selected_pricing_id = int(iid)
+        self._load_pricing_tier(row.get("transaction_range") or "")
+
+    def _load_pricing_tier(self, transaction_range: str) -> None:
+        service_type = self.pricing_service_menu.get().strip() or PRICING_DEFAULT_SERVICE
+        self._configure_pricing_form_for_service(service_type)
+        tier = self.app.db.lookup_pricing_by_range(
+            transaction_range, service_type=service_type
+        )
+        self.pricing_range_var.set(transaction_range)
+        self.pricing_monthly_var.set(str(tier.get("monthly_fee") or "") if tier else "")
+        self.pricing_annual_var.set(str(tier.get("annual_fee") or "") if tier else "")
+        self.pricing_sla_var.set(str(tier.get("sla_hours") or "") if tier else "")
+        self.pricing_headcount_var.set(str(tier.get("headcount") or "") if tier else "")
+        self.pricing_docs_var.set(str(tier.get("required_docs") or "") if tier else "")
+        if tier:
+            self._selected_pricing_id = int(tier["id"])
+
+    def _reset_service_pricing(self) -> None:
+        service_type = self.pricing_service_menu.get().strip() or PRICING_DEFAULT_SERVICE
+        uses_ranges = pricing_uses_transaction_ranges(service_type)
+        label = "transaction tiers" if uses_ranges else "charge lines"
+        if not messagebox.askyesno(
+            "Reset pricing",
+            f"Reset all {label} for '{service_type}' to defaults?",
+            parent=self.winfo_toplevel(),
+        ):
+            return
+        self.app.db.reset_service_pricing_to_defaults(service_type)
+        self.feedback.success(f"Pricing reset for {service_type}.")
+        self._refresh_pricing_matrix()
+
+    def _seed_all_service_pricing(self) -> None:
+        self.app.db._seed_all_service_pricing()
+        self._refresh_pricing_services()
+        self._refresh_pricing_matrix()
+        self.feedback.success("Pricing tiers ensured for all services.")
+
+    def _save_pricing_tier(self) -> None:
+        service_type = self.pricing_service_menu.get().strip() or PRICING_DEFAULT_SERVICE
+        uses_ranges = pricing_uses_transaction_ranges(service_type)
+        transaction_range = self.pricing_range_var.get().strip()
+        if not transaction_range:
+            label = "transaction range" if uses_ranges else "charge line"
+            self.feedback.error(f"Enter a {label} first.")
+            return
+
+        def _parse_int(value: str, label: str) -> int | None:
+            raw = value.strip()
+            if not raw:
+                return None
+            try:
+                return int(raw.replace(",", ""))
+            except ValueError as exc:
+                raise ValueError(f"{label} must be a whole number.") from exc
+
+        try:
+            fee_label = "Fee" if not uses_ranges else "Monthly fee"
+            monthly = _parse_int(self.pricing_monthly_var.get(), fee_label)
+            annual = (
+                _parse_int(self.pricing_annual_var.get(), "Annual fee")
+                if uses_ranges
+                else 0
+            )
+            sla = _parse_int(self.pricing_sla_var.get(), "SLA hours")
+            headcount = (
+                _parse_int(self.pricing_headcount_var.get(), "Headcount")
+                if uses_ranges
+                else 0
+            )
+        except ValueError as exc:
+            self.feedback.error(str(exc))
+            return
+
+        docs = self.pricing_docs_var.get().strip() or None
+        selected_id = getattr(self, "_selected_pricing_id", None)
+        tier = (
+            self.app.db.get_pricing_tier(int(selected_id))
+            if selected_id
+            else self.app.db.lookup_pricing_by_range(
+                transaction_range, service_type=service_type
+            )
+        )
+        try:
+            if tier:
+                self.app.db.update_pricing_tier(
+                    tier["id"],
+                    transaction_range=transaction_range,
+                    monthly_fee=monthly,
+                    annual_fee=annual,
+                    sla_hours=sla,
+                    headcount=headcount,
+                    required_docs=docs,
+                )
+            else:
+                self.app.db.add_pricing_tier(
+                    service_type=service_type,
+                    transaction_range=transaction_range,
+                    monthly_fee=monthly or 0,
+                    annual_fee=annual or 0,
+                    sla_hours=sla or 0,
+                    headcount=headcount or 0,
+                    required_docs=docs or "",
+                )
+        except Exception as exc:
+            self.feedback.error(f"Could not save pricing: {exc}")
+            return
+        self.feedback.success(f"Pricing saved for {service_type}.")
+        self._refresh_pricing_matrix()
+        self.app.set_status(f"Pricing updated: {service_type} / {transaction_range}")
+
+    def _add_pricing_charge_line(self) -> None:
+        service_type = self.pricing_service_menu.get().strip() or PRICING_DEFAULT_SERVICE
+        if pricing_uses_transaction_ranges(service_type):
+            self.feedback.error("Charge lines apply only to flat-fee services.")
+            return
+        name = simpledialog.askstring(
+            "New charge line",
+            "Charge name (e.g. DBD fee, Registration fee):",
+            parent=self.winfo_toplevel(),
+        )
+        if not name:
+            return
+        charge_name = name.strip()
+        if not charge_name:
+            self.feedback.error("Charge line name cannot be empty.")
+            return
+        if self.app.db.lookup_pricing_by_range(charge_name, service_type=service_type):
+            self.feedback.error(f"Charge line '{charge_name}' already exists.")
+            return
+        try:
+            tier_id = self.app.db.add_pricing_tier(
+                service_type=service_type,
+                transaction_range=charge_name,
+                monthly_fee=0,
+                annual_fee=0,
+                sla_hours=0,
+                headcount=0,
+                required_docs="",
+            )
+        except Exception as exc:
+            self.feedback.error(f"Could not add charge line: {exc}")
+            return
+        self.feedback.success(f"Added charge line: {charge_name}")
+        self._refresh_pricing_matrix()
+        self.pricing_tree.tree.selection_set(str(tier_id))
+        self.pricing_tree.tree.focus(str(tier_id))
+        self._on_pricing_row_select(str(tier_id))
+
+    def _delete_pricing_charge_line(self) -> None:
+        service_type = self.pricing_service_menu.get().strip() or PRICING_DEFAULT_SERVICE
+        if pricing_uses_transaction_ranges(service_type):
+            self.feedback.error("Charge lines apply only to flat-fee services.")
+            return
+        selected_id = getattr(self, "_selected_pricing_id", None)
+        if not selected_id:
+            self.feedback.error("Select a charge line to delete.")
+            return
+        row = self._pricing_rows.get(str(selected_id))
+        if not row:
+            self.feedback.error("Select a charge line to delete.")
+            return
+        charge_name = row.get("transaction_range") or "this charge line"
+        if not messagebox.askyesno(
+            "Delete charge line",
+            f"Delete '{charge_name}' from {service_type}?",
+            parent=self.winfo_toplevel(),
+        ):
+            return
+        self.app.db.delete_pricing_tier(int(selected_id))
+        self._selected_pricing_id = None
+        self.feedback.success(f"Deleted charge line: {charge_name}")
+        self._refresh_pricing_matrix()
 
     def _save_portal(self) -> None:
         try:
@@ -875,9 +1468,11 @@ class SettingsView(BaseView):
         from skyadmin_pro.config import APP_TAGLINE, SETTING_APP_TAGLINE
 
         text = self.tagline_var.get().strip()
-        self.app.db.set_setting(SETTING_APP_TAGLINE, text or APP_TAGLINE)
+        saved = text or APP_TAGLINE
+        self.app.db.set_setting(SETTING_APP_TAGLINE, saved)
         self.feedback.success("Tagline saved.")
-        self.app.set_status(f"Tagline: {text or APP_TAGLINE}")
+        self.app.refresh_tagline(saved)
+        self.app.set_status(f"Tagline: {saved}")
 
     def _open_activation(self) -> None:
         from skyadmin_pro.ui.activation import ActivationDialog
@@ -891,11 +1486,11 @@ class SettingsView(BaseView):
     def _activate_with_passcode(self) -> None:
         import threading
 
-        from skyadmin_pro.config import REVOCATION_URL
         from skyadmin_pro.services.license import (
             check_activation_usable,
             fetch_revocations,
             mark_used,
+            requires_online_check,
             save_license_file,
         )
 
@@ -913,7 +1508,7 @@ class SettingsView(BaseView):
             if not ok:
                 self._after(lambda: self._activation_fail(msg))
                 return
-            if (REVOCATION_URL or "").strip():
+            if requires_online_check():
                 net_ok, net_msg = fetch_revocations(timeout=6)
                 if not net_ok:
                     self._after(lambda: self._activation_fail(
@@ -935,11 +1530,11 @@ class SettingsView(BaseView):
     def _activate_with_key(self) -> None:
         import threading
 
-        from skyadmin_pro.config import REVOCATION_URL
         from skyadmin_pro.services.license import (
             check_activation_usable,
             fetch_revocations,
             mark_used,
+            requires_online_check,
             save_license_file,
         )
 
@@ -957,7 +1552,7 @@ class SettingsView(BaseView):
             if not ok:
                 self._after(lambda: self._activation_fail(msg))
                 return
-            if (REVOCATION_URL or "").strip():
+            if requires_online_check():
                 net_ok, net_msg = fetch_revocations(timeout=6)
                 if not net_ok:
                     self._after(lambda: self._activation_fail(
@@ -987,6 +1582,7 @@ class SettingsView(BaseView):
         self._refresh_license_label()
         self.feedback.success(f"✓ {msg.splitlines()[0]} — activated.")
         self.app.set_status(f"License activated via {kind}.")
+        self.app.refresh_sidebar_status()
 
     def _after(self, fn) -> None:
         try:
@@ -1047,6 +1643,7 @@ class SettingsView(BaseView):
                     self.feedback.error(msg.splitlines()[0])
                 self._refresh_license_label()
                 try:
+                    self.app.refresh_sidebar_status()
                     self.app.set_status(msg.splitlines()[0])
                 except Exception:
                     pass

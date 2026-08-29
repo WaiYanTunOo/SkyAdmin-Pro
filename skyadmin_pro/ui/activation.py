@@ -90,13 +90,19 @@ class ActivationDialog(ctk.CTkToplevel):
             font=ctk.CTkFont(size=HEADER_TITLE_SIZE, weight="bold"),
         ).grid(row=0, column=0, sticky="w", padx=24, pady=(18, 0))
 
-        days = license_remaining_days()
-        if days is not None and days < 0:
-            sub = f"Your license expired {abs(days)} day(s) ago. Choose a package to continue."
-        elif days is None:
+        from skyadmin_pro.services.license import license_time_left_text
+
+        left = license_time_left_text()
+        if left == "Not activated":
             sub = "Choose a package to activate this copy of SkyAdmin Pro."
+        elif left.startswith("Active — no expiry"):
+            sub = left
+        elif left.startswith("Expired"):
+            sub = f"Your license {left.lower()}. Choose a package to continue."
+        elif left.startswith("Active —"):
+            sub = left.replace("Active —", "License active —", 1)
         else:
-            sub = f"License active — {days} day(s) remaining."
+            sub = left
         ctk.CTkLabel(body, text=sub, text_color=TEXT_MUTED, anchor="w").grid(
             row=1, column=0, sticky="ew", padx=16, pady=(2, 10)
         )
@@ -290,9 +296,9 @@ class ActivationDialog(ctk.CTkToplevel):
             self._set_status(f"✗ {msg}", "error")
             return
 
-        from skyadmin_pro.config import REVOCATION_URL
+        from skyadmin_pro.services.license import requires_online_check
 
-        needs_online = bool(REVOCATION_URL.strip())
+        needs_online = requires_online_check()
         self._activating = True
         self.activate_btn.configure(state="disabled", text="Checking…")
 

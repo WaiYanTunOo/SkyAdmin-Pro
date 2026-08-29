@@ -35,6 +35,8 @@ from skyadmin_pro.config import (
     SETTING_PORTAL_URL,
     SETTING_SNIPPET_OVERRIDES,
     SETTING_SERVICE_TYPES,
+    SETTING_ORGANIZATION_LIST,
+    SETTING_DEPARTMENT_LIST,
     SETTING_WINDOW_GEOMETRY,
     SETTING_WORKSPACE_ROOT,
     renewal_template_for,
@@ -305,12 +307,14 @@ CREATE INDEX IF NOT EXISTS idx_checklist_templates_name ON checklist_templates(n
 
 CREATE TABLE IF NOT EXISTS pricing_matrix (
     id                  INTEGER PRIMARY KEY AUTOINCREMENT,
-    transaction_range   TEXT NOT NULL UNIQUE,
+    service_type        TEXT NOT NULL DEFAULT 'General',
+    transaction_range   TEXT NOT NULL,
     monthly_fee         INTEGER,
     annual_fee          INTEGER,
     sla_hours           INTEGER,
     headcount           INTEGER,
-    required_docs       TEXT
+    required_docs       TEXT,
+    UNIQUE(service_type, transaction_range)
 );
 
 CREATE TABLE IF NOT EXISTS tax_cycle_log (
@@ -340,6 +344,79 @@ CREATE TABLE IF NOT EXISTS financial_documents (
 );
 CREATE INDEX IF NOT EXISTS idx_financial_docs_client ON financial_documents(client_id);
 CREATE INDEX IF NOT EXISTS idx_financial_docs_category ON financial_documents(category);
+
+CREATE TABLE IF NOT EXISTS office_contacts (
+    id              INTEGER PRIMARY KEY AUTOINCREMENT,
+    name            TEXT    NOT NULL,
+    role_title      TEXT,
+    organization    TEXT,
+    department      TEXT,
+    phone           TEXT,
+    email           TEXT,
+    line_id         TEXT,
+    category        TEXT    NOT NULL DEFAULT 'Office',
+    client_id       INTEGER,
+    notes           TEXT,
+    is_favorite     INTEGER NOT NULL DEFAULT 0,
+    created_at      TEXT    NOT NULL DEFAULT (datetime('now', 'localtime')),
+    updated_at      TEXT    NOT NULL DEFAULT (datetime('now', 'localtime')),
+    FOREIGN KEY (client_id) REFERENCES clients(id) ON DELETE SET NULL
+);
+CREATE INDEX IF NOT EXISTS idx_office_contacts_name ON office_contacts(name);
+CREATE INDEX IF NOT EXISTS idx_office_contacts_category ON office_contacts(category);
+
+CREATE TABLE IF NOT EXISTS client_credentials (
+    id                  INTEGER PRIMARY KEY AUTOINCREMENT,
+    client_id           INTEGER NOT NULL,
+    credential_type     TEXT    NOT NULL DEFAULT 'DBD',
+    registration_number TEXT,
+    login_id            TEXT,
+    username            TEXT,
+    secret_value        TEXT    NOT NULL,
+    portal_url          TEXT,
+    notes               TEXT,
+    is_favorite         INTEGER NOT NULL DEFAULT 0,
+    created_at          TEXT    NOT NULL DEFAULT (datetime('now', 'localtime')),
+    updated_at          TEXT    NOT NULL DEFAULT (datetime('now', 'localtime')),
+    FOREIGN KEY (client_id) REFERENCES clients(id) ON DELETE CASCADE
+);
+CREATE INDEX IF NOT EXISTS idx_client_credentials_client ON client_credentials(client_id);
+CREATE INDEX IF NOT EXISTS idx_client_credentials_type ON client_credentials(credential_type);
+
+CREATE TABLE IF NOT EXISTS office_credentials (
+    id              INTEGER PRIMARY KEY AUTOINCREMENT,
+    account_label   TEXT    NOT NULL,
+    login_id        TEXT,
+    email           TEXT,
+    secret_value    TEXT    NOT NULL,
+    system_type     TEXT    NOT NULL DEFAULT 'Email',
+    portal_url      TEXT,
+    contact_id      INTEGER,
+    notes           TEXT,
+    is_favorite     INTEGER NOT NULL DEFAULT 0,
+    created_at      TEXT    NOT NULL DEFAULT (datetime('now', 'localtime')),
+    updated_at      TEXT    NOT NULL DEFAULT (datetime('now', 'localtime')),
+    FOREIGN KEY (contact_id) REFERENCES office_contacts(id) ON DELETE SET NULL
+);
+CREATE INDEX IF NOT EXISTS idx_office_credentials_label ON office_credentials(account_label);
+CREATE INDEX IF NOT EXISTS idx_office_credentials_type ON office_credentials(system_type);
+
+CREATE TABLE IF NOT EXISTS notebook_entries (
+    id              INTEGER PRIMARY KEY AUTOINCREMENT,
+    entry_type      TEXT    NOT NULL DEFAULT 'general',
+    title           TEXT    NOT NULL,
+    body            TEXT,
+    entry_date      TEXT    NOT NULL,
+    client_id       INTEGER,
+    author          TEXT,
+    follow_up_date  TEXT,
+    is_pinned       INTEGER NOT NULL DEFAULT 0,
+    created_at      TEXT    NOT NULL DEFAULT (datetime('now', 'localtime')),
+    updated_at      TEXT    NOT NULL DEFAULT (datetime('now', 'localtime')),
+    FOREIGN KEY (client_id) REFERENCES clients(id) ON DELETE SET NULL
+);
+CREATE INDEX IF NOT EXISTS idx_notebook_entries_date ON notebook_entries(entry_date);
+CREATE INDEX IF NOT EXISTS idx_notebook_entries_type ON notebook_entries(entry_type);
 """
 
 
@@ -351,6 +428,8 @@ class Database:
         self.db_file.parent.mkdir(parents=True, exist_ok=True)
         self._log = logging.getLogger(__name__)
         self._service_types_cache: list[str] | None = None
+        self._organization_list_cache: list[str] | None = None
+        self._department_list_cache: list[str] | None = None
         self._wal_enabled: bool | None = None
         self._initialize()
 
@@ -388,6 +467,11 @@ class Database:
         self._migrate()
         with self.connection() as conn:
             conn.executescript(SCHEMA_SQL)
+        self._migrate_secret_fields()
+        self._migrate_legacy_vault()
+        self._migrate_ird_to_client_credentials()
+        self._migrate_pricing_matrix_services()
+        self._migrate_client_credentials_login_id()
         self._seed_settings()
         self._seed_checklist_templates()
         self._seed_pricing_matrix()
@@ -652,6 +736,208 @@ class Database:
         finally:
             conn.close()
 
+    def _migrate_secret_fields(self) -> None:
+        """Encrypt legacy plaintext IRD passwords at rest."""
+        from skyadmin_pro.services.secret_fields import encrypt_secret, is_encrypted_secret
+
+        with self.connection() as conn:
+            rows = conn.execute(
+                """
+                SELECT id, ird_password
+                FROM clients
+                WHERE ird_password IS NOT NULL AND TRIM(ird_password) != ''
+                """
+            ).fetchall()
+            for row in rows:
+                raw = str(row["ird_password"] or "")
+                if raw and not is_encrypted_secret(raw):
+                    conn.execute(
+                        "UPDATE clients SET ird_password = ? WHERE id = ?",
+                        (encrypt_secret(raw), int(row["id"])),
+                    )
+
+    def _migrate_legacy_vault(self) -> None:
+        """Move legacy vault_entries rows into client_credentials / office_credentials."""
+        with self.connection() as conn:
+            tables = {
+                row[0]
+                for row in conn.execute(
+                    "SELECT name FROM sqlite_master WHERE type='table'"
+                ).fetchall()
+            }
+            if "vault_entries" not in tables:
+                return
+            rows = conn.execute("SELECT * FROM vault_entries").fetchall()
+            if not rows:
+                return
+            for row in rows:
+                data = dict(row)
+                secret = data.get("secret_value") or ""
+                if data.get("client_id"):
+                    conn.execute(
+                        """
+                        INSERT INTO client_credentials
+                            (client_id, credential_type, registration_number, username,
+                             secret_value, portal_url, notes, is_favorite, updated_at)
+                        VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)
+                        """,
+                        (
+                            data["client_id"],
+                            data.get("category") or "Other",
+                            data.get("title"),
+                            data.get("username"),
+                            secret,
+                            data.get("url"),
+                            data.get("notes"),
+                            data.get("is_favorite") or 0,
+                            self._now(),
+                        ),
+                    )
+                else:
+                    conn.execute(
+                        """
+                        INSERT INTO office_credentials
+                            (account_label, login_id, email, secret_value, system_type,
+                             portal_url, contact_id, notes, is_favorite, updated_at)
+                        VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+                        """,
+                        (
+                            data.get("title") or "Office account",
+                            data.get("username"),
+                            data.get("username"),
+                            secret,
+                            data.get("category") or "Email",
+                            data.get("url"),
+                            data.get("contact_id"),
+                            data.get("notes"),
+                            data.get("is_favorite") or 0,
+                            self._now(),
+                        ),
+                    )
+            conn.execute("DELETE FROM vault_entries")
+
+    def _migrate_ird_to_client_credentials(self) -> int:
+        """Import legacy clients.ird_password into Office Hub RD credentials."""
+        from skyadmin_pro.services.secret_fields import (
+            decrypt_secret,
+            encrypt_secret,
+            is_encrypted_secret,
+        )
+
+        migrated = 0
+        with self.connection() as conn:
+            clients = conn.execute(
+                """
+                SELECT id, ird_password FROM clients
+                WHERE ird_password IS NOT NULL AND TRIM(ird_password) != ''
+                """
+            ).fetchall()
+            for client in clients:
+                cid = int(client["id"])
+                existing = conn.execute(
+                    """
+                    SELECT COUNT(*) AS n FROM client_credentials
+                    WHERE client_id = ? AND credential_type = 'RD'
+                    """,
+                    (cid,),
+                ).fetchone()["n"]
+                if existing:
+                    continue
+                raw = str(client["ird_password"] or "")
+                plain = decrypt_secret(raw) if is_encrypted_secret(raw) else raw
+                if not plain:
+                    continue
+                conn.execute(
+                    """
+                    INSERT INTO client_credentials
+                        (client_id, credential_type, username, secret_value, notes, updated_at)
+                    VALUES (?, 'RD', '', ?, 'Imported from Company Details IRD field', ?)
+                    """,
+                    (cid, encrypt_secret(plain), self._now()),
+                )
+                migrated += 1
+        return migrated
+
+    def _migrate_pricing_matrix_services(self) -> None:
+        """Add service_type column and unique (service_type, transaction_range)."""
+        from skyadmin_pro.config import PRICING_DEFAULT_SERVICE
+
+        with self.connection() as conn:
+            tables = {
+                row[0]
+                for row in conn.execute(
+                    "SELECT name FROM sqlite_master WHERE type='table'"
+                ).fetchall()
+            }
+            if "pricing_matrix" not in tables:
+                return
+            columns = {
+                row["name"]
+                for row in conn.execute("PRAGMA table_info(pricing_matrix)")
+            }
+            if "service_type" in columns:
+                return
+            conn.execute(
+                """
+                CREATE TABLE pricing_matrix_new (
+                    id                  INTEGER PRIMARY KEY AUTOINCREMENT,
+                    service_type        TEXT NOT NULL DEFAULT 'General',
+                    transaction_range   TEXT NOT NULL,
+                    monthly_fee         INTEGER,
+                    annual_fee          INTEGER,
+                    sla_hours           INTEGER,
+                    headcount           INTEGER,
+                    required_docs       TEXT,
+                    UNIQUE(service_type, transaction_range)
+                )
+                """
+            )
+            conn.execute(
+                """
+                INSERT INTO pricing_matrix_new
+                    (id, service_type, transaction_range, monthly_fee, annual_fee,
+                     sla_hours, headcount, required_docs)
+                SELECT id, ?, transaction_range, monthly_fee, annual_fee,
+                       sla_hours, headcount, required_docs
+                FROM pricing_matrix
+                """,
+                (PRICING_DEFAULT_SERVICE,),
+            )
+            conn.execute("DROP TABLE pricing_matrix")
+            conn.execute("ALTER TABLE pricing_matrix_new RENAME TO pricing_matrix")
+        self._seed_all_service_pricing()
+
+    def _migrate_client_credentials_login_id(self) -> None:
+        with self.connection() as conn:
+            columns = {
+                row["name"]
+                for row in conn.execute("PRAGMA table_info(client_credentials)")
+            }
+            if "login_id" not in columns:
+                conn.execute("ALTER TABLE client_credentials ADD COLUMN login_id TEXT")
+            conn.execute(
+                """
+                UPDATE client_credentials
+                SET login_id = COALESCE(
+                    NULLIF(TRIM(login_id), ''),
+                    NULLIF(TRIM(registration_number), ''),
+                    NULLIF(TRIM(username), '')
+                )
+                WHERE login_id IS NULL OR TRIM(login_id) = ''
+                """
+            )
+
+    @staticmethod
+    def _prepare_client_record(row: dict | None) -> dict | None:
+        if row is None:
+            return None
+        from skyadmin_pro.services.secret_fields import decrypt_secret
+
+        data = dict(row)
+        if "ird_password" in data:
+            data["ird_password"] = decrypt_secret(data.get("ird_password"))
+        return data
+
     def _seed_settings(self) -> None:
         defaults = {
             SETTING_APPEARANCE_MODE: DEFAULT_APPEARANCE_MODE,
@@ -688,21 +974,136 @@ class Database:
 
     def _seed_pricing_matrix(self) -> None:
         """Seed the default pricing matrix once per database."""
+        from skyadmin_pro.config import PRICING_DEFAULT_SERVICE
+
         with self.connection() as conn:
             existing = conn.execute(
                 "SELECT COUNT(*) AS n FROM pricing_matrix"
             ).fetchone()["n"]
             if existing:
+                self._seed_all_service_pricing()
                 return
             for txn_range, monthly, annual, sla, headcount, docs in DEFAULT_PRICING_MATRIX:
                 conn.execute(
                     """
                     INSERT INTO pricing_matrix
-                        (transaction_range, monthly_fee, annual_fee, sla_hours, headcount, required_docs)
-                    VALUES (?, ?, ?, ?, ?, ?)
+                        (service_type, transaction_range, monthly_fee, annual_fee,
+                         sla_hours, headcount, required_docs)
+                    VALUES (?, ?, ?, ?, ?, ?, ?)
                     """,
-                    (txn_range, monthly, annual, sla, headcount, docs),
+                    (PRICING_DEFAULT_SERVICE, txn_range, monthly, annual, sla, headcount, docs),
                 )
+        self._seed_all_service_pricing()
+
+    def list_pricing_service_types(self) -> list[str]:
+        from skyadmin_pro.config import ACCOUNTING_PRICING_SERVICES, PRICING_DEFAULT_SERVICE
+
+        names: set[str] = {PRICING_DEFAULT_SERVICE}
+        names.update(ACCOUNTING_PRICING_SERVICES)
+        names.update(self.list_service_types())
+        return sorted(names, key=str.casefold)
+
+    def _seed_all_service_pricing(self) -> None:
+        """Ensure every service type has the correct pricing grid (volume tiers or charge lines)."""
+        from skyadmin_pro.config import (
+            DEFAULT_PRICING_MATRIX,
+            PRICING_DEFAULT_SERVICE,
+            default_charge_lines_for,
+            pricing_uses_transaction_ranges,
+        )
+
+        template_rows = self._fetch_all(
+            "SELECT * FROM pricing_matrix WHERE service_type = ?",
+            (PRICING_DEFAULT_SERVICE,),
+        )
+        if not template_rows:
+            template_rows = [
+                {
+                    "transaction_range": txn_range,
+                    "monthly_fee": monthly,
+                    "annual_fee": annual,
+                    "sla_hours": sla,
+                    "headcount": headcount,
+                    "required_docs": docs,
+                }
+                for txn_range, monthly, annual, sla, headcount, docs in DEFAULT_PRICING_MATRIX
+            ]
+        with self.connection() as conn:
+            for service_type in self.list_pricing_service_types():
+                if pricing_uses_transaction_ranges(service_type):
+                    conn.execute(
+                        """
+                        DELETE FROM pricing_matrix
+                        WHERE service_type = ? AND transaction_range = 'Flat fee'
+                        """,
+                        (service_type,),
+                    )
+                    for row in template_rows:
+                        txn_range = row["transaction_range"]
+                        exists = conn.execute(
+                            """
+                            SELECT COUNT(*) AS n FROM pricing_matrix
+                            WHERE service_type = ? AND transaction_range = ?
+                            """,
+                            (service_type, txn_range),
+                        ).fetchone()["n"]
+                        if exists:
+                            continue
+                        conn.execute(
+                            """
+                            INSERT INTO pricing_matrix
+                                (service_type, transaction_range, monthly_fee, annual_fee,
+                                 sla_hours, headcount, required_docs)
+                            VALUES (?, ?, ?, ?, ?, ?, ?)
+                            """,
+                            (
+                                service_type,
+                                txn_range,
+                                row.get("monthly_fee"),
+                                row.get("annual_fee"),
+                                row.get("sla_hours"),
+                                row.get("headcount"),
+                                row.get("required_docs") or "",
+                            ),
+                        )
+                else:
+                    for txn_range, *_ in DEFAULT_PRICING_MATRIX:
+                        conn.execute(
+                            """
+                            DELETE FROM pricing_matrix
+                            WHERE service_type = ? AND transaction_range = ?
+                            """,
+                            (service_type, txn_range),
+                        )
+                    existing = {
+                        str(row["transaction_range"])
+                        for row in self._fetch_all(
+                            "SELECT transaction_range FROM pricing_matrix WHERE service_type = ?",
+                            (service_type,),
+                        )
+                    }
+                    for charge_name, monthly, annual, sla, headcount, docs in default_charge_lines_for(
+                        service_type
+                    ):
+                        if charge_name in existing:
+                            continue
+                        conn.execute(
+                            """
+                            INSERT INTO pricing_matrix
+                                (service_type, transaction_range, monthly_fee, annual_fee,
+                                 sla_hours, headcount, required_docs)
+                            VALUES (?, ?, ?, ?, ?, ?, ?)
+                            """,
+                            (
+                                service_type,
+                                charge_name,
+                                monthly,
+                                annual,
+                                sla,
+                                headcount,
+                                docs,
+                            ),
+                        )
 
     def list_checklist_template_names(self) -> list[str]:
         rows = self._fetch_all(
@@ -840,6 +1241,216 @@ class Database:
             raise ValueError("Service list cannot be empty.")
         self.set_setting(SETTING_SERVICE_TYPES, json.dumps(cleaned, ensure_ascii=False))
 
+    def _load_name_list_setting(self, key: str) -> list[str]:
+        raw = self.get_setting(key)
+        if not raw:
+            return []
+        try:
+            parsed = json.loads(raw)
+            if not isinstance(parsed, list):
+                return []
+        except (ValueError, TypeError):
+            logging.getLogger(__name__).warning("Corrupt name list for %s", key)
+            return []
+        cleaned: list[str] = []
+        seen: set[str] = set()
+        for item in parsed:
+            name = str(item).strip()
+            fold = name.casefold()
+            if name and fold not in seen:
+                seen.add(fold)
+                cleaned.append(name)
+        return sorted(cleaned, key=str.casefold)
+
+    def _save_name_list_setting(self, key: str, names: list[str], *, label: str) -> None:
+        cleaned: list[str] = []
+        seen: set[str] = set()
+        for item in names:
+            name = str(item).strip()
+            fold = name.casefold()
+            if name and fold not in seen:
+                seen.add(fold)
+                cleaned.append(name)
+        if not cleaned:
+            raise ValueError(f"{label} cannot be empty.")
+        self.set_setting(key, json.dumps(sorted(cleaned, key=str.casefold), ensure_ascii=False))
+
+    def list_organizations(self) -> list[str]:
+        """Client company names for Office Hub contact pickers (not a separate master list)."""
+        if self._organization_list_cache is not None:
+            return list(self._organization_list_cache)
+        names: list[str] = []
+        seen: set[str] = set()
+        for row in self._fetch_all("SELECT name, company_name FROM clients ORDER BY name COLLATE NOCASE"):
+            for field in (row.get("name"), row.get("company_name")):
+                name = str(field or "").strip()
+                fold = name.casefold()
+                if name and fold not in seen:
+                    seen.add(fold)
+                    names.append(name)
+        result = sorted(names, key=str.casefold)
+        self._organization_list_cache = result
+        return list(result)
+
+    def list_departments(self) -> list[str]:
+        if self._department_list_cache is not None:
+            return list(self._department_list_cache)
+        result = self._load_name_list_setting(SETTING_DEPARTMENT_LIST)
+        self._department_list_cache = result
+        return list(result)
+
+    def set_organizations(self, names: list[str]) -> None:
+        """Deprecated — organizations are client company names. Clears cache only."""
+        self._organization_list_cache = None
+
+    def set_departments(self, names: list[str]) -> None:
+        self._department_list_cache = None
+        self._save_name_list_setting(SETTING_DEPARTMENT_LIST, names, label="Department list")
+
+    def ensure_directory_entries(
+        self, *, organization: str | None = None, department: str | None = None
+    ) -> None:
+        """Ensure a typed company exists in clients; add new departments to the master list."""
+        org = (organization or "").strip()
+        dept = (department or "").strip()
+        if org:
+            self.get_or_create_client(org)
+            self._organization_list_cache = None
+        if dept:
+            depts = self.list_departments()
+            if dept.casefold() not in {name.casefold() for name in depts}:
+                depts.append(dept)
+                self.set_departments(depts)
+
+    def import_directory_from_data(self) -> tuple[int, int]:
+        """Create clients from contact organizations; merge departments into Settings list."""
+        depts = self.list_departments()
+        dept_fold = {name.casefold() for name in depts}
+        new_orgs = 0
+        new_depts = 0
+
+        for row in self._fetch_all(
+            """
+            SELECT DISTINCT organization FROM office_contacts
+            WHERE organization IS NOT NULL AND TRIM(organization) != ''
+            """
+        ):
+            name = str(row["organization"]).strip()
+            if name and self.client_id_by_name(name) is None:
+                self.get_or_create_client(name)
+                new_orgs += 1
+
+        for row in self._fetch_all(
+            """
+            SELECT DISTINCT department FROM office_contacts
+            WHERE department IS NOT NULL AND TRIM(department) != ''
+            """
+        ):
+            name = str(row["department"]).strip()
+            if name.casefold() not in dept_fold:
+                depts.append(name)
+                dept_fold.add(name.casefold())
+                new_depts += 1
+
+        for row in self._fetch_all("SELECT name, company_name FROM clients"):
+            for field in (row.get("company_name"), row.get("name")):
+                name = str(field or "").strip()
+                if name and self.client_id_by_name(name) is None:
+                    self.get_or_create_client(name)
+                    new_orgs += 1
+
+        if new_orgs:
+            self._organization_list_cache = None
+        if new_depts:
+            self.set_departments(depts)
+        return new_orgs, new_depts
+
+    def list_office_hub_setup_candidates(self) -> list[dict]:
+        """Per-client Office Hub adoption status (contacts + portal logins)."""
+        return self._fetch_all(
+            """
+            SELECT c.id, c.name, c.director, c.contact_name, c.email, c.contact_number,
+                   c.registration_number,
+                   (SELECT COUNT(*) FROM office_contacts oc WHERE oc.client_id = c.id)
+                       AS contact_count,
+                   (SELECT COUNT(*) FROM client_credentials cc WHERE cc.client_id = c.id)
+                       AS credential_count,
+                   (SELECT COUNT(*) FROM client_credentials cc
+                    WHERE cc.client_id = c.id AND cc.credential_type = 'RD')
+                       AS rd_count,
+                   CASE
+                       WHEN c.ird_password IS NOT NULL AND trim(c.ird_password) != '' THEN 1
+                       ELSE 0
+                   END AS has_legacy_ird
+            FROM clients c
+            ORDER BY c.name COLLATE NOCASE
+            """
+        )
+
+    def seed_client_liaison_contacts(
+        self, *, only_missing: bool = True, client_id: int | None = None
+    ) -> int:
+        """Create Client liaison contacts from director / contact fields on clients."""
+        created = 0
+        for row in self._fetch_all(
+            "SELECT * FROM clients ORDER BY name COLLATE NOCASE"
+        ):
+            cid = int(row["id"])
+            if client_id is not None and cid != int(client_id):
+                continue
+            if only_missing:
+                existing = self._fetch_one(
+                    "SELECT COUNT(*) AS n FROM office_contacts WHERE client_id = ?",
+                    (cid,),
+                )
+                if existing and int(existing["n"]) > 0:
+                    continue
+            name = (row.get("director") or row.get("contact_name") or "").strip()
+            if not name:
+                continue
+            director = (row.get("director") or "").strip()
+            self.add_office_contact(
+                name=name,
+                role_title="Director" if director else "Contact",
+                organization=row.get("name"),
+                phone=row.get("contact_number"),
+                email=row.get("email"),
+                category="Client liaison",
+                client_id=cid,
+                notes="Imported from Company Details",
+            )
+            created += 1
+        return created
+
+    def list_vo_csh_setup_candidates(self) -> list[dict]:
+        """Clients with VO/CSH documents or renewal fields on file."""
+        from skyadmin_pro.config import CSH_DOCUMENT_TYPES, VO_DOCUMENT_TYPES
+
+        vo_clause, vo_params = _in_clause("d.document_type", VO_DOCUMENT_TYPES)
+        csh_clause, csh_params = _in_clause("d.document_type", CSH_DOCUMENT_TYPES)
+        params = vo_params + csh_params
+        return self._fetch_all(
+            f"""
+            SELECT c.id, c.name, c.vo_renewal_date, c.csh_renewal_date,
+                   c.vo_service_provider, c.csh_service_provider,
+                   (SELECT COUNT(*) FROM documents d
+                    WHERE d.client_id = c.id AND {vo_clause}) AS vo_doc_count,
+                   (SELECT COUNT(*) FROM documents d
+                    WHERE d.client_id = c.id AND {csh_clause}) AS csh_doc_count
+            FROM clients c
+            WHERE EXISTS (
+                SELECT 1 FROM documents d
+                WHERE d.client_id = c.id AND ({vo_clause} OR {csh_clause})
+            )
+            OR (c.vo_renewal_date IS NOT NULL AND trim(c.vo_renewal_date) != '')
+            OR (c.csh_renewal_date IS NOT NULL AND trim(c.csh_renewal_date) != '')
+            OR (c.vo_service_provider IS NOT NULL AND trim(c.vo_service_provider) != '')
+            OR (c.csh_service_provider IS NOT NULL AND trim(c.csh_service_provider) != '')
+            ORDER BY c.name COLLATE NOCASE
+            """,
+            params + params,
+        )
+
     def save_snippet_version(
         self, snapshot: dict, note: str = "", created_at: str | None = None
     ) -> int:
@@ -961,6 +1572,7 @@ class Database:
                     raise
                 return int(row["id"])
         self.add_new_client_tasks(new_id, cleaned)
+        self._organization_list_cache = None
         return new_id
 
     def add_new_client_tasks(self, client_id: int, client_name: str) -> list[int]:
@@ -1227,17 +1839,11 @@ class Database:
         )
 
     def get_client(self, client_id: int) -> dict | None:
-        return self._fetch_one(
-            """
-            SELECT id, name, company_name, contact_name, email, status, notes,
-                   registration_number, director, contact_number,
-                   registered_capital, vat_registration, business_address,
-                   business_objectives, created_at, updated_at
-            FROM clients
-            WHERE id = ?
-            """,
+        row = self._fetch_one(
+            "SELECT * FROM clients WHERE id = ?",
             (client_id,),
         )
+        return self._prepare_client_record(row)
 
     def search_clients(self, query: str = "") -> list[dict]:
         """Company-list rows: match name / contact / email, sorted by name."""
@@ -2220,6 +2826,25 @@ class Database:
             """
         )
 
+    def list_expiring_supplier_services(self) -> list[dict]:
+        """Supplier services with expiry within EXPIRY_ALERT_DAYS (dashboard alerts)."""
+        rows = self._fetch_all(
+            """
+            SELECT ss.id, ss.supplier_id, ss.company_name, ss.service_type,
+                   ss.expiry_date, ss.notes, s.name AS supplier_name
+            FROM supplier_services ss
+            LEFT JOIN suppliers s ON s.id = ss.supplier_id
+            WHERE ss.expiry_date IS NOT NULL AND trim(ss.expiry_date) != ''
+            ORDER BY ss.expiry_date ASC
+            """
+        )
+        filtered: list[dict] = []
+        for row in rows:
+            left = days_until(row["expiry_date"])
+            if left is not None and left <= EXPIRY_ALERT_DAYS:
+                filtered.append(row)
+        return filtered
+
     def add_supplier_service(
         self,
         *,
@@ -2298,6 +2923,39 @@ class Database:
                  notes, now, now),
             )
             return int(cursor.lastrowid)
+
+    def update_supplier_payment(
+        self,
+        payment_id: int,
+        *,
+        supplier_id: int,
+        client_id: int | None = None,
+        amount: str | None = None,
+        due_date: str | None = None,
+        paid_date: str | None = None,
+        notes: str | None = None,
+    ) -> None:
+        paid = 1 if paid_date else 0
+        with self.connection() as conn:
+            conn.execute(
+                """
+                UPDATE supplier_payments
+                SET supplier_id = ?, client_id = ?, amount = ?, due_date = ?,
+                    paid = ?, paid_date = ?, notes = ?, updated_at = ?
+                WHERE id = ?
+                """,
+                (
+                    supplier_id,
+                    client_id,
+                    amount,
+                    due_date,
+                    paid,
+                    paid_date,
+                    notes,
+                    self._now(),
+                    payment_id,
+                ),
+            )
 
     def get_supplier_payment(self, payment_id: int) -> dict | None:
         return self._fetch_one(
@@ -2448,7 +3106,10 @@ class Database:
     def dashboard_counts(self) -> dict[str, int]:
         # Resolve helpers BEFORE opening the connection so they don't nest
         # additional connections inside this one.
-        expiring = len(self.list_expiring_documents())
+        expiring = (
+            len(self.list_expiring_documents())
+            + len(self.list_expiring_supplier_services())
+        )
         service_types = tuple(self.list_service_types())
         overdue_clause, overdue_params = _in_clause("document_type", service_types)
         with self.connection() as conn:
@@ -2627,6 +3288,11 @@ class Database:
         updates = {k: v for k, v in fields.items() if k in allowed}
         if not updates:
             return
+        if "ird_password" in updates:
+            from skyadmin_pro.services.secret_fields import encrypt_secret
+
+            raw = str(updates["ird_password"] or "").strip()
+            updates["ird_password"] = encrypt_secret(raw) if raw else ""
         sets = ", ".join(f"{k} = ?" for k in updates)
         params = list(updates.values()) + [self._now(), client_id]
         with self.connection() as conn:
@@ -2700,6 +3366,39 @@ class Database:
             ).fetchone()
         return row["changed_at"] if row else None
 
+    def list_accounting_setup_candidates(self) -> list[dict]:
+        """Clients with accounting documents and/or an accounting service contract."""
+        from skyadmin_pro.config import ACCOUNTING_DOCUMENT_TYPES
+
+        clause, params = _in_clause("d.document_type", tuple(ACCOUNTING_DOCUMENT_TYPES))
+        rows = self._fetch_all(
+            f"""
+            SELECT c.id, c.name, c.tax_id, c.service_type, c.num_transactions,
+                   c.service_fee, c.payment_status,
+                   GROUP_CONCAT(DISTINCT d.document_type) AS document_types
+            FROM clients c
+            INNER JOIN documents d ON d.client_id = c.id
+            WHERE {clause}
+            GROUP BY c.id
+            ORDER BY c.name COLLATE NOCASE
+            """,
+            params,
+        )
+        seen = {int(row["id"]) for row in rows}
+        for row in self._fetch_all(
+            """
+            SELECT id, name, tax_id, service_type, num_transactions,
+                   service_fee, payment_status, '' AS document_types
+            FROM clients
+            WHERE service_type IS NOT NULL AND trim(service_type) != ''
+            ORDER BY name COLLATE NOCASE
+            """
+        ):
+            if int(row["id"]) not in seen:
+                rows.append(row)
+                seen.add(int(row["id"]))
+        return rows
+
     def list_accounting_clients(self) -> list[dict]:
         """Clients with service_type set (accounting service clients)."""
         return self._fetch_all(
@@ -2745,6 +3444,30 @@ class Database:
                 (str(year), str(month).zfill(2)),
             ).fetchone()
         return int(row["total"])
+
+    def roll_forward_stale_expiry_dates(self) -> int:
+        """Persist rolled 31-Dec annual expiry dates so lists/exports match the dashboard."""
+        from skyadmin_pro.services.tracking import effective_expiry_date
+
+        rows = self._fetch_all(
+            """
+            SELECT id, document_type, expiry_date
+            FROM documents
+            WHERE expiry_date IS NOT NULL AND trim(expiry_date) != ''
+            """
+        )
+        updated = 0
+        with self.connection() as conn:
+            for row in rows:
+                effective = effective_expiry_date(row["expiry_date"], row["document_type"])
+                if not effective or effective == row["expiry_date"]:
+                    continue
+                conn.execute(
+                    "UPDATE documents SET expiry_date = ? WHERE id = ?",
+                    (effective, int(row["id"])),
+                )
+                updated += 1
+        return updated
 
     def count_vo_csh_expiring(self, days: int = 30) -> int:
         """Count of clients with VO or CSH renewal within N days."""
@@ -2913,9 +3636,18 @@ class Database:
     # ------------------------------------------------------------------ #
     # Pricing matrix CRUD
     # ------------------------------------------------------------------ #
-    def get_pricing_matrix(self) -> list[dict]:
+    def get_pricing_matrix(self, *, service_type: str | None = None) -> list[dict]:
+        if service_type:
+            return self._fetch_all(
+                """
+                SELECT * FROM pricing_matrix
+                WHERE service_type = ?
+                ORDER BY monthly_fee ASC
+                """,
+                (service_type,),
+            )
         return self._fetch_all(
-            "SELECT * FROM pricing_matrix ORDER BY monthly_fee ASC"
+            "SELECT * FROM pricing_matrix ORDER BY service_type, monthly_fee ASC"
         )
 
     def get_pricing_tier(self, tier_id: int) -> dict | None:
@@ -2924,6 +3656,7 @@ class Database:
     def add_pricing_tier(
         self,
         *,
+        service_type: str,
         transaction_range: str,
         monthly_fee: int,
         annual_fee: int,
@@ -2935,10 +3668,19 @@ class Database:
             cursor = conn.execute(
                 """
                 INSERT INTO pricing_matrix
-                    (transaction_range, monthly_fee, annual_fee, sla_hours, headcount, required_docs)
-                VALUES (?, ?, ?, ?, ?, ?)
+                    (service_type, transaction_range, monthly_fee, annual_fee,
+                     sla_hours, headcount, required_docs)
+                VALUES (?, ?, ?, ?, ?, ?, ?)
                 """,
-                (transaction_range, monthly_fee, annual_fee, sla_hours, headcount, required_docs),
+                (
+                    service_type,
+                    transaction_range,
+                    monthly_fee,
+                    annual_fee,
+                    sla_hours,
+                    headcount,
+                    required_docs,
+                ),
             )
             return int(cursor.lastrowid)
 
@@ -2946,6 +3688,7 @@ class Database:
         self,
         tier_id: int,
         *,
+        service_type: str | None = None,
         transaction_range: str | None = None,
         monthly_fee: int | None = None,
         annual_fee: int | None = None,
@@ -2955,6 +3698,7 @@ class Database:
     ) -> None:
         fields, params = [], []
         for col, val in (
+            ("service_type", service_type),
             ("transaction_range", transaction_range),
             ("monthly_fee", monthly_fee),
             ("annual_fee", annual_fee),
@@ -2978,11 +3722,77 @@ class Database:
         with self.connection() as conn:
             conn.execute("DELETE FROM pricing_matrix WHERE id = ?", (tier_id,))
 
-    def lookup_pricing_by_range(self, transaction_range: str) -> dict | None:
+    def lookup_pricing_by_range(
+        self,
+        transaction_range: str,
+        *,
+        service_type: str | None = None,
+    ) -> dict | None:
+        from skyadmin_pro.config import PRICING_DEFAULT_SERVICE
+
+        stype = (service_type or "").strip() or PRICING_DEFAULT_SERVICE
+        row = self._fetch_one(
+            """
+            SELECT * FROM pricing_matrix
+            WHERE service_type = ? AND transaction_range = ?
+            """,
+            (stype, transaction_range),
+        )
+        if row:
+            return row
+        if stype != PRICING_DEFAULT_SERVICE:
+            return self._fetch_one(
+                """
+                SELECT * FROM pricing_matrix
+                WHERE service_type = ? AND transaction_range = ?
+                """,
+                (PRICING_DEFAULT_SERVICE, transaction_range),
+            )
         return self._fetch_one(
-            "SELECT * FROM pricing_matrix WHERE transaction_range = ?",
+            "SELECT * FROM pricing_matrix WHERE transaction_range = ? LIMIT 1",
             (transaction_range,),
         )
+
+    def reset_service_pricing_to_defaults(self, service_type: str) -> None:
+        from skyadmin_pro.config import (
+            DEFAULT_PRICING_MATRIX,
+            PRICING_DEFAULT_SERVICE,
+            default_charge_lines_for,
+            pricing_uses_transaction_ranges,
+        )
+
+        if pricing_uses_transaction_ranges(service_type):
+            if service_type == PRICING_DEFAULT_SERVICE:
+                template = DEFAULT_PRICING_MATRIX
+            else:
+                template = [
+                    (
+                        row["transaction_range"],
+                        row.get("monthly_fee") or 0,
+                        row.get("annual_fee") or 0,
+                        row.get("sla_hours") or 0,
+                        row.get("headcount") or 0,
+                        row.get("required_docs") or "",
+                    )
+                    for row in self.get_pricing_matrix(service_type=PRICING_DEFAULT_SERVICE)
+                ] or list(DEFAULT_PRICING_MATRIX)
+        else:
+            template = list(default_charge_lines_for(service_type))
+        with self.connection() as conn:
+            conn.execute(
+                "DELETE FROM pricing_matrix WHERE service_type = ?",
+                (service_type,),
+            )
+            for txn_range, monthly, annual, sla, headcount, docs in template:
+                conn.execute(
+                    """
+                    INSERT INTO pricing_matrix
+                        (service_type, transaction_range, monthly_fee, annual_fee,
+                         sla_hours, headcount, required_docs)
+                    VALUES (?, ?, ?, ?, ?, ?, ?)
+                    """,
+                    (service_type, txn_range, monthly, annual, sla, headcount, docs),
+                )
 
     # ------------------------------------------------------------------ #
     # Financial documents: receipts, invoices, bank transfers, etc.
@@ -3133,3 +3943,444 @@ class Database:
             """,
             tuple(params),
         )
+
+    # ------------------------------------------------------------------ #
+    # Office contacts, password vault, notebook
+    # ------------------------------------------------------------------ #
+
+    def list_office_contacts(
+        self, *, query: str = "", category: str | None = None
+    ) -> list[dict]:
+        sql = """
+            SELECT oc.*, c.name AS client_name
+            FROM office_contacts oc
+            LEFT JOIN clients c ON c.id = oc.client_id
+        """
+        conditions: list[str] = []
+        params: list = []
+        q = (query or "").strip()
+        if q:
+            like = f"%{_escape_like(q)}%"
+            conditions.append(
+                "(oc.name LIKE ? ESCAPE '\\' OR oc.organization LIKE ? ESCAPE '\\'"
+                " OR oc.email LIKE ? ESCAPE '\\' OR oc.phone LIKE ? ESCAPE '\\')"
+            )
+            params.extend([like, like, like, like])
+        if category:
+            conditions.append("oc.category = ?")
+            params.append(category)
+        if conditions:
+            sql += " WHERE " + " AND ".join(conditions)
+        sql += " ORDER BY oc.is_favorite DESC, oc.name COLLATE NOCASE"
+        return self._fetch_all(sql, tuple(params))
+
+    def get_office_contact(self, contact_id: int) -> dict | None:
+        return self._fetch_one(
+            """
+            SELECT oc.*, c.name AS client_name
+            FROM office_contacts oc
+            LEFT JOIN clients c ON c.id = oc.client_id
+            WHERE oc.id = ?
+            """,
+            (contact_id,),
+        )
+
+    def add_office_contact(self, **fields: object) -> int:
+        name = str(fields.get("name") or "").strip()
+        if not name:
+            raise ValueError("Contact name is required.")
+        with self.connection() as conn:
+            cursor = conn.execute(
+                """
+                INSERT INTO office_contacts
+                    (name, role_title, organization, department, phone, email,
+                     line_id, category, client_id, notes, is_favorite, updated_at)
+                VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+                """,
+                (
+                    name,
+                    fields.get("role_title"),
+                    fields.get("organization"),
+                    fields.get("department"),
+                    fields.get("phone"),
+                    fields.get("email"),
+                    fields.get("line_id"),
+                    fields.get("category") or "Office",
+                    fields.get("client_id"),
+                    fields.get("notes"),
+                    1 if fields.get("is_favorite") else 0,
+                    self._now(),
+                ),
+            )
+            return int(cursor.lastrowid)
+
+    def update_office_contact(self, contact_id: int, **fields: object) -> None:
+        allowed = {
+            "name", "role_title", "organization", "department", "phone", "email",
+            "line_id", "category", "client_id", "notes", "is_favorite",
+        }
+        updates = {k: v for k, v in fields.items() if k in allowed}
+        if not updates:
+            return
+        if "name" in updates and not str(updates["name"] or "").strip():
+            raise ValueError("Contact name is required.")
+        if "is_favorite" in updates:
+            updates["is_favorite"] = 1 if updates["is_favorite"] else 0
+        updates["updated_at"] = self._now()
+        sets = ", ".join(f"{k} = ?" for k in updates)
+        with self.connection() as conn:
+            conn.execute(
+                f"UPDATE office_contacts SET {sets} WHERE id = ?",
+                (*updates.values(), contact_id),
+            )
+
+    def delete_office_contact(self, contact_id: int) -> None:
+        with self.connection() as conn:
+            conn.execute("DELETE FROM office_contacts WHERE id = ?", (contact_id,))
+
+    def list_client_credentials(
+        self,
+        *,
+        query: str = "",
+        credential_type: str | None = None,
+        client_id: int | None = None,
+    ) -> list[dict]:
+        from skyadmin_pro.services.vault import prepare_client_credential_row
+
+        sql = """
+            SELECT cc.*, c.name AS client_name
+            FROM client_credentials cc
+            JOIN clients c ON c.id = cc.client_id
+        """
+        conditions: list[str] = []
+        params: list = []
+        q = (query or "").strip()
+        if q:
+            like = f"%{_escape_like(q)}%"
+            conditions.append(
+                "(c.name LIKE ? ESCAPE '\\' OR cc.registration_number LIKE ? ESCAPE '\\'"
+                " OR cc.username LIKE ? ESCAPE '\\' OR cc.credential_type LIKE ? ESCAPE '\\')"
+            )
+            params.extend([like, like, like, like])
+        if credential_type:
+            conditions.append("cc.credential_type = ?")
+            params.append(credential_type)
+        if client_id:
+            conditions.append("cc.client_id = ?")
+            params.append(client_id)
+        if conditions:
+            sql += " WHERE " + " AND ".join(conditions)
+        sql += " ORDER BY cc.is_favorite DESC, c.name COLLATE NOCASE, cc.credential_type"
+        return [
+            prepare_client_credential_row(row)
+            for row in self._fetch_all(sql, tuple(params))
+        ]
+
+    def get_client_credential(self, entry_id: int) -> dict | None:
+        from skyadmin_pro.services.vault import prepare_client_credential_row
+
+        row = self._fetch_one(
+            """
+            SELECT cc.*, c.name AS client_name
+            FROM client_credentials cc
+            JOIN clients c ON c.id = cc.client_id
+            WHERE cc.id = ?
+            """,
+            (entry_id,),
+        )
+        return prepare_client_credential_row(row)
+
+    def get_client_rd_credential(self, client_id: int) -> dict | None:
+        """Primary RD/IRD portal credential for Company Details (Office Hub source)."""
+        rows = self.list_client_credentials(client_id=client_id, credential_type="RD")
+        return rows[0] if rows else None
+
+    def add_client_credential(self, **fields: object) -> int:
+        from skyadmin_pro.services.vault import encrypt_vault_secret
+
+        client_id = fields.get("client_id")
+        if not client_id:
+            raise ValueError("Client is required for client credentials.")
+        secret = str(fields.get("secret_value") or fields.get("password") or "")
+        login_id = (
+            fields.get("login_id")
+            or fields.get("username")
+            or fields.get("registration_number")
+        )
+        with self.connection() as conn:
+            cursor = conn.execute(
+                """
+                INSERT INTO client_credentials
+                    (client_id, credential_type, registration_number, login_id, username,
+                     secret_value, portal_url, notes, is_favorite, updated_at)
+                VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+                """,
+                (
+                    client_id,
+                    fields.get("credential_type") or "DBD",
+                    fields.get("registration_number"),
+                    login_id,
+                    login_id,
+                    encrypt_vault_secret(secret),
+                    fields.get("portal_url") or fields.get("url"),
+                    fields.get("notes"),
+                    1 if fields.get("is_favorite") else 0,
+                    self._now(),
+                ),
+            )
+            return int(cursor.lastrowid)
+
+    def update_client_credential(self, entry_id: int, **fields: object) -> None:
+        from skyadmin_pro.services.vault import encrypt_vault_secret
+
+        allowed = {
+            "client_id", "credential_type", "registration_number", "login_id", "username",
+            "secret_value", "password", "portal_url", "url", "notes", "is_favorite",
+        }
+        updates = {k: v for k, v in fields.items() if k in allowed}
+        if not updates:
+            return
+        if "url" in updates and "portal_url" not in updates:
+            updates["portal_url"] = updates.pop("url")
+        if "login_id" in updates and "username" not in updates:
+            updates["username"] = updates["login_id"]
+        if "password" in updates:
+            raw = str(updates.pop("password") or "")
+            if raw:
+                updates["secret_value"] = encrypt_vault_secret(raw)
+        elif "secret_value" in updates:
+            updates["secret_value"] = encrypt_vault_secret(str(updates["secret_value"] or ""))
+        if "client_id" in updates and not updates["client_id"]:
+            raise ValueError("Client is required for client credentials.")
+        if "is_favorite" in updates:
+            updates["is_favorite"] = 1 if updates["is_favorite"] else 0
+        updates["updated_at"] = self._now()
+        sets = ", ".join(f"{k} = ?" for k in updates)
+        with self.connection() as conn:
+            conn.execute(
+                f"UPDATE client_credentials SET {sets} WHERE id = ?",
+                (*updates.values(), entry_id),
+            )
+
+    def delete_client_credential(self, entry_id: int) -> None:
+        with self.connection() as conn:
+            conn.execute("DELETE FROM client_credentials WHERE id = ?", (entry_id,))
+
+    def list_office_credentials(
+        self, *, query: str = "", system_type: str | None = None
+    ) -> list[dict]:
+        from skyadmin_pro.services.vault import prepare_office_credential_row
+
+        sql = """
+            SELECT oc.*, c.name AS contact_name
+            FROM office_credentials oc
+            LEFT JOIN office_contacts c ON c.id = oc.contact_id
+        """
+        conditions: list[str] = []
+        params: list = []
+        q = (query or "").strip()
+        if q:
+            like = f"%{_escape_like(q)}%"
+            conditions.append(
+                "(oc.account_label LIKE ? ESCAPE '\\' OR oc.login_id LIKE ? ESCAPE '\\'"
+                " OR oc.email LIKE ? ESCAPE '\\' OR oc.system_type LIKE ? ESCAPE '\\')"
+            )
+            params.extend([like, like, like, like])
+        if system_type:
+            conditions.append("oc.system_type = ?")
+            params.append(system_type)
+        if conditions:
+            sql += " WHERE " + " AND ".join(conditions)
+        sql += " ORDER BY oc.is_favorite DESC, oc.account_label COLLATE NOCASE"
+        return [
+            prepare_office_credential_row(row)
+            for row in self._fetch_all(sql, tuple(params))
+        ]
+
+    def get_office_credential(self, entry_id: int) -> dict | None:
+        from skyadmin_pro.services.vault import prepare_office_credential_row
+
+        row = self._fetch_one(
+            """
+            SELECT oc.*, c.name AS contact_name
+            FROM office_credentials oc
+            LEFT JOIN office_contacts c ON c.id = oc.contact_id
+            WHERE oc.id = ?
+            """,
+            (entry_id,),
+        )
+        return prepare_office_credential_row(row)
+
+    def add_office_credential(self, **fields: object) -> int:
+        from skyadmin_pro.services.vault import encrypt_vault_secret
+
+        label = str(fields.get("account_label") or fields.get("title") or "").strip()
+        if not label:
+            raise ValueError("Account label is required.")
+        secret = str(fields.get("secret_value") or fields.get("password") or "")
+        login_id = fields.get("login_id") or fields.get("username")
+        email = fields.get("email") or login_id
+        with self.connection() as conn:
+            cursor = conn.execute(
+                """
+                INSERT INTO office_credentials
+                    (account_label, login_id, email, secret_value, system_type,
+                     portal_url, contact_id, notes, is_favorite, updated_at)
+                VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+                """,
+                (
+                    label,
+                    login_id,
+                    email,
+                    encrypt_vault_secret(secret),
+                    fields.get("system_type") or fields.get("category") or "Email",
+                    fields.get("portal_url") or fields.get("url"),
+                    fields.get("contact_id"),
+                    fields.get("notes"),
+                    1 if fields.get("is_favorite") else 0,
+                    self._now(),
+                ),
+            )
+            return int(cursor.lastrowid)
+
+    def update_office_credential(self, entry_id: int, **fields: object) -> None:
+        from skyadmin_pro.services.vault import encrypt_vault_secret
+
+        allowed = {
+            "account_label", "title", "login_id", "username", "email",
+            "secret_value", "password", "system_type", "category",
+            "portal_url", "url", "contact_id", "notes", "is_favorite",
+        }
+        updates = {k: v for k, v in fields.items() if k in allowed}
+        if not updates:
+            return
+        if "title" in updates and "account_label" not in updates:
+            updates["account_label"] = updates.pop("title")
+        if "username" in updates and "login_id" not in updates:
+            updates["login_id"] = updates.pop("username")
+        if "category" in updates and "system_type" not in updates:
+            updates["system_type"] = updates.pop("category")
+        if "url" in updates and "portal_url" not in updates:
+            updates["portal_url"] = updates.pop("url")
+        if "password" in updates:
+            updates["secret_value"] = encrypt_vault_secret(str(updates.pop("password") or ""))
+        elif "secret_value" in updates:
+            updates["secret_value"] = encrypt_vault_secret(str(updates["secret_value"] or ""))
+        if "account_label" in updates and not str(updates["account_label"] or "").strip():
+            raise ValueError("Account label is required.")
+        if "is_favorite" in updates:
+            updates["is_favorite"] = 1 if updates["is_favorite"] else 0
+        updates["updated_at"] = self._now()
+        sets = ", ".join(f"{k} = ?" for k in updates)
+        with self.connection() as conn:
+            conn.execute(
+                f"UPDATE office_credentials SET {sets} WHERE id = ?",
+                (*updates.values(), entry_id),
+            )
+
+    def delete_office_credential(self, entry_id: int) -> None:
+        with self.connection() as conn:
+            conn.execute("DELETE FROM office_credentials WHERE id = ?", (entry_id,))
+
+    def list_notebook_entries(
+        self,
+        *,
+        query: str = "",
+        entry_type: str | None = None,
+        client_id: int | None = None,
+        from_date: str | None = None,
+        to_date: str | None = None,
+    ) -> list[dict]:
+        sql = """
+            SELECT n.*, c.name AS client_name
+            FROM notebook_entries n
+            LEFT JOIN clients c ON c.id = n.client_id
+        """
+        conditions: list[str] = []
+        params: list = []
+        q = (query or "").strip()
+        if q:
+            like = f"%{_escape_like(q)}%"
+            conditions.append(
+                "(n.title LIKE ? ESCAPE '\\' OR n.body LIKE ? ESCAPE '\\'"
+                " OR n.author LIKE ? ESCAPE '\\')"
+            )
+            params.extend([like, like, like])
+        if entry_type:
+            conditions.append("n.entry_type = ?")
+            params.append(entry_type)
+        if client_id:
+            conditions.append("n.client_id = ?")
+            params.append(client_id)
+        if from_date:
+            conditions.append("n.entry_date >= ?")
+            params.append(from_date)
+        if to_date:
+            conditions.append("n.entry_date <= ?")
+            params.append(to_date)
+        if conditions:
+            sql += " WHERE " + " AND ".join(conditions)
+        sql += " ORDER BY n.is_pinned DESC, n.entry_date DESC, n.id DESC"
+        return self._fetch_all(sql, tuple(params))
+
+    def get_notebook_entry(self, entry_id: int) -> dict | None:
+        return self._fetch_one(
+            """
+            SELECT n.*, c.name AS client_name
+            FROM notebook_entries n
+            LEFT JOIN clients c ON c.id = n.client_id
+            WHERE n.id = ?
+            """,
+            (entry_id,),
+        )
+
+    def add_notebook_entry(self, **fields: object) -> int:
+        title = str(fields.get("title") or "").strip()
+        if not title:
+            raise ValueError("Notebook title is required.")
+        entry_date = str(fields.get("entry_date") or date.today().isoformat())[:10]
+        with self.connection() as conn:
+            cursor = conn.execute(
+                """
+                INSERT INTO notebook_entries
+                    (entry_type, title, body, entry_date, client_id, author,
+                     follow_up_date, is_pinned, updated_at)
+                VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)
+                """,
+                (
+                    fields.get("entry_type") or "general",
+                    title,
+                    fields.get("body"),
+                    entry_date,
+                    fields.get("client_id"),
+                    fields.get("author"),
+                    fields.get("follow_up_date"),
+                    1 if fields.get("is_pinned") else 0,
+                    self._now(),
+                ),
+            )
+            return int(cursor.lastrowid)
+
+    def update_notebook_entry(self, entry_id: int, **fields: object) -> None:
+        allowed = {
+            "entry_type", "title", "body", "entry_date", "client_id",
+            "author", "follow_up_date", "is_pinned",
+        }
+        updates = {k: v for k, v in fields.items() if k in allowed}
+        if not updates:
+            return
+        if "title" in updates and not str(updates["title"] or "").strip():
+            raise ValueError("Notebook title is required.")
+        if "is_pinned" in updates:
+            updates["is_pinned"] = 1 if updates["is_pinned"] else 0
+        updates["updated_at"] = self._now()
+        sets = ", ".join(f"{k} = ?" for k in updates)
+        with self.connection() as conn:
+            conn.execute(
+                f"UPDATE notebook_entries SET {sets} WHERE id = ?",
+                (*updates.values(), entry_id),
+            )
+
+    def delete_notebook_entry(self, entry_id: int) -> None:
+        with self.connection() as conn:
+            conn.execute("DELETE FROM notebook_entries WHERE id = ?", (entry_id,))

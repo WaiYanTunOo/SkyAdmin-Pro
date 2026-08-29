@@ -14,7 +14,7 @@ import logging
 import platform
 import sys
 import uuid
-from datetime import date, datetime, timedelta
+from datetime import date, datetime, timedelta, timezone
 from pathlib import Path
 
 # ---------------------------------------------------------------------------
@@ -249,6 +249,13 @@ def _last_sync_path() -> Path | None:
     except Exception:
         return None
 
+def requires_online_check() -> bool:
+    """True when API or Gist control URLs are configured (daily sync required)."""
+    from skyadmin_pro.config import API_BASE_URL, REVOCATION_URL
+
+    return bool((API_BASE_URL or REVOCATION_URL or "").strip())
+
+
 def _record_online_sync() -> None:
     """Record successful online control-list sync - machine-bound seal + monotonic clock."""
     try:
@@ -411,9 +418,9 @@ def generate_license(
     mid = (machine_id or get_machine_id()).strip().upper()
     exp = None
     if days_valid is not None:
-        exp = (datetime.now() + timedelta(days=days_valid)).replace(
-            microsecond=0
-        ).isoformat(timespec="seconds")
+        exp = (
+            datetime.now(timezone.utc) + timedelta(days=days_valid)
+        ).replace(microsecond=0).strftime("%Y-%m-%dT%H:%M:%SZ")
     iat = issued_at or datetime.now().strftime("%Y-%m-%dT%H:%M")
     n = nonce or uuid.uuid4().hex[:12]
     pkg = str(package_days) if package_days is not None else (str(days_valid) if days_valid is not None else "")
@@ -629,12 +636,18 @@ def _read_license_payload() -> dict | None:
 
 
 def _parse_expiry(exp: str) -> datetime:
-    """Parse expiry as a full timestamp or a legacy date-only string."""
+    """Parse expiry as UTC (Z suffix), offset-aware, or legacy local naive."""
     text = str(exp).strip()
+    if text.endswith("Z"):
+        dt = datetime.fromisoformat(text.replace("Z", "+00:00"))
+        return dt.astimezone().replace(tzinfo=None)
     try:
-        return datetime.fromisoformat(text)
+        dt = datetime.fromisoformat(text)
     except ValueError:
         return datetime.combine(date.fromisoformat(text[:10]), datetime.min.time())
+    if dt.tzinfo is not None:
+        return dt.astimezone().replace(tzinfo=None)
+    return dt
 
 
 def revoked_nonces() -> frozenset[str]:
@@ -749,7 +762,7 @@ def check_activation_usable(text: str) -> tuple[bool, str, str | None]:
         machine is allowed (repair/reinstall scenario) until it expires.
     """
     if _is_rate_limited():
-        return False, "Too many failed attempts - wait 30 seconds and try again.", None
+        return False, "Too many failed attempts — wait 60 seconds and try again.", None
     ok, msg = verify_key_text(text)
     if not ok:
         _record_attempt(False)
