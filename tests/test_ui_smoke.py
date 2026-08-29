@@ -1,6 +1,5 @@
 """Offscreen UI smoke: main window builds, sidebar, settings, data flows."""
 
-import shutil
 import sys
 from pathlib import Path
 
@@ -21,14 +20,6 @@ def app(tmp_path_factory):
 
     tmp = tmp_path_factory.mktemp("ui")
     db = Database(tmp / "test.db")
-
-    # Copy the developer's real DB when present so data-dependent asserts run.
-    real_db = Path.home() / ".skyadmin_pro" / "skyadmin_pro.db"
-    if real_db.exists():
-        db.shutdown()
-        shutil.copy2(real_db, tmp / "test.db")
-        db = Database(tmp / "test.db")
-
     paths = WorkspacePaths(tmp / "workspace")
     paths.ensure()
     ctk.set_appearance_mode("dark")

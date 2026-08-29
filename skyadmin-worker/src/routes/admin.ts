@@ -46,10 +46,10 @@ async function isValidSession(c: Context<{ Bindings: Env }>): Promise<boolean> {
 
 async function isIpBlocked(c: Context<{ Bindings: Env }>, ip: string): Promise<boolean> {
   const cutoff = new Date(Date.now() - LOGIN_BLOCK_MINUTES * 60 * 1000).toISOString();
-  const { results } = await c.env.DB.prepare(
+  const row = await c.env.DB.prepare(
     "SELECT COUNT(*) as cnt FROM login_attempts WHERE ip = ? AND attempted_at > ?"
   ).bind(ip, cutoff).first<{ cnt: number }>();
-  return (results?.cnt ?? 0) >= MAX_LOGIN_ATTEMPTS;
+  return (row?.cnt ?? 0) >= MAX_LOGIN_ATTEMPTS;
 }
 
 async function recordLoginAttempt(c: Context<{ Bindings: Env }>, ip: string): Promise<void> {

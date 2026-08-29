@@ -260,7 +260,7 @@ def _startup_license_sync(on_result=None) -> None:
     threading.Thread(target=worker, daemon=True).start()
 
 
-def bootstrap() -> MainWindow:
+def bootstrap() -> "MainWindow":
     from skyadmin_pro.config import (
         DEFAULT_APPEARANCE_MODE,
         DEFAULT_COLOR_THEME,
@@ -442,66 +442,65 @@ def main() -> None:
         )
         raise SystemExit(1)
 
+    # --- Proprietary lock — hardware-bound license required ---
     try:
-        # --- Proprietary lock — hardware-bound license required ---
+        from skyadmin_pro.services.license import (
+            banned_machines,
+            fetch_revocations,
+            get_machine_id,
+            verify_license,
+        )
+
+        # Always fetch the latest control list at startup — don't wait
+        # for the 24h stale window. This ensures revocations/bans published
+        # while the app was closed take effect immediately on next launch.
         try:
-            from skyadmin_pro.services.license import (
-                banned_machines,
-                fetch_revocations,
-                get_machine_id,
-                is_daily_sync_stale,
-                verify_license,
+            fetch_revocations(timeout=5)
+        except Exception:
+            pass
+
+        # Immediate ban check — block BEFORE showing any activation dialog.
+        if get_machine_id() in banned_machines():
+            _fatal_error(
+                "SkyAdmin Pro — Machine blocked",
+                "This machine has been blocked by Sky Creation Innovations.\n\n"
+                "Contact us: dev.skycreation@gmail.com · WhatsApp +66 8383 23134",
             )
+            raise SystemExit(1)
 
-            # Always fetch the latest control list at startup — don't wait
-            # for the 24h stale window. This ensures revocations/bans published
-            # while the app was closed take effect immediately on next launch.
-            try:
-                fetch_revocations(timeout=5)
-            except Exception:
-                pass
-
-            # Immediate ban check — block BEFORE showing any activation dialog.
-            if get_machine_id() in banned_machines():
+        ok, msg = verify_license()
+        if not ok:
+            # Blocked/revoked machines get a hard error — no activation offer.
+            lowered = msg.lower()
+            if "blocked" in lowered or "revoked" in lowered:
                 _fatal_error(
-                    "SkyAdmin Pro — Machine blocked",
-                    "This machine has been blocked by Sky Creation Innovations.\n\n"
+                    "SkyAdmin Pro — License blocked",
+                    f"{msg.splitlines()[0]}\n\n"
+                    "This software is the exclusive property of Sky Creation Innovations.\n"
                     "Contact us: dev.skycreation@gmail.com · WhatsApp +66 8383 23134",
                 )
                 raise SystemExit(1)
+            # Unlicensed/expired → online-assisted activation dialog.
+            from skyadmin_pro.ui.activation import run_activation_standalone
 
-            ok, msg = verify_license()
-            if not ok:
-                # Blocked/revoked machines get a hard error — no activation offer.
-                lowered = msg.lower()
-                if "blocked" in lowered or "revoked" in lowered:
-                    _fatal_error(
-                        "SkyAdmin Pro — License blocked",
-                        f"{msg.splitlines()[0]}\n\n"
-                        "This software is the exclusive property of Sky Creation Innovations.\n"
-                        "Contact us: dev.skycreation@gmail.com · WhatsApp +66 8383 23134",
-                    )
-                    raise SystemExit(1)
-                # Unlicensed/expired → online-assisted activation dialog.
-                from skyadmin_pro.ui.activation import run_activation_standalone
+            if not run_activation_standalone():
+                _fatal_error(
+                    "SkyAdmin Pro — Not activated",
+                    "Activation was not completed.\n\n"
+                    "This software is the exclusive property of Sky Creation Innovations.\n"
+                    "Contact us on WhatsApp +66 8383 23134 to get your activation code.",
+                )
+                raise SystemExit(1)
+            logging.getLogger(__name__).info("License activated at runtime.")
+        else:
+            logging.getLogger(__name__).info("License OK: %s", msg)
+    except SystemExit:
+        raise
+    except Exception as exc:
+        logging.getLogger(__name__).exception("License check failed")
+        _fatal_error("SkyAdmin Pro — License error", f"License verification failed:\n{exc}")
+        raise SystemExit(1) from exc
 
-                if not run_activation_standalone():
-                    _fatal_error(
-                        "SkyAdmin Pro — Not activated",
-                        "Activation was not completed.\n\n"
-                        "This software is the exclusive property of Sky Creation Innovations.\n"
-                        "Contact us on WhatsApp +66 8383 23134 to get your activation code.",
-                    )
-                    raise SystemExit(1)
-                logging.getLogger(__name__).info("License activated at runtime.")
-            else:
-                logging.getLogger(__name__).info("License OK: %s", msg)
-        except SystemExit:
-            raise
-        except Exception as exc:
-            logging.getLogger(__name__).exception("License check failed")
-            _fatal_error("SkyAdmin Pro — License error", f"License verification failed:\n{exc}")
-            raise SystemExit(1) from exc
     try:
         import customtkinter as ctk  # noqa: F401  (theme set inside bootstrap)
 

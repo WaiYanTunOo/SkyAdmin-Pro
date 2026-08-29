@@ -268,7 +268,7 @@ def images_to_pdf(
 
 
 def merge_pdfs(sources: list[Path], output: Path) -> Path:
-    from PyPDF2 import PdfReader, PdfWriter
+    from pypdf import PdfReader, PdfWriter
 
     if not sources:
         raise ValueError("Select at least one PDF to merge.")
