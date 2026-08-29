@@ -1,4 +1,5 @@
 """Generate the SkyAdmin Pro application icon (.ico)."""
+
 import struct
 from io import BytesIO
 from pathlib import Path
@@ -61,8 +62,7 @@ def draw(size: int) -> Image.Image:
         y0 = int((110 + i * 30) * scale)
         x0 = pad + int(16 * scale)
         x1 = x0 + int(size * width)
-        draw.rounded_rectangle([x0, y0, x1, y0 + int(14 * scale)],
-                               radius=int(7 * scale), fill=line_color)
+        draw.rounded_rectangle([x0, y0, x1, y0 + int(14 * scale)], radius=int(7 * scale), fill=line_color)
 
     # check mark accent
     cx = int(size * 0.62)
@@ -90,7 +90,7 @@ def write_ico(path: Path, images: list[Image.Image]) -> None:
     offset = 6 + 16 * len(pngs)
     entries = bytearray()
     payload = bytearray()
-    for size, data in zip(ICON_SIZES, pngs):
+    for size, data in zip(ICON_SIZES, pngs, strict=True):
         width = size if size < 256 else 0
         entries += struct.pack(
             "<BBBBHHII",

@@ -2,61 +2,18 @@
 
 from __future__ import annotations
 
-import os
-import shutil
-from datetime import date, timedelta
-from pathlib import Path
-from tkinter import filedialog, messagebox
-
 import customtkinter as ctk
 
 from skyadmin_pro.config import (
-    ACCOUNTING_PRICING_SERVICES,
     IMPORTANT_DOC_TYPES,
-    NAV_OFFICE_HUB,
-    PAYMENT_STATUSES,
     SERVICE_PROGRESS,
-    TAX_FILING_FIELDS,
-    TAX_FILING_LABELS,
-    TAX_FILING_STATUSES,
-    TRANSACTION_RANGES,
-    FINANCIAL_DOC_CATEGORIES,
-    FINANCIAL_DOC_SUBCATEGORIES,
-    FINANCIAL_DOC_FOLDER_MAP,
 )
 from skyadmin_pro.services.file_ops import (
-    copy_file,
     format_thousands,
-    open_in_file_manager,
-    parse_flexible_date,
-    sanitize_amount,
 )
-from skyadmin_pro.services.snippets import effective_text, load_snippet_overrides
-from skyadmin_pro.services.tax_ids_rollout import (
-    apply_pricing_tier,
-    infer_service_types,
-    list_accounting_setup_rows,
-    parse_document_types,
-)
-from skyadmin_pro.services.tracking import (
-    classify_expiry,
-    days_until,
-    effective_expiry_date,
-)
-from skyadmin_pro.services.vo_csh_rollout import (
-    infer_client_vo_csh_renewal_dates,
-    infer_vo_csh_renewal_dates,
-    list_vo_csh_setup_rows,
-)
-from skyadmin_pro.services.workflow import (
-    copy_to_clipboard,
-    create_client_workspace,
-    resolve_client_folder,
-)
-from skyadmin_pro.ui.setup_rollout import RolloutAction, SetupRolloutPanel
-from skyadmin_pro.ui.theme import CARD_RADIUS, CARD_TITLE_SIZE, TEXT_FAINT, TEXT_MUTED
+from skyadmin_pro.ui.theme import CARD_RADIUS, CARD_TITLE_SIZE, TEXT_MUTED
 from skyadmin_pro.ui.treeview import ThemedTreeview
-from skyadmin_pro.ui.widgets import DatePickerField, make_modal
+from skyadmin_pro.ui.widgets import DatePickerField
 
 
 class GeneralTabMixin:
@@ -77,9 +34,7 @@ class GeneralTabMixin:
             justify="left",
             font=ctk.CTkFont(weight="bold"),
         )
-        self.company_name_label.grid(
-            row=1, column=0, sticky="ew", padx=16, pady=(0, 6)
-        )
+        self.company_name_label.grid(row=1, column=0, sticky="ew", padx=16, pady=(0, 6))
 
         grid = ctk.CTkFrame(frame, fg_color="transparent")
         grid.grid(row=2, column=0, sticky="ew", padx=16)
@@ -102,9 +57,7 @@ class GeneralTabMixin:
             (4, 2, "VAT registration", self.info_vat),
         )
         for row, col, label, var in labels:
-            ctk.CTkLabel(grid, text=label).grid(
-                row=row, column=col, sticky="w", pady=(2, 2)
-            )
+            ctk.CTkLabel(grid, text=label).grid(row=row, column=col, sticky="w", pady=(2, 2))
             ctk.CTkEntry(grid, textvariable=var).grid(
                 row=row + 1,
                 column=col,
@@ -114,27 +67,21 @@ class GeneralTabMixin:
                 pady=(0, 4),
             )
 
-        ctk.CTkLabel(grid, text="Business address").grid(
-            row=6, column=0, sticky="w", pady=(6, 2)
-        )
+        ctk.CTkLabel(grid, text="Business address").grid(row=6, column=0, sticky="w", pady=(6, 2))
         ctk.CTkEntry(grid, textvariable=self.info_address).grid(
             row=7, column=0, columnspan=4, sticky="ew", padx=(0, 12), pady=(0, 4)
         )
 
-        ctk.CTkLabel(frame, text="Business objectives").grid(
-            row=3, column=0, sticky="w", padx=16, pady=(6, 2)
-        )
+        ctk.CTkLabel(frame, text="Business objectives").grid(row=3, column=0, sticky="w", padx=16, pady=(6, 2))
         self.info_objectives = ctk.CTkTextbox(frame, height=80, wrap="word")
-        self.info_objectives.grid(
-            row=4, column=0, sticky="ew", padx=16, pady=(0, 8)
-        )
+        self.info_objectives.grid(row=4, column=0, sticky="ew", padx=16, pady=(0, 8))
 
         buttons = ctk.CTkFrame(frame, fg_color="transparent")
         buttons.grid(row=5, column=0, sticky="ew", padx=16, pady=(0, 14))
         buttons.grid_columnconfigure(1, weight=1)
-        ctk.CTkButton(
-            buttons, text="Save company info", width=150, command=self._save_company_info
-        ).grid(row=0, column=0, sticky="w")
+        ctk.CTkButton(buttons, text="Save company info", width=150, command=self._save_company_info).grid(
+            row=0, column=0, sticky="w"
+        )
         ctk.CTkLabel(
             buttons,
             text="Company name is managed in the Clients & Expiry tab.",
@@ -194,60 +141,36 @@ class GeneralTabMixin:
         form.grid(row=2, column=0, sticky="ew", padx=12, pady=(0, 12))
         form.grid_columnconfigure((0, 1, 2, 3), weight=1)
 
-        self.service_status_label = ctk.CTkLabel(
-            form, text="New service record", text_color=TEXT_MUTED
-        )
-        self.service_status_label.grid(
-            row=0, column=0, columnspan=4, sticky="w", pady=(4, 6)
-        )
+        self.service_status_label = ctk.CTkLabel(form, text="New service record", text_color=TEXT_MUTED)
+        self.service_status_label.grid(row=0, column=0, columnspan=4, sticky="w", pady=(4, 6))
 
-        ctk.CTkLabel(form, text="Service type").grid(
-            row=1, column=0, sticky="w", pady=(2, 2)
-        )
+        ctk.CTkLabel(form, text="Service type").grid(row=1, column=0, sticky="w", pady=(2, 2))
         self.service_type = ctk.CTkOptionMenu(form, values=self.app.db.list_service_types())
         self.service_type.set(self.app.db.list_service_types()[0])
         self.service_type.grid(row=2, column=0, sticky="ew", padx=(0, 6))
 
-        ctk.CTkLabel(form, text="Start date").grid(
-            row=1, column=1, sticky="w", pady=(2, 2)
-        )
+        ctk.CTkLabel(form, text="Start date").grid(row=1, column=1, sticky="w", pady=(2, 2))
         self.service_start = ctk.StringVar()
-        DatePickerField(form, var=self.service_start).grid(
-            row=2, column=1, sticky="ew", padx=(0, 6)
-        )
+        DatePickerField(form, var=self.service_start).grid(row=2, column=1, sticky="ew", padx=(0, 6))
 
-        ctk.CTkLabel(form, text="Expiry date").grid(
-            row=1, column=2, sticky="w", pady=(2, 2)
-        )
+        ctk.CTkLabel(form, text="Expiry date").grid(row=1, column=2, sticky="w", pady=(2, 2))
         self.service_expiry = ctk.StringVar()
-        DatePickerField(form, var=self.service_expiry).grid(
-            row=2, column=2, sticky="ew", padx=(0, 6)
-        )
+        DatePickerField(form, var=self.service_expiry).grid(row=2, column=2, sticky="ew", padx=(0, 6))
 
-        ctk.CTkLabel(form, text="Payment date").grid(
-            row=1, column=3, sticky="w", pady=(2, 2)
-        )
+        ctk.CTkLabel(form, text="Payment date").grid(row=1, column=3, sticky="w", pady=(2, 2))
         self.service_payment = ctk.StringVar()
-        DatePickerField(form, var=self.service_payment).grid(
-            row=2, column=3, sticky="ew"
-        )
+        DatePickerField(form, var=self.service_payment).grid(row=2, column=3, sticky="ew")
 
-        ctk.CTkLabel(form, text="Amount").grid(
-            row=3, column=0, sticky="w", pady=(10, 2)
-        )
+        ctk.CTkLabel(form, text="Amount").grid(row=3, column=0, sticky="w", pady=(10, 2))
         self.service_amount = ctk.StringVar()
         amount_entry = ctk.CTkEntry(form, textvariable=self.service_amount)
         amount_entry.bind(
             "<FocusOut>",
-            lambda _e: self.service_amount.set(
-                format_thousands(self.service_amount.get())
-            ),
+            lambda _e: self.service_amount.set(format_thousands(self.service_amount.get())),
         )
         amount_entry.grid(row=4, column=0, sticky="ew", padx=(0, 6))
 
-        ctk.CTkLabel(form, text="Progress").grid(
-            row=3, column=1, sticky="w", pady=(10, 2)
-        )
+        ctk.CTkLabel(form, text="Progress").grid(row=3, column=1, sticky="w", pady=(10, 2))
         self.service_progress = ctk.CTkOptionMenu(form, values=list(SERVICE_PROGRESS))
         self.service_progress.set(SERVICE_PROGRESS[0])
         self.service_progress.grid(row=4, column=1, sticky="ew", padx=(0, 6))
@@ -314,39 +237,25 @@ class GeneralTabMixin:
         form.grid(row=2, column=0, sticky="ew", padx=12, pady=(0, 12))
         form.grid_columnconfigure((0, 1, 2), weight=1)
 
-        self.document_status_label = ctk.CTkLabel(
-            form, text="New document record", text_color=TEXT_MUTED
-        )
-        self.document_status_label.grid(
-            row=0, column=0, columnspan=3, sticky="w", pady=(4, 6)
-        )
+        self.document_status_label = ctk.CTkLabel(form, text="New document record", text_color=TEXT_MUTED)
+        self.document_status_label.grid(row=0, column=0, columnspan=3, sticky="w", pady=(4, 6))
 
-        ctk.CTkLabel(form, text="Document type").grid(
-            row=1, column=0, sticky="w", pady=(2, 2)
-        )
+        ctk.CTkLabel(form, text="Document type").grid(row=1, column=0, sticky="w", pady=(2, 2))
         self.doc_type = ctk.CTkOptionMenu(form, values=list(IMPORTANT_DOC_TYPES))
         self.doc_type.set(IMPORTANT_DOC_TYPES[0])
         self.doc_type.grid(row=2, column=0, sticky="ew", padx=(0, 6))
 
-        ctk.CTkLabel(form, text="Expiry date (optional)").grid(
-            row=1, column=1, sticky="w", pady=(2, 2)
-        )
+        ctk.CTkLabel(form, text="Expiry date (optional)").grid(row=1, column=1, sticky="w", pady=(2, 2))
         self.doc_expiry = ctk.StringVar()
-        DatePickerField(form, var=self.doc_expiry).grid(
-            row=2, column=1, sticky="ew", padx=(0, 6)
-        )
+        DatePickerField(form, var=self.doc_expiry).grid(row=2, column=1, sticky="ew", padx=(0, 6))
 
-        ctk.CTkLabel(form, text="File (pick or type)").grid(
-            row=1, column=2, sticky="w", pady=(2, 2)
-        )
+        ctk.CTkLabel(form, text="File (pick or type)").grid(row=1, column=2, sticky="w", pady=(2, 2))
         file_row = ctk.CTkFrame(form, fg_color="transparent")
         file_row.grid(row=2, column=2, sticky="ew", padx=(0, 6))
         file_row.grid_columnconfigure(0, weight=1)
         self.doc_file = ctk.StringVar()
         self.doc_path = ctk.StringVar()
-        ctk.CTkEntry(file_row, textvariable=self.doc_file).grid(
-            row=0, column=0, sticky="ew"
-        )
+        ctk.CTkEntry(file_row, textvariable=self.doc_file).grid(row=0, column=0, sticky="ew")
         ctk.CTkButton(
             file_row,
             text="Pick file…",

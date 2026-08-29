@@ -2,8 +2,8 @@
 
 from __future__ import annotations
 
+from collections.abc import Callable, Iterable, Sequence
 from tkinter import ttk
-from typing import Callable, Iterable, Sequence
 
 import customtkinter as ctk
 
@@ -68,7 +68,6 @@ class ThemedTreeview(ctk.CTkFrame):
     def apply_theme(self) -> None:
         mode = ctk.get_appearance_mode()
         # Reuse existing style to avoid memory leak from creating new Style objects
-        style_name = "Sky.Treeview"
         try:
             style = ttk.Style()
             # Only set theme if not already set (avoids global side effect)
@@ -100,18 +99,22 @@ class ThemedTreeview(ctk.CTkFrame):
             fieldbackground=background,
             rowheight=TABLE_ROW_HEIGHT,
             borderwidth=0,
-            font=("Segoe UI", TABLE_FONT_SIZE) if __import__("sys").platform == "win32" else
-                  ("SF Pro Text", TABLE_FONT_SIZE) if __import__("sys").platform == "darwin" else
-                  ("Ubuntu", TABLE_FONT_SIZE),
+            font=("Segoe UI", TABLE_FONT_SIZE)
+            if __import__("sys").platform == "win32"
+            else ("SF Pro Text", TABLE_FONT_SIZE)
+            if __import__("sys").platform == "darwin"
+            else ("Ubuntu", TABLE_FONT_SIZE),
         )
         style.configure(
             "Sky.Treeview.Heading",
             background=heading,
             foreground=foreground,
             relief="flat",
-            font=("Segoe UI", TABLE_HEADER_FONT_SIZE, "bold") if __import__("sys").platform == "win32" else
-                  ("SF Pro Text", TABLE_HEADER_FONT_SIZE, "bold") if __import__("sys").platform == "darwin" else
-                  ("Ubuntu", TABLE_HEADER_FONT_SIZE, "bold"),
+            font=("Segoe UI", TABLE_HEADER_FONT_SIZE, "bold")
+            if __import__("sys").platform == "win32"
+            else ("SF Pro Text", TABLE_HEADER_FONT_SIZE, "bold")
+            if __import__("sys").platform == "darwin"
+            else ("Ubuntu", TABLE_HEADER_FONT_SIZE, "bold"),
         )
         style.map("Sky.Treeview", background=[("selected", selected)])
         self.tree.configure(style="Sky.Treeview")
@@ -147,10 +150,7 @@ class ThemedTreeview(ctk.CTkFrame):
         for index, values in enumerate(row_list):
             iid = str(iids[index]) if iids is not None else str(index)
             extra = list(tags[index]) if tags is not None else []
-            if extra:
-                combined = tuple(dict.fromkeys(extra))
-            else:
-                combined = ("even" if index % 2 else "odd",)
+            combined = tuple(dict.fromkeys(extra)) if extra else ("even" if index % 2 else "odd",)
             self.tree.insert("", "end", iid=iid, values=values, tags=combined)
         restored = [iid for iid in previous if self.tree.exists(iid)]
         if restored:
@@ -187,6 +187,7 @@ class ThemedTreeview(ctk.CTkFrame):
     # Excel-like helpers
     def _on_mousewheel(self, event) -> None:
         import sys
+
         if sys.platform == "darwin":
             # macOS: delta is ±1 per scroll unit
             delta = -event.delta
@@ -199,6 +200,7 @@ class ThemedTreeview(ctk.CTkFrame):
 
     def _on_shift_mousewheel(self, event) -> None:
         import sys
+
         if sys.platform == "darwin":
             delta = -event.delta
         else:

@@ -19,17 +19,12 @@ def db(tmp_path):
 
 
 def test_infer_service_type_prefers_monthly_accounting():
-    docs = (
-        "Company Annual Accounting Service, "
-        "Company Monthly Accounting Service"
-    )
+    docs = "Company Annual Accounting Service, Company Monthly Accounting Service"
     assert infer_service_type_from_documents(docs) == "Monthly Accounting"
 
 
 def test_setup_missing_fields():
-    missing = setup_missing_fields(
-        {"service_type": "Monthly Accounting", "num_transactions": "", "tax_id": ""}
-    )
+    missing = setup_missing_fields({"service_type": "Monthly Accounting", "num_transactions": "", "tax_id": ""})
     assert missing == ["Transaction volume", "Tax ID"]
 
 

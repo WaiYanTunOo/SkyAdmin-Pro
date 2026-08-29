@@ -1,7 +1,6 @@
 """Crypto backup/restore safety checks."""
 
 import zipfile
-from pathlib import Path
 
 import pytest
 from cryptography.fernet import Fernet

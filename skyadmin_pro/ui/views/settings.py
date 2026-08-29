@@ -17,14 +17,15 @@ from skyadmin_pro.config import (
     SETTING_APPEARANCE_MODE,
     SETTING_COLOR_THEME,
     SETTING_PORTAL_URL,
+    SETTING_WORKSPACE_CUSTOM,
     SETTING_WORKSPACE_ROOT,
     TRANSACTION_RANGES,
     pricing_uses_transaction_ranges,
 )
 from skyadmin_pro.paths import WorkspacePaths
+from skyadmin_pro.services.data_hygiene import run_data_hygiene
 from skyadmin_pro.services.file_ops import open_in_file_manager
 from skyadmin_pro.services.workflow import normalize_portal_url, repair_client_workspaces
-from skyadmin_pro.services.data_hygiene import run_data_hygiene
 from skyadmin_pro.ui.theme import TEXT_MUTED
 from skyadmin_pro.ui.treeview import ThemedTreeview
 from skyadmin_pro.ui.views.base import BaseView
@@ -55,9 +56,7 @@ class SettingsView(BaseView):
             anchor="w",
         ).grid(row=0, column=0, columnspan=2, sticky="w", padx=20, pady=(18, 8))
 
-        ctk.CTkLabel(card, text="Theme", anchor="w").grid(
-            row=1, column=0, sticky="w", padx=20
-        )
+        ctk.CTkLabel(card, text="Theme", anchor="w").grid(row=1, column=0, sticky="w", padx=20)
         self.appearance_menu = ctk.CTkOptionMenu(
             card,
             values=["Dark", "Light", "System"],
@@ -66,9 +65,7 @@ class SettingsView(BaseView):
         )
         self.appearance_menu.grid(row=1, column=1, sticky="w", padx=20, pady=(8, 0))
 
-        ctk.CTkLabel(card, text="Accent", anchor="w").grid(
-            row=2, column=0, sticky="w", padx=20, pady=(12, 0)
-        )
+        ctk.CTkLabel(card, text="Accent", anchor="w").grid(row=2, column=0, sticky="w", padx=20, pady=(12, 0))
         self.color_theme_menu = ctk.CTkOptionMenu(
             card,
             values=["blue", "green", "dark-blue"],
@@ -78,24 +75,16 @@ class SettingsView(BaseView):
         self.color_theme_menu.grid(row=2, column=1, sticky="w", padx=20, pady=(12, 0))
 
         # Tagline (sidebar subtitle) — user-editable
-        ctk.CTkLabel(card, text="Tagline", anchor="w").grid(
-            row=3, column=0, sticky="w", padx=20, pady=(12, 0)
-        )
+        ctk.CTkLabel(card, text="Tagline", anchor="w").grid(row=3, column=0, sticky="w", padx=20, pady=(12, 0))
         tag_row = ctk.CTkFrame(card, fg_color="transparent")
         tag_row.grid(row=3, column=1, sticky="ew", padx=20, pady=(12, 0))
         tag_row.grid_columnconfigure(0, weight=1)
         self.tagline_var = ctk.StringVar()
-        ctk.CTkEntry(tag_row, textvariable=self.tagline_var).grid(
-            row=0, column=0, sticky="ew"
-        )
-        ctk.CTkButton(
-            tag_row, text="Save", width=70, command=self._save_tagline
-        ).grid(row=0, column=1, padx=(8, 0))
+        ctk.CTkEntry(tag_row, textvariable=self.tagline_var).grid(row=0, column=0, sticky="ew")
+        ctk.CTkButton(tag_row, text="Save", width=70, command=self._save_tagline).grid(row=0, column=1, padx=(8, 0))
 
         # Language
-        ctk.CTkLabel(card, text="Language", anchor="w").grid(
-            row=4, column=0, sticky="w", padx=20, pady=(12, 0)
-        )
+        ctk.CTkLabel(card, text="Language", anchor="w").grid(row=4, column=0, sticky="w", padx=20, pady=(12, 0))
         from skyadmin_pro.services.i18n import available_languages
 
         self.lang_menu = ctk.CTkOptionMenu(
@@ -114,65 +103,90 @@ class SettingsView(BaseView):
             anchor="w",
         ).grid(row=5, column=0, columnspan=2, sticky="w", padx=20, pady=(16, 4))
         self.license_label = ctk.CTkLabel(
-            card, text="License: checking…", anchor="w", text_color=TEXT_MUTED,
+            card,
+            text="License: checking…",
+            anchor="w",
+            text_color=TEXT_MUTED,
         )
         self.license_label.grid(row=6, column=0, columnspan=2, sticky="ew", padx=20)
         self.daily_sync_label = ctk.CTkLabel(
-            card, text="", anchor="w", text_color=TEXT_MUTED, wraplength=500, justify="left",
+            card,
+            text="",
+            anchor="w",
+            text_color=TEXT_MUTED,
+            wraplength=500,
+            justify="left",
         )
         self.daily_sync_label.grid(row=7, column=0, sticky="w", padx=20, pady=(2, 0))
-        ctk.CTkButton(card, text="Sync Now", width=90, command=self._sync_now).grid(row=7, column=1, sticky="e", padx=20, pady=(2, 0))
+        ctk.CTkButton(card, text="Sync Now", width=90, command=self._sync_now).grid(
+            row=7, column=1, sticky="e", padx=20, pady=(2, 0)
+        )
         lic_buttons = ctk.CTkFrame(card, fg_color="transparent")
         lic_buttons.grid(row=8, column=0, columnspan=2, sticky="w", padx=20, pady=(6, 0))
         ctk.CTkButton(
-            lic_buttons, text="Activate / Manage License…", width=200,
+            lic_buttons,
+            text="Activate / Manage License…",
+            width=200,
             command=self._open_activation,
         ).pack(side="left")
         ctk.CTkButton(
-            lic_buttons, text="License Agreement", width=150,
-            fg_color="transparent", border_width=1,
+            lic_buttons,
+            text="License Agreement",
+            width=150,
+            fg_color="transparent",
+            border_width=1,
             command=self._show_license,
         ).pack(side="left", padx=(8, 0))
         ctk.CTkButton(
-            lic_buttons, text="Disclaimer", width=110,
-            fg_color="transparent", border_width=1,
+            lic_buttons,
+            text="Disclaimer",
+            width=110,
+            fg_color="transparent",
+            border_width=1,
             command=self._show_disclaimer,
         ).pack(side="left", padx=(8, 0))
 
         # Full license key paste box
         ctk.CTkLabel(
-            card, text="Paste License Key:", anchor="w",
+            card,
+            text="Paste License Key:",
+            anchor="w",
         ).grid(row=9, column=0, columnspan=2, sticky="w", padx=20, pady=(12, 2))
         key_row = ctk.CTkFrame(card, fg_color="transparent")
         key_row.grid(row=10, column=0, columnspan=2, sticky="ew", padx=20, pady=(0, 4))
         key_row.grid_columnconfigure(0, weight=1)
         self.key_paste_var = ctk.StringVar()
         key_entry = ctk.CTkEntry(
-            key_row, textvariable=self.key_paste_var,
+            key_row,
+            textvariable=self.key_paste_var,
             placeholder_text="Paste the full License Key here…",
         )
         key_entry.grid(row=0, column=0, sticky="ew")
         key_entry.bind("<Return>", lambda _e: self._activate_with_key())
-        ctk.CTkButton(
-            key_row, text="Activate", width=110, command=self._activate_with_key
-        ).grid(row=0, column=1, padx=(8, 0))
+        ctk.CTkButton(key_row, text="Activate", width=110, command=self._activate_with_key).grid(
+            row=0, column=1, padx=(8, 0)
+        )
 
         # Quick passcode activation (8-digit code from the owner)
         ctk.CTkLabel(
-            card, text="Or enter 8-digit Passcode:", anchor="w",
+            card,
+            text="Or enter 8-digit Passcode:",
+            anchor="w",
         ).grid(row=11, column=0, columnspan=2, sticky="w", padx=20, pady=(8, 2))
         pass_row = ctk.CTkFrame(card, fg_color="transparent")
         pass_row.grid(row=12, column=0, columnspan=2, sticky="ew", padx=20, pady=(0, 18))
         self.passcode_var = ctk.StringVar()
         pc_entry = ctk.CTkEntry(
-            pass_row, textvariable=self.passcode_var,
-            placeholder_text="8-digit passcode…", width=210,
+            pass_row,
+            textvariable=self.passcode_var,
+            placeholder_text="8-digit passcode…",
+            width=210,
         )
         pc_entry.grid(row=0, column=0, sticky="w")
         pc_entry.bind("<Return>", lambda _e: self._activate_with_passcode())
-        ctk.CTkButton(
-            pass_row, text="Activate", width=110, command=self._activate_with_passcode
-        ).grid(row=0, column=1, padx=(8, 0))
+        ctk.CTkButton(pass_row, text="Activate", width=110, command=self._activate_with_passcode).grid(
+            row=0, column=1, padx=(8, 0)
+        )
 
         portal = ctk.CTkFrame(scroll, corner_radius=12)
         portal.grid(row=2, column=0, sticky="ew", pady=(16, 0))
@@ -191,13 +205,9 @@ class SettingsView(BaseView):
             text_color=TEXT_MUTED,
             anchor="w",
         ).grid(row=1, column=0, columnspan=2, sticky="ew", padx=20)
-        ctk.CTkLabel(portal, text="Portal URL", anchor="w").grid(
-            row=2, column=0, sticky="w", padx=20, pady=(12, 16)
-        )
+        ctk.CTkLabel(portal, text="Portal URL", anchor="w").grid(row=2, column=0, sticky="w", padx=20, pady=(12, 16))
         self.portal_var = ctk.StringVar()
-        ctk.CTkEntry(portal, textvariable=self.portal_var).grid(
-            row=2, column=1, sticky="ew", padx=20, pady=(12, 8)
-        )
+        ctk.CTkEntry(portal, textvariable=self.portal_var).grid(row=2, column=1, sticky="ew", padx=20, pady=(12, 8))
         ctk.CTkButton(portal, text="Save portal URL", width=140, command=self._save_portal).grid(
             row=3, column=1, sticky="w", padx=20, pady=(0, 16)
         )
@@ -281,12 +291,8 @@ class SettingsView(BaseView):
         self.pricing_headcount_var = ctk.StringVar()
         self.pricing_docs_var = ctk.StringVar()
 
-        self.pricing_range_heading = ctk.CTkLabel(
-            pricing_form, text="Transaction range", anchor="w"
-        )
-        self.pricing_range_heading.grid(
-            row=0, column=0, sticky="w", padx=(0, 8), pady=4
-        )
+        self.pricing_range_heading = ctk.CTkLabel(pricing_form, text="Transaction range", anchor="w")
+        self.pricing_range_heading.grid(row=0, column=0, sticky="w", padx=(0, 8), pady=4)
         self.pricing_charge_entry = ctk.CTkEntry(
             pricing_form,
             textvariable=self.pricing_range_var,
@@ -299,46 +305,32 @@ class SettingsView(BaseView):
             width=280,
         )
         self.pricing_range_menu.grid(row=0, column=1, sticky="w", pady=4)
-        self.pricing_monthly_label = ctk.CTkLabel(
-            pricing_form, text="Monthly fee (THB)", anchor="w"
-        )
-        self.pricing_monthly_label.grid(
-            row=0, column=2, sticky="w", padx=(16, 8), pady=4
-        )
+        self.pricing_monthly_label = ctk.CTkLabel(pricing_form, text="Monthly fee (THB)", anchor="w")
+        self.pricing_monthly_label.grid(row=0, column=2, sticky="w", padx=(16, 8), pady=4)
         ctk.CTkEntry(pricing_form, textvariable=self.pricing_monthly_var, width=120).grid(
             row=0, column=3, sticky="w", pady=4
         )
         ctk.CTkLabel(pricing_form, text="Annual fee (THB)", anchor="w").grid(
             row=1, column=0, sticky="w", padx=(0, 8), pady=4
         )
-        self.pricing_annual_entry = ctk.CTkEntry(
-            pricing_form, textvariable=self.pricing_annual_var, width=120
-        )
+        self.pricing_annual_entry = ctk.CTkEntry(pricing_form, textvariable=self.pricing_annual_var, width=120)
         self.pricing_annual_entry.grid(row=1, column=1, sticky="w", pady=4)
-        ctk.CTkLabel(pricing_form, text="SLA hours", anchor="w").grid(
-            row=1, column=2, sticky="w", padx=(16, 8), pady=4
-        )
+        ctk.CTkLabel(pricing_form, text="SLA hours", anchor="w").grid(row=1, column=2, sticky="w", padx=(16, 8), pady=4)
         ctk.CTkEntry(pricing_form, textvariable=self.pricing_sla_var, width=120).grid(
             row=1, column=3, sticky="w", pady=4
         )
-        ctk.CTkLabel(pricing_form, text="Headcount", anchor="w").grid(
-            row=2, column=0, sticky="w", padx=(0, 8), pady=4
-        )
-        self.pricing_headcount_entry = ctk.CTkEntry(
-            pricing_form, textvariable=self.pricing_headcount_var, width=120
-        )
+        ctk.CTkLabel(pricing_form, text="Headcount", anchor="w").grid(row=2, column=0, sticky="w", padx=(0, 8), pady=4)
+        self.pricing_headcount_entry = ctk.CTkEntry(pricing_form, textvariable=self.pricing_headcount_var, width=120)
         self.pricing_headcount_entry.grid(row=2, column=1, sticky="w", pady=4)
         ctk.CTkLabel(pricing_form, text="Required documents", anchor="w").grid(
             row=2, column=2, sticky="nw", padx=(16, 8), pady=4
         )
-        ctk.CTkEntry(pricing_form, textvariable=self.pricing_docs_var).grid(
-            row=2, column=3, sticky="ew", pady=4
-        )
+        ctk.CTkEntry(pricing_form, textvariable=self.pricing_docs_var).grid(row=2, column=3, sticky="ew", pady=4)
         pricing_buttons = ctk.CTkFrame(pricing, fg_color="transparent")
         pricing_buttons.grid(row=5, column=0, sticky="w", padx=20, pady=(8, 16))
-        ctk.CTkButton(
-            pricing_buttons, text="Save pricing row", width=140, command=self._save_pricing_tier
-        ).grid(row=0, column=0, padx=(0, 8))
+        ctk.CTkButton(pricing_buttons, text="Save pricing row", width=140, command=self._save_pricing_tier).grid(
+            row=0, column=0, padx=(0, 8)
+        )
         self.pricing_add_charge_btn = ctk.CTkButton(
             pricing_buttons,
             text="Add charge line",
@@ -382,9 +374,9 @@ class SettingsView(BaseView):
         self.services_text.grid(row=2, column=0, sticky="ew", padx=20, pady=(12, 8))
         services_buttons = ctk.CTkFrame(services, fg_color="transparent")
         services_buttons.grid(row=3, column=0, sticky="w", padx=20, pady=(0, 16))
-        ctk.CTkButton(
-            services_buttons, text="Save services", width=140, command=self._save_services
-        ).grid(row=0, column=0)
+        ctk.CTkButton(services_buttons, text="Save services", width=140, command=self._save_services).grid(
+            row=0, column=0
+        )
         ctk.CTkButton(
             services_buttons,
             text="Reset to defaults",
@@ -423,9 +415,9 @@ class SettingsView(BaseView):
 
         dir_buttons = ctk.CTkFrame(directory, fg_color="transparent")
         dir_buttons.grid(row=3, column=0, sticky="w", padx=20, pady=(8, 16))
-        ctk.CTkButton(
-            dir_buttons, text="Save departments", width=140, command=self._save_directory_lists
-        ).grid(row=0, column=0)
+        ctk.CTkButton(dir_buttons, text="Save departments", width=140, command=self._save_directory_lists).grid(
+            row=0, column=0
+        )
         ctk.CTkButton(
             dir_buttons,
             text="Import from data",
@@ -473,9 +465,7 @@ class SettingsView(BaseView):
         self._new_list_var = ctk.StringVar()
         new_list_entry = ctk.CTkEntry(picker, textvariable=self._new_list_var, width=170)
         new_list_entry.grid(row=0, column=3, sticky="ew", padx=(8, 8))
-        ctk.CTkButton(
-            picker, text="Add", width=56, command=self._add_checklist_list
-        ).grid(row=0, column=4, padx=(0, 8))
+        ctk.CTkButton(picker, text="Add", width=56, command=self._add_checklist_list).grid(row=0, column=4, padx=(0, 8))
         ctk.CTkButton(
             picker,
             text="Delete list",
@@ -506,9 +496,9 @@ class SettingsView(BaseView):
 
         checklist_buttons = ctk.CTkFrame(checklists, fg_color="transparent")
         checklist_buttons.grid(row=5, column=0, sticky="w", padx=20, pady=(4, 16))
-        ctk.CTkButton(
-            checklist_buttons, text="Save list", width=140, command=self._save_checklist
-        ).grid(row=0, column=0)
+        ctk.CTkButton(checklist_buttons, text="Save list", width=140, command=self._save_checklist).grid(
+            row=0, column=0
+        )
         ctk.CTkButton(
             checklist_buttons,
             text="Reset to defaults",
@@ -536,15 +526,13 @@ class SettingsView(BaseView):
         workspace_row.grid(row=1, column=1, sticky="ew", padx=20, pady=(0, 6))
         workspace_row.grid_columnconfigure(0, weight=1)
         self.workspace_var = ctk.StringVar()
-        ctk.CTkEntry(workspace_row, textvariable=self.workspace_var).grid(
-            row=0, column=0, sticky="ew"
+        ctk.CTkEntry(workspace_row, textvariable=self.workspace_var).grid(row=0, column=0, sticky="ew")
+        ctk.CTkButton(workspace_row, text="Browse…", width=80, command=self._browse_workspace).grid(
+            row=0, column=1, padx=(8, 0)
         )
-        ctk.CTkButton(
-            workspace_row, text="Browse…", width=80, command=self._browse_workspace
-        ).grid(row=0, column=1, padx=(8, 0))
-        ctk.CTkButton(
-            workspace_row, text="Save", width=70, command=self._save_workspace
-        ).grid(row=0, column=2, padx=(8, 0))
+        ctk.CTkButton(workspace_row, text="Save", width=70, command=self._save_workspace).grid(
+            row=0, column=2, padx=(8, 0)
+        )
         ctk.CTkButton(
             workspace_row,
             text="Repair client folders",
@@ -581,8 +569,11 @@ class SettingsView(BaseView):
         diag_row = ctk.CTkFrame(info, fg_color="transparent")
         diag_row.grid(row=5, column=0, columnspan=2, sticky="ew", padx=20, pady=(0, 16))
         ctk.CTkButton(
-            diag_row, text="✉ Email diagnostics to support", width=230,
-            fg_color="transparent", border_width=1,
+            diag_row,
+            text="✉ Email diagnostics to support",
+            width=230,
+            fg_color="transparent",
+            border_width=1,
             command=self._email_diagnostics,
         ).pack(side="left")
 
@@ -613,7 +604,12 @@ class SettingsView(BaseView):
             row=2, column=0, sticky="w", padx=20, pady=(0, 12)
         )
         ctk.CTkButton(
-            backup, text="Restore Encrypted Backup…", width=200, fg_color="transparent", border_width=1, command=self._restore_encrypted
+            backup,
+            text="Restore Encrypted Backup…",
+            width=200,
+            fg_color="transparent",
+            border_width=1,
+            command=self._restore_encrypted,
         ).grid(row=2, column=1, sticky="w", padx=(8, 20), pady=(0, 12))
         self.backup_banner = ctk.CTkLabel(backup, text="", anchor="w", justify="left", wraplength=720)
         self.backup_banner.grid(row=3, column=0, columnspan=2, sticky="ew", padx=20, pady=(0, 14))
@@ -629,7 +625,9 @@ class SettingsView(BaseView):
         self.update_label = ctk.CTkLabel(self.update_frame, text="", anchor="w", justify="left", wraplength=680)
         self.update_label.grid(row=0, column=0, sticky="ew", padx=20, pady=(12, 4))
         self._update_download_btn = ctk.CTkButton(
-            self.update_frame, text="Download", width=120,
+            self.update_frame,
+            text="Download",
+            width=120,
             command=self._open_update_url,
         )
         self._update_download_btn.grid(row=1, column=0, sticky="w", padx=20, pady=(0, 12))
@@ -673,9 +671,9 @@ class SettingsView(BaseView):
         frame.grid_columnconfigure(0, weight=1)
         value = ctk.CTkLabel(frame, text="", anchor="w")
         value.grid(row=0, column=0, sticky="ew")
-        ctk.CTkButton(
-            frame, text="Open", width=70, fg_color="transparent", border_width=1, command=on_open
-        ).grid(row=0, column=1, padx=(8, 0))
+        ctk.CTkButton(frame, text="Open", width=70, fg_color="transparent", border_width=1, command=on_open).grid(
+            row=0, column=1, padx=(8, 0)
+        )
         return value
 
     def on_show(self) -> None:
@@ -699,9 +697,7 @@ class SettingsView(BaseView):
         self.path_labels["Clients"].configure(text=str(self.app.paths.clients))
         self.path_labels["Suppliers"].configure(text=str(self.app.paths.suppliers))
         self.db_value.configure(text=str(self.app.db.db_file))
-        self.portal_var.set(
-            self.app.db.get_setting(SETTING_PORTAL_URL, DEFAULT_PORTAL_URL) or DEFAULT_PORTAL_URL
-        )
+        self.portal_var.set(self.app.db.get_setting(SETTING_PORTAL_URL, DEFAULT_PORTAL_URL) or DEFAULT_PORTAL_URL)
         self.services_text.delete("1.0", "end")
         self.services_text.insert("1.0", "\n".join(self.app.db.list_service_types()))
         self._reload_checklists()
@@ -722,12 +718,7 @@ class SettingsView(BaseView):
 
         info = read_update_info()
         if info and is_newer_version(info["version"], APP_VERSION):
-            self.update_label.configure(
-                text=(
-                    f"⬆ Update available: v{info['version']} "
-                    f"(you have v{APP_VERSION})."
-                )
-            )
+            self.update_label.configure(text=(f"⬆ Update available: v{info['version']} (you have v{APP_VERSION})."))
             self._update_url = info.get("url") or ""
             self.update_frame.grid(row=0, column=0, sticky="ew", pady=(0, 14))
         else:
@@ -761,9 +752,7 @@ class SettingsView(BaseView):
             f"{log_tail}\n"
         )
         subject = "SkyAdmin Pro — Diagnostics"
-        webbrowser.open(
-            f"mailto:{OWNER_EMAIL}?subject={quote(subject)}&body={quote(body)}"
-        )
+        webbrowser.open(f"mailto:{OWNER_EMAIL}?subject={quote(subject)}&body={quote(body)}")
 
     def _refresh_backup_banner(self) -> None:
         from datetime import date as _date
@@ -809,9 +798,7 @@ class SettingsView(BaseView):
             frame.destroy()
         self._checklist_rows.clear()
         for entry in self.app.db.get_checklist_template_items(name):
-            self._add_checklist_row(
-                str(entry.get("item") or ""), str(entry.get("due_days") or 0)
-            )
+            self._add_checklist_row(str(entry.get("item") or ""), str(entry.get("due_days") or 0))
 
     def _add_checklist_row(self, item: str, days: str) -> None:
         row = ctk.CTkFrame(self.checklist_scroll, fg_color="transparent")
@@ -833,7 +820,7 @@ class SettingsView(BaseView):
         self._checklist_rows.append((row, item_var, days_var))
 
     def _remove_checklist_row(self, frame: ctk.CTkFrame) -> None:
-        for index, (current, *_ ) in enumerate(self._checklist_rows):
+        for index, (current, *_) in enumerate(self._checklist_rows):
             if current is frame:
                 self._checklist_rows.pop(index)
                 frame.destroy()
@@ -862,7 +849,7 @@ class SettingsView(BaseView):
             if not item:
                 continue
             try:
-                days = int((days_var.get().strip() or "0"))
+                days = int(days_var.get().strip() or "0")
             except ValueError:
                 self.feedback.error(f"Days for “{item[:30]}…” must be a number.")
                 return
@@ -904,8 +891,7 @@ class SettingsView(BaseView):
             return
         if not messagebox.askyesno(
             "Delete checklist",
-            f"Delete the checklist “{name}”?\n\n"
-            "Companies already seeded keep their items.",
+            f"Delete the checklist “{name}”?\n\nCompanies already seeded keep their items.",
             parent=self.winfo_toplevel(),
         ):
             return
@@ -980,12 +966,11 @@ class SettingsView(BaseView):
                     self.feedback.error(f"Backup failed: {err}")
                 else:
                     self.feedback.success(f"Encrypted backup saved: {Path(dest).name}")
-                    from skyadmin_pro.config import SETTING_LAST_ENCRYPTED_BACKUP
                     from datetime import date as _d
 
-                    self.app.db.set_setting(
-                        SETTING_LAST_ENCRYPTED_BACKUP, _d.today().isoformat()
-                    )
+                    from skyadmin_pro.config import SETTING_LAST_ENCRYPTED_BACKUP
+
+                    self.app.db.set_setting(SETTING_LAST_ENCRYPTED_BACKUP, _d.today().isoformat())
                     self._refresh_backup_banner()
                     self.app.set_status(f"Backup saved to {dest}")
 
@@ -1030,9 +1015,7 @@ class SettingsView(BaseView):
                 backup_dir.mkdir(parents=True, exist_ok=True)
                 stamp = _dt.now().strftime("%Y%m%d_%H%M%S")
                 safety_path = backup_dir / f"pre_restore_{stamp}.skybackup"
-                create_encrypted_backup(
-                    self.app.paths.root, self.app.db.db_file, safety_path
-                )
+                create_encrypted_backup(self.app.paths.root, self.app.db.db_file, safety_path)
                 # Note: shutdown() is NOT called here - it's unsafe from a worker thread.
                 # The restore operation will handle the DB file directly.
                 restore_encrypted_backup(Path(src), self.app.paths.root, self.app.db.db_file)
@@ -1053,8 +1036,7 @@ class SettingsView(BaseView):
                     self.app.set_status("Restore complete — restart required")
                     messagebox.showinfo(
                         "Restore complete",
-                        "Backup restored successfully."
-                        f"{extra}\n\nPlease close and reopen SkyAdmin Pro.",
+                        f"Backup restored successfully.{extra}\n\nPlease close and reopen SkyAdmin Pro.",
                         parent=self.winfo_toplevel(),
                     )
 
@@ -1110,12 +1092,8 @@ class SettingsView(BaseView):
                 f"Check: {', '.join(result['failed_names'][:3])}"
             )
             return
-        self.feedback.success(
-            f"Client folders OK — {linked} linked to existing folders, {created} newly created."
-        )
-        self.app.set_status(
-            f"Client folders: {linked} linked, {created} created, {result['total']} total"
-        )
+        self.feedback.success(f"Client folders OK — {linked} linked to existing folders, {created} newly created.")
+        self.app.set_status(f"Client folders: {linked} linked, {created} created, {result['total']} total")
 
     def _run_data_hygiene(self) -> None:
         if not messagebox.askyesno(
@@ -1179,20 +1157,14 @@ class SettingsView(BaseView):
     def _on_color_theme_change(self, choice: str) -> None:
         ctk.set_default_color_theme(choice)
         self.app.db.set_setting(SETTING_COLOR_THEME, choice)
-        self.feedback.info(
-            f"Accent set to {choice}. Restart the app to fully apply button colors."
-        )
+        self.feedback.info(f"Accent set to {choice}. Restart the app to fully apply button colors.")
 
     def _load_directory_lists(self) -> None:
         self.departments_text.delete("1.0", "end")
         self.departments_text.insert("1.0", "\n".join(self.app.db.list_departments()))
 
     def _save_directory_lists(self) -> None:
-        depts = [
-            line.strip()
-            for line in self.departments_text.get("1.0", "end").splitlines()
-            if line.strip()
-        ]
+        depts = [line.strip() for line in self.departments_text.get("1.0", "end").splitlines() if line.strip()]
         try:
             self.app.db.set_departments(depts)
         except ValueError as exc:
@@ -1282,9 +1254,7 @@ class SettingsView(BaseView):
     def _load_pricing_tier(self, transaction_range: str) -> None:
         service_type = self.pricing_service_menu.get().strip() or PRICING_DEFAULT_SERVICE
         self._configure_pricing_form_for_service(service_type)
-        tier = self.app.db.lookup_pricing_by_range(
-            transaction_range, service_type=service_type
-        )
+        tier = self.app.db.lookup_pricing_by_range(transaction_range, service_type=service_type)
         self.pricing_range_var.set(transaction_range)
         self.pricing_monthly_var.set(str(tier.get("monthly_fee") or "") if tier else "")
         self.pricing_annual_var.set(str(tier.get("annual_fee") or "") if tier else "")
@@ -1335,17 +1305,9 @@ class SettingsView(BaseView):
         try:
             fee_label = "Fee" if not uses_ranges else "Monthly fee"
             monthly = _parse_int(self.pricing_monthly_var.get(), fee_label)
-            annual = (
-                _parse_int(self.pricing_annual_var.get(), "Annual fee")
-                if uses_ranges
-                else 0
-            )
+            annual = _parse_int(self.pricing_annual_var.get(), "Annual fee") if uses_ranges else 0
             sla = _parse_int(self.pricing_sla_var.get(), "SLA hours")
-            headcount = (
-                _parse_int(self.pricing_headcount_var.get(), "Headcount")
-                if uses_ranges
-                else 0
-            )
+            headcount = _parse_int(self.pricing_headcount_var.get(), "Headcount") if uses_ranges else 0
         except ValueError as exc:
             self.feedback.error(str(exc))
             return
@@ -1355,9 +1317,7 @@ class SettingsView(BaseView):
         tier = (
             self.app.db.get_pricing_tier(int(selected_id))
             if selected_id
-            else self.app.db.lookup_pricing_by_range(
-                transaction_range, service_type=service_type
-            )
+            else self.app.db.lookup_pricing_by_range(transaction_range, service_type=service_type)
         )
         try:
             if tier:
@@ -1465,9 +1425,7 @@ class SettingsView(BaseView):
 
         i18n.set_language(lang.lower())
         self.app.db.set_setting("ui_language", lang.lower())
-        self.feedback.info(
-            f"Language set to {lang}. Restart the app to fully apply."
-        )
+        self.feedback.info(f"Language set to {lang}. Restart the app to fully apply.")
 
     def _save_tagline(self) -> None:
         from skyadmin_pro.config import APP_TAGLINE, SETTING_APP_TAGLINE
@@ -1516,9 +1474,9 @@ class SettingsView(BaseView):
             if requires_online_check():
                 net_ok, net_msg = fetch_revocations(timeout=6)
                 if not net_ok:
-                    self._after(lambda: self._activation_fail(
-                        "Internet required to activate - " + net_msg.splitlines()[0]
-                    ))
+                    self._after(
+                        lambda: self._activation_fail("Internet required to activate - " + net_msg.splitlines()[0])
+                    )
                     return
                 ok2, msg2, nonce2 = check_activation_usable(code)
                 if not ok2:
@@ -1560,9 +1518,9 @@ class SettingsView(BaseView):
             if requires_online_check():
                 net_ok, net_msg = fetch_revocations(timeout=6)
                 if not net_ok:
-                    self._after(lambda: self._activation_fail(
-                        "Internet required to activate - " + net_msg.splitlines()[0]
-                    ))
+                    self._after(
+                        lambda: self._activation_fail("Internet required to activate - " + net_msg.splitlines()[0])
+                    )
                     return
                 ok2, msg2, nonce2 = check_activation_usable(content)
                 if not ok2:
@@ -1646,6 +1604,7 @@ class SettingsView(BaseView):
 
         def worker():
             ok, msg = fetch_revocations(timeout=6)
+
             def done():
                 if not self.winfo_exists():
                     return
@@ -1659,10 +1618,12 @@ class SettingsView(BaseView):
                     self.app.set_status(msg.splitlines()[0])
                 except Exception:
                     pass
+
             try:
                 self.after(0, done)
             except Exception:
                 pass
+
         threading.Thread(target=worker, daemon=True).start()
 
     def _show_license(self) -> None:
@@ -1692,6 +1653,4 @@ class SettingsView(BaseView):
         box.grid(row=0, column=0, sticky="nsew", padx=16, pady=16)
         box.insert("1.0", text)
         box.configure(state="disabled")
-        ctk.CTkButton(top, text="Close", width=110, command=top.destroy).grid(
-            row=1, column=0, pady=(0, 16)
-        )
+        ctk.CTkButton(top, text="Close", width=110, command=top.destroy).grid(row=1, column=0, pady=(0, 16))

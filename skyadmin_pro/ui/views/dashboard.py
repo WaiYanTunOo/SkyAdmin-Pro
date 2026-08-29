@@ -4,7 +4,7 @@ tasks, and client month closes."""
 from __future__ import annotations
 
 import tkinter as tk
-from datetime import date, timedelta
+from datetime import date
 from tkinter import filedialog, messagebox
 
 import customtkinter as ctk
@@ -23,7 +23,6 @@ from skyadmin_pro.services.workflow import (
     create_client_workspace,
     format_eod_report,
 )
-from skyadmin_pro.ui.treeview import ThemedTreeview
 from skyadmin_pro.ui.theme import (
     CANVAS_BG,
     CANVAS_TEXT,
@@ -31,6 +30,7 @@ from skyadmin_pro.ui.theme import (
     CARD_TITLE_SIZE,
     TEXT_MUTED,
 )
+from skyadmin_pro.ui.treeview import ThemedTreeview
 from skyadmin_pro.ui.views.base import BaseView
 from skyadmin_pro.ui.widgets import FeedbackLabel, MonthStatusPanel
 
@@ -381,7 +381,6 @@ class DashboardView(BaseView):
         now = date.today()
         self._report_months = []
         for i in range(12):
-            d = date(now.year, now.month, 1)
             m = now.month - i
             y = now.year
             while m <= 0:
@@ -489,14 +488,14 @@ class DashboardView(BaseView):
         card.grid_propagate(False)
         card.grid_columnconfigure(0, weight=1)
         ctk.CTkLabel(
-            card, text=label, text_color=TEXT_MUTED, anchor="w",
-            wraplength=0, font=ctk.CTkFont(size=12),
-        ).grid(
-            row=0, column=0, sticky="nw", padx=16, pady=(18, 0)
-        )
-        value_label = ctk.CTkLabel(
-            card, text=value, font=ctk.CTkFont(size=28, weight="bold"), anchor="w"
-        )
+            card,
+            text=label,
+            text_color=TEXT_MUTED,
+            anchor="w",
+            wraplength=0,
+            font=ctk.CTkFont(size=12),
+        ).grid(row=0, column=0, sticky="nw", padx=16, pady=(18, 0))
+        value_label = ctk.CTkLabel(card, text=value, font=ctk.CTkFont(size=28, weight="bold"), anchor="w")
         value_label.grid(row=1, column=0, sticky="sw", padx=16, pady=(6, 16))
         return value_label
 
@@ -554,14 +553,21 @@ class DashboardView(BaseView):
                 color = "#d97706"
             x = x0 + day * bar_w
             canvas.create_rectangle(
-                x - bar_w // 2, baseline - bh,
-                x + bar_w // 2, baseline,
-                fill=color, outline="", tags=f"bar_{day}",
+                x - bar_w // 2,
+                baseline - bh,
+                x + bar_w // 2,
+                baseline,
+                fill=color,
+                outline="",
+                tags=f"bar_{day}",
             )
             if count > 1:
                 canvas.create_text(
-                    x, baseline - bh - 10, text=str(count),
-                    fill=value_color, font=("Segoe UI", 8),
+                    x,
+                    baseline - bh - 10,
+                    text=str(count),
+                    fill=value_color,
+                    font=("Segoe UI", 8),
                 )
         # Legend
         lx = width - 180
@@ -635,17 +641,13 @@ class DashboardView(BaseView):
         pending = self.app.db.list_tasks(status="pending")
         ongoing = self.app.db.list_ongoing_services()
         renewal_due = self.app.db.list_renewal_items_due()
-        self._refresh_next_actions(
-            overdue, supplier_due, expiring, supplier_expiring, pending, ongoing, renewal_due
-        )
+        self._refresh_next_actions(overdue, supplier_due, expiring, supplier_expiring, pending, ongoing, renewal_due)
 
         rows = []
         tags = []
         iids = []
         for item in expiring:
-            eff = effective_expiry_date(
-                item.get("expiry_date"), item.get("document_type")
-            )
+            eff = effective_expiry_date(item.get("expiry_date"), item.get("document_type"))
             left = days_until(eff)
             if left is None:
                 continue
@@ -746,30 +748,14 @@ class DashboardView(BaseView):
     ) -> None:
         today = date.today().isoformat()
         overdue = self.app.db.list_overdue_services() if overdue is None else overdue
-        supplier_due = (
-            self.app.db.list_pending_supplier_payments()
-            if supplier_due is None
-            else supplier_due
-        )
-        expiring = (
-            self.app.db.list_expiring_documents() if expiring is None else expiring
-        )
+        supplier_due = self.app.db.list_pending_supplier_payments() if supplier_due is None else supplier_due
+        expiring = self.app.db.list_expiring_documents() if expiring is None else expiring
         supplier_expiring = (
-            self.app.db.list_expiring_supplier_services()
-            if supplier_expiring is None
-            else supplier_expiring
+            self.app.db.list_expiring_supplier_services() if supplier_expiring is None else supplier_expiring
         )
-        pending_tasks = (
-            self.app.db.list_tasks(status="pending")
-            if pending_tasks is None
-            else pending_tasks
-        )
-        ongoing = (
-            self.app.db.list_ongoing_services() if ongoing is None else ongoing
-        )
-        renewal_due = (
-            self.app.db.list_renewal_items_due() if renewal_due is None else renewal_due
-        )
+        pending_tasks = self.app.db.list_tasks(status="pending") if pending_tasks is None else pending_tasks
+        ongoing = self.app.db.list_ongoing_services() if ongoing is None else ongoing
+        renewal_due = self.app.db.list_renewal_items_due() if renewal_due is None else renewal_due
         self._next_targets: dict[str, tuple[str, str]] = {}
         actions: list[tuple[int, str, tuple, str]] = []
         for item in overdue:
@@ -799,9 +785,7 @@ class DashboardView(BaseView):
                 )
             )
         for item in expiring:
-            eff = effective_expiry_date(
-                item.get("expiry_date"), item.get("document_type")
-            )
+            eff = effective_expiry_date(item.get("expiry_date"), item.get("document_type"))
             left = days_until(eff)
             if left is None:
                 continue
@@ -967,9 +951,7 @@ class DashboardView(BaseView):
         overrides = load_snippet_overrides(self.app.db.get_setting)
         template = effective_text("client", "Invoice payment reminder", overrides)
         if not template:
-            self.workflow_feedback.error(
-                "Reminder template not found — add 'Invoice payment reminder' in Utilities."
-            )
+            self.workflow_feedback.error("Reminder template not found — add 'Invoice payment reminder' in Utilities.")
             return
         client = item.get("client_name") or ""
         message = (
@@ -1022,9 +1004,7 @@ class DashboardView(BaseView):
             return
         count = len(tasks) + len(pipeline)
         if count:
-            self.workflow_feedback.success(
-                f"EOD report copied ({count} item(s)). Paste into chat or email."
-            )
+            self.workflow_feedback.success(f"EOD report copied ({count} item(s)). Paste into chat or email.")
         else:
             self.workflow_feedback.info("Nothing completed today — empty report copied.")
         self.app.set_status("EOD report copied to clipboard.")
@@ -1041,9 +1021,7 @@ class DashboardView(BaseView):
             self.workflow_feedback.error(str(exc))
             return
         self.onboard_var.set("")
-        self.workflow_feedback.success(
-            f"Workspace ready: {folder.name}/01_Company_Setup, 02_Accounting, 03_Visa"
-        )
+        self.workflow_feedback.success(f"Workspace ready: {folder.name}/01_Company_Setup, 02_Accounting, 03_Visa")
         self.app.set_status(f"Created client workspace at {folder}")
         self.refresh()
         try:
@@ -1153,24 +1131,25 @@ class DashboardView(BaseView):
         rows, iids, tags = [], [], []
         for c in clients:
             tag_list = []
-            for field in ("fs_status", "pnd53_status", "pp30_status",
-                          "pnd51_status", "pnd50_status", "audit_status"):
+            for field in ("fs_status", "pnd53_status", "pp30_status", "pnd51_status", "pnd50_status", "audit_status"):
                 if c.get(field) == "Pending":
                     tag_list.append("urgent")
                     break
             fee = c.get("service_fee") or "\u2014"
             paid = c.get("payment_status") or "\u2014"
-            rows.append((
-                c.get("name") or "\u2014",
-                status_icon.get(c.get("fs_status") or "Not Applicable", "\u2b1c"),
-                status_icon.get(c.get("pnd53_status") or "Not Applicable", "\u2b1c"),
-                status_icon.get(c.get("pp30_status") or "Not Applicable", "\u2b1c"),
-                status_icon.get(c.get("pnd51_status") or "Not Applicable", "\u2b1c"),
-                status_icon.get(c.get("pnd50_status") or "Not Applicable", "\u2b1c"),
-                status_icon.get(c.get("audit_status") or "Not Applicable", "\u2b1c"),
-                fee,
-                paid,
-            ))
+            rows.append(
+                (
+                    c.get("name") or "\u2014",
+                    status_icon.get(c.get("fs_status") or "Not Applicable", "\u2b1c"),
+                    status_icon.get(c.get("pnd53_status") or "Not Applicable", "\u2b1c"),
+                    status_icon.get(c.get("pp30_status") or "Not Applicable", "\u2b1c"),
+                    status_icon.get(c.get("pnd51_status") or "Not Applicable", "\u2b1c"),
+                    status_icon.get(c.get("pnd50_status") or "Not Applicable", "\u2b1c"),
+                    status_icon.get(c.get("audit_status") or "Not Applicable", "\u2b1c"),
+                    fee,
+                    paid,
+                )
+            )
             iids.append(str(c["id"]))
             tags.append(tuple(tag_list))
         self.tax_overview_tree.set_rows(rows, iids=iids, tags=tags)

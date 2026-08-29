@@ -20,7 +20,7 @@ from skyadmin_pro.services.office_hub_rollout import (
 )
 from skyadmin_pro.services.workflow import copy_to_clipboard
 from skyadmin_pro.ui.setup_rollout import RolloutAction, SetupRolloutPanel
-from skyadmin_pro.ui.theme import CARD_TITLE_SIZE, TEXT_MUTED
+from skyadmin_pro.ui.theme import CARD_TITLE_SIZE
 from skyadmin_pro.ui.treeview import ThemedTreeview
 from skyadmin_pro.ui.views.base import BaseView
 from skyadmin_pro.ui.widgets import FeedbackLabel
@@ -29,8 +29,7 @@ from skyadmin_pro.ui.widgets import FeedbackLabel
 class OfficeHubView(BaseView):
     title = "Office Hub"
     subtitle = (
-        "Office contacts, client DBD/RD passwords, office account vault, "
-        "and daily/weekly notebook for instructions."
+        "Office contacts, client DBD/RD passwords, office account vault, and daily/weekly notebook for instructions."
     )
 
     def build(self) -> None:
@@ -110,9 +109,7 @@ class OfficeHubView(BaseView):
         self._office_setup_panel.configure_data(
             list_rows=lambda: list_office_setup_rows(self.app.db),
             row_cells=self._office_setup_cells,
-            summary=lambda ready, total: (
-                f"{ready} of {total} client(s) have contacts and portal logins"
-            ),
+            summary=lambda ready, total: f"{ready} of {total} client(s) have contacts and portal logins",
         )
 
     def _office_setup_cells(self, row: dict) -> tuple:
@@ -161,9 +158,7 @@ class OfficeHubView(BaseView):
         if not row.get("can_seed_contact"):
             self.feedback.error("No director/contact name on file to import.")
             return
-        created = self.app.db.seed_client_liaison_contacts(
-            only_missing=True, client_id=int(row["id"])
-        )
+        created = self.app.db.seed_client_liaison_contacts(only_missing=True, client_id=int(row["id"]))
         if created:
             self.feedback.success("Liaison contact imported.")
         else:
@@ -189,9 +184,7 @@ class OfficeHubView(BaseView):
 
     def _migrate_all_legacy_ird(self) -> None:
         pending = sum(
-            1
-            for row in list_office_setup_rows(self.app.db)
-            if "IRD migrate" in (row.get("setup_missing") or [])
+            1 for row in list_office_setup_rows(self.app.db) if "IRD migrate" in (row.get("setup_missing") or [])
         )
         if pending == 0:
             self.feedback.info("No legacy IRD passwords need migration.")
@@ -223,9 +216,9 @@ class OfficeHubView(BaseView):
         toolbar.grid(row=0, column=0, sticky="ew", pady=(8, 8))
         toolbar.grid_columnconfigure(1, weight=1)
         self.contact_search_var = ctk.StringVar()
-        ctk.CTkEntry(
-            toolbar, textvariable=self.contact_search_var, placeholder_text="Search contacts…"
-        ).grid(row=0, column=0, columnspan=2, sticky="ew", padx=(0, 8))
+        ctk.CTkEntry(toolbar, textvariable=self.contact_search_var, placeholder_text="Search contacts…").grid(
+            row=0, column=0, columnspan=2, sticky="ew", padx=(0, 8)
+        )
         self.contact_search_var.trace_add("write", lambda *_: self._refresh_contacts())
         self.contact_category_menu = ctk.CTkOptionMenu(
             toolbar, values=["All"] + list(CONTACT_CATEGORIES), command=lambda _v: self._refresh_contacts(), width=150
@@ -304,7 +297,12 @@ class OfficeHubView(BaseView):
             buttons, text="Delete", width=90, fg_color="transparent", border_width=1, command=self._delete_contact
         ).pack(side="left", padx=(8, 0))
         ctk.CTkButton(
-            buttons, text="Copy phone", width=110, fg_color="transparent", border_width=1, command=self._copy_contact_phone
+            buttons,
+            text="Copy phone",
+            width=110,
+            fg_color="transparent",
+            border_width=1,
+            command=self._copy_contact_phone,
         ).pack(side="left", padx=(8, 0))
 
     # ------------------------------------------------------------------ #
@@ -374,9 +372,7 @@ class OfficeHubView(BaseView):
         self.cc_favorite = ctk.BooleanVar()
         self.cc_pw_entry: ctk.CTkEntry | None = None
 
-        self.cc_client_menu = ctk.CTkComboBox(
-            form, variable=self.cc_client, values=[""], width=220
-        )
+        self.cc_client_menu = ctk.CTkComboBox(form, variable=self.cc_client, values=[""], width=220)
         fields = [
             ("Client company", self.cc_client_menu, 1, 0, "widget", None),
             ("Type", self.cc_type, 1, 2, "menu", CLIENT_CREDENTIAL_TYPES),
@@ -412,7 +408,11 @@ class OfficeHubView(BaseView):
         buttons.grid(row=6, column=0, columnspan=4, sticky="w", padx=16, pady=(4, 12))
         ctk.CTkButton(buttons, text="Save", width=90, command=self._save_client_credential).pack(side="left")
         ctk.CTkButton(
-            buttons, text="Delete", width=80, fg_color="transparent", border_width=1,
+            buttons,
+            text="Delete",
+            width=80,
+            fg_color="transparent",
+            border_width=1,
             command=self._delete_client_credential,
         ).pack(side="left", padx=(8, 0))
 
@@ -507,7 +507,11 @@ class OfficeHubView(BaseView):
         buttons.grid(row=7, column=0, columnspan=4, sticky="w", padx=16, pady=(4, 12))
         ctk.CTkButton(buttons, text="Save", width=90, command=self._save_office_credential).pack(side="left")
         ctk.CTkButton(
-            buttons, text="Delete", width=80, fg_color="transparent", border_width=1,
+            buttons,
+            text="Delete",
+            width=80,
+            fg_color="transparent",
+            border_width=1,
             command=self._delete_office_credential,
         ).pack(side="left", padx=(8, 0))
 
@@ -523,17 +527,21 @@ class OfficeHubView(BaseView):
         toolbar.grid(row=0, column=0, sticky="ew", pady=(8, 8))
         toolbar.grid_columnconfigure(0, weight=1)
         self.note_search_var = ctk.StringVar()
-        ctk.CTkEntry(
-            toolbar, textvariable=self.note_search_var, placeholder_text="Search notebook…"
-        ).grid(row=0, column=0, sticky="ew", padx=(0, 8))
+        ctk.CTkEntry(toolbar, textvariable=self.note_search_var, placeholder_text="Search notebook…").grid(
+            row=0, column=0, sticky="ew", padx=(0, 8)
+        )
         self.note_search_var.trace_add("write", lambda *_: self._refresh_notes())
         type_labels = ["All"] + [label for _key, label in NOTEBOOK_ENTRY_TYPES]
         self.note_type_menu = ctk.CTkOptionMenu(
             toolbar, values=type_labels, command=lambda _v: self._refresh_notes(), width=170
         )
         self.note_type_menu.grid(row=0, column=1, padx=(0, 8))
-        ctk.CTkButton(toolbar, text="Today", width=70, command=self._filter_notes_today).grid(row=0, column=2, padx=(0, 8))
-        ctk.CTkButton(toolbar, text="This week", width=90, command=self._filter_notes_week).grid(row=0, column=3, padx=(0, 8))
+        ctk.CTkButton(toolbar, text="Today", width=70, command=self._filter_notes_today).grid(
+            row=0, column=2, padx=(0, 8)
+        )
+        ctk.CTkButton(toolbar, text="This week", width=90, command=self._filter_notes_week).grid(
+            row=0, column=3, padx=(0, 8)
+        )
         ctk.CTkButton(toolbar, text="New note", width=100, command=self._new_note).grid(row=0, column=4)
 
         self.notes_tree = ThemedTreeview(
@@ -577,9 +585,9 @@ class OfficeHubView(BaseView):
         for label, var, row, col, kind in note_fields:
             ctk.CTkLabel(form, text=label, anchor="w").grid(row=row, column=col, sticky="w", padx=16, pady=4)
             if kind == "menu":
-                ctk.CTkOptionMenu(
-                    form, variable=var, values=[lbl for _k, lbl in NOTEBOOK_ENTRY_TYPES], width=200
-                ).grid(row=row, column=col + 1, sticky="w", padx=(0, 16), pady=4)
+                ctk.CTkOptionMenu(form, variable=var, values=[lbl for _k, lbl in NOTEBOOK_ENTRY_TYPES], width=200).grid(
+                    row=row, column=col + 1, sticky="w", padx=(0, 16), pady=4
+                )
             else:
                 ctk.CTkEntry(form, textvariable=var).grid(row=row, column=col + 1, sticky="ew", padx=(0, 16), pady=4)
 
@@ -708,9 +716,7 @@ class OfficeHubView(BaseView):
     def _refresh_contacts(self) -> None:
         cat = self.contact_category_menu.get()
         category = None if cat == "All" else cat
-        rows = self.app.db.list_office_contacts(
-            query=self.contact_search_var.get(), category=category
-        )
+        rows = self.app.db.list_office_contacts(query=self.contact_search_var.get(), category=category)
         tree_rows = [
             (
                 row.get("name") or "",
@@ -818,9 +824,7 @@ class OfficeHubView(BaseView):
     def _refresh_client_credentials(self) -> None:
         cred_type = self.client_cred_type_menu.get()
         ctype = None if cred_type == "All" else cred_type
-        rows = self.app.db.list_client_credentials(
-            query=self.client_cred_search_var.get(), credential_type=ctype
-        )
+        rows = self.app.db.list_client_credentials(query=self.client_cred_search_var.get(), credential_type=ctype)
         tree_rows = [
             (
                 row.get("client_name") or "",
@@ -841,9 +845,7 @@ class OfficeHubView(BaseView):
             return
         self.cc_client.set(row.get("client_name") or "")
         self.cc_type.set(row.get("credential_type") or CLIENT_CREDENTIAL_TYPES[0])
-        self.cc_login_id.set(
-            row.get("login_id") or row.get("username") or row.get("registration_number") or ""
-        )
+        self.cc_login_id.set(row.get("login_id") or row.get("username") or row.get("registration_number") or "")
         self.cc_password.set(row.get("password") or "")
         self.cc_url.set(row.get("portal_url") or "")
         self.cc_favorite.set(bool(row.get("is_favorite")))
@@ -916,9 +918,7 @@ class OfficeHubView(BaseView):
     def _refresh_office_credentials(self) -> None:
         system = self.office_cred_type_menu.get()
         stype = None if system == "All" else system
-        rows = self.app.db.list_office_credentials(
-            query=self.office_cred_search_var.get(), system_type=stype
-        )
+        rows = self.app.db.list_office_credentials(query=self.office_cred_search_var.get(), system_type=stype)
         tree_rows = [
             (
                 row.get("account_label") or "",

@@ -32,9 +32,7 @@ CLIENT_REPLIES: tuple[Snippet, ...] = (
     ),
     Snippet(
         "Documents received",
-        "မင်္ဂလာပါ။\n\n"
-        "စာရွက်စာတမ်းများ လက်ခံရရှိပါပြီ။ ကျေးဇူးတင်ပါတယ်။\n"
-        "ဖိုင်ကို စစ်ဆေးနေပါသည်။ မကြာမီ အကြောင်းပြန်ပေးပါမည်။",
+        "မင်္ဂလာပါ။\n\nစာရွက်စာတမ်းများ လက်ခံရရှိပါပြီ။ ကျေးဇူးတင်ပါတယ်။\nဖိုင်ကို စစ်ဆေးနေပါသည်။ မကြာမီ အကြောင်းပြန်ပေးပါမည်။",
     ),
     Snippet(
         "Waiting for signature",
@@ -60,9 +58,7 @@ CLIENT_REPLIES: tuple[Snippet, ...] = (
     ),
     Snippet(
         "Processing at Immigration",
-        "မင်္ဂလာပါ။\n\n"
-        "လူဝင်မှုကြီးကြပ်ရေးသို့ ဖိုင်တင်ပြီးပါပြီ။\n"
-        "ရလဒ်ထွက်လျှင် သို့မဟုတ် စာရွက် ထပ်တောင်းလျှင် ချက်ချင်း အကြောင်းကြားပါမည်။",
+        "မင်္ဂလာပါ။\n\nလူဝင်မှုကြီးကြပ်ရေးသို့ ဖိုင်တင်ပြီးပါပြီ။\nရလဒ်ထွက်လျှင် သို့မဟုတ် စာရွက် ထပ်တောင်းလျှင် ချက်ချင်း အကြောင်းကြားပါမည်။",
     ),
     Snippet(
         "Ready for pickup / courier",
@@ -74,22 +70,15 @@ CLIENT_REPLIES: tuple[Snippet, ...] = (
     ),
     Snippet(
         "Invoice attached",
-        "မင်္ဂလာပါ။\n\n"
-        "ငွေတောင်းခံလွှာ ပူးတွဲပို့လိုက်ပါသည်။\n"
-        "ငွေလွှဲပြီး စလစ် ပို့ပေးပါ။ ပြေစာ ထုတ်ပေးပါမည်။\n\n"
-        "ကျေးဇူးတင်ပါတယ်။",
+        "မင်္ဂလာပါ။\n\nငွေတောင်းခံလွှာ ပူးတွဲပို့လိုက်ပါသည်။\nငွေလွှဲပြီး စလစ် ပို့ပေးပါ။ ပြေစာ ထုတ်ပေးပါမည်။\n\nကျေးဇူးတင်ပါတယ်။",
     ),
     Snippet(
         "Payment received",
-        "မင်္ဂလာပါ။\n\n"
-        "ငွေလက်ခံရရှိပါပြီ။ ကျေးဇူးတင်ပါတယ်။\n"
-        "နောက်တစ်ဆင့် ဆက်လုပ်ပြီး အကြောင်းပြန်ပါမည်။",
+        "မင်္ဂလာပါ။\n\nငွေလက်ခံရရှိပါပြီ။ ကျေးဇူးတင်ပါတယ်။\nနောက်တစ်ဆင့် ဆက်လုပ်ပြီး အကြောင်းပြန်ပါမည်။",
     ),
     Snippet(
         "Expiry reminder",
-        "မင်္ဂလာပါ။\n\n"
-        "သတိပေးချက်: ဖိုင်ထဲရှိ နိုင်ငံကူးလက်မှတ်၊ ဗီဇာ သို့မဟုတ် အလုပ်ပါမစ် သက်တမ်းကုန်ခါနီးပါပြီ။\n"
-        "သက်တမ်းတိုး ပေးစေချင်ရင် ပြောပေးပါ။",
+        "မင်္ဂလာပါ။\n\nသတိပေးချက်: ဖိုင်ထဲရှိ နိုင်ငံကူးလက်မှတ်၊ ဗီဇာ သို့မဟုတ် အလုပ်ပါမစ် သက်တမ်းကုန်ခါနီးပါပြီ။\nသက်တမ်းတိုး ပေးစေချင်ရင် ပြောပေးပါ။",
     ),
     Snippet(
         "Need original document",
@@ -100,9 +89,7 @@ CLIENT_REPLIES: tuple[Snippet, ...] = (
     ),
     Snippet(
         "Follow up",
-        "မင်္ဂလာပါ။\n\n"
-        "ယခင်စာ ရရှိပါသလား။ အချိန်ရရင် ပြန်ကြားပေးပါ။\n"
-        "မရှင်းလင်းတာ ရှိရင် ထပ်ရှင်းပြပေးပါမည်။ ကျေးဇူးတင်ပါတယ်။",
+        "မင်္ဂလာပါ။\n\nယခင်စာ ရရှိပါသလား။ အချိန်ရရင် ပြန်ကြားပေးပါ။\nမရှင်းလင်းတာ ရှိရင် ထပ်ရှင်းပြပေးပါမည်။ ကျေးဇူးတင်ပါတယ်။",
     ),
     Snippet(
         "Missing docs — initial request",
@@ -471,9 +458,7 @@ SNIPPET_SECTIONS: dict[str, tuple[Snippet, ...]] = {
 }
 
 
-def apply_snippet_overrides(
-    section: str, overrides: dict[str, dict[str, str]] | None
-) -> tuple[Snippet, ...]:
+def apply_snippet_overrides(section: str, overrides: dict[str, dict[str, str]] | None) -> tuple[Snippet, ...]:
     """Merge saved overrides over the built-in defaults for one section.
 
     Overrides are keyed by the snippet's original label::
@@ -510,9 +495,7 @@ def apply_snippet_overrides(
     return tuple([*merged, *extras])
 
 
-def effective_text(
-    section: str, label: str, overrides: dict[str, dict[str, dict[str, str]]] | None = None
-) -> str:
+def effective_text(section: str, label: str, overrides: dict[str, dict[str, dict[str, str]]] | None = None) -> str:
     """Return the effective (override-aware) text for one snippet, or ''."""
     items = apply_snippet_overrides(section, (overrides or {}).get(section) or {})
     for snippet in items:
@@ -588,8 +571,7 @@ def unpack_snippet_pack(data: dict) -> dict:
     history = data.get("history") or []
     if not isinstance(active, dict) or not isinstance(history, list):
         raise ValueError("Messages file is corrupt.")
-    clean_active = {section: _clean_section(section_value)
-                    for section, section_value in active.items()}
+    clean_active = {section: _clean_section(section_value) for section, section_value in active.items()}
     clean_history = []
     for item in history:
         if not isinstance(item, dict):
@@ -597,8 +579,7 @@ def unpack_snippet_pack(data: dict) -> dict:
         snapshot = item.get("snapshot")
         if not isinstance(snapshot, dict):
             continue
-        clean_snapshot = {section: _clean_section(section_value)
-                          for section, section_value in snapshot.items()}
+        clean_snapshot = {section: _clean_section(section_value) for section, section_value in snapshot.items()}
         clean_history.append(
             {
                 "created_at": item.get("created_at") or "",

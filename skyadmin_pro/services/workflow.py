@@ -73,9 +73,7 @@ def resolve_client_folder(
 
     if create:
         return create_client_workspace(root, client_name)
-    raise FileNotFoundError(
-        f"No workspace folder found for client '{client_name.strip()}'."
-    )
+    raise FileNotFoundError(f"No workspace folder found for client '{client_name.strip()}'.")
 
 
 def _ensure_workspace_subfolders(folder: Path) -> None:

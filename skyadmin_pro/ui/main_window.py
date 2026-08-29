@@ -2,7 +2,8 @@
 
 from __future__ import annotations
 
-from typing import TYPE_CHECKING, Callable
+from collections.abc import Callable
+from typing import TYPE_CHECKING
 
 import customtkinter as ctk
 
@@ -41,7 +42,7 @@ if TYPE_CHECKING:
 
 
 class MainWindow(dnd_base_class()):
-    _VIEW_FACTORIES: dict[str, Callable[["MainWindow"], "BaseView"]] = {}
+    _VIEW_FACTORIES: dict[str, Callable[[MainWindow], BaseView]] = {}
 
     @classmethod
     def _register_view_factories(cls) -> None:
@@ -268,7 +269,9 @@ class MainWindow(dnd_base_class()):
     def _highlight_nav(self, active_key: str) -> None:
         for key, button in self._nav_buttons.items():
             if key == active_key:
-                button.configure(fg_color=SIDEBAR_ACTIVE_BG, text_color=SIDEBAR_ACTIVE_TEXT, hover_color=SIDEBAR_ACTIVE_BG)
+                button.configure(
+                    fg_color=SIDEBAR_ACTIVE_BG, text_color=SIDEBAR_ACTIVE_TEXT, hover_color=SIDEBAR_ACTIVE_BG
+                )
             else:
                 button.configure(fg_color="transparent", text_color=SIDEBAR_TEXT, hover_color=SIDEBAR_HOVER_BG)
 

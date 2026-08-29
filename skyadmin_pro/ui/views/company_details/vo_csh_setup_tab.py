@@ -48,9 +48,7 @@ class VoCshSetupTabMixin:
         panel.configure_data(
             list_rows=lambda: list_vo_csh_setup_rows(self.app.db),
             row_cells=self._vo_csh_setup_cells,
-            summary=lambda ready, total: (
-                f"{ready} of {total} VO/CSH client(s) have renewal dates set"
-            ),
+            summary=lambda ready, total: f"{ready} of {total} VO/CSH client(s) have renewal dates set",
         )
         self._vo_csh_setup_panel = panel
         return panel
@@ -98,17 +96,13 @@ class VoCshSetupTabMixin:
         if not total:
             self.feedback.info("Nothing to infer for this client.")
             return
-        self.feedback.success(
-            f"Inferred {result['vo']} VO and {result['csh']} CSH renewal date(s)."
-        )
+        self.feedback.success(f"Inferred {result['vo']} VO and {result['csh']} CSH renewal date(s).")
         self.refresh_vo_csh_setup()
         self.refresh()
 
     def _infer_all_vo_csh_dates(self) -> None:
         pending = sum(
-            1
-            for row in list_vo_csh_setup_rows(self.app.db)
-            if row.get("can_infer_vo") or row.get("can_infer_csh")
+            1 for row in list_vo_csh_setup_rows(self.app.db) if row.get("can_infer_vo") or row.get("can_infer_csh")
         )
         if pending == 0:
             self.feedback.info("No clients need renewal date inference.")
@@ -121,9 +115,6 @@ class VoCshSetupTabMixin:
             return
         result = infer_vo_csh_renewal_dates(self.app.db, only_missing=True)
         total = int(result["vo"]) + int(result["csh"])
-        self.feedback.success(
-            f"Inferred {result['vo']} VO and {result['csh']} CSH renewal date(s) "
-            f"({total} total)."
-        )
+        self.feedback.success(f"Inferred {result['vo']} VO and {result['csh']} CSH renewal date(s) ({total} total).")
         self.refresh_vo_csh_setup()
         self.refresh()

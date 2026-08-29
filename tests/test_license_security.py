@@ -25,6 +25,7 @@ def _wrap(obj: dict) -> str:
 
 # --- uniqueness -----------------------------------------------------------
 
+
 def test_keys_unique_for_identical_params(mid):
     keys = {lic.generate_license(mid, 14, package_days=14) for _ in range(3)}
     assert len(keys) == 3
@@ -40,21 +41,23 @@ def test_key_verifies_and_reports_package(mid):
 
 # --- tamper resistance ----------------------------------------------------
 
-@pytest.mark.parametrize("field,value", [
-    ("exp", "2099-01-01T00:00:00"),
-    ("pkg", "365"),
-    ("n", "deadbeefdead"),
-    ("iat", "2020-01-01T00:00"),
-])
+
+@pytest.mark.parametrize(
+    "field,value",
+    [
+        ("exp", "2099-01-01T00:00:00"),
+        ("pkg", "365"),
+        ("n", "deadbeefdead"),
+        ("iat", "2020-01-01T00:00"),
+    ],
+)
 def test_tampered_field_rejected(mid, field, value):
     key = lic.generate_license(mid, days_valid=30, package_days=30)
     b64 = "".join(key.split())
     b64 += "=" * (-len(b64) % 4)
     obj = json.loads(base64.urlsafe_b64decode(b64))
     obj[field] = value
-    tampered = base64.urlsafe_b64encode(
-        json.dumps(obj, separators=(",", ":")).encode()
-    ).decode().rstrip("=")
+    tampered = base64.urlsafe_b64encode(json.dumps(obj, separators=(",", ":")).encode()).decode().rstrip("=")
     ok, _msg = lic.verify_key_text(tampered)
     assert not ok
 
@@ -74,26 +77,27 @@ def test_expired_rejected(mid):
 
 
 def test_utc_expiry_parses_full_duration(mid):
-  from datetime import timezone
+    from datetime import timezone
 
-  exp = (datetime.now(timezone.utc) + timedelta(days=1)).strftime("%Y-%m-%dT%H:%M:%SZ")
-  payload = f"{mid}|{exp}|x|nonceutc01|1"
-  obj = {"mid": mid, "exp": exp, "sig": _sign(payload), "iat": "x", "n": "nonceutc01", "pkg": "1"}
-  ok, _msg, _n = lic.check_activation_usable(_wrap(obj))
-  assert ok
-  parsed = lic._parse_expiry(exp)
-  assert parsed > datetime.now()
+    exp = (datetime.now(timezone.utc) + timedelta(days=1)).strftime("%Y-%m-%dT%H:%M:%SZ")
+    payload = f"{mid}|{exp}|x|nonceutc01|1"
+    obj = {"mid": mid, "exp": exp, "sig": _sign(payload), "iat": "x", "n": "nonceutc01", "pkg": "1"}
+    ok, _msg, _n = lic.check_activation_usable(_wrap(obj))
+    assert ok
+    parsed = lic._parse_expiry(exp)
+    assert parsed > datetime.now()
 
 
 def test_never_expire_key_has_no_exp(mid):
-  payload = f"{mid}||x|noncenever01|"
-  obj = {"mid": mid, "exp": None, "sig": _sign(payload), "iat": "x", "n": "noncenever01", "pkg": ""}
-  ok, msg, _n = lic.check_activation_usable(_wrap(obj))
-  assert ok
-  assert "never" in msg.lower()
+    payload = f"{mid}||x|noncenever01|"
+    obj = {"mid": mid, "exp": None, "sig": _sign(payload), "iat": "x", "n": "noncenever01", "pkg": ""}
+    ok, msg, _n = lic.check_activation_usable(_wrap(obj))
+    assert ok
+    assert "never" in msg.lower()
 
 
 # --- one-time use ---------------------------------------------------------
+
 
 def test_burn_blocks_redemption(mid, fake_app_dir, monkeypatch):
     (fake_app_dir / "hardware.id").write_text(mid, encoding="utf-8")
@@ -117,7 +121,8 @@ def test_burn_blocks_redemption(mid, fake_app_dir, monkeypatch):
 
     # A DIFFERENT machine's saved license (different nonce) → blocked.
     monkeypatch.setattr(
-        lic, "_read_license_payload",
+        lic,
+        "_read_license_payload",
         lambda: {"mid": mid, "exp": payload["exp"], "n": "other-nonce-xyz"},
     )
     ok, msg, _ = lic.check_activation_usable(key)
@@ -125,6 +130,7 @@ def test_burn_blocks_redemption(mid, fake_app_dir, monkeypatch):
 
 
 # --- machine ban covers passcode ------------------------------------------
+
 
 def test_machine_ban_blocks_key_and_passcode(mid, fake_app_dir):
     # Seed hardware.id so get_machine_id() returns the same value
@@ -143,6 +149,7 @@ def test_machine_ban_blocks_key_and_passcode(mid, fake_app_dir):
 
 
 # --- SKYCTRL1 signed control list -----------------------------------------
+
 
 def _ctrl_wrap(lines):
     plaintext = "\n".join(lines) + "\n"
@@ -173,17 +180,18 @@ class FakeResp:
 
 
 def test_control_list_apply_and_replace(mid, fake_app_dir, monkeypatch):
+    import urllib.request
+
     import skyadmin_pro.config as cfg
     import skyadmin_pro.paths as paths_mod
-    import urllib.request
 
     monkeypatch.setattr(paths_mod, "app_data_dir", lambda: fake_app_dir)
     monkeypatch.setattr(cfg, "REVOCATION_URL", "https://x/raw/c.txt")
     monkeypatch.setattr(cfg, "API_BASE_URL", "")  # use Gist path for this test
     monkeypatch.setattr(
-        urllib.request, "urlopen", lambda req, timeout=0: FakeResp(
-            _ctrl_wrap([f"REVOKE n{mid[:6]}", f"BAN {mid}", "USED u123"])
-        )
+        urllib.request,
+        "urlopen",
+        lambda req, timeout=0: FakeResp(_ctrl_wrap([f"REVOKE n{mid[:6]}", f"BAN {mid}", "USED u123"])),
     )
     ok, msg = lic.fetch_revocations(timeout=1)
     assert ok, msg
@@ -192,9 +200,7 @@ def test_control_list_apply_and_replace(mid, fake_app_dir, monkeypatch):
     assert "u123" in lic.used_nonces()
 
     # Owner clears everything → local state replaced (empty).
-    monkeypatch.setattr(
-        urllib.request, "urlopen", lambda req, timeout=0: FakeResp(_ctrl_wrap([]))
-    )
+    monkeypatch.setattr(urllib.request, "urlopen", lambda req, timeout=0: FakeResp(_ctrl_wrap([])))
     ok, msg = lic.fetch_revocations(timeout=1)
     assert ok
     assert not (fake_app_dir / "revoked.txt").exists()
@@ -202,10 +208,11 @@ def test_control_list_apply_and_replace(mid, fake_app_dir, monkeypatch):
 
 
 def test_control_list_tamper_refused(mid, fake_app_dir, monkeypatch):
-    import skyadmin_pro.config as cfg
-    import skyadmin_pro.paths as paths_mod
     import urllib.request
     from io import BytesIO
+
+    import skyadmin_pro.config as cfg
+    import skyadmin_pro.paths as paths_mod
 
     monkeypatch.setattr(paths_mod, "app_data_dir", lambda: fake_app_dir)
     monkeypatch.setattr(cfg, "REVOCATION_URL", "https://x/raw/c.txt")
@@ -238,6 +245,7 @@ def test_control_list_tamper_refused(mid, fake_app_dir, monkeypatch):
 
 
 # --- update checker -------------------------------------------------------
+
 
 def test_update_info_roundtrip_and_compare(fake_app_dir):
     from skyadmin_pro.config import APP_VERSION

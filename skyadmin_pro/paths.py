@@ -34,8 +34,8 @@ def user_documents_dir() -> Path:
             out = ctypes.c_wchar_p()
             hr = ctypes.windll.shell32.SHGetKnownFolderPath(
                 ctypes.cast(folder_id, ctypes.c_void_p),
-                0,      # flags: default known path for current user
-                None,   # hToken: calling process user
+                0,  # flags: default known path for current user
+                None,  # hToken: calling process user
                 ctypes.byref(out),
             )
             value = out.value if hr == 0 else None

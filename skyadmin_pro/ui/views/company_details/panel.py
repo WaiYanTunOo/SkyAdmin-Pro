@@ -22,6 +22,7 @@ from skyadmin_pro.services.tracking import classify_expiry, days_until, effectiv
 from skyadmin_pro.services.workflow import copy_to_clipboard, create_client_workspace
 from skyadmin_pro.ui.combo_utils import fill_combo
 from skyadmin_pro.ui.theme import CARD_TITLE_SIZE, TEXT_MUTED
+from skyadmin_pro.ui.treeview import ThemedTreeview
 from skyadmin_pro.ui.views.company_details.accounting_setup_tab import AccountingSetupTabMixin
 from skyadmin_pro.ui.views.company_details.filing_tab import FilingTabMixin
 from skyadmin_pro.ui.views.company_details.financial_docs_tab import FinancialDocsTabMixin
@@ -57,14 +58,10 @@ class CompanyDetailsPanel(
         selector = ctk.CTkFrame(self, fg_color="transparent")
         selector.grid(row=0, column=0, sticky="ew", pady=(0, 8))
         selector.grid_columnconfigure(1, weight=1)
-        ctk.CTkLabel(selector, text="Company / Client:").grid(
-            row=0, column=0, sticky="w"
-        )
+        ctk.CTkLabel(selector, text="Company / Client:").grid(row=0, column=0, sticky="w")
         self.company_box = ctk.CTkComboBox(selector, values=[""], command=self._on_company)
         self.company_box.grid(row=0, column=1, sticky="ew")
-        self.company_info = ctk.CTkLabel(
-            selector, text="", text_color=TEXT_MUTED, anchor="e"
-        )
+        self.company_info = ctk.CTkLabel(selector, text="", text_color=TEXT_MUTED, anchor="e")
         self.company_info.grid(row=0, column=2, sticky="e", padx=(12, 0))
         ctk.CTkButton(
             selector,
@@ -148,7 +145,6 @@ class CompanyDetailsPanel(
         self._fin_frame = self._build_financial_docs(fin_scroll)
         self._fin_frame.grid(row=0, column=0, sticky="ew")
 
-
     # --- shared client selection & refresh ---
 
     def _selected_client_id(self) -> int | None:
@@ -182,8 +178,15 @@ class CompanyDetailsPanel(
             self.company_name_label.configure(text="—")
             self.service_tree.set_rows([])
             self.doc_tree.set_rows([])
-            for var in (self.info_reg_number, self.info_director, self.info_email,
-                        self.info_contact, self.info_capital, self.info_vat, self.info_address):
+            for var in (
+                self.info_reg_number,
+                self.info_director,
+                self.info_email,
+                self.info_contact,
+                self.info_capital,
+                self.info_vat,
+                self.info_address,
+            ):
                 var.set("")
             self.info_objectives.delete("1.0", "end")
             self.tax_id_var.set("")
@@ -199,7 +202,7 @@ class CompanyDetailsPanel(
             for field in TAX_FILING_FIELDS:
                 if field in self.filing_vars:
                     self.filing_vars[field].set("Not Applicable")
-            for key, lbl in self.filing_summary_labels.items():
+            for _key, lbl in self.filing_summary_labels.items():
                 lbl.configure(text="0")
             self.refresh_accounting_setup()
             self.refresh_vo_csh_setup()
@@ -207,9 +210,7 @@ class CompanyDetailsPanel(
 
         services = self.app.db.list_client_services(client_id)
         documents = self.app.db.list_client_documents(client_id)
-        self.company_info.configure(
-            text=f"{len(services)} service(s) \u00b7 {len(documents)} document(s)"
-        )
+        self.company_info.configure(text=f"{len(services)} service(s) \u00b7 {len(documents)} document(s)")
 
         client = self.app.db.get_client(client_id)
         self.company_name_label.configure(text=client["name"] if client else "\u2014")
@@ -250,9 +251,12 @@ class CompanyDetailsPanel(
                     val = "Not Applicable"
                 self.filing_vars[field].set(val)
                 self.filing_labels[field].configure(
-                    text="\u2705" if val == "Complete"
-                    else "\U0001f7e1" if val == "On-Going"
-                    else "\u274c" if val == "Pending"
+                    text="\u2705"
+                    if val == "Complete"
+                    else "\U0001f7e1"
+                    if val == "On-Going"
+                    else "\u274c"
+                    if val == "Pending"
                     else "\u2b1c"
                 )
                 if val == "Complete":
@@ -269,20 +273,20 @@ class CompanyDetailsPanel(
             lbl.configure(text=str(counts[key]))
         # Last changed timestamp
         last_changed = self.app.db.get_filing_last_changed(client_id) if client_id else None
-        self.filing_last_changed_label.configure(
-            text=f"Last changed: {last_changed}" if last_changed else ""
-        )
+        self.filing_last_changed_label.configure(text=f"Last changed: {last_changed}" if last_changed else "")
         # Filing change history
         self.filing_history_tree.apply_theme()
         history = self.app.db.get_filing_change_history(client_id) if client_id else []
         hist_rows, hist_iids = [], []
         for h in history:
-            hist_rows.append((
-                h.get("changed_at") or "",
-                TAX_FILING_LABELS.get(h.get("field") or "", h.get("field") or ""),
-                h.get("old_value") or "—",
-                h.get("new_value") or "—",
-            ))
+            hist_rows.append(
+                (
+                    h.get("changed_at") or "",
+                    TAX_FILING_LABELS.get(h.get("field") or "", h.get("field") or ""),
+                    h.get("old_value") or "—",
+                    h.get("new_value") or "—",
+                )
+            )
             hist_iids.append(str(h["id"]))
         self.filing_history_tree.set_rows(hist_rows, iids=hist_iids)
 
@@ -491,8 +495,7 @@ class CompanyDetailsPanel(
         ctk.CTkLabel(
             top,
             text=(
-                f"Client: {service.get('client_name') or '—'}"
-                f"   ·   Current expiry: {service.get('expiry_date') or '—'}"
+                f"Client: {service.get('client_name') or '—'}   ·   Current expiry: {service.get('expiry_date') or '—'}"
             ),
             text_color=TEXT_MUTED,
             anchor="w",
@@ -508,24 +511,16 @@ class CompanyDetailsPanel(
             text_color=TEXT_MUTED,
         ).grid(row=2, column=0, sticky="w", padx=20, pady=(8, 6))
 
-        ctk.CTkLabel(top, text="New expiry date", anchor="w").grid(
-            row=3, column=0, sticky="w", padx=20, pady=(6, 2)
-        )
+        ctk.CTkLabel(top, text="New expiry date", anchor="w").grid(row=3, column=0, sticky="w", padx=20, pady=(6, 2))
         renew_var = ctk.StringVar()
         DatePickerField(top, var=renew_var).grid(row=4, column=0, sticky="ew", padx=20)
 
-        ctk.CTkLabel(top, text="Note (optional)", anchor="w").grid(
-            row=5, column=0, sticky="w", padx=20, pady=(8, 2)
-        )
+        ctk.CTkLabel(top, text="Note (optional)", anchor="w").grid(row=5, column=0, sticky="w", padx=20, pady=(8, 2))
         note_var = ctk.StringVar()
-        ctk.CTkEntry(top, textvariable=note_var).grid(
-            row=6, column=0, sticky="ew", padx=20, pady=(0, 10)
-        )
+        ctk.CTkEntry(top, textvariable=note_var).grid(row=6, column=0, sticky="ew", padx=20, pady=(0, 10))
 
         needs_docs_var = ctk.BooleanVar(
-            value=self.app.db.renewal_docs_default(
-                service.get("client_id"), service.get("document_type") or ""
-            )
+            value=self.app.db.renewal_docs_default(service.get("client_id"), service.get("document_type") or "")
         )
         needs_docs = ctk.CTkCheckBox(
             top,
@@ -582,7 +577,6 @@ class CompanyDetailsPanel(
         if not service:
             self.feedback.error("Service record not found.")
             return
-        renewals = self.app.db.list_service_renewals(int(iid))
         top = ctk.CTkToplevel(self)
         top.title("Renewal history")
         top.geometry("720x400")
@@ -639,9 +633,7 @@ class CompanyDetailsPanel(
             target = next((r for r in renewal if str(r["id"]) == sel), None)
             if target is None:
                 return
-            self.app.db.set_renewal_needs_documents(
-                int(sel), not bool(target.get("needs_documents"))
-            )
+            self.app.db.set_renewal_needs_documents(int(sel), not bool(target.get("needs_documents")))
             redraw()
             self.feedback.success("Document requirement updated.")
 
@@ -656,10 +648,7 @@ class CompanyDetailsPanel(
         ).pack(side="left")
         ctk.CTkLabel(
             footer,
-            text=(
-                "Documents needed depends on this company's task and can change "
-                "over time — flip it per renewal."
-            ),
+            text=("Documents needed depends on this company's task and can change over time — flip it per renewal."),
             text_color=TEXT_MUTED,
         ).pack(side="right", padx=(12, 0))
         redraw()
@@ -778,13 +767,27 @@ class CompanyDetailsPanel(
             parent=self.winfo_toplevel(),
         ):
             return
-        db.add_task(title=f"Send missing docs request to {client}", client_id=client_id, category="Accounting", due_date=today.isoformat())
-        db.add_task(title=f"Follow-up: missing docs email to {client}", client_id=client_id, category="Accounting", due_date=(today + timedelta(days=2)).isoformat())
-        db.add_task(title=f"Call re: missing docs for {client}", client_id=client_id, category="Accounting", due_date=(today + timedelta(days=3)).isoformat())
+        db.add_task(
+            title=f"Send missing docs request to {client}",
+            client_id=client_id,
+            category="Accounting",
+            due_date=today.isoformat(),
+        )
+        db.add_task(
+            title=f"Follow-up: missing docs email to {client}",
+            client_id=client_id,
+            category="Accounting",
+            due_date=(today + timedelta(days=2)).isoformat(),
+        )
+        db.add_task(
+            title=f"Call re: missing docs for {client}",
+            client_id=client_id,
+            category="Accounting",
+            due_date=(today + timedelta(days=3)).isoformat(),
+        )
         self.feedback.success(
             f"3 follow-up tasks created for {client} "
-            f"(today, +2d email, +3d call)."
-            + (" Request email copied." if copied else "")
+            f"(today, +2d email, +3d call)." + (" Request email copied." if copied else "")
         )
         self.app.set_status(f"Missing-docs follow-up scheduled for {client}.")
         view = self.app._views.get("database_tasks")

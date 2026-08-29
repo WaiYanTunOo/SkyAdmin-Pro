@@ -1,7 +1,5 @@
 """Client workspace folder resolution and repair."""
 
-from pathlib import Path
-
 import pytest
 
 from skyadmin_pro.services.workflow import (

@@ -128,10 +128,110 @@ OWNER_BUSINESS_NAME = "Sky Creation Innovations"
 # --------------------------------------------------------------------------- #
 # Gist control list URL — encoded to prevent string extraction.
 _URL_PARTS = [
-    bytes([104, 116, 116, 112, 115, 58, 47, 47, 103, 105, 115, 116, 46, 103, 105, 116, 104, 117, 98, 117, 115, 101, 114, 99, 111, 110, 116, 101, 110, 116, 46, 99, 111, 109]),  # "https://gist.githubusercontent.com"
+    bytes(
+        [
+            104,
+            116,
+            116,
+            112,
+            115,
+            58,
+            47,
+            47,
+            103,
+            105,
+            115,
+            116,
+            46,
+            103,
+            105,
+            116,
+            104,
+            117,
+            98,
+            117,
+            115,
+            101,
+            114,
+            99,
+            111,
+            110,
+            116,
+            101,
+            110,
+            116,
+            46,
+            99,
+            111,
+            109,
+        ]
+    ),  # "https://gist.githubusercontent.com"
     bytes([47, 87, 97, 105, 89, 97, 110, 84, 117, 110, 79, 111]),  # "/WaiYanTunOo"
-    bytes([47, 100, 55, 100, 99, 100, 100, 52, 56, 48, 98, 98, 49, 56, 100, 55, 98, 56, 49, 55, 50, 56, 53, 102, 53, 48, 50, 102, 48, 56, 57, 52]),  # "/d7dcddd480bb18d7b817285f502f0894"
-    bytes([47, 114, 97, 119, 47, 115, 107, 121, 97, 100, 109, 105, 110, 45, 99, 111, 110, 116, 114, 111, 108, 46, 116, 120, 116]),  # "/raw/skyadmin-control.txt"
+    bytes(
+        [
+            47,
+            100,
+            55,
+            100,
+            99,
+            100,
+            100,
+            52,
+            56,
+            48,
+            98,
+            98,
+            49,
+            56,
+            100,
+            55,
+            98,
+            56,
+            49,
+            55,
+            50,
+            56,
+            53,
+            102,
+            53,
+            48,
+            50,
+            102,
+            48,
+            56,
+            57,
+            52,
+        ]
+    ),  # "/d7dcddd480bb18d7b817285f502f0894"
+    bytes(
+        [
+            47,
+            114,
+            97,
+            119,
+            47,
+            115,
+            107,
+            121,
+            97,
+            100,
+            109,
+            105,
+            110,
+            45,
+            99,
+            111,
+            110,
+            116,
+            114,
+            111,
+            108,
+            46,
+            116,
+            120,
+            116,
+        ]
+    ),  # "/raw/skyadmin-control.txt"
 ]
 REVOCATION_URL = b"".join(_URL_PARTS).decode()
 
@@ -140,7 +240,58 @@ REVOCATION_URL = b"".join(_URL_PARTS).decode()
 # When set, the app uses API-based control instead of (or in addition to) the Gist.
 # Leave empty ("") to fall back to Gist-only mode.
 _API_URL_PARTS = [
-    bytes([104, 116, 116, 112, 115, 58, 47, 47, 115, 107, 121, 97, 100, 109, 105, 110, 45, 119, 111, 114, 107, 101, 114, 46, 115, 107, 121, 97, 100, 109, 105, 110, 45, 112, 114, 111, 46, 119, 111, 114, 107, 101, 114, 115, 46, 100, 101, 118]),  # "https://skyadmin-worker.skyadmin-pro.workers.dev"
+    bytes(
+        [
+            104,
+            116,
+            116,
+            112,
+            115,
+            58,
+            47,
+            47,
+            115,
+            107,
+            121,
+            97,
+            100,
+            109,
+            105,
+            110,
+            45,
+            119,
+            111,
+            114,
+            107,
+            101,
+            114,
+            46,
+            115,
+            107,
+            121,
+            97,
+            100,
+            109,
+            105,
+            110,
+            45,
+            112,
+            114,
+            111,
+            46,
+            119,
+            111,
+            114,
+            107,
+            101,
+            114,
+            115,
+            46,
+            100,
+            101,
+            118,
+        ]
+    ),  # "https://skyadmin-worker.skyadmin-pro.workers.dev"
 ]
 API_BASE_URL = b"".join(_API_URL_PARTS).decode()
 
@@ -474,9 +625,7 @@ def renewal_template_for(document_type: str) -> str | None:
     return None
 
 
-DOC_TYPES_WITH_EXPIRY = frozenset(
-    {DOC_TYPE_PASSPORT_VISA, DOC_TYPE_LICENSE}
-)
+DOC_TYPES_WITH_EXPIRY = frozenset({DOC_TYPE_PASSPORT_VISA, DOC_TYPE_LICENSE})
 DOC_TYPES_WITH_AMOUNT = frozenset({DOC_TYPE_INVOICE})
 
 # Clients & Expiry register — documents and services tracked per client,
@@ -511,9 +660,7 @@ VO_DOCUMENT_TYPES: tuple[str, ...] = (
     "Virtual Office Rental",
     "VAT Registered Office Rental",
 )
-CSH_DOCUMENT_TYPES: tuple[str, ...] = (
-    "CSH (Company Thai Shareholder) Rental",
-)
+CSH_DOCUMENT_TYPES: tuple[str, ...] = ("CSH (Company Thai Shareholder) Rental",)
 VO_CSH_DOCUMENT_TYPES: tuple[str, ...] = VO_DOCUMENT_TYPES + CSH_DOCUMENT_TYPES
 
 DOCUMENT_TO_VO_CSH_RENEWAL: dict[str, str] = {
@@ -599,9 +746,7 @@ PRICING_DEFAULT_SERVICE = "General"
 # Each charge is stored as its own row; ``transaction_range`` holds the charge label.
 FLAT_FEE_TRANSACTION_RANGE = "Flat fee"
 
-TRANSACTION_RANGE_PRICING_SERVICES: frozenset[str] = frozenset(
-    {PRICING_DEFAULT_SERVICE, *ACCOUNTING_PRICING_SERVICES}
-)
+TRANSACTION_RANGE_PRICING_SERVICES: frozenset[str] = frozenset({PRICING_DEFAULT_SERVICE, *ACCOUNTING_PRICING_SERVICES})
 
 # Default charge lines for common flat-fee services (name, monthly, annual, sla, hc, docs).
 DEFAULT_SERVICE_CHARGE_LINES: dict[str, tuple[tuple[str, int, int, int, int, str], ...]] = {
@@ -637,19 +782,46 @@ def default_charge_lines_for(
 def is_transaction_volume_tier(label: str) -> bool:
     return (label or "").strip() in TRANSACTION_RANGES
 
+
 PAYMENT_STATUSES: tuple[str, ...] = ("Paid", "Pending", "N/A")
 
 DEFAULT_PRICING_MATRIX: tuple[tuple[str, int, int, int, int, str], ...] = (
     ("Non-Operation Business (No Transaction)", 6000, 72000, 8, 1, "Bank Statement, Service Invoices"),
-    ("1 to 50 Transactions", 12000, 144000, 8, 1, "Bank Statement, Service Invoices, Purchase Invoice/BL, Tax Invoice/Receipt, Sale Invoices/DN"),
-    ("51 to 100 Transactions", 18000, 216000, 16, 2, "Bank Statement, Service Invoices, Purchase Invoice/BL, Tax Invoice/Receipt, Sale Invoices/DN"),
-    ("101 to 200 Transactions", 24000, 288000, 24, 2, "Bank Statement, Service Invoices, Purchase Invoice/BL, Tax Invoice/Receipt, Sale Invoices/DN, Warehouse Receipt"),
-    ("200+ Transactions", 30000, 360000, 24, 3, "Bank Statement, Service Invoices, Purchase Invoice/BL, Tax Invoice/Receipt, Sale Invoices/DN, Warehouse Receipt, Transport Documents"),
+    (
+        "1 to 50 Transactions",
+        12000,
+        144000,
+        8,
+        1,
+        "Bank Statement, Service Invoices, Purchase Invoice/BL, Tax Invoice/Receipt, Sale Invoices/DN",
+    ),
+    (
+        "51 to 100 Transactions",
+        18000,
+        216000,
+        16,
+        2,
+        "Bank Statement, Service Invoices, Purchase Invoice/BL, Tax Invoice/Receipt, Sale Invoices/DN",
+    ),
+    (
+        "101 to 200 Transactions",
+        24000,
+        288000,
+        24,
+        2,
+        "Bank Statement, Service Invoices, Purchase Invoice/BL, Tax Invoice/Receipt, Sale Invoices/DN, Warehouse Receipt",
+    ),
+    (
+        "200+ Transactions",
+        30000,
+        360000,
+        24,
+        3,
+        "Bank Statement, Service Invoices, Purchase Invoice/BL, Tax Invoice/Receipt, Sale Invoices/DN, Warehouse Receipt, Transport Documents",
+    ),
 )
 
-DEFAULT_FLAT_FEE_PRICING: tuple[tuple[str, int, int, int, int, str], ...] = (
-    ("Service fee", 0, 0, 0, 0, ""),
-)
+DEFAULT_FLAT_FEE_PRICING: tuple[tuple[str, int, int, int, int, str], ...] = (("Service fee", 0, 0, 0, 0, ""),)
 
 # Annual year-end services: the stored expiry date is the previous year's
 # 31-Dec due date. Expiry alerts roll a past 31-Dec expiry forward to the next
@@ -765,6 +937,7 @@ SERVICE_TASK_CATEGORY: dict[str, str] = {
 def service_task_category(document_type: str) -> str:
     """Map a service type to a task category (defaults to General)."""
     return SERVICE_TASK_CATEGORY.get((document_type or "").strip(), "General")
+
 
 # Auto-created follow-up tasks whenever a brand-new customer is added.
 # Each entry: (title template, due offset in days, category).

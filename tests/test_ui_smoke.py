@@ -1,6 +1,5 @@
 """Offscreen UI smoke: main window builds, sidebar, settings, data flows."""
 
-import sys
 from pathlib import Path
 
 import pytest
@@ -34,7 +33,7 @@ def app(tmp_path_factory):
 
 def test_sidebar_has_six_nav_buttons(app):
     assert len(app._nav_buttons) == 6
-    for key, btn in app._nav_buttons.items():
+    for _key, btn in app._nav_buttons.items():
         assert btn.cget("text").strip()
 
 
@@ -53,11 +52,13 @@ def test_settings_license_controls(app):
     app.update()
     settings = app._views["settings"]
     texts = []
+
     def walk(w):
         for c in w.winfo_children():
             if isinstance(c, __import__("customtkinter").CTkButton):
                 texts.append(str(c.cget("text")))
             walk(c)
+
     walk(settings)
     assert sum("Activate / Manage" in t for t in texts) == 1
     assert any("Disclaimer" in t for t in texts)

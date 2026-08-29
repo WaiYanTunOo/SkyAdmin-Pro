@@ -88,9 +88,7 @@ class SetupRolloutPanel(ctk.CTkFrame):
         )
         self.filter_menu.set("All")
         self.filter_menu.grid(row=0, column=1, sticky="w")
-        self.summary_label = ctk.CTkLabel(
-            toolbar, text="", text_color=TEXT_MUTED, anchor="w"
-        )
+        self.summary_label = ctk.CTkLabel(toolbar, text="", text_color=TEXT_MUTED, anchor="w")
         self.summary_label.grid(row=0, column=2, sticky="ew", padx=(16, 0))
         toolbar.grid_columnconfigure(2, weight=1)
 

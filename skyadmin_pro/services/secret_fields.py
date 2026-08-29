@@ -31,8 +31,7 @@ def decrypt_secret(value: str | None) -> str:
         return ""
     if not is_encrypted_secret(value):
         return value
-    from cryptography.fernet import InvalidToken
-    from cryptography.fernet import Fernet
+    from cryptography.fernet import Fernet, InvalidToken
 
     blob = value[len(SECRET_PREFIX) :]
     try:

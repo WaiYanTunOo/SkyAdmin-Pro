@@ -23,22 +23,22 @@ from skyadmin_pro.services._secret import _derive_secret
 def _verify_integrity() -> bool:
     """Verify that critical license functions haven't been patched."""
     # In frozen exe inspect.getsource fails (no .py) - fallback to SECRET sanity + bytecode check
-    if SECRET == b"\x00" * len(SECRET) or len(SECRET) < 16:
+    if b"\x00" * len(SECRET) == SECRET or len(SECRET) < 16:
         return False
     try:
         import inspect as _inspect
+
         src = _inspect.getsource(verify_key_text)
         if "banned_machines" not in src:
             return False
         if "revoked_nonces" not in src:
             return False
-        if "hmac.compare_digest" not in src:
-            return False
-        return True
+        return "hmac.compare_digest" in src
     except Exception:
         # Frozen: verify via reading compiled file for key strings
         try:
             import pathlib
+
             p = pathlib.Path(__file__).with_suffix(".pyc")
             if p.exists():
                 data = p.read_bytes()
@@ -107,15 +107,11 @@ def _windows_stable_id() -> str | None:
     try:
         import winreg
 
-        key = winreg.OpenKey(
-            winreg.HKEY_LOCAL_MACHINE, r"SOFTWARE\Microsoft\Cryptography"
-        )
+        key = winreg.OpenKey(winreg.HKEY_LOCAL_MACHINE, r"SOFTWARE\Microsoft\Cryptography")
         value, _ = winreg.QueryValueEx(key, "MachineGuid")
         winreg.CloseKey(key)
         if value:
-            return hashlib.sha256(
-                ("SKY|" + value).encode()
-            ).hexdigest()[:16].upper()
+            return hashlib.sha256(("SKY|" + value).encode()).hexdigest()[:16].upper()
     except Exception:
         pass
     return None
@@ -157,11 +153,7 @@ def get_machine_id() -> str:
     except Exception:
         pass
 
-    computed = (
-        _legacy_machine_id()
-        if has_existing_license
-        else (_windows_stable_id() or _legacy_machine_id())
-    )
+    computed = _legacy_machine_id() if has_existing_license else (_windows_stable_id() or _legacy_machine_id())
     try:
         from skyadmin_pro.paths import app_data_dir
 
@@ -178,9 +170,11 @@ def get_machine_id() -> str:
 def _last_sync_path() -> Path | None:
     try:
         from skyadmin_pro.paths import app_data_dir
+
         return app_data_dir() / DAILY_SYNC_FILENAME
     except Exception:
         return None
+
 
 def requires_online_check() -> bool:
     """True when API or Gist control URLs are configured (daily sync required)."""
@@ -202,6 +196,7 @@ def _record_online_sync() -> None:
             p.write_text(now_iso, encoding="utf-8")
             try:
                 from skyadmin_pro.services._protect_core import seal_value
+
                 seal_p = p.parent / ".last_sync.seal"
                 seal_p.write_text(seal_value(seal_data), encoding="utf-8")
             except Exception:
@@ -215,6 +210,7 @@ def _record_online_sync() -> None:
     except Exception:
         pass
 
+
 def _get_last_sync_time() -> datetime | None:
     try:
         p = _last_sync_path()
@@ -224,6 +220,7 @@ def _get_last_sync_time() -> datetime | None:
         # Verify machine-bound seal - if seal exists and mismatches, treat as tampered -> stale
         try:
             from skyadmin_pro.services._protect_core import verify_seal
+
             seal_p = p.parent / ".last_sync.seal"
             if seal_p.exists():
                 sealed = seal_p.read_text(encoding="utf-8").strip()
@@ -235,6 +232,7 @@ def _get_last_sync_time() -> datetime | None:
         return datetime.fromisoformat(txt)
     except Exception:
         return None
+
 
 def _is_clock_tampered() -> bool:
     """Detect if system clock was set back to bypass expiry."""
@@ -254,12 +252,15 @@ def _is_clock_tampered() -> bool:
         pass
     return False
 
+
 def _attempt_path() -> Path | None:
     try:
         from skyadmin_pro.paths import app_data_dir
+
         return app_data_dir() / ".attempts.txt"
     except Exception:
         return None
+
 
 def _is_rate_limited() -> bool:
     try:
@@ -273,6 +274,7 @@ def _is_rate_limited() -> bool:
         return len(recent) >= _MAX_ATTEMPTS
     except Exception:
         return False
+
 
 def _record_attempt(success: bool) -> None:
     try:
@@ -297,15 +299,18 @@ def _record_attempt(success: bool) -> None:
     except Exception:
         pass
 
+
 def is_daily_sync_stale() -> bool:
     """True if everyday online check has not been satisfied within 24h."""
     import os as _os
+
     # Allow tests to bypass daily check via env var without code change
     if _os.environ.get("SKYADMIN_SKIP_DAILY_CHECK") == "1":
         return False
     if _os.environ.get("PYTEST_CURRENT_TEST"):
         return False
     from skyadmin_pro.config import API_BASE_URL, REVOCATION_URL
+
     has_online = bool((API_BASE_URL or REVOCATION_URL or "").strip())
     if not has_online:
         return False  # offline mode - no daily requirement
@@ -315,6 +320,7 @@ def is_daily_sync_stale() -> bool:
     if last is None:
         return True  # never synced - require online
     return (datetime.now() - last).total_seconds() > MAX_OFFLINE_SECONDS
+
 
 def get_daily_sync_status() -> tuple[bool, str]:
     """Return (is_ok, human_message) for UI."""
@@ -328,6 +334,7 @@ def get_daily_sync_status() -> tuple[bool, str]:
     hours = int(age // 3600)
     mins = int((age % 3600) // 60)
     return True, f"Last online check: {last.strftime('%Y-%m-%d %H:%M')} ({hours}h {mins}m ago) - OK"
+
 
 def _hmac(payload: str) -> str:
     return hmac.new(SECRET, payload.encode(), hashlib.sha256).hexdigest()
@@ -352,8 +359,10 @@ def generate_license(
     exp = None
     if days_valid is not None:
         exp = (
-            datetime.now(timezone.utc) + timedelta(days=days_valid)
-        ).replace(microsecond=0).strftime("%Y-%m-%dT%H:%M:%SZ")
+            (datetime.now(timezone.utc) + timedelta(days=days_valid))
+            .replace(microsecond=0)
+            .strftime("%Y-%m-%dT%H:%M:%SZ")
+        )
     iat = issued_at or datetime.now().strftime("%Y-%m-%dT%H:%M")
     n = nonce or uuid.uuid4().hex[:12]
     pkg = str(package_days) if package_days is not None else (str(days_valid) if days_valid is not None else "")
@@ -524,8 +533,7 @@ def verify_license() -> tuple[bool, str]:
         try:
             shadow = _shadow_path()
             if shadow is not None and (
-                not shadow.exists()
-                or shadow.read_text(encoding="utf-8").strip() != raw.strip()
+                not shadow.exists() or shadow.read_text(encoding="utf-8").strip() != raw.strip()
             ):
                 shadow.parent.mkdir(parents=True, exist_ok=True)
                 shadow.write_text(raw.strip(), encoding="utf-8")
@@ -545,6 +553,7 @@ def license_status_text() -> str:
 # --------------------------------------------------------------------------- #
 # Remaining days / expiry display                                             #
 # --------------------------------------------------------------------------- #
+
 
 def _read_license_payload() -> dict | None:
     """Parse the license file into its JSON payload (passcode → None)."""
@@ -641,6 +650,7 @@ def revoked_passcodes() -> frozenset[str]:
 # own expiry; it just can never be (re)activated anywhere again.              #
 # --------------------------------------------------------------------------- #
 
+
 def used_nonces() -> frozenset[str]:
     try:
         from skyadmin_pro.paths import app_data_dir
@@ -648,9 +658,7 @@ def used_nonces() -> frozenset[str]:
         path = app_data_dir() / "used.txt"
         if not path.exists():
             return frozenset()
-        return frozenset(
-            t.strip() for t in path.read_text(encoding="utf-8").splitlines() if t.strip()
-        )
+        return frozenset(t.strip() for t in path.read_text(encoding="utf-8").splitlines() if t.strip())
     except Exception:
         return frozenset()
 
@@ -708,10 +716,11 @@ def check_activation_usable(text: str) -> tuple[bool, str, str | None]:
         saved_nonce = str((saved_payload or {}).get("n") or "")
         if nonce != saved_nonce:
             _record_attempt(False)
-            return False, (
-                "This activation code has already been used. "
-                "Each code works exactly once — request a new one."
-            ), nonce
+            return (
+                False,
+                ("This activation code has already been used. Each code works exactly once — request a new one."),
+                nonce,
+            )
     _record_attempt(True)
     return True, msg, nonce or None
 
@@ -840,10 +849,7 @@ def _apply_control_list(text: str, source: str) -> tuple[bool, str]:
         plaintext = base64.b64decode(payload_b64).decode("utf-8")
         expected_sig = _hmac(plaintext)
         if not hmac.compare_digest(expected_sig, str(obj.get("sig", ""))):
-            return False, (
-                "Control list signature invalid — refusing to apply "
-                "(possible tampering)."
-            )
+            return False, ("Control list signature invalid — refusing to apply (possible tampering).")
         text = plaintext
     except Exception as exc:
         return False, f"Control list unreadable: {exc}"
@@ -885,9 +891,7 @@ def _apply_control_list(text: str, source: str) -> tuple[bool, str]:
     def replace(path: Path, items: set[str]) -> None:
         current: set[str] = set()
         if path.exists():
-            current = {
-                ln.strip() for ln in path.read_text(encoding="utf-8").splitlines() if ln.strip()
-            }
+            current = {ln.strip() for ln in path.read_text(encoding="utf-8").splitlines() if ln.strip()}
         wanted = set(items)
         if current != wanted:
             if wanted:
@@ -925,8 +929,7 @@ def _apply_control_list(text: str, source: str) -> tuple[bool, str]:
         if latest:
             update_file.write_text(
                 json.dumps(
-                    {"version": latest[0], "url": latest[1],
-                     "checked": datetime.now().isoformat(timespec="seconds")},
+                    {"version": latest[0], "url": latest[1], "checked": datetime.now().isoformat(timespec="seconds")},
                     ensure_ascii=False,
                 ),
                 encoding="utf-8",
@@ -947,6 +950,7 @@ def _apply_control_list(text: str, source: str) -> tuple[bool, str]:
 # --------------------------------------------------------------------------- #
 # Update checker                                                              #
 # --------------------------------------------------------------------------- #
+
 
 def read_update_info() -> dict | None:
     """Read app_data/update.json written by the last control-list sync."""
@@ -1025,7 +1029,7 @@ def license_expiry_text() -> str:
     raw = license_time_left_text()
     # Strip the leading "Active — " prefix for use in label composites.
     if raw.startswith("Active — "):
-        return raw[len("Active — "):]
+        return raw[len("Active — ") :]
     return raw
 
 
@@ -1033,6 +1037,7 @@ def license_expiry_text() -> str:
 # Online-assisted activation: customer pastes a key sent from the owner's     #
 # phone (WhatsApp/Telegram/Email). No file copying, activates instantly.      #
 # --------------------------------------------------------------------------- #
+
 
 def verify_key_text(text: str) -> tuple[bool, str]:
     """Validate a PASTED full license key OR 8-digit passcode for this machine.
@@ -1085,13 +1090,9 @@ def verify_key_text(text: str) -> tuple[bool, str]:
                 if raw in revoked_passcodes():
                     return False, "This passcode has been revoked by Sky Creation Innovations."
                 if datetime.now() >= exp_dt:
-                    return False, (
-                        f"Passcode expired on {exp_dt.strftime('%Y-%m-%d %H:%M')}. "
-                        "Request a renewal."
-                    )
+                    return False, (f"Passcode expired on {exp_dt.strftime('%Y-%m-%d %H:%M')}. Request a renewal.")
                 return True, (
-                    f"Passcode accepted for machine {current_mid} "
-                    f"(expires: {exp_dt.strftime('%Y-%m-%d %H:%M')})."
+                    f"Passcode accepted for machine {current_mid} (expires: {exp_dt.strftime('%Y-%m-%d %H:%M')})."
                 )
             return False, f"Passcode is not valid for this machine ({current_mid})."
 
@@ -1128,10 +1129,7 @@ def verify_key_text(text: str) -> tuple[bool, str]:
             except ValueError:
                 return False, f"License has invalid expiry: {exp!r}"
             if datetime.now() >= exp_dt:
-                return False, (
-                    f"License expired on {exp_dt.strftime('%Y-%m-%d %H:%M')}. "
-                    "Request a renewal."
-                )
+                return False, (f"License expired on {exp_dt.strftime('%Y-%m-%d %H:%M')}. Request a renewal.")
         # Revocation list (optional file ~/.skyadmin_pro/revoked.txt, one nonce per line)
         if nonce and nonce in revoked_nonces():
             return False, "This license has been revoked by Sky Creation Innovations."
@@ -1195,9 +1193,7 @@ def _self_heal_license() -> Path | None:
         primary = app_data_dir() / LICENSE_FILENAME
         if not primary.exists():
             primary.write_text(shadow.read_text(encoding="utf-8"), encoding="utf-8")
-            logging.getLogger(__name__).info(
-                "License file was missing — restored from shadow copy."
-            )
+            logging.getLogger(__name__).info("License file was missing — restored from shadow copy.")
             return primary
     except Exception:
         return None

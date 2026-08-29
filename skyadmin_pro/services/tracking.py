@@ -17,9 +17,7 @@ def days_until(iso_date: str | None) -> int | None:
     return (target - date.today()).days
 
 
-def effective_expiry_date(
-    expiry_date: str | None, document_type: str | None = None
-) -> str | None:
+def effective_expiry_date(expiry_date: str | None, document_type: str | None = None) -> str | None:
     """Roll an annual year-end (31 Dec) service's expiry forward to the next
     31 December, so a record dated 2025-12-31 stays active until 2026-12-31."""
     if not expiry_date:

@@ -62,5 +62,5 @@ def _derive_secret() -> bytes:
             k = _XK[block_idx % len(_XK)]
             parts_a.append(bytes(c ^ k for c in ea))
             parts_b.append(bytes(c ^ k for c in eb))
-        _SECRET = b"".join(a + b for a, b in zip(parts_a, parts_b))
+        _SECRET = b"".join(a + b for a, b in zip(parts_a, parts_b, strict=True))
         return _SECRET

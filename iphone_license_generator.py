@@ -26,8 +26,7 @@ import json
 import os
 import secrets as _secrets
 import sys
-from datetime import date, datetime, timedelta
-from typing import Optional
+from datetime import datetime, timedelta
 
 # ── XOR-interleaved SECRET (offline fallback only) ──────────────────────────
 # Same derivation as skyadmin_pro/services/license.py.
@@ -49,7 +48,7 @@ def _derive_secret() -> bytes:
         k = _XK[idx % len(_XK)]
         parts_a.append(bytes(c ^ k for c in ea))
         parts_b.append(bytes(c ^ k for c in eb))
-    return b"".join(a + b for a, b in zip(parts_a, parts_b))
+    return b"".join(a + b for a, b in zip(parts_a, parts_b, strict=True))
 
 
 SECRET = _derive_secret()
@@ -61,11 +60,11 @@ def _hmac(payload: str) -> str:
 
 # ── API helper ───────────────────────────────────────────────────────────────
 
-def _api_call(method: str, path: str, body: dict | None = None,
-              api_url: str = "", api_token: str = "") -> dict:
+
+def _api_call(method: str, path: str, body: dict | None = None, api_url: str = "", api_token: str = "") -> dict:
     """Call the Cloudflare Worker API. Raises on error."""
-    import urllib.request
     import urllib.error
+    import urllib.request
 
     url = api_url.rstrip("/") + path
     headers = {"Content-Type": "application/json"}
@@ -81,6 +80,7 @@ def _api_call(method: str, path: str, body: dict | None = None,
 
 
 # ── Offline generation (local SECRET) ───────────────────────────────────────
+
 
 def generate_license_offline(machine_id: str, days_valid: int | None = 365) -> tuple[str, str, str]:
     """Offline generation. Returns (license_key, issued_at, nonce)."""
@@ -126,20 +126,26 @@ def generate_passcode_offline(machine_id: str, days_valid: int | None = None) ->
 
 # ── Online generation (API) ─────────────────────────────────────────────────
 
-def generate_license_online(machine_id: str, days: int | None, price: int,
-                            api_url: str, api_token: str) -> dict:
+
+def generate_license_online(machine_id: str, days: int | None, price: int, api_url: str, api_token: str) -> dict:
     """Call POST /api/generate. Returns dict with license_key, passcode, nonce, etc."""
-    return _api_call("POST", "/api/generate", {
-        "mid": machine_id.strip().upper(),
-        "days": days,
-        "price": price,
-    }, api_url, api_token)
+    return _api_call(
+        "POST",
+        "/api/generate",
+        {
+            "mid": machine_id.strip().upper(),
+            "days": days,
+            "price": price,
+        },
+        api_url,
+        api_token,
+    )
 
 
 # ── CSV logging ──────────────────────────────────────────────────────────────
 
-def log_license(csv_path: str, machine_id: str, days_valid, exp, iat, nonce,
-                passcode: str, key: str) -> None:
+
+def log_license(csv_path: str, machine_id: str, days_valid, exp, iat, nonce, passcode: str, key: str) -> None:
     """Append issuance to issued_licenses.csv."""
     import csv
     import os
@@ -148,10 +154,21 @@ def log_license(csv_path: str, machine_id: str, days_valid, exp, iat, nonce,
     with open(csv_path, "a", newline="", encoding="utf-8") as f:
         w = csv.writer(f)
         if new_file:
-            w.writerow(["issued", "machine_id", "package_days", "expires",
-                        "nonce", "passcode", "license_key", "status"])
-        w.writerow([iat, machine_id, days_valid if days_valid is not None else "unlimited",
-                    exp or "never", nonce, passcode, key, "ACTIVE"])
+            w.writerow(
+                ["issued", "machine_id", "package_days", "expires", "nonce", "passcode", "license_key", "status"]
+            )
+        w.writerow(
+            [
+                iat,
+                machine_id,
+                days_valid if days_valid is not None else "unlimited",
+                exp or "never",
+                nonce,
+                passcode,
+                key,
+                "ACTIVE",
+            ]
+        )
 
 
 # ── Main ─────────────────────────────────────────────────────────────────────
@@ -223,8 +240,7 @@ def main() -> None:
     print("\n" + "=" * 60)
     print(f"Mode       : {mode}")
     print(f"Machine ID : {mid}")
-    print(f"Package    : {'Unlimited' if days is None else f'{days} days'}"
-          + (f"  ({price:,} Baht)" if price else ""))
+    print(f"Package    : {'Unlimited' if days is None else f'{days} days'}" + (f"  ({price:,} Baht)" if price else ""))
     print(f"Issued     : {iat}")
     print(f"Expires    : {exp_str}")
     print("=" * 60)

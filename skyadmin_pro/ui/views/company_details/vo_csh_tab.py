@@ -2,61 +2,13 @@
 
 from __future__ import annotations
 
-import os
-import shutil
-from datetime import date, timedelta
-from pathlib import Path
-from tkinter import filedialog, messagebox
-
 import customtkinter as ctk
 
-from skyadmin_pro.config import (
-    ACCOUNTING_PRICING_SERVICES,
-    IMPORTANT_DOC_TYPES,
-    NAV_OFFICE_HUB,
-    PAYMENT_STATUSES,
-    SERVICE_PROGRESS,
-    TAX_FILING_FIELDS,
-    TAX_FILING_LABELS,
-    TAX_FILING_STATUSES,
-    TRANSACTION_RANGES,
-    FINANCIAL_DOC_CATEGORIES,
-    FINANCIAL_DOC_SUBCATEGORIES,
-    FINANCIAL_DOC_FOLDER_MAP,
-)
 from skyadmin_pro.services.file_ops import (
-    copy_file,
-    format_thousands,
-    open_in_file_manager,
     parse_flexible_date,
-    sanitize_amount,
 )
-from skyadmin_pro.services.snippets import effective_text, load_snippet_overrides
-from skyadmin_pro.services.tax_ids_rollout import (
-    apply_pricing_tier,
-    infer_service_types,
-    list_accounting_setup_rows,
-    parse_document_types,
-)
-from skyadmin_pro.services.tracking import (
-    classify_expiry,
-    days_until,
-    effective_expiry_date,
-)
-from skyadmin_pro.services.vo_csh_rollout import (
-    infer_client_vo_csh_renewal_dates,
-    infer_vo_csh_renewal_dates,
-    list_vo_csh_setup_rows,
-)
-from skyadmin_pro.services.workflow import (
-    copy_to_clipboard,
-    create_client_workspace,
-    resolve_client_folder,
-)
-from skyadmin_pro.ui.setup_rollout import RolloutAction, SetupRolloutPanel
-from skyadmin_pro.ui.theme import CARD_RADIUS, CARD_TITLE_SIZE, TEXT_FAINT, TEXT_MUTED
-from skyadmin_pro.ui.treeview import ThemedTreeview
-from skyadmin_pro.ui.widgets import DatePickerField, make_modal
+from skyadmin_pro.ui.theme import CARD_RADIUS, CARD_TITLE_SIZE
+from skyadmin_pro.ui.widgets import DatePickerField
 
 
 class VoCshTabMixin:
@@ -84,31 +36,19 @@ class VoCshTabMixin:
         ctk.CTkEntry(form, textvariable=self.vo_address_var).grid(
             row=1, column=0, columnspan=2, sticky="ew", pady=(0, 4)
         )
-        ctk.CTkLabel(form, text="VO Service Provider").grid(
-            row=2, column=0, sticky="w", pady=(6, 2)
-        )
+        ctk.CTkLabel(form, text="VO Service Provider").grid(row=2, column=0, sticky="w", pady=(6, 2))
         ctk.CTkEntry(form, textvariable=self.vo_provider_var).grid(
             row=3, column=0, sticky="ew", padx=(0, 12), pady=(0, 4)
         )
-        ctk.CTkLabel(form, text="VO Renewal Date").grid(
-            row=2, column=1, sticky="w", pady=(6, 2)
-        )
-        DatePickerField(form, var=self.vo_renewal_var).grid(
-            row=3, column=1, sticky="ew", pady=(0, 4)
-        )
+        ctk.CTkLabel(form, text="VO Renewal Date").grid(row=2, column=1, sticky="w", pady=(6, 2))
+        DatePickerField(form, var=self.vo_renewal_var).grid(row=3, column=1, sticky="ew", pady=(0, 4))
 
-        ctk.CTkLabel(form, text="CSH Service Provider").grid(
-            row=4, column=0, sticky="w", pady=(6, 2)
-        )
+        ctk.CTkLabel(form, text="CSH Service Provider").grid(row=4, column=0, sticky="w", pady=(6, 2))
         ctk.CTkEntry(form, textvariable=self.csh_provider_var).grid(
             row=5, column=0, sticky="ew", padx=(0, 12), pady=(0, 4)
         )
-        ctk.CTkLabel(form, text="CSH Renewal Date").grid(
-            row=4, column=1, sticky="w", pady=(6, 2)
-        )
-        DatePickerField(form, var=self.csh_renewal_var).grid(
-            row=5, column=1, sticky="ew", pady=(0, 4)
-        )
+        ctk.CTkLabel(form, text="CSH Renewal Date").grid(row=4, column=1, sticky="w", pady=(6, 2))
+        DatePickerField(form, var=self.csh_renewal_var).grid(row=5, column=1, sticky="ew", pady=(0, 4))
 
         ctk.CTkLabel(form, text="Shareholders (e.g. Thai 51%, Foreign 49%)").grid(
             row=6, column=0, sticky="w", pady=(6, 2)
@@ -118,7 +58,9 @@ class VoCshTabMixin:
         )
 
         ctk.CTkButton(
-            frame, text="Save VO & CSH", width=160,
+            frame,
+            text="Save VO & CSH",
+            width=160,
             command=self._save_vo_csh,
         ).grid(row=2, column=0, sticky="w", padx=16, pady=(8, 14))
         return frame

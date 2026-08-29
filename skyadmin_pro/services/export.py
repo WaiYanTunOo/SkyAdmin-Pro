@@ -57,10 +57,8 @@ def export_to_excel(db: Database, dest: Path) -> Path:
         payments_frame = pd.DataFrame(supplier_payments)
         if not payments_frame.empty and "paid" in payments_frame.columns:
             payments_frame = payments_frame.copy()
-            payments_frame["paid"] = (
-                payments_frame["paid"]
-                .map({1: "Yes", 0: "No", True: "Yes", False: "No"})
-                .fillna(payments_frame["paid"])
+            payments_frame["paid"] = payments_frame["paid"].apply(
+                lambda value: "Yes" if value in (1, True) else ("No" if value in (0, False) else value)
             )
         with pd.ExcelWriter(target, engine="openpyxl") as writer:
             for sheet_name, frame, mapping in (
@@ -75,9 +73,7 @@ def export_to_excel(db: Database, dest: Path) -> Path:
                 ("Renewals", pd.DataFrame(renewals), _RENEWAL_COLUMNS),
                 ("Financial Docs", pd.DataFrame(financial_docs), _FINANCIAL_DOC_COLUMNS),
             ):
-                _sheet(frame, mapping).to_excel(
-                    writer, sheet_name=sheet_name[:31], index=False
-                )
+                _sheet(frame, mapping).to_excel(writer, sheet_name=sheet_name[:31], index=False)
 
     return _atomic_excel_write(build, Path(dest))
 
@@ -204,9 +200,7 @@ def export_monthly_report(db: Database, year: int, month: int, dest: Path) -> Pa
         else:
             keep = [col for col in mapping if col in df.columns]
             df = df[keep].rename(columns=mapping)
-            df["Source"] = (
-                df["Source"].map({"doc": "Document", "pipe": "Pipeline"}).fillna(df["Source"])
-            )
+            df["Source"] = df["Source"].map({"doc": "Document", "pipe": "Pipeline"}).fillna(df["Source"])
         with pd.ExcelWriter(target, engine="openpyxl") as writer:
             df.to_excel(writer, sheet_name="Incentive services", index=False)
 

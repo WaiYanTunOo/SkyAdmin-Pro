@@ -65,12 +65,8 @@ def enrich_vo_csh_setup_row(db: Database, row: dict) -> dict:
         "suggested_csh_renewal_date": suggested_csh or "",
         "setup_missing": missing,
         "setup_status": vo_csh_setup_status_label(missing),
-        "can_infer_vo": bool(
-            not (row.get("vo_renewal_date") or "").strip() and suggested_vo
-        ),
-        "can_infer_csh": bool(
-            not (row.get("csh_renewal_date") or "").strip() and suggested_csh
-        ),
+        "can_infer_vo": bool(not (row.get("vo_renewal_date") or "").strip() and suggested_vo),
+        "can_infer_csh": bool(not (row.get("csh_renewal_date") or "").strip() and suggested_csh),
     }
 
 
@@ -99,9 +95,7 @@ def infer_vo_csh_renewal_dates(db: Database, *, only_missing: bool = True) -> di
     return {"vo": vo_updated, "csh": csh_updated}
 
 
-def infer_client_vo_csh_renewal_dates(
-    db: Database, client_id: int, *, only_missing: bool = True
-) -> dict[str, int]:
+def infer_client_vo_csh_renewal_dates(db: Database, client_id: int, *, only_missing: bool = True) -> dict[str, int]:
     """Infer renewal dates for one client."""
     row = db.get_client(client_id)
     if not row:

@@ -8,7 +8,7 @@ import pytest
 ROOT = Path(__file__).resolve().parents[1]
 sys.path.insert(0, str(ROOT))
 
-from skyadmin_pro.database import Database
+from skyadmin_pro.database import Database  # noqa: E402
 
 
 @pytest.fixture

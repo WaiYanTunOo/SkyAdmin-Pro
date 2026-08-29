@@ -23,7 +23,7 @@ from skyadmin_pro.config import (
 from skyadmin_pro.services import file_ops
 from skyadmin_pro.services.file_ops import open_in_file_manager
 from skyadmin_pro.services.workflow import open_portal_and_copy_path
-from skyadmin_pro.ui.theme import CARD_TITLE_SIZE, FEEDBACK_ERROR, TEXT_MUTED, TEXT_SUBTLE, WRAP_CARD
+from skyadmin_pro.ui.theme import CARD_TITLE_SIZE, TEXT_MUTED, TEXT_SUBTLE, WRAP_CARD
 from skyadmin_pro.ui.views.base import BaseView
 from skyadmin_pro.ui.widgets import DatePickerField, DropZone, FeedbackLabel, OrderedPathList, SelectableFileList
 
@@ -155,9 +155,7 @@ class SmartRenamerPanel(ctk.CTkFrame):
 
         toolbar = ctk.CTkFrame(left, fg_color="transparent")
         toolbar.grid(row=0, column=0, sticky="ew", padx=12, pady=(12, 6))
-        ctk.CTkButton(toolbar, text="Refresh", width=90, command=self.refresh).pack(
-            side="left"
-        )
+        ctk.CTkButton(toolbar, text="Refresh", width=90, command=self.refresh).pack(side="left")
         ctk.CTkButton(
             toolbar,
             text="Open folder",
@@ -174,9 +172,7 @@ class SmartRenamerPanel(ctk.CTkFrame):
         right.grid(row=1, column=1, sticky="nsew", padx=(8, 0))
         right.grid_columnconfigure(0, weight=1)
 
-        ctk.CTkLabel(right, text="Client name", anchor="w").grid(
-            row=0, column=0, sticky="w", padx=16, pady=(16, 4)
-        )
+        ctk.CTkLabel(right, text="Client name", anchor="w").grid(row=0, column=0, sticky="w", padx=16, pady=(16, 4))
         self.client_var = ctk.StringVar()
         self._preview_after: str | None = None
         self.client_box = ctk.CTkComboBox(
@@ -188,9 +184,7 @@ class SmartRenamerPanel(ctk.CTkFrame):
         self.client_box.grid(row=1, column=0, sticky="ew", padx=16)
         self.client_var.trace_add("write", lambda *_: self._schedule_preview())
 
-        ctk.CTkLabel(right, text="Document type", anchor="w").grid(
-            row=2, column=0, sticky="w", padx=16, pady=(14, 4)
-        )
+        ctk.CTkLabel(right, text="Document type", anchor="w").grid(row=2, column=0, sticky="w", padx=16, pady=(14, 4))
         self.type_menu = ctk.CTkOptionMenu(
             right,
             values=list(DOCUMENT_TYPES),
@@ -212,21 +206,15 @@ class SmartRenamerPanel(ctk.CTkFrame):
         self.expiry_wrap = ctk.CTkFrame(right, fg_color="transparent")
         self.expiry_wrap.grid(row=5, column=0, sticky="ew", padx=16, pady=(14, 0))
         self.expiry_wrap.grid_columnconfigure(0, weight=1)
-        ctk.CTkLabel(self.expiry_wrap, text="Expiry date", anchor="w").grid(
-            row=0, column=0, sticky="w"
-        )
+        ctk.CTkLabel(self.expiry_wrap, text="Expiry date", anchor="w").grid(row=0, column=0, sticky="w")
         self.expiry_var = ctk.StringVar()
-        DatePickerField(self.expiry_wrap, var=self.expiry_var).grid(
-            row=1, column=0, sticky="ew", pady=(4, 0)
-        )
+        DatePickerField(self.expiry_wrap, var=self.expiry_var).grid(row=1, column=0, sticky="ew", pady=(4, 0))
         self.expiry_var.trace_add("write", lambda *_: self._schedule_preview())
 
         self.amount_wrap = ctk.CTkFrame(right, fg_color="transparent")
         self.amount_wrap.grid(row=6, column=0, sticky="ew", padx=16, pady=(14, 0))
         self.amount_wrap.grid_columnconfigure(0, weight=1)
-        ctk.CTkLabel(self.amount_wrap, text="Amount", anchor="w").grid(
-            row=0, column=0, sticky="w"
-        )
+        ctk.CTkLabel(self.amount_wrap, text="Amount", anchor="w").grid(row=0, column=0, sticky="w")
         self.amount_var = ctk.StringVar()
         amount_entry = ctk.CTkEntry(
             self.amount_wrap,
@@ -240,9 +228,7 @@ class SmartRenamerPanel(ctk.CTkFrame):
         amount_entry.grid(row=1, column=0, sticky="ew", pady=(4, 0))
         self.amount_var.trace_add("write", lambda *_: self._schedule_preview())
 
-        ctk.CTkLabel(right, text="New filename", anchor="w").grid(
-            row=7, column=0, sticky="w", padx=16, pady=(16, 4)
-        )
+        ctk.CTkLabel(right, text="New filename", anchor="w").grid(row=7, column=0, sticky="w", padx=16, pady=(16, 4))
         self.preview = ctk.CTkLabel(
             right,
             text="Select a file to preview the name.",
@@ -313,9 +299,7 @@ class SmartRenamerPanel(ctk.CTkFrame):
         client_id = self.app.db.client_id_by_name(client) or 0
         month_key = date.today().strftime("%Y%m")
         invoice_no = self.app.db.next_invoice_number(client_id, month_key)
-        return file_ops.build_invoice_filename(
-            client_name=client, suffix=suffix, invoice_no=invoice_no
-        )
+        return file_ops.build_invoice_filename(client_name=client, suffix=suffix, invoice_no=invoice_no)
 
     def _preview_name(self) -> str | None:
         selected = self.file_list.selected
@@ -478,11 +462,9 @@ class ImageToPdfPanel(ctk.CTkFrame):
 
         dnd = bool(getattr(app, "dnd_available", False))
         hint = (
-            "Drop JPG or PNG files here, or click to browse.\n"
-            "Each image becomes a PDF in the staging folder."
+            "Drop JPG or PNG files here, or click to browse.\nEach image becomes a PDF in the staging folder."
             if dnd
-            else "Click to choose JPG or PNG files.\n"
-            "Each image becomes a PDF in the staging folder."
+            else "Click to choose JPG or PNG files.\nEach image becomes a PDF in the staging folder."
         )
         self.drop_zone = DropZone(
             self,
@@ -598,12 +580,8 @@ class AgentBundlePanel(ctk.CTkFrame):
         self.output_var = ctk.StringVar(value=f"{date.today().strftime('%Y%m%d')}_AgentBundle.pdf")
         ctk.CTkEntry(form, textvariable=self.output_var).grid(row=0, column=1, sticky="ew")
 
-        ctk.CTkLabel(form, text="Save to").grid(
-            row=1, column=0, sticky="w", padx=(0, 8), pady=(10, 0)
-        )
-        self.dest_menu = ctk.CTkOptionMenu(
-            form, values=[FOLDER_READY, FOLDER_STAGING]
-        )
+        ctk.CTkLabel(form, text="Save to").grid(row=1, column=0, sticky="w", padx=(0, 8), pady=(10, 0))
+        self.dest_menu = ctk.CTkOptionMenu(form, values=[FOLDER_READY, FOLDER_STAGING])
         self.dest_menu.set(FOLDER_READY)
         self.dest_menu.grid(row=1, column=1, sticky="w", pady=(10, 0))
 
@@ -648,11 +626,7 @@ class AgentBundlePanel(ctk.CTkFrame):
         name = self.output_var.get().strip() or f"{date.today().strftime('%Y%m%d')}_AgentBundle.pdf"
         if not name.lower().endswith(".pdf"):
             name += ".pdf"
-        dest_dir = (
-            self.app.paths.ready_to_upload
-            if self.dest_menu.get() == FOLDER_READY
-            else self.app.paths.staging
-        )
+        dest_dir = self.app.paths.ready_to_upload if self.dest_menu.get() == FOLDER_READY else self.app.paths.staging
         target = dest_dir / name
         self._busy = True
         self._merge_btn.configure(state="disabled")
@@ -791,15 +765,11 @@ def _launch_portal(app, path: Path, feedback: FeedbackLabel) -> None:
         feedback.error(f"Could not open the portal: {exc}")
         return
     try:
-        backup = file_ops.backup_file(
-            path, app.paths.archive / FOLDER_PORTAL_BACKUP
-        )
+        backup = file_ops.backup_file(path, app.paths.archive / FOLDER_PORTAL_BACKUP)
     except OSError as exc:
         feedback.error(f"Portal opened, but the backup copy failed: {exc}")
         return
-    feedback.success(
-        f"Backup saved to {backup.name}. Portal opened — paste with Ctrl+V.\n{absolute}"
-    )
+    feedback.success(f"Backup saved to {backup.name}. Portal opened — paste with Ctrl+V.\n{absolute}")
     app.set_status("Portal opened — file path on clipboard (backup saved).")
 
 
@@ -869,9 +839,7 @@ class ArchivePanel(ctk.CTkFrame):
         self.refresh()
 
     def refresh(self) -> None:
-        ready, ready_sig = file_ops.list_files_with_signature(
-            self.app.paths.ready_to_upload
-        )
+        ready, ready_sig = file_ops.list_files_with_signature(self.app.paths.ready_to_upload)
         staging, staging_sig = file_ops.list_files_with_signature(self.app.paths.staging)
         signature = (ready_sig, staging_sig)
         if signature == self._archive_signature:
@@ -935,9 +903,7 @@ class ArchivePanel(ctk.CTkFrame):
                 extra = ""
                 if result.errors:
                     extra = " Some files could not be moved: " + "; ".join(result.errors)
-                    self.feedback.error(
-                        f"Archived {result.total_moved} file(s) to {result.month_folder.name}.{extra}"
-                    )
+                    self.feedback.error(f"Archived {result.total_moved} file(s) to {result.month_folder.name}.{extra}")
                 else:
                     self.feedback.success(
                         f"Archived {len(result.moved_ready)} ready file(s) and "
@@ -973,9 +939,7 @@ class FinancialDocsPanel(ctk.CTkFrame):
         bar.grid_columnconfigure(3, weight=1)
         bar.grid_columnconfigure(5, weight=1)
 
-        ctk.CTkLabel(bar, text="Search:", font=("Segoe UI", 12)).grid(
-            row=0, column=0, padx=(0, 4)
-        )
+        ctk.CTkLabel(bar, text="Search:", font=("Segoe UI", 12)).grid(row=0, column=0, padx=(0, 4))
         self.search_var = ctk.StringVar()
         self._search_after: str | None = None
         self.search_entry = ctk.CTkEntry(
@@ -985,42 +949,38 @@ class FinancialDocsPanel(ctk.CTkFrame):
         self.search_entry.bind("<Return>", lambda _: self._do_search())
         self.search_var.trace_add("write", lambda *_: self._debounced_search())
 
-        ctk.CTkLabel(bar, text="Category:", font=("Segoe UI", 12)).grid(
-            row=0, column=2, padx=(0, 4)
-        )
+        ctk.CTkLabel(bar, text="Category:", font=("Segoe UI", 12)).grid(row=0, column=2, padx=(0, 4))
         from skyadmin_pro.config import FINANCIAL_DOC_CATEGORIES
+
         self.cat_var = ctk.StringVar(value="All")
         self.cat_menu = ctk.CTkOptionMenu(
-            bar, variable=self.cat_var,
+            bar,
+            variable=self.cat_var,
             values=["All"] + list(FINANCIAL_DOC_CATEGORIES),
             width=140,
         )
         self.cat_menu.grid(row=0, column=3, sticky="ew", padx=(0, 8))
 
-        ctk.CTkLabel(bar, text="Client:", font=("Segoe UI", 12)).grid(
-            row=0, column=4, padx=(0, 4)
-        )
+        ctk.CTkLabel(bar, text="Client:", font=("Segoe UI", 12)).grid(row=0, column=4, padx=(0, 4))
         self.client_var = ctk.StringVar(value="All")
         self.client_menu = ctk.CTkOptionMenu(
-            bar, variable=self.client_var, values=["All"], width=180,
+            bar,
+            variable=self.client_var,
+            values=["All"],
+            width=180,
         )
         self.client_menu.grid(row=0, column=5, sticky="ew", padx=(0, 8))
 
-        ctk.CTkButton(bar, text="Search", width=70, command=self._do_search).grid(
-            row=0, column=6, padx=(0, 4)
-        )
-        ctk.CTkButton(bar, text="Clear", width=60, fg_color="transparent", border_width=1, command=self._clear_search).grid(
-            row=0, column=7, padx=(0, 4)
-        )
-        ctk.CTkButton(bar, text="Open", width=60, command=self._open_selected).grid(
-            row=0, column=8, padx=(0, 4)
-        )
-        ctk.CTkButton(bar, text="Refresh", width=70, command=self.refresh).grid(
-            row=0, column=9
-        )
+        ctk.CTkButton(bar, text="Search", width=70, command=self._do_search).grid(row=0, column=6, padx=(0, 4))
+        ctk.CTkButton(
+            bar, text="Clear", width=60, fg_color="transparent", border_width=1, command=self._clear_search
+        ).grid(row=0, column=7, padx=(0, 4))
+        ctk.CTkButton(bar, text="Open", width=60, command=self._open_selected).grid(row=0, column=8, padx=(0, 4))
+        ctk.CTkButton(bar, text="Refresh", width=70, command=self.refresh).grid(row=0, column=9)
 
     def _build_treeview(self) -> None:
         from skyadmin_pro.ui.treeview import ThemedTreeview
+
         self.tree = ThemedTreeview(
             self,
             columns=(
@@ -1038,9 +998,7 @@ class FinancialDocsPanel(ctk.CTkFrame):
 
         summary_frame = ctk.CTkFrame(self, fg_color="transparent")
         summary_frame.grid(row=2, column=0, sticky="ew", padx=4, pady=(0, 4))
-        self.summary_label = ctk.CTkLabel(
-            summary_frame, text="", font=("Segoe UI", 11), text_color=TEXT_MUTED
-        )
+        self.summary_label = ctk.CTkLabel(summary_frame, text="", font=("Segoe UI", 11), text_color=TEXT_MUTED)
         self.summary_label.pack(side="left")
 
     def _populate_client_menu(self) -> None:
@@ -1088,10 +1046,7 @@ class FinancialDocsPanel(ctk.CTkFrame):
         cat_filter = self.cat_var.get()
         client_filter = self.client_var.get()
 
-        if keyword:
-            rows = self.app.db.search_financial_documents(keyword)
-        else:
-            rows = self.app.db.all_financial_documents()
+        rows = self.app.db.search_financial_documents(keyword) if keyword else self.app.db.all_financial_documents()
 
         if cat_filter != "All":
             rows = [r for r in rows if r.get("category") == cat_filter]
@@ -1101,14 +1056,16 @@ class FinancialDocsPanel(ctk.CTkFrame):
         tree_rows = []
         tree_iids = []
         for doc in rows:
-            tree_rows.append((
-                doc.get("client_name", ""),
-                doc.get("doc_date") or "",
-                doc.get("category") or "",
-                doc.get("file_name") or "",
-                doc.get("amount") or "",
-                doc.get("description") or "",
-            ))
+            tree_rows.append(
+                (
+                    doc.get("client_name", ""),
+                    doc.get("doc_date") or "",
+                    doc.get("category") or "",
+                    doc.get("file_name") or "",
+                    doc.get("amount") or "",
+                    doc.get("description") or "",
+                )
+            )
             tree_iids.append(str(doc["id"]))
         self.tree.set_rows(tree_rows, iids=tree_iids)
 

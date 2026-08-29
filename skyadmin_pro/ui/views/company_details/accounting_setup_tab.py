@@ -4,8 +4,6 @@ from __future__ import annotations
 
 from tkinter import messagebox
 
-import customtkinter as ctk
-
 from skyadmin_pro.services.tax_ids_rollout import (
     apply_pricing_tier,
     infer_service_types,
@@ -58,18 +56,14 @@ class AccountingSetupTabMixin:
         panel.configure_data(
             list_rows=lambda: list_accounting_setup_rows(self.app.db),
             row_cells=self._accounting_setup_cells,
-            summary=lambda ready, total: (
-                f"{ready} of {total} accounting client(s) ready for tax cycle"
-            ),
+            summary=lambda ready, total: f"{ready} of {total} accounting client(s) ready for tax cycle",
         )
         self._accounting_setup_panel = panel
         return panel
 
     def _accounting_setup_cells(self, row: dict) -> tuple:
         docs = parse_document_types(row.get("document_types"))
-        short_docs = (
-            docs[0] if len(docs) == 1 else f"{len(docs)} doc type(s)" if docs else "—"
-        )
+        short_docs = docs[0] if len(docs) == 1 else f"{len(docs)} doc type(s)" if docs else "—"
         return (
             row.get("name") or "",
             row.get("setup_status") or "",
@@ -108,15 +102,17 @@ class AccountingSetupTabMixin:
         if not suggested:
             self.feedback.error("No service type can be inferred from this client's documents.")
             return
-        if (row.get("service_type") or "").strip() and (
-            row.get("service_type") or ""
-        ).strip() != suggested:
-            if not messagebox.askyesno(
+        current_type = (row.get("service_type") or "").strip()
+        if (
+            current_type
+            and current_type != suggested
+            and not messagebox.askyesno(
                 "Overwrite service type",
                 f"Replace '{row.get('service_type')}' with inferred '{suggested}'?",
                 parent=self.winfo_toplevel(),
-            ):
-                return
+            )
+        ):
+            return
         self.app.db.update_client_fields(int(row["id"]), service_type=suggested)
         self.feedback.success(f"Service type set to {suggested}.")
         self.refresh_accounting_setup()
@@ -127,16 +123,14 @@ class AccountingSetupTabMixin:
         pending = sum(
             1
             for row in list_accounting_setup_rows(self.app.db)
-            if not (row.get("service_type") or "").strip()
-            and (row.get("suggested_service_type") or "").strip()
+            if not (row.get("service_type") or "").strip() and (row.get("suggested_service_type") or "").strip()
         )
         if pending == 0:
             self.feedback.info("No clients need service-type inference.")
             return
         if not messagebox.askyesno(
             "Infer service types",
-            f"Infer service type from documents for {pending} client(s) "
-            "that do not have one yet?",
+            f"Infer service type from documents for {pending} client(s) that do not have one yet?",
             parent=self.winfo_toplevel(),
         ):
             return
@@ -155,9 +149,7 @@ class AccountingSetupTabMixin:
             self.feedback.error("Set service type first (use Infer service type).")
             return
         if not (row.get("num_transactions") or "").strip():
-            self.feedback.error(
-                "Set transaction volume in Tax IDs before applying pricing."
-            )
+            self.feedback.error("Set transaction volume in Tax IDs before applying pricing.")
             return
         if apply_pricing_tier(self.app.db, client_id):
             self.feedback.success("Pricing tier applied from matrix.")
@@ -165,6 +157,4 @@ class AccountingSetupTabMixin:
             if self._selected_client_id() == client_id:
                 self.refresh()
         else:
-            self.feedback.error(
-                "No matching pricing tier — check Settings → Pricing matrix."
-            )
+            self.feedback.error("No matching pricing tier — check Settings → Pricing matrix.")

@@ -138,11 +138,7 @@ def list_files(folder: Path) -> list[Path]:
     try:
         if not folder.exists():
             return []
-        files = [
-            path
-            for path in folder.iterdir()
-            if path.is_file() and not path.name.startswith(".")
-        ]
+        files = [path for path in folder.iterdir() if path.is_file() and not path.name.startswith(".")]
     except OSError:
         # Folder removed mid-scan, permission denied, or long-path failure.
         return []

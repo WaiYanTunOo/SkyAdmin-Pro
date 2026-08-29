@@ -1,7 +1,5 @@
 """Excel export — supplier sheets match database schema."""
 
-from pathlib import Path
-
 import pytest
 
 from skyadmin_pro.database import Database

@@ -35,7 +35,11 @@ from skyadmin_pro.ui.widgets import FeedbackLabel, make_modal
 _SECTION_TITLES = (
     ("client", "To Burmese clients (Burmese)", "Messages in Burmese. Click to copy."),
     ("supplier", "To Thai suppliers (English + krub)", "Simple English, krub, 🙏. No Thai script. Click to copy."),
-    ("service", "Service document requests (English)", "VAT address update, work permit renewal — click to copy the document request."),
+    (
+        "service",
+        "Service document requests (English)",
+        "VAT address update, work permit renewal — click to copy the document request.",
+    ),
     ("checklist", "Checklists", "Visa, company, work permit, accounting, and courier — Myanmar clients in Thailand."),
 )
 
@@ -115,9 +119,7 @@ class UtilitiesView(BaseView):
 
         actions = ctk.CTkFrame(translator, fg_color="transparent")
         actions.grid(row=4, column=0, sticky="ew", padx=16, pady=10)
-        self.translate_btn = ctk.CTkButton(
-            actions, text="Translate", width=120, command=self._translate
-        )
+        self.translate_btn = ctk.CTkButton(actions, text="Translate", width=120, command=self._translate)
         self.translate_btn.pack(side="left")
         self.copy_btn = ctk.CTkButton(
             actions,
@@ -165,9 +167,7 @@ class UtilitiesView(BaseView):
                 overrides = {}
             try:
                 self._sections = {
-                    section: apply_snippet_overrides(
-                        section, overrides.get(section) or {}
-                    )
+                    section: apply_snippet_overrides(section, overrides.get(section) or {})
                     for section in ("client", "supplier", "service", "checklist")
                 }
             except Exception:
@@ -249,11 +249,7 @@ class UtilitiesView(BaseView):
             default_labels = {snippet.label for snippet in defaults}
             section_overrides = self._overrides.get(current) or {}
             extras = sorted(
-                (
-                    (key, value)
-                    for key, value in section_overrides.items()
-                    if key not in default_labels
-                ),
+                ((key, value) for key, value in section_overrides.items() if key not in default_labels),
                 key=lambda kv: (kv[1].get("label") or kv[0]).lower(),
             )
             items: list[dict] = []
@@ -305,9 +301,7 @@ class UtilitiesView(BaseView):
 
         row = 0
         for section, items in self._editor_draft.items():
-            title = next(
-                title for key, title, _hint in _SECTION_TITLES if key == section
-            )
+            title = next(title for key, title, _hint in _SECTION_TITLES if key == section)
             ctk.CTkLabel(
                 scroll,
                 text=title,
@@ -349,9 +343,7 @@ class UtilitiesView(BaseView):
         card = ctk.CTkFrame(master, corner_radius=8)
         card.grid(row=row, column=0, sticky="ew", padx=8, pady=4)
         card.grid_columnconfigure(0, weight=1)
-        label_entry = ctk.CTkEntry(
-            card, placeholder_text="Button label", font=_editor_font()
-        )
+        label_entry = ctk.CTkEntry(card, placeholder_text="Button label", font=_editor_font())
         label_entry.insert(0, item["label"])
         label_entry.grid(row=0, column=0, sticky="ew", padx=10, pady=(8, 4))
         text_box = ctk.CTkTextbox(card, height=76, wrap="word", font=_editor_font())
@@ -402,7 +394,6 @@ class UtilitiesView(BaseView):
         new_overrides: dict[str, dict[str, dict[str, str]]] = dict(self._overrides)
         for section, items in self._editor_draft.items():
             defaults = SNIPPET_SECTIONS.get(section, ())
-            default_labels = {snippet.label for snippet in defaults}
             section_overrides: dict[str, dict[str, str]] = {}
             for item in items:
                 if item["removed"]:
@@ -431,9 +422,7 @@ class UtilitiesView(BaseView):
             top.destroy()
             self.hub_feedback.info("No changes made.")
             return
-        self.app.db.set_setting(
-            SETTING_SNIPPET_OVERRIDES, json.dumps(new_overrides, ensure_ascii=False)
-        )
+        self.app.db.set_setting(SETTING_SNIPPET_OVERRIDES, json.dumps(new_overrides, ensure_ascii=False))
         parts = [f"{section} {len(items)}" for section, items in new_overrides.items()]
         note = f"Edited messages ({', '.join(parts)})" if parts else "Edited messages"
         self.app.db.save_snippet_version(new_overrides, note=note)
@@ -470,9 +459,7 @@ class UtilitiesView(BaseView):
         if not path:
             return
         try:
-            Path(path).write_text(
-                json.dumps(pack, ensure_ascii=False, indent=2), encoding="utf-8"
-            )
+            Path(path).write_text(json.dumps(pack, ensure_ascii=False, indent=2), encoding="utf-8")
         except OSError as exc:
             self.hub_feedback.error(f"Export failed: {exc}")
             return
@@ -499,9 +486,7 @@ class UtilitiesView(BaseView):
         if not path:
             return
         try:
-            Path(path).write_text(
-                json.dumps(pack, ensure_ascii=False, indent=2), encoding="utf-8"
-            )
+            Path(path).write_text(json.dumps(pack, ensure_ascii=False, indent=2), encoding="utf-8")
         except OSError as exc:
             self.hub_feedback.error(f"Export failed: {exc}")
             return
@@ -542,9 +527,7 @@ class UtilitiesView(BaseView):
                 db.save_snippet_version(entry["snapshot"], note=entry.get("note") or "", created_at=key)
                 existing.add(key)
                 added += 1
-        db.save_snippet_version(
-            pack["active"], note=f"Imported from {Path(path).name}"
-        )
+        db.save_snippet_version(pack["active"], note=f"Imported from {Path(path).name}")
         self._load_snippets()
         self._build_hub()
         count = sum(len(section) for section in pack["active"].values())
@@ -718,9 +701,7 @@ class UtilitiesView(BaseView):
         fields.grid_columnconfigure(1, weight=1)
         entries: dict[str, ctk.CTkEntry] = {}
         for row, token in enumerate(tokens):
-            ctk.CTkLabel(fields, text=token, anchor="w").grid(
-                row=row, column=0, sticky="w", padx=(0, 10), pady=5
-            )
+            ctk.CTkLabel(fields, text=token, anchor="w").grid(row=row, column=0, sticky="w", padx=(0, 10), pady=5)
             entry = ctk.CTkEntry(fields)
             entry.insert(0, defaults.get(token, ""))
             entry.grid(row=row, column=1, sticky="ew", pady=5)

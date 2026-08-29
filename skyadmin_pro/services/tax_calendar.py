@@ -189,10 +189,7 @@ def monthly_cycle_status(today: date | None = None) -> tuple[CycleStatus, ...]:
                 days_to_next = upcoming[0].start_day - day
             else:
                 # All stages passed — count the wrap to next month's first.
-                days_to_next = (
-                    gap_to_next_month
-                    + min(stages[0].start_day - 1, days_next_month)
-                )
+                days_to_next = gap_to_next_month + min(stages[0].start_day - 1, days_next_month)
         results.append(
             CycleStatus(
                 key=key,

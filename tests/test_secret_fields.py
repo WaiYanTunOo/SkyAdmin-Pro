@@ -2,8 +2,6 @@
 
 import sqlite3
 
-import pytest
-
 from skyadmin_pro.database import Database
 from skyadmin_pro.services.secret_fields import (
     decrypt_secret,
@@ -35,9 +33,7 @@ def test_database_encrypts_and_decrypts_ird_password(tmp_path, fake_app_dir, mon
 
     with sqlite3.connect(db.db_file) as conn:
         conn.row_factory = sqlite3.Row
-        row = conn.execute(
-            "SELECT ird_password FROM clients WHERE id = ?", (client_id,)
-        ).fetchone()
+        row = conn.execute("SELECT ird_password FROM clients WHERE id = ?", (client_id,)).fetchone()
     stored = row["ird_password"]
     assert is_encrypted_secret(stored)
     assert "portal-pass-123" not in stored
@@ -69,7 +65,5 @@ def test_plaintext_ird_password_migrated_on_startup(tmp_path, fake_app_dir, monk
 
     with sqlite3.connect(db.db_file) as conn:
         conn.row_factory = sqlite3.Row
-        row = conn.execute(
-            "SELECT ird_password FROM clients WHERE id = ?", (client_id,)
-        ).fetchone()
+        row = conn.execute("SELECT ird_password FROM clients WHERE id = ?", (client_id,)).fetchone()
     assert is_encrypted_secret(row["ird_password"])

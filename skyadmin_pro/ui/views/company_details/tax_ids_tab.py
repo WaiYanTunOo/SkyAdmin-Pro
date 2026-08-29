@@ -2,61 +2,23 @@
 
 from __future__ import annotations
 
-import os
-import shutil
-from datetime import date, timedelta
-from pathlib import Path
-from tkinter import filedialog, messagebox
-
 import customtkinter as ctk
 
 from skyadmin_pro.config import (
     ACCOUNTING_PRICING_SERVICES,
-    IMPORTANT_DOC_TYPES,
     NAV_OFFICE_HUB,
     PAYMENT_STATUSES,
-    SERVICE_PROGRESS,
-    TAX_FILING_FIELDS,
-    TAX_FILING_LABELS,
-    TAX_FILING_STATUSES,
     TRANSACTION_RANGES,
-    FINANCIAL_DOC_CATEGORIES,
-    FINANCIAL_DOC_SUBCATEGORIES,
-    FINANCIAL_DOC_FOLDER_MAP,
 )
 from skyadmin_pro.services.file_ops import (
-    copy_file,
-    format_thousands,
-    open_in_file_manager,
     parse_flexible_date,
-    sanitize_amount,
-)
-from skyadmin_pro.services.snippets import effective_text, load_snippet_overrides
-from skyadmin_pro.services.tax_ids_rollout import (
-    apply_pricing_tier,
-    infer_service_types,
-    list_accounting_setup_rows,
-    parse_document_types,
-)
-from skyadmin_pro.services.tracking import (
-    classify_expiry,
-    days_until,
-    effective_expiry_date,
-)
-from skyadmin_pro.services.vo_csh_rollout import (
-    infer_client_vo_csh_renewal_dates,
-    infer_vo_csh_renewal_dates,
-    list_vo_csh_setup_rows,
 )
 from skyadmin_pro.services.workflow import (
     copy_to_clipboard,
-    create_client_workspace,
-    resolve_client_folder,
 )
-from skyadmin_pro.ui.setup_rollout import RolloutAction, SetupRolloutPanel
-from skyadmin_pro.ui.theme import CARD_RADIUS, CARD_TITLE_SIZE, TEXT_FAINT, TEXT_MUTED
+from skyadmin_pro.ui.theme import CARD_RADIUS, CARD_TITLE_SIZE, TEXT_MUTED
 from skyadmin_pro.ui.treeview import ThemedTreeview
-from skyadmin_pro.ui.widgets import DatePickerField, make_modal
+from skyadmin_pro.ui.widgets import DatePickerField
 
 
 class TaxIdsTabMixin:
@@ -81,61 +43,35 @@ class TaxIdsTabMixin:
         self.headcount_var = ctk.StringVar()
 
         ctk.CTkLabel(form, text="Tax ID").grid(row=0, column=0, columnspan=2, sticky="w", pady=(2, 2))
-        ctk.CTkEntry(form, textvariable=self.tax_id_var).grid(
-            row=1, column=0, columnspan=2, sticky="ew", pady=(0, 4)
-        )
+        ctk.CTkEntry(form, textvariable=self.tax_id_var).grid(row=1, column=0, columnspan=2, sticky="ew", pady=(0, 4))
 
-        ctk.CTkLabel(form, text="VAT Registered").grid(
-            row=2, column=0, sticky="w", pady=(6, 2)
-        )
+        ctk.CTkLabel(form, text="VAT Registered").grid(row=2, column=0, sticky="w", pady=(6, 2))
         self.vat_registered_var = ctk.BooleanVar()
         ctk.CTkCheckBox(form, text="Yes", variable=self.vat_registered_var).grid(
             row=3, column=0, sticky="w", pady=(0, 4)
         )
-        ctk.CTkLabel(form, text="VAT Registration Date").grid(
-            row=2, column=1, sticky="w", pady=(6, 2)
-        )
-        DatePickerField(form, var=self.vat_reg_date_var).grid(
-            row=3, column=1, sticky="ew", pady=(0, 4)
-        )
+        ctk.CTkLabel(form, text="VAT Registration Date").grid(row=2, column=1, sticky="w", pady=(6, 2))
+        DatePickerField(form, var=self.vat_reg_date_var).grid(row=3, column=1, sticky="ew", pady=(0, 4))
 
-        ctk.CTkLabel(form, text="Service Type").grid(
-            row=4, column=0, sticky="w", pady=(6, 2)
-        )
-        self.acct_service_type = ctk.CTkOptionMenu(
-            form, values=["", *ACCOUNTING_PRICING_SERVICES]
-        )
+        ctk.CTkLabel(form, text="Service Type").grid(row=4, column=0, sticky="w", pady=(6, 2))
+        self.acct_service_type = ctk.CTkOptionMenu(form, values=["", *ACCOUNTING_PRICING_SERVICES])
         self.acct_service_type.grid(row=5, column=0, sticky="ew", padx=(0, 12), pady=(0, 4))
-        ctk.CTkLabel(form, text="Transaction Volume").grid(
-            row=4, column=1, sticky="w", pady=(6, 2)
-        )
+        ctk.CTkLabel(form, text="Transaction Volume").grid(row=4, column=1, sticky="w", pady=(6, 2))
         self.acct_txn_volume = ctk.CTkOptionMenu(form, values=list(TRANSACTION_RANGES))
         self.acct_txn_volume.grid(row=5, column=1, sticky="ew", pady=(0, 4))
 
-        ctk.CTkLabel(form, text="Service Fee (THB)").grid(
-            row=6, column=0, sticky="w", pady=(6, 2)
-        )
+        ctk.CTkLabel(form, text="Service Fee (THB)").grid(row=6, column=0, sticky="w", pady=(6, 2))
         ctk.CTkEntry(form, textvariable=self.service_fee_var).grid(
             row=7, column=0, sticky="ew", padx=(0, 12), pady=(0, 4)
         )
-        ctk.CTkLabel(form, text="Payment Status").grid(
-            row=6, column=1, sticky="w", pady=(6, 2)
-        )
+        ctk.CTkLabel(form, text="Payment Status").grid(row=6, column=1, sticky="w", pady=(6, 2))
         self.acct_payment_status = ctk.CTkOptionMenu(form, values=list(PAYMENT_STATUSES))
         self.acct_payment_status.grid(row=7, column=1, sticky="ew", pady=(0, 4))
 
-        ctk.CTkLabel(form, text="SLA (hours)").grid(
-            row=8, column=0, sticky="w", pady=(6, 2)
-        )
-        ctk.CTkEntry(form, textvariable=self.sla_var).grid(
-            row=9, column=0, sticky="ew", padx=(0, 12), pady=(0, 4)
-        )
-        ctk.CTkLabel(form, text="Headcount").grid(
-            row=8, column=1, sticky="w", pady=(6, 2)
-        )
-        ctk.CTkEntry(form, textvariable=self.headcount_var).grid(
-            row=9, column=1, sticky="ew", pady=(0, 4)
-        )
+        ctk.CTkLabel(form, text="SLA (hours)").grid(row=8, column=0, sticky="w", pady=(6, 2))
+        ctk.CTkEntry(form, textvariable=self.sla_var).grid(row=9, column=0, sticky="ew", padx=(0, 12), pady=(0, 4))
+        ctk.CTkLabel(form, text="Headcount").grid(row=8, column=1, sticky="w", pady=(6, 2))
+        ctk.CTkEntry(form, textvariable=self.headcount_var).grid(row=9, column=1, sticky="ew", pady=(0, 4))
 
         cred_card = ctk.CTkFrame(frame, corner_radius=12)
         cred_card.grid(row=2, column=0, sticky="ew", padx=16, pady=(4, 8))
@@ -171,13 +107,11 @@ class TaxIdsTabMixin:
         cred_detail.grid(row=3, column=0, sticky="ew", padx=16, pady=(0, 8))
         cred_detail.grid_columnconfigure(1, weight=1)
         ctk.CTkLabel(cred_detail, text="Password", anchor="w").grid(row=0, column=0, sticky="w", padx=(0, 8))
-        self.cred_pw_entry = ctk.CTkEntry(
-            cred_detail, textvariable=self.cred_pw_var, show="*", state="disabled"
-        )
+        self.cred_pw_entry = ctk.CTkEntry(cred_detail, textvariable=self.cred_pw_var, show="*", state="disabled")
         self.cred_pw_entry.grid(row=0, column=1, sticky="ew")
-        ctk.CTkButton(
-            cred_detail, text="Copy", width=70, command=self._copy_client_cred_password
-        ).grid(row=0, column=2, padx=(8, 0))
+        ctk.CTkButton(cred_detail, text="Copy", width=70, command=self._copy_client_cred_password).grid(
+            row=0, column=2, padx=(8, 0)
+        )
 
         cred_actions = ctk.CTkFrame(cred_card, fg_color="transparent")
         cred_actions.grid(row=4, column=0, sticky="w", padx=16, pady=(0, 12))
@@ -189,7 +123,9 @@ class TaxIdsTabMixin:
         ).pack(side="left")
 
         ctk.CTkButton(
-            frame, text="Save Tax IDs & Service Info", width=200,
+            frame,
+            text="Save Tax IDs & Service Info",
+            width=200,
             command=self._save_tax_ids,
         ).grid(row=3, column=0, sticky="w", padx=16, pady=(8, 14))
 
@@ -289,6 +225,7 @@ class TaxIdsTabMixin:
         # Only auto-fill if fields are empty or match a previous tier value
         if current_fee and current_sla and current_hc:
             import tkinter.messagebox as mb
+
             if not mb.askyesno(
                 "Auto-fill pricing",
                 f"Overwrite current values with pricing for '{choice}'?\n\n"
@@ -297,9 +234,7 @@ class TaxIdsTabMixin:
             ):
                 return
         if fee is None and sla is None and hc is None:
-            self.feedback.error(
-                f"No pricing configured for '{choice}' — set it in Settings → Pricing matrix."
-            )
+            self.feedback.error(f"No pricing configured for '{choice}' — set it in Settings → Pricing matrix.")
             return
         if fee is not None:
             self.service_fee_var.set(str(fee))

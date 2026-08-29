@@ -3,9 +3,9 @@
 from __future__ import annotations
 
 import calendar
+from collections.abc import Callable
 from datetime import date, datetime
 from pathlib import Path
-from typing import Callable
 
 import customtkinter as ctk
 
@@ -68,6 +68,7 @@ def bind_escape(top) -> None:
 
 def make_modal(top) -> None:
     """Standard dialog setup: grab focus (best effort) + Escape to close."""
+
     def _grab():
         try:
             top.grab_set()
@@ -82,6 +83,7 @@ def make_modal(top) -> None:
     except Exception:
         pass
     bind_escape(top)
+
 
 _STATUS_LABEL = {
     MONTH_STATUS_OPEN: "Open",
@@ -127,21 +129,15 @@ class MonthStatusPanel(ctk.CTkFrame):
         ctk.CTkLabel(header, text=title, font=ctk.CTkFont(size=CARD_TITLE_SIZE, weight="bold")).grid(
             row=0, column=0, sticky="w"
         )
-        self.summary = ctk.CTkLabel(
-            header, text="", text_color=TEXT_MUTED, anchor="e"
-        )
+        self.summary = ctk.CTkLabel(header, text="", text_color=TEXT_MUTED, anchor="e")
         self.summary.grid(row=0, column=2, sticky="e", padx=(12, 0))
 
         nav = ctk.CTkFrame(header, fg_color="transparent")
         nav.grid(row=0, column=3, sticky="e", padx=(8, 0))
         self.month_label = ctk.CTkLabel(nav, text="", font=ctk.CTkFont(weight="bold"))
         self.month_label.pack(side="right")
-        ctk.CTkButton(
-            nav, text="\u25b6", width=34, command=lambda: self._shift(1)
-        ).pack(side="right", padx=(6, 8))
-        ctk.CTkButton(
-            nav, text="\u25c0", width=34, command=lambda: self._shift(-1)
-        ).pack(side="right")
+        ctk.CTkButton(nav, text="\u25b6", width=34, command=lambda: self._shift(1)).pack(side="right", padx=(6, 8))
+        ctk.CTkButton(nav, text="\u25c0", width=34, command=lambda: self._shift(-1)).pack(side="right")
 
         self.tree = ThemedTreeview(
             self,
@@ -157,14 +153,12 @@ class MonthStatusPanel(ctk.CTkFrame):
 
         controls = ctk.CTkFrame(self, fg_color="transparent")
         controls.grid(row=2, column=0, sticky="ew", padx=16, pady=(0, 14))
-        self.status_menu = ctk.CTkSegmentedButton(
-            controls, values=[_STATUS_LABEL[s] for s in _STATUS_CYCLE[:3]]
-        )
+        self.status_menu = ctk.CTkSegmentedButton(controls, values=[_STATUS_LABEL[s] for s in _STATUS_CYCLE[:3]])
         self.status_menu.set(_STATUS_LABEL[MONTH_STATUS_OPEN])
         self.status_menu.pack(side="left")
-        ctk.CTkButton(
-            controls, text="Apply to selected", width=140, command=self._apply_selected
-        ).pack(side="left", padx=(10, 0))
+        ctk.CTkButton(controls, text="Apply to selected", width=140, command=self._apply_selected).pack(
+            side="left", padx=(10, 0)
+        )
         ctk.CTkLabel(
             controls,
             text="Double-click a row to advance its status",
@@ -181,17 +175,12 @@ class MonthStatusPanel(ctk.CTkFrame):
 
     def refresh(self) -> None:
         month_key = self._month_key()
-        self.month_label.configure(
-            text=f"{calendar.month_name[self._month]} {self._year}"
-        )
+        self.month_label.configure(text=f"{calendar.month_name[self._month]} {self._year}")
         clients = self.app.db.list_monthly_tax_clients()
         client_ids = [int(client["id"]) for client in clients]
         summary = self.app.db.month_close_summary(month_key, client_ids=client_ids)
         self.summary.configure(
-            text=(
-                f"{summary['closed']}/{summary['clients']} closed · "
-                f"{summary['in_progress']} in progress"
-            )
+            text=(f"{summary['closed']}/{summary['clients']} closed · {summary['in_progress']} in progress")
         )
 
         self.tree.apply_theme()
@@ -202,9 +191,7 @@ class MonthStatusPanel(ctk.CTkFrame):
             record = statuses.get(client_id)
             status = record["status"] if record else MONTH_STATUS_OPEN
             updated = (record.get("updated_at") or "")[:16] if record else "—"
-            rows.append(
-                (client.get("name") or "—", _STATUS_LABEL[status], updated)
-            )
+            rows.append((client.get("name") or "—", _STATUS_LABEL[status], updated))
             iids.append(str(client_id))
             tag = _STATUS_TAG[status]
             tags.append((tag,) if tag else ())
@@ -220,13 +207,9 @@ class MonthStatusPanel(ctk.CTkFrame):
             self.app.set_status("Select a client row first.")
             return
         label = self.status_menu.get()
-        status = next(
-            key for key, value in _STATUS_LABEL.items() if value == label
-        )
+        status = next(key for key, value in _STATUS_LABEL.items() if value == label)
         self.app.db.set_client_month_status(client_id, self._month_key(), status)
-        self.app.set_status(
-            f"Month close set to '{label}' for this client ({self.month_label.cget('text')})."
-        )
+        self.app.set_status(f"Month close set to '{label}' for this client ({self.month_label.cget('text')}).")
         self.refresh()
 
     def _advance(self, iid: str | None) -> None:
@@ -238,9 +221,7 @@ class MonthStatusPanel(ctk.CTkFrame):
         current = record["status"] if record else MONTH_STATUS_OPEN
         next_status = _STATUS_CYCLE[_STATUS_CYCLE.index(current) + 1]
         self.app.db.set_client_month_status(client_id, self._month_key(), next_status)
-        self.app.set_status(
-            f"Status advanced to '{_STATUS_LABEL[next_status]}' for this client."
-        )
+        self.app.set_status(f"Status advanced to '{_STATUS_LABEL[next_status]}' for this client.")
         self.refresh()
 
 
@@ -257,9 +238,7 @@ class DatePickerField(ctk.CTkFrame):
         super().__init__(master, fg_color="transparent", **kwargs)
         self.grid_columnconfigure(0, weight=1)
         self.var = var if var is not None else ctk.StringVar()
-        ctk.CTkEntry(self, textvariable=self.var, placeholder_text="YYYY-MM-DD").grid(
-            row=0, column=0, sticky="ew"
-        )
+        ctk.CTkEntry(self, textvariable=self.var, placeholder_text="YYYY-MM-DD").grid(row=0, column=0, sticky="ew")
         ctk.CTkButton(
             self,
             text="Calendar",
@@ -302,36 +281,24 @@ class DatePickerField(ctk.CTkFrame):
         nav.grid(row=0, column=0, sticky="ew", padx=6, pady=(6, 4))
         left_nav = ctk.CTkFrame(nav, fg_color="transparent")
         left_nav.pack(side="left")
-        ctk.CTkButton(
-            left_nav, text="\u25c0", width=28, command=lambda: set_year(view.year - 1)
-        ).pack(side="left")
+        ctk.CTkButton(left_nav, text="\u25c0", width=28, command=lambda: set_year(view.year - 1)).pack(side="left")
         year_menu = ctk.CTkOptionMenu(
             left_nav,
             width=82,
             values=[str(year) for year in range(view.year - 10, view.year + 11)],
         )
         year_menu.pack(side="left", padx=4)
-        ctk.CTkButton(
-            left_nav, text="\u25b6", width=28, command=lambda: set_year(view.year + 1)
-        ).pack(side="left")
+        ctk.CTkButton(left_nav, text="\u25b6", width=28, command=lambda: set_year(view.year + 1)).pack(side="left")
 
-        month_label = ctk.CTkLabel(
-            nav, text="", font=ctk.CTkFont(size=14, weight="bold"), anchor="center"
-        )
+        month_label = ctk.CTkLabel(nav, text="", font=ctk.CTkFont(size=14, weight="bold"), anchor="center")
         month_label.pack(side="left", expand=True, fill="x", padx=6)
 
         right_nav = ctk.CTkFrame(nav, fg_color="transparent")
         right_nav.pack(side="right")
-        ctk.CTkButton(
-            right_nav, text="\u25c0", width=28, command=lambda: set_month(view.month - 1)
-        ).pack(side="left")
-        month_menu = ctk.CTkOptionMenu(
-            right_nav, width=96, values=calendar.month_name[1:]
-        )
+        ctk.CTkButton(right_nav, text="\u25c0", width=28, command=lambda: set_month(view.month - 1)).pack(side="left")
+        month_menu = ctk.CTkOptionMenu(right_nav, width=96, values=calendar.month_name[1:])
         month_menu.pack(side="left", padx=4)
-        ctk.CTkButton(
-            right_nav, text="\u25b6", width=28, command=lambda: set_month(view.month + 1)
-        ).pack(side="left")
+        ctk.CTkButton(right_nav, text="\u25b6", width=28, command=lambda: set_month(view.month + 1)).pack(side="left")
 
         grid_frame = ctk.CTkFrame(body, fg_color="transparent")
         grid_frame.grid(row=1, column=0, padx=6, pady=(0, 6))
@@ -360,9 +327,7 @@ class DatePickerField(ctk.CTkFrame):
         def draw() -> None:
             for child in grid_frame.winfo_children():
                 child.destroy()
-            month_label.configure(
-                text=f"{calendar.month_name[view.month]} {view.year}"
-            )
+            month_label.configure(text=f"{calendar.month_name[view.month]} {view.year}")
             for index, name in enumerate(("Mo", "Tu", "We", "Th", "Fr", "Sa", "Su")):
                 ctk.CTkLabel(
                     grid_frame,
@@ -383,9 +348,12 @@ class DatePickerField(ctk.CTkFrame):
                     text_color=("white", "white") if is_today else ("gray10", "gray90"),
                     hover_color=("gray80", "gray25"),
                     command=lambda d=chosen: self._pick(top, d),
-                ).grid(row=(first_weekday + day_number - 1) // 7 + 1,
-                       column=(first_weekday + day_number - 1) % 7,
-                       padx=1, pady=1)
+                ).grid(
+                    row=(first_weekday + day_number - 1) // 7 + 1,
+                    column=(first_weekday + day_number - 1) % 7,
+                    padx=1,
+                    pady=1,
+                )
 
         def _sync_year_menu() -> None:
             values = tuple(str(year) for year in range(view.year - 10, view.year + 11))
@@ -411,9 +379,7 @@ class DatePickerField(ctk.CTkFrame):
             draw()
 
         year_menu.configure(command=lambda choice: set_year(int(choice)))
-        month_menu.configure(
-            command=lambda choice: set_month(calendar.month_name.index(choice))
-        )
+        month_menu.configure(command=lambda choice: set_month(calendar.month_name.index(choice)))
         _sync_year_menu()
         _sync_month_menu()
         draw()
@@ -509,7 +475,7 @@ class SelectableFileList(ctk.CTkFrame):
 
     def select(self, path: Path | None, notify: bool = True) -> None:
         self.selected = path
-        for button, file_path in zip(self._buttons, self.files):
+        for button, file_path in zip(self._buttons, self.files, strict=True):
             if path is not None and file_path == path:
                 button.configure(fg_color=("gray75", "gray30"))
             else:
@@ -573,12 +539,12 @@ class OrderedPathList(ctk.CTkFrame):
             ctk.CTkLabel(self._scroll, text=path.name, anchor="w").grid(
                 row=index, column=1, sticky="ew", padx=4, pady=4
             )
-            ctk.CTkButton(
-                self._scroll, text="Up", width=48, command=lambda i=index: self._move(i, -1)
-            ).grid(row=index, column=2, padx=2, pady=4)
-            ctk.CTkButton(
-                self._scroll, text="Down", width=56, command=lambda i=index: self._move(i, 1)
-            ).grid(row=index, column=3, padx=2, pady=4)
+            ctk.CTkButton(self._scroll, text="Up", width=48, command=lambda i=index: self._move(i, -1)).grid(
+                row=index, column=2, padx=2, pady=4
+            )
+            ctk.CTkButton(self._scroll, text="Down", width=56, command=lambda i=index: self._move(i, 1)).grid(
+                row=index, column=3, padx=2, pady=4
+            )
             ctk.CTkButton(
                 self._scroll,
                 text="Remove",

@@ -34,9 +34,7 @@ def translate_text(text: str, source: str, target: str) -> str:
     try:
         from deep_translator import GoogleTranslator
     except ImportError as exc:
-        raise RuntimeError(
-            "deep-translator is not installed. Run: pip install deep-translator"
-        ) from exc
+        raise RuntimeError("deep-translator is not installed. Run: pip install deep-translator") from exc
 
     # deep-translator's requests calls have no timeout by default — without
     # this, a half-dead connection hangs the worker thread forever.
@@ -53,9 +51,7 @@ def translate_text(text: str, source: str, target: str) -> str:
                 if attempt == 0:
                     time.sleep(1.0)  # brief backoff, then one retry
         else:
-            raise RuntimeError(
-                "Translation failed. Check the internet connection and try again."
-            ) from last_exc
+            raise RuntimeError("Translation failed. Check the internet connection and try again.") from last_exc
     finally:
         socket.setdefaulttimeout(old_timeout)
 

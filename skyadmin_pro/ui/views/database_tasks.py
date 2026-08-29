@@ -2,9 +2,7 @@
 
 from __future__ import annotations
 
-import os
-from datetime import date, timedelta
-from pathlib import Path
+from datetime import date
 from tkinter import filedialog, messagebox
 
 import customtkinter as ctk
@@ -14,7 +12,6 @@ from skyadmin_pro.config import (
     GENERAL_RENEWAL_TEMPLATE_NAME,
     PIPELINE_MAX_STEP,
     PIPELINE_STEPS,
-    SERVICE_PROGRESS,
     TASK_CATEGORIES,
     TASK_STATUS_COMPLETED,
     TASK_STATUS_PENDING,
@@ -22,7 +19,6 @@ from skyadmin_pro.config import (
 )
 from skyadmin_pro.services.export import default_export_name, export_to_excel
 from skyadmin_pro.services.file_ops import (
-    copy_file,
     format_thousands,
     open_in_file_manager,
     parse_flexible_date,
@@ -36,15 +32,13 @@ from skyadmin_pro.services.tracking import (
 )
 from skyadmin_pro.services.workflow import (
     create_client_workspace,
-    repair_client_workspaces,
-    resolve_client_folder,
 )
 from skyadmin_pro.ui.combo_utils import fill_combo
+from skyadmin_pro.ui.theme import CARD_RADIUS, CARD_TITLE_SIZE, TEXT_MUTED
 from skyadmin_pro.ui.treeview import ThemedTreeview
-from skyadmin_pro.ui.theme import CARD_CONTENT_PADX, CARD_RADIUS, CARD_TITLE_SIZE, TEXT_FAINT, TEXT_MUTED
 from skyadmin_pro.ui.views.base import BaseView
-from skyadmin_pro.ui.widgets import DatePickerField, FeedbackLabel, make_modal, MonthStatusPanel
 from skyadmin_pro.ui.views.company_details import CompanyDetailsPanel
+from skyadmin_pro.ui.widgets import DatePickerField, FeedbackLabel, MonthStatusPanel, make_modal
 
 NONE_TASK = "(none)"
 
@@ -94,14 +88,10 @@ class DatabaseTasksView(BaseView):
         self.courier_panel = CourierPanel(self.tabs.tab("Courier Tracker"), self.app, self.feedback)
         self.courier_panel.grid(row=0, column=0, sticky="nsew", padx=8, pady=8)
 
-        self.clients_panel = ClientsExpiryPanel(
-            self.tabs.tab("Clients & Expiry"), self.app, self.feedback
-        )
+        self.clients_panel = ClientsExpiryPanel(self.tabs.tab("Clients & Expiry"), self.app, self.feedback)
         self.clients_panel.grid(row=0, column=0, sticky="nsew", padx=8, pady=8)
 
-        month_scroll = ctk.CTkScrollableFrame(
-            self.tabs.tab("Monthly Tax Status"), fg_color="transparent"
-        )
+        month_scroll = ctk.CTkScrollableFrame(self.tabs.tab("Monthly Tax Status"), fg_color="transparent")
         month_scroll.grid(row=0, column=0, sticky="nsew", padx=8, pady=8)
         month_scroll.grid_columnconfigure(0, weight=1)
         self.month_panel = MonthStatusPanel(
@@ -112,24 +102,16 @@ class DatabaseTasksView(BaseView):
         )
         self.month_panel.grid(row=0, column=0, sticky="nsew", padx=8, pady=8)
 
-        self.company_panel = CompanyDetailsPanel(
-            self.tabs.tab("Company Details"), self.app, self.feedback
-        )
+        self.company_panel = CompanyDetailsPanel(self.tabs.tab("Company Details"), self.app, self.feedback)
         self.company_panel.grid(row=0, column=0, sticky="nsew", padx=8, pady=8)
 
-        self.renewals_panel = RenewalPanel(
-            self.tabs.tab("Renewals"), self.app, self.feedback
-        )
+        self.renewals_panel = RenewalPanel(self.tabs.tab("Renewals"), self.app, self.feedback)
         self.renewals_panel.grid(row=0, column=0, sticky="nsew", padx=8, pady=8)
 
-        self.pipeline_panel = ServicePipelinePanel(
-            self.tabs.tab("Service Pipeline"), self.app, self.feedback
-        )
+        self.pipeline_panel = ServicePipelinePanel(self.tabs.tab("Service Pipeline"), self.app, self.feedback)
         self.pipeline_panel.grid(row=0, column=0, sticky="nsew", padx=8, pady=8)
 
-        self.suppliers_panel = SuppliersPanel(
-            self.tabs.tab("Suppliers & AP"), self.app, self.feedback
-        )
+        self.suppliers_panel = SuppliersPanel(self.tabs.tab("Suppliers & AP"), self.app, self.feedback)
         self.suppliers_panel.grid(row=0, column=0, sticky="nsew", padx=8, pady=8)
 
     def on_show(self) -> None:
@@ -295,12 +277,8 @@ class TaskPanel(ctk.CTkFrame):
         buttons = ctk.CTkFrame(form, fg_color="transparent")
         buttons.grid(row=12, column=0, sticky="ew", padx=16, pady=(14, 14))
         buttons.grid_columnconfigure((0, 1), weight=1)
-        ctk.CTkButton(buttons, text="New", command=self._new).grid(
-            row=0, column=0, sticky="ew", padx=(0, 4), pady=3
-        )
-        ctk.CTkButton(buttons, text="Save", command=self._save).grid(
-            row=0, column=1, sticky="ew", padx=(4, 0), pady=3
-        )
+        ctk.CTkButton(buttons, text="New", command=self._new).grid(row=0, column=0, sticky="ew", padx=(0, 4), pady=3)
+        ctk.CTkButton(buttons, text="Save", command=self._save).grid(row=0, column=1, sticky="ew", padx=(4, 0), pady=3)
         ctk.CTkButton(buttons, text="Mark complete", command=self._complete).grid(
             row=1, column=0, columnspan=2, sticky="ew", pady=3
         )
@@ -521,25 +499,19 @@ class CourierPanel(ctk.CTkFrame):
         form.grid(row=0, column=1, sticky="nsew")
         form.grid_columnconfigure(0, weight=1)
 
-        ctk.CTkLabel(
-            form, text="Log outgoing delivery", font=ctk.CTkFont(size=CARD_TITLE_SIZE, weight="bold")
-        ).grid(row=0, column=0, sticky="w", padx=16, pady=(14, 8))
+        ctk.CTkLabel(form, text="Log outgoing delivery", font=ctk.CTkFont(size=CARD_TITLE_SIZE, weight="bold")).grid(
+            row=0, column=0, sticky="w", padx=16, pady=(14, 8)
+        )
 
         ctk.CTkLabel(form, text="Client").grid(row=1, column=0, sticky="w", padx=16, pady=(4, 2))
         self.client_box = ctk.CTkComboBox(form, values=[""])
         self.client_box.grid(row=2, column=0, sticky="ew", padx=16)
 
-        ctk.CTkLabel(form, text="Tracking number").grid(
-            row=3, column=0, sticky="w", padx=16, pady=(10, 2)
-        )
+        ctk.CTkLabel(form, text="Tracking number").grid(row=3, column=0, sticky="w", padx=16, pady=(10, 2))
         self.tracking_var = ctk.StringVar()
-        ctk.CTkEntry(form, textvariable=self.tracking_var).grid(
-            row=4, column=0, sticky="ew", padx=16
-        )
+        ctk.CTkEntry(form, textvariable=self.tracking_var).grid(row=4, column=0, sticky="ew", padx=16)
 
-        ctk.CTkLabel(form, text="Driver (Grab / Lalamove)").grid(
-            row=5, column=0, sticky="w", padx=16, pady=(10, 2)
-        )
+        ctk.CTkLabel(form, text="Driver (Grab / Lalamove)").grid(row=5, column=0, sticky="w", padx=16, pady=(10, 2))
         self.driver_box = ctk.CTkComboBox(form, values=list(COURIER_DRIVERS))
         self.driver_box.set("Grab")
         self.driver_box.grid(row=6, column=0, sticky="ew", padx=16)
@@ -548,15 +520,11 @@ class CourierPanel(ctk.CTkFrame):
         self.sent_var = ctk.StringVar(value=date.today().isoformat())
         DatePickerField(form, var=self.sent_var).grid(row=8, column=0, sticky="ew", padx=16)
 
-        ctk.CTkLabel(form, text="Destination").grid(
-            row=9, column=0, sticky="w", padx=16, pady=(10, 2)
-        )
+        ctk.CTkLabel(form, text="Destination").grid(row=9, column=0, sticky="w", padx=16, pady=(10, 2))
         self.dest_var = ctk.StringVar()
         ctk.CTkEntry(form, textvariable=self.dest_var).grid(row=10, column=0, sticky="ew", padx=16)
 
-        ctk.CTkLabel(form, text="Related task").grid(
-            row=11, column=0, sticky="w", padx=16, pady=(10, 2)
-        )
+        ctk.CTkLabel(form, text="Related task").grid(row=11, column=0, sticky="w", padx=16, pady=(10, 2))
         self.task_menu = ctk.CTkOptionMenu(form, values=[NONE_TASK])
         self.task_menu.set(NONE_TASK)
         self.task_menu.grid(row=12, column=0, sticky="ew", padx=16)
@@ -641,9 +609,7 @@ class CourierPanel(ctk.CTkFrame):
         if iid is None:
             self.feedback.error("Select a courier log first.")
             return
-        if not messagebox.askyesno(
-            "Delete courier log", "Remove this delivery record?", parent=self.winfo_toplevel()
-        ):
+        if not messagebox.askyesno("Delete courier log", "Remove this delivery record?", parent=self.winfo_toplevel()):
             return
         self.app.db.delete_courier_log(int(iid))
         self.feedback.success("Courier log deleted.")
@@ -699,9 +665,7 @@ class ClientsExpiryPanel(ctk.CTkFrame):
         self.client_tree.grid(row=1, column=0, sticky="nsew", padx=12, pady=(0, 8))
         actions = ctk.CTkFrame(left, fg_color="transparent")
         actions.grid(row=2, column=0, sticky="ew", padx=12, pady=(0, 8))
-        ctk.CTkButton(
-            actions, text="Add / Edit client", width=125, command=self._open_client_dialog
-        ).pack(side="left")
+        ctk.CTkButton(actions, text="Add / Edit client", width=125, command=self._open_client_dialog).pack(side="left")
         ctk.CTkButton(
             actions,
             text="View company details",
@@ -798,9 +762,7 @@ class ClientsExpiryPanel(ctk.CTkFrame):
         documents = self.app.db.list_documents(expiring_only=True)
         rows, iids, tags = [], [], []
         for item in documents:
-            eff = effective_expiry_date(
-                item.get("expiry_date"), item.get("document_type")
-            )
+            eff = effective_expiry_date(item.get("expiry_date"), item.get("document_type"))
             left = days_until(eff)
             status = expiry_label(left) if left is not None else "—"
             tag = classify_expiry(left) if left is not None else "odd"
@@ -885,24 +847,16 @@ class ClientsExpiryPanel(ctk.CTkFrame):
         contact_var = ctk.StringVar(value=_field_value("contact_name"))
         email_var = ctk.StringVar(value=_field_value("email"))
         status_var = ctk.StringVar(
-            value=("Inactive" if current.get("status") == "inactive" else "Active")
-            if current
-            else "Active"
+            value=("Inactive" if current.get("status") == "inactive" else "Active") if current else "Active"
         )
         for row, label, var in (
             (0, "Company name", name_var),
             (1, "Contact name", contact_var),
             (2, "Email", email_var),
         ):
-            ctk.CTkLabel(body, text=label, anchor="w").grid(
-                row=row, column=0, sticky="w", padx=(0, 10), pady=6
-            )
-            ctk.CTkEntry(body, textvariable=var, width=320).grid(
-                row=row, column=1, sticky="ew", pady=6
-            )
-        ctk.CTkLabel(body, text="Status", anchor="w").grid(
-            row=3, column=0, sticky="w", padx=(0, 10), pady=6
-        )
+            ctk.CTkLabel(body, text=label, anchor="w").grid(row=row, column=0, sticky="w", padx=(0, 10), pady=6)
+            ctk.CTkEntry(body, textvariable=var, width=320).grid(row=row, column=1, sticky="ew", pady=6)
+        ctk.CTkLabel(body, text="Status", anchor="w").grid(row=3, column=0, sticky="w", padx=(0, 10), pady=6)
         status_menu = ctk.CTkOptionMenu(body, values=["Active", "Inactive"], variable=status_var)
         status_menu.grid(row=3, column=1, sticky="ew", pady=6)
 
@@ -923,9 +877,7 @@ class ClientsExpiryPanel(ctk.CTkFrame):
             command=top.destroy,
         ).pack(side="right", padx=(0, 8))
 
-    def _save_client_dialog(
-        self, top, client_id: int | None, name_var, contact_var, email_var, status_var
-    ) -> None:
+    def _save_client_dialog(self, top, client_id: int | None, name_var, contact_var, email_var, status_var) -> None:
         name = name_var.get().strip()
         if not name:
             self.feedback.error("Enter a company name.")
@@ -936,9 +888,7 @@ class ClientsExpiryPanel(ctk.CTkFrame):
         try:
             if client_id is None:
                 cid = self.app.db.get_or_create_client(name)
-                self.app.db.update_client(
-                    cid, contact_name=contact, email=email, status=status
-                )
+                self.app.db.update_client(cid, contact_name=contact, email=email, status=status)
                 view = self.app._views.get("database_tasks")
                 if view is not None and hasattr(view, "tasks_panel"):
                     view.tasks_panel.refresh()
@@ -968,9 +918,7 @@ class ClientsExpiryPanel(ctk.CTkFrame):
         except Exception as exc:
             self.feedback.error(str(exc))
             return
-        self.feedback.success(
-            f"Workspace ready: {folder.name}/01_Company_Setup, 02_Accounting, 03_Visa"
-        )
+        self.feedback.success(f"Workspace ready: {folder.name}/01_Company_Setup, 02_Accounting, 03_Visa")
         self.refresh()
         try:
             open_in_file_manager(folder)
@@ -1087,15 +1035,11 @@ class RenewalPanel(ctk.CTkFrame):
         selector = ctk.CTkFrame(self, fg_color="transparent")
         selector.grid(row=0, column=0, sticky="ew", pady=(0, 8))
         selector.grid_columnconfigure((1, 3), weight=1)
-        ctk.CTkLabel(selector, text="Company / Client:").grid(
-            row=0, column=0, sticky="w"
-        )
+        ctk.CTkLabel(selector, text="Company / Client:").grid(row=0, column=0, sticky="w")
         self.company_box = ctk.CTkComboBox(selector, values=[""], command=self._on_company)
         self.company_box.grid(row=0, column=1, sticky="ew", padx=(0, 12))
         ctk.CTkLabel(selector, text="Service:").grid(row=0, column=2, sticky="w")
-        self.service_box = ctk.CTkComboBox(
-            selector, values=[""], command=self._on_service, state="readonly"
-        )
+        self.service_box = ctk.CTkComboBox(selector, values=[""], command=self._on_service, state="readonly")
         self.service_box.grid(row=0, column=3, sticky="ew")
 
         card = ctk.CTkFrame(self, corner_radius=CARD_RADIUS)
@@ -1111,9 +1055,7 @@ class RenewalPanel(ctk.CTkFrame):
             anchor="w",
         )
         self.checklist_title.grid(row=0, column=0, sticky="w")
-        self.progress_label = ctk.CTkLabel(
-            header, text="0 of 0", text_color=TEXT_MUTED, anchor="e"
-        )
+        self.progress_label = ctk.CTkLabel(header, text="0 of 0", text_color=TEXT_MUTED, anchor="e")
         self.progress_label.grid(row=0, column=1, sticky="e")
         self.countdown = ctk.CTkLabel(
             card,
@@ -1175,19 +1117,8 @@ class RenewalPanel(ctk.CTkFrame):
         client_id = self._selected_client_id()
         if client_id is None:
             return []
-        services = [
-            item
-            for item in self.app.db.list_client_services(client_id)
-            if item.get("expiry_date")
-        ]
-        services.sort(
-            key=lambda s: (
-                effective_expiry_date(
-                    s.get("expiry_date"), s.get("document_type")
-                )
-                or ""
-            )
-        )
+        services = [item for item in self.app.db.list_client_services(client_id) if item.get("expiry_date")]
+        services.sort(key=lambda s: effective_expiry_date(s.get("expiry_date"), s.get("document_type")) or "")
         labels: list[str] = []
         seen: set[str] = set()
         self._service_by_value.clear()
@@ -1231,9 +1162,7 @@ class RenewalPanel(ctk.CTkFrame):
         service = self._service_by_value.get(self.service_box.get())
         if service is None:
             return
-        left = days_until(
-            effective_expiry_date(service.get("expiry_date"), service.get("document_type"))
-        )
+        left = days_until(effective_expiry_date(service.get("expiry_date"), service.get("document_type")))
         if left is None:
             self.countdown.configure(
                 text="No renewal expiry date set for this service.",
@@ -1257,12 +1186,8 @@ class RenewalPanel(ctk.CTkFrame):
             "yellow": ("#a16207", "#fde047"),
             "green": ("#15803d", "#4ade80"),
         }.get(tag, ("gray10", "gray90"))
-        self.countdown.configure(
-            text=f"{document_type} — {detail}", text_color=tag_color
-        )
-        self.app.set_status(
-            f"Renewal for {client}: {document_type} — {detail} ({template})."
-        )
+        self.countdown.configure(text=f"{document_type} — {detail}", text_color=tag_color)
+        self.app.set_status(f"Renewal for {client}: {document_type} — {detail} ({template}).")
 
         self.app.db.ensure_renewal_checklist(client_id, template)
         items = self.app.db.list_renewal_checklist(client_id, template)
@@ -1340,13 +1265,9 @@ class ServicePipelinePanel(ctk.CTkFrame):
         self.pipe_client = ctk.CTkComboBox(top, values=[""])
         self.pipe_client.grid(row=0, column=1, sticky="ew", padx=(0, 12))
         ctk.CTkLabel(top, text="Service:").grid(row=0, column=2, sticky="w")
-        self.pipe_service = ctk.CTkComboBox(
-            top, values=self.app.db.list_service_types(), state="readonly"
-        )
+        self.pipe_service = ctk.CTkComboBox(top, values=self.app.db.list_service_types(), state="readonly")
         self.pipe_service.grid(row=0, column=3, sticky="ew", padx=(0, 12))
-        ctk.CTkButton(
-            top, text="Add to pipeline", width=130, command=self._add_item
-        ).grid(row=0, column=4)
+        ctk.CTkButton(top, text="Add to pipeline", width=130, command=self._add_item).grid(row=0, column=4)
 
         pipeline_card = ctk.CTkFrame(self, corner_radius=CARD_RADIUS)
         pipeline_card.grid(row=1, column=0, sticky="nsew", pady=(0, 8))
@@ -1361,9 +1282,7 @@ class ServicePipelinePanel(ctk.CTkFrame):
             font=ctk.CTkFont(size=CARD_TITLE_SIZE, weight="bold"),
             anchor="w",
         ).grid(row=0, column=0, sticky="w")
-        self.summary = ctk.CTkLabel(
-            title_row, text="", text_color=TEXT_MUTED, anchor="e"
-        )
+        self.summary = ctk.CTkLabel(title_row, text="", text_color=TEXT_MUTED, anchor="e")
         self.summary.grid(row=0, column=1, sticky="e", padx=(12, 0))
 
         self.pipe_tree = ThemedTreeview(
@@ -1389,12 +1308,10 @@ class ServicePipelinePanel(ctk.CTkFrame):
         )
         self.step_menu.set(PIPELINE_STEPS[0])
         self.step_menu.grid(row=0, column=1, sticky="w", padx=(4, 8))
-        ctk.CTkButton(controls, text="Apply", width=70, command=self._set_step).grid(
-            row=0, column=2
+        ctk.CTkButton(controls, text="Apply", width=70, command=self._set_step).grid(row=0, column=2)
+        ctk.CTkButton(controls, text="Advance step", width=120, command=self._advance_item).grid(
+            row=0, column=3, padx=(8, 0)
         )
-        ctk.CTkButton(
-            controls, text="Advance step", width=120, command=self._advance_item
-        ).grid(row=0, column=3, padx=(8, 0))
         ctk.CTkButton(
             controls,
             text="Delete",
@@ -1420,11 +1337,7 @@ class ServicePipelinePanel(ctk.CTkFrame):
         for item in items:
             step = max(1, min(int(item["step"]), PIPELINE_MAX_STEP))
             status = PIPELINE_STEPS[step - 1]
-            tag = (
-                "done"
-                if step == PIPELINE_MAX_STEP
-                else ("wip" if step in (4, 5, 6, 7, 8) else "")
-            )
+            tag = "done" if step == PIPELINE_MAX_STEP else ("wip" if step in (4, 5, 6, 7, 8) else "")
             rows.append(
                 (
                     item.get("client_name") or "Unassigned",
@@ -1438,9 +1351,7 @@ class ServicePipelinePanel(ctk.CTkFrame):
             tags.append([tag] if tag else [])
         self.pipe_tree.set_rows(rows, iids=iids, tags=tags)
         summary = self.app.db.pipeline_summary()
-        self.summary.configure(
-            text=f"{summary['total']} engagement(s) tracked — {summary['completed']} completed."
-        )
+        self.summary.configure(text=f"{summary['total']} engagement(s) tracked — {summary['completed']} completed.")
 
     def _refresh_tasks_panel(self) -> None:
         view = self.app._views.get("database_tasks")
@@ -1454,9 +1365,7 @@ class ServicePipelinePanel(ctk.CTkFrame):
             self.feedback.error("Select a client and a service.")
             return
         if service not in self.app.db.list_service_types():
-            self.feedback.error(
-                "Pick a service from the list — add new services in Settings."
-            )
+            self.feedback.error("Pick a service from the list — add new services in Settings.")
             return
         client_id = self.app.db.get_or_create_client(name)
         self.app.db.add_pipeline_item(client_id=client_id, service=service)
@@ -1554,7 +1463,8 @@ class SuppliersPanel(ctk.CTkFrame):
         card.grid(row=0, column=0, sticky="ew", pady=(0, 10))
         card.grid_columnconfigure(0, weight=1)
         ctk.CTkLabel(
-            card, text="Supplier directory",
+            card,
+            text="Supplier directory",
             font=ctk.CTkFont(size=CARD_TITLE_SIZE, weight="bold"),
         ).grid(row=0, column=0, sticky="w", padx=16, pady=(14, 8))
 
@@ -1578,7 +1488,11 @@ class SuppliersPanel(ctk.CTkFrame):
         btns.grid(row=2, column=0, sticky="ew", padx=16, pady=(0, 8))
         ctk.CTkButton(btns, text="Save", width=100, command=self._save_supplier).pack(side="left")
         ctk.CTkButton(
-            btns, text="New", width=70, fg_color="transparent", border_width=1,
+            btns,
+            text="New",
+            width=70,
+            fg_color="transparent",
+            border_width=1,
             command=self._new_supplier,
         ).pack(side="left", padx=(8, 0))
 
@@ -1595,7 +1509,10 @@ class SuppliersPanel(ctk.CTkFrame):
         )
         self.supplier_tree.grid(row=3, column=0, sticky="nsew", padx=12, pady=(0, 8))
         ctk.CTkButton(
-            card, text="Delete selected", fg_color="transparent", border_width=1,
+            card,
+            text="Delete selected",
+            fg_color="transparent",
+            border_width=1,
             command=self._delete_supplier,
         ).grid(row=4, column=0, sticky="w", padx=16, pady=(0, 14))
 
@@ -1610,7 +1527,8 @@ class SuppliersPanel(ctk.CTkFrame):
         svc_card.grid_columnconfigure(0, weight=1)
 
         ctk.CTkLabel(
-            svc_card, text="Supplier services — tracked per supplier",
+            svc_card,
+            text="Supplier services — tracked per supplier",
             font=ctk.CTkFont(size=CARD_TITLE_SIZE, weight="bold"),
         ).grid(row=0, column=0, sticky="w", padx=16, pady=(14, 4))
 
@@ -1643,10 +1561,17 @@ class SuppliersPanel(ctk.CTkFrame):
         svc_btns.grid(row=3, column=0, sticky="ew", padx=16, pady=(4, 4))
         ctk.CTkButton(svc_btns, text="Add service", width=110, command=self._add_supplier_service).pack(side="left")
         ctk.CTkButton(
-            svc_btns, text="Edit", width=70, command=self._edit_supplier_service,
+            svc_btns,
+            text="Edit",
+            width=70,
+            command=self._edit_supplier_service,
         ).pack(side="left", padx=(8, 0))
         ctk.CTkButton(
-            svc_btns, text="Delete", width=70, fg_color="transparent", border_width=1,
+            svc_btns,
+            text="Delete",
+            width=70,
+            fg_color="transparent",
+            border_width=1,
             command=self._delete_supplier_service,
         ).pack(side="left", padx=(8, 0))
 
@@ -1672,7 +1597,8 @@ class SuppliersPanel(ctk.CTkFrame):
         pay_card.grid(row=0, column=0, sticky="ew")
         pay_card.grid_columnconfigure(0, weight=1)
         ctk.CTkLabel(
-            pay_card, text="Supplier payments (AP)",
+            pay_card,
+            text="Supplier payments (AP)",
             font=ctk.CTkFont(size=CARD_TITLE_SIZE, weight="bold"),
         ).grid(row=0, column=0, sticky="w", padx=16, pady=(14, 8))
 
@@ -1701,15 +1627,15 @@ class SuppliersPanel(ctk.CTkFrame):
         self.pay_notes.grid(row=2, column=3, sticky="ew", pady=4)
         pay_form_btns = ctk.CTkFrame(pay_card, fg_color="transparent")
         pay_form_btns.grid(row=2, column=0, sticky="w", padx=16, pady=(8, 4))
-        self.pay_save_btn = ctk.CTkButton(
-            pay_form_btns, text="Add payment", width=120, command=self._save_payment
-        )
+        self.pay_save_btn = ctk.CTkButton(pay_form_btns, text="Add payment", width=120, command=self._save_payment)
         self.pay_save_btn.pack(side="left")
+        ctk.CTkButton(pay_form_btns, text="Edit", width=70, command=self._edit_payment).pack(side="left", padx=(8, 0))
         ctk.CTkButton(
-            pay_form_btns, text="Edit", width=70, command=self._edit_payment
-        ).pack(side="left", padx=(8, 0))
-        ctk.CTkButton(
-            pay_form_btns, text="New", width=70, fg_color="transparent", border_width=1,
+            pay_form_btns,
+            text="New",
+            width=70,
+            fg_color="transparent",
+            border_width=1,
             command=self._new_payment,
         ).pack(side="left", padx=(8, 0))
 
@@ -1731,7 +1657,11 @@ class SuppliersPanel(ctk.CTkFrame):
         pay_btns.grid(row=4, column=0, sticky="ew", padx=16, pady=(0, 14))
         ctk.CTkButton(pay_btns, text="Mark paid", width=110, command=self._mark_paid).pack(side="left")
         ctk.CTkButton(
-            pay_btns, text="Delete", width=90, fg_color="transparent", border_width=1,
+            pay_btns,
+            text="Delete",
+            width=90,
+            fg_color="transparent",
+            border_width=1,
             command=self._delete_payment,
         ).pack(side="left", padx=(8, 0))
 
@@ -1752,9 +1682,7 @@ class SuppliersPanel(ctk.CTkFrame):
             ],
             iids=[str(s["id"]) for s in suppliers],
         )
-        fill_combo(
-            self.pay_supplier, [s["name"] for s in suppliers], self.pay_supplier.get()
-        )
+        fill_combo(self.pay_supplier, [s["name"] for s in suppliers], self.pay_supplier.get())
         fill_combo(self.pay_client, self.app.db.list_client_names(), self.pay_client.get())
         self._refresh_supplier_services()
         payments = self.app.db.list_supplier_payments()
@@ -1845,8 +1773,7 @@ class SuppliersPanel(ctk.CTkFrame):
             return
         if not messagebox.askyesno(
             "Delete supplier",
-            "Delete this supplier?\n\nAll of their payment records will be removed too. "
-            "This cannot be undone.",
+            "Delete this supplier?\n\nAll of their payment records will be removed too. This cannot be undone.",
             parent=self.winfo_toplevel(),
         ):
             return
@@ -1866,9 +1793,7 @@ class SuppliersPanel(ctk.CTkFrame):
         if client_name:
             client_id = self.app.db.client_id_by_name(client_name)
             if client_id is None:
-                self.feedback.error(
-                    f"Client '{client_name}' does not exist — add the client first."
-                )
+                self.feedback.error(f"Client '{client_name}' does not exist — add the client first.")
                 return
         raw_amount = self.pay_amount.get().strip()
         pay_date = parse_flexible_date(self.pay_date_var.get().strip())
@@ -1970,9 +1895,7 @@ class SuppliersPanel(ctk.CTkFrame):
             anchor="w",
         ).grid(row=1, column=0, sticky="w", padx=20)
 
-        ctk.CTkLabel(top, text="Payment date", anchor="w").grid(
-            row=2, column=0, sticky="w", padx=20, pady=(10, 2)
-        )
+        ctk.CTkLabel(top, text="Payment date", anchor="w").grid(row=2, column=0, sticky="w", padx=20, pady=(10, 2))
         date_var = ctk.StringVar(value=payment.get("paid_date") or date.today().isoformat())
         DatePickerField(top, var=date_var).grid(row=3, column=0, sticky="ew", padx=20)
 
@@ -1987,9 +1910,7 @@ class SuppliersPanel(ctk.CTkFrame):
             self.feedback.success("Payment marked as paid.")
             self.refresh()
 
-        ctk.CTkButton(top, text="Confirm paid", command=_do).grid(
-            row=4, column=0, sticky="ew", padx=20, pady=(12, 18)
-        )
+        ctk.CTkButton(top, text="Confirm paid", command=_do).grid(row=4, column=0, sticky="ew", padx=20, pady=(12, 18))
 
     def _delete_payment(self) -> None:
         iid = self.pay_tree.selected_iid()

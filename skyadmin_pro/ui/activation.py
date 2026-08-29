@@ -8,7 +8,6 @@ with a signed code from the phone generator → paste → activated instantly.
 from __future__ import annotations
 
 import tkinter as tk
-from pathlib import Path
 from urllib.parse import quote
 from webbrowser import open as _open_url
 
@@ -27,10 +26,8 @@ from skyadmin_pro.services.license import (
     check_activation_usable,
     fetch_revocations,
     get_machine_id,
-    license_remaining_days,
     mark_used,
     save_license_file,
-    verify_key_text,
 )  # noqa: F401 (fetch_revocations used inside _activate worker)
 from skyadmin_pro.ui.theme import (
     CARD_RADIUS,
@@ -86,7 +83,8 @@ class ActivationDialog(ctk.CTkToplevel):
 
         # Header — includes remaining days when relevant
         ctk.CTkLabel(
-            body, text="Pricing & Activation",
+            body,
+            text="Pricing & Activation",
             font=ctk.CTkFont(size=HEADER_TITLE_SIZE, weight="bold"),
         ).grid(row=0, column=0, sticky="w", padx=24, pady=(18, 0))
 
@@ -112,7 +110,9 @@ class ActivationDialog(ctk.CTkToplevel):
         price_card.grid(row=2, column=0, sticky="ew", padx=16, pady=(0, 12))
         price_card.grid_columnconfigure((0, 1), weight=1, uniform="tiers")
         ctk.CTkLabel(
-            price_card, text="Packages", anchor="w",
+            price_card,
+            text="Packages",
+            anchor="w",
             font=ctk.CTkFont(size=13, weight="bold"),
         ).grid(row=0, column=0, columnspan=2, sticky="w", padx=16, pady=(12, 4))
         for i, (label, _days, baht) in enumerate(PRICING_TIERS):
@@ -123,7 +123,8 @@ class ActivationDialog(ctk.CTkToplevel):
                 anchor="w", padx=12, pady=(8, 0)
             )
             ctk.CTkLabel(
-                tier, text=f"{baht:,} Baht",
+                tier,
+                text=f"{baht:,} Baht",
                 font=ctk.CTkFont(size=16, weight="bold"),
                 text_color="#2563eb" if ctk.get_appearance_mode() == "Light" else "#60a5fa",
             ).pack(anchor="w", padx=12, pady=(0, 8))
@@ -131,15 +132,16 @@ class ActivationDialog(ctk.CTkToplevel):
         over = ctk.CTkFrame(price_card, corner_radius=10, fg_color=("gray90", "gray20"))
         over.grid(row=rows_used + 1, column=0, columnspan=2, sticky="ew", padx=8, pady=(4, 12))
         over.grid_columnconfigure(1, weight=1)
-        ctk.CTkLabel(over, text=PRICING_OVER_YEAR_TEXT, anchor="w").grid(
-            row=0, column=0, sticky="w", padx=12, pady=10
-        )
+        ctk.CTkLabel(over, text=PRICING_OVER_YEAR_TEXT, anchor="w").grid(row=0, column=0, sticky="w", padx=12, pady=10)
         ctk.CTkButton(
-            over, text="WhatsApp us", width=130, height=30,
-            fg_color="#128C7E", hover_color="#075E54",
+            over,
+            text="WhatsApp us",
+            width=130,
+            height=30,
+            fg_color="#128C7E",
+            hover_color="#075E54",
             command=lambda: open_whatsapp_chat(
-                "SkyAdmin Pro — I'm interested in a license over 1 year.\n"
-                f"Machine ID: {machine_id}"
+                f"SkyAdmin Pro — I'm interested in a license over 1 year.\nMachine ID: {machine_id}"
             ),
         ).grid(row=0, column=1, sticky="e", padx=12, pady=6)
 
@@ -162,39 +164,53 @@ class ActivationDialog(ctk.CTkToplevel):
             row=0, column=0, sticky="w", padx=16, pady=(12, 2)
         )
         ctk.CTkLabel(
-            mid_card, text=machine_id,
-            font=ctk.CTkFont(size=19, weight="bold"), anchor="w",
+            mid_card,
+            text=machine_id,
+            font=ctk.CTkFont(size=19, weight="bold"),
+            anchor="w",
         ).grid(row=1, column=0, sticky="w", padx=16)
         ctk.CTkButton(
-            mid_card, text="Copy Machine ID", width=160,
-            fg_color="transparent", border_width=1, command=self._copy_mid,
+            mid_card,
+            text="Copy Machine ID",
+            width=160,
+            fg_color="transparent",
+            border_width=1,
+            command=self._copy_mid,
         ).grid(row=2, column=0, sticky="w", padx=16, pady=(6, 12))
 
         # ---- Step 1: email request ----
         ctk.CTkLabel(
-            body, text="1. Enter your email — we reply with your code:",
+            body,
+            text="1. Enter your email — we reply with your code:",
             anchor="w",
         ).grid(row=4, column=0, sticky="ew", padx=16, pady=(0, 4))
         self.email_var = ctk.StringVar()
         ctk.CTkEntry(
-            body, textvariable=self.email_var,
+            body,
+            textvariable=self.email_var,
             placeholder_text="yourname@gmail.com",
         ).grid(row=5, column=0, sticky="ew", padx=16)
         req_row = ctk.CTkFrame(body, fg_color="transparent")
         req_row.grid(row=6, column=0, sticky="ew", padx=16, pady=(8, 0))
         req_row.grid_columnconfigure(0, weight=1)
+        ctk.CTkButton(req_row, text="Request Code by Email", height=38, command=self._request_email).grid(
+            row=0, column=0, sticky="ew"
+        )
         ctk.CTkButton(
-            req_row, text="Request Code by Email", height=38, command=self._request_email
-        ).grid(row=0, column=0, sticky="ew")
-        ctk.CTkButton(
-            req_row, text="Discuss on WhatsApp", height=38,
-            fg_color="#128C7E", hover_color="#075E54",
+            req_row,
+            text="Discuss on WhatsApp",
+            height=38,
+            fg_color="#128C7E",
+            hover_color="#075E54",
             command=lambda: open_whatsapp_chat(activation_request_message(self._customer_email())),
         ).grid(row=1, column=0, sticky="ew", pady=(6, 0))
         ctk.CTkLabel(
             req_row,
             text=f"Email: {OWNER_EMAIL}   ·   WhatsApp: {OWNER_WHATSAPP_DISPLAY}",
-            text_color=TEXT_MUTED, anchor="w", wraplength=500, justify="left",
+            text_color=TEXT_MUTED,
+            anchor="w",
+            wraplength=500,
+            justify="left",
         ).grid(row=2, column=0, sticky="ew", pady=(8, 0))
 
         # ---- Step 2: paste code ----
@@ -207,7 +223,11 @@ class ActivationDialog(ctk.CTkToplevel):
         self.key_box.grid(row=8, column=0, sticky="ew", padx=16)
 
         self.status = ctk.CTkLabel(
-            body, text="", anchor="w", justify="left", wraplength=520,
+            body,
+            text="",
+            anchor="w",
+            justify="left",
+            wraplength=520,
         )
         self.status.grid(row=9, column=0, sticky="ew", padx=16, pady=(8, 0))
 
@@ -215,29 +235,42 @@ class ActivationDialog(ctk.CTkToplevel):
         actions = ctk.CTkFrame(body, fg_color="transparent")
         actions.grid(row=10, column=0, sticky="ew", padx=16, pady=(10, 20))
         actions.grid_columnconfigure(0, weight=1)
-        self.activate_btn = ctk.CTkButton(
-            actions, text="Activate Now", height=42, command=self._activate
-        )
+        self.activate_btn = ctk.CTkButton(actions, text="Activate Now", height=42, command=self._activate)
         self.activate_btn.grid(row=0, column=0, sticky="ew")
         bottom = ctk.CTkFrame(actions, fg_color="transparent")
         bottom.grid(row=1, column=0, sticky="ew", pady=(8, 14))
         self.continue_btn = ctk.CTkButton(
-            bottom, text="Continue to App", height=34,
-            state="disabled", command=self._continue,
+            bottom,
+            text="Continue to App",
+            height=34,
+            state="disabled",
+            command=self._continue,
         )
         self.continue_btn.pack(side="left")
         ctk.CTkButton(
-            bottom, text="License", height=34,
-            fg_color="transparent", border_width=1, command=self._show_license_text,
+            bottom,
+            text="License",
+            height=34,
+            fg_color="transparent",
+            border_width=1,
+            command=self._show_license_text,
         ).pack(side="left", padx=(8, 0))
         ctk.CTkButton(
-            bottom, text="Disclaimer", height=34,
-            fg_color="transparent", border_width=1, command=self._show_disclaimer_text,
+            bottom,
+            text="Disclaimer",
+            height=34,
+            fg_color="transparent",
+            border_width=1,
+            command=self._show_disclaimer_text,
         ).pack(side="left", padx=(6, 0))
         if allow_quit:
             ctk.CTkButton(
-                bottom, text="Quit", height=34, fg_color="transparent",
-                border_width=1, command=self._quit,
+                bottom,
+                text="Quit",
+                height=34,
+                fg_color="transparent",
+                border_width=1,
+                command=self._quit,
             ).pack(side="right")
 
         self.bind("<Escape>", lambda _e: self._close())
@@ -269,10 +302,7 @@ class ActivationDialog(ctk.CTkToplevel):
             return
         subject = "SkyAdmin Pro — License Request"
         body = activation_request_message(email)
-        url = (
-            f"mailto:{OWNER_EMAIL}?subject={quote(subject)}"
-            f"&body={quote(body)}"
-        )
+        url = f"mailto:{OWNER_EMAIL}?subject={quote(subject)}&body={quote(body)}"
         _open_url(url)
         try:
             import pyperclip
@@ -331,10 +361,11 @@ class ActivationDialog(ctk.CTkToplevel):
         def worker():
             net_ok, net_msg = fetch_revocations()
             if not net_ok:
-                result_ok, result_msg, result_nonce = False, (
-                    "Internet connection is required to activate. "
-                    "Please connect and try again."
-                ), None
+                result_ok, result_msg, result_nonce = (
+                    False,
+                    ("Internet connection is required to activate. Please connect and try again."),
+                    None,
+                )
             else:
                 # Re-run the FULL gate AFTER syncing revocations/bans/used —
                 # remotely revoked, banned or already-used codes must be
@@ -382,9 +413,7 @@ class ActivationDialog(ctk.CTkToplevel):
         box.grid(row=0, column=0, sticky="nsew", padx=14, pady=(14, 6))
         box.insert("1.0", text)
         box.configure(state="disabled")
-        ctk.CTkButton(top, text="Close", width=110, command=top.destroy).grid(
-            row=1, column=0, pady=(0, 14)
-        )
+        ctk.CTkButton(top, text="Close", width=110, command=top.destroy).grid(row=1, column=0, pady=(0, 14))
 
     def _continue(self) -> None:
         self._close()

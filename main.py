@@ -10,6 +10,10 @@ from __future__ import annotations
 import logging
 import sys
 from pathlib import Path
+from typing import TYPE_CHECKING
+
+if TYPE_CHECKING:
+    from skyadmin_pro.ui.main_window import MainWindow
 
 if sys.platform == "win32":
     import msvcrt
@@ -51,7 +55,7 @@ class _SingleInstance:
     def acquire(self) -> bool:
         try:
             self._path.parent.mkdir(parents=True, exist_ok=True)
-            self._handle = open(self._path, "a+b")
+            self._handle = open(self._path, "a+b")  # noqa: SIM115
             if sys.platform == "win32" and msvcrt is not None:
                 try:
                     msvcrt.locking(self._handle.fileno(), msvcrt.LK_NBLCK, 1)
@@ -237,13 +241,9 @@ def _startup_license_sync(on_result=None) -> None:
                 return
             callbacks = on_result() if callable(on_result) else {}
             licensed, why = verify_license()
-            logging.getLogger(__name__).info(
-                "Control list synced; licensed=%s (%s)", licensed, why.splitlines()[0]
-            )
+            logging.getLogger(__name__).info("Control list synced; licensed=%s (%s)", licensed, why.splitlines()[0])
             if not licensed:
-                logging.getLogger(__name__).warning(
-                    "License invalid post-sync."
-                )
+                logging.getLogger(__name__).warning("License invalid post-sync.")
                 cb = callbacks.get("invalid")
                 if callable(cb):
                     cb(why)
@@ -260,7 +260,7 @@ def _startup_license_sync(on_result=None) -> None:
     threading.Thread(target=worker, daemon=True).start()
 
 
-def bootstrap() -> "MainWindow":
+def bootstrap() -> MainWindow:
     from skyadmin_pro.config import (
         DEFAULT_APPEARANCE_MODE,
         DEFAULT_COLOR_THEME,
@@ -278,9 +278,7 @@ def bootstrap() -> "MainWindow":
     # Software data in the system folder; customer documents next to the exe.
     db = Database()
     _normalize_workspace(db)
-    workspace = (
-        db.get_setting(SETTING_WORKSPACE_ROOT) or str(default_workspace_root())
-    )
+    workspace = db.get_setting(SETTING_WORKSPACE_ROOT) or str(default_workspace_root())
 
     appearance = db.get_setting(SETTING_APPEARANCE_MODE, DEFAULT_APPEARANCE_MODE)
     theme = db.get_setting(SETTING_COLOR_THEME, DEFAULT_COLOR_THEME)
@@ -292,6 +290,7 @@ def bootstrap() -> "MainWindow":
     lang = db.get_setting("ui_language")
     if lang:
         from skyadmin_pro.services.i18n import set_language
+
         set_language(lang)
 
     paths = WorkspacePaths(workspace)
@@ -342,10 +341,7 @@ def bootstrap() -> "MainWindow":
         from skyadmin_pro.services.license import is_newer_version
 
         if is_newer_version(info.get("version", ""), APP_VERSION):
-            msg = (
-                f"Update v{info['version']} available — see Settings → Update. "
-                f"Current v{APP_VERSION}."
-            )
+            msg = f"Update v{info['version']} available — see Settings → Update. Current v{APP_VERSION}."
             window.after(0, lambda: window.set_status(msg))
 
     def _sync_callback():
@@ -395,10 +391,6 @@ def _check_bytecode_integrity() -> None:
     ]
     # Expected CRCs of each module's source code (computed at build time).
     # If these don't match, the .pyc was tampered with.
-    expected = {
-        "skyadmin_pro.services.license": 0x00000000,  # computed below at first run
-        "skyadmin_pro.services.crypto": 0x00000000,
-    }
     for mod_name in critical_modules:
         try:
             mod = importlib.import_module(mod_name)
@@ -413,9 +405,7 @@ def _check_bytecode_integrity() -> None:
                 try:
                     stored_crc = int(stored_path.read_text(encoding="utf-8").strip(), 16)
                     if stored_crc != 0 and actual_crc != stored_crc:
-                        logging.getLogger(__name__).critical(
-                            "Bytecode tamper detected in %s", mod_name
-                        )
+                        logging.getLogger(__name__).critical("Bytecode tamper detected in %s", mod_name)
                         return  # don't block, but log the threat
                 except (ValueError, OSError):
                     pass
@@ -529,19 +519,17 @@ def main() -> None:
 
                     if get_machine_id() in banned_machines():
                         logging.getLogger(__name__).critical("Machine banned — killing app")
-                        app.after(0, lambda m="This machine has been blocked by Sky Creation Innovations.": _kill_app(m))
+                        app.after(
+                            0, lambda m="This machine has been blocked by Sky Creation Innovations.": _kill_app(m)
+                        )
                         return
                     ok, why = verify_license()
                     if not ok:
-                        logging.getLogger(__name__).critical(
-                            "License invalid mid-session: %s", why.splitlines()[0]
-                        )
+                        logging.getLogger(__name__).critical("License invalid mid-session: %s", why.splitlines()[0])
                         app.after(0, lambda w=why: _kill_app(w.splitlines()[0]))
                         return
                 except Exception:
-                    logging.getLogger(__name__).debug(
-                        "Periodic license check failed", exc_info=True
-                    )
+                    logging.getLogger(__name__).debug("Periodic license check failed", exc_info=True)
 
         def _kill_app(reason: str) -> None:
             try:

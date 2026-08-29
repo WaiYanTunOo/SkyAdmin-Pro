@@ -48,9 +48,9 @@ def test_client_credential_dbd_rd_encrypted(db, monkeypatch):
 
     with sqlite3.connect(db.db_file) as conn:
         conn.row_factory = sqlite3.Row
-        raw = conn.execute(
-            "SELECT secret_value FROM client_credentials WHERE id = ?", (entry_id,)
-        ).fetchone()["secret_value"]
+        raw = conn.execute("SELECT secret_value FROM client_credentials WHERE id = ?", (entry_id,)).fetchone()[
+            "secret_value"
+        ]
     assert is_encrypted_secret(raw)
 
 

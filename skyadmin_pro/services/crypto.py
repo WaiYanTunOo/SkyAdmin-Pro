@@ -51,9 +51,7 @@ def encrypt_file(path: Path, machine_id: str) -> bool:
     except Exception as exc:
         import logging
 
-        logging.getLogger(__name__).warning(
-            "encrypt_file failed for %s: %s", path, exc, exc_info=True
-        )
+        logging.getLogger(__name__).warning("encrypt_file failed for %s: %s", path, exc, exc_info=True)
         return False
 
 
@@ -76,6 +74,7 @@ def decrypt_file(path: Path, machine_id: str) -> bool:
 
 
 # ---- Encrypted backup for data folder copy (universal key) ----
+
 
 def create_encrypted_backup(workspace_root: Path, db_file: Path, dest: Path) -> Path:
     """Create an encrypted .skybackup archive of DB + Workspace.
@@ -137,9 +136,7 @@ def restore_encrypted_backup(archive: Path, workspace_root: Path, db_file: Path)
     try:
         with zipfile.ZipFile(tmp_path, "r") as z:
             if "skyadmin_pro.db" not in z.namelist():
-                raise ValueError(
-                    "Backup archive is missing skyadmin_pro.db — restore aborted."
-                )
+                raise ValueError("Backup archive is missing skyadmin_pro.db — restore aborted.")
             db_data = z.read("skyadmin_pro.db")
             db_file.parent.mkdir(parents=True, exist_ok=True)
             db_file.write_bytes(db_data)
