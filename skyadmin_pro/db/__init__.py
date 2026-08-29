@@ -1,4 +1,4 @@
-"""Backward-compatible import path for Database."""
+"""Database package."""
 
 from skyadmin_pro.db.database import Database
 

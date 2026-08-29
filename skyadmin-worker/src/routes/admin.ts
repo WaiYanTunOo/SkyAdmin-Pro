@@ -4,11 +4,14 @@ import { Context } from "hono";
 import { getCookie, setCookie } from "hono/cookie";
 import { Env } from "../db";
 import { hmacSign } from "../signing";
+import {
+  isBlockedAttemptCount,
+  loginBlockCutoffIso,
+  readAttemptCount,
+} from "../admin_security";
 
 const SESSION_TTL = 86400 * 7; // 7 days
 const CSRF_TTL = 3600; // 1 hour
-const MAX_LOGIN_ATTEMPTS = 5;
-const LOGIN_BLOCK_MINUTES = 15;
 
 function sessionKey(secret: string): string {
   return "skyadm_" + secret.slice(0, 8);
@@ -45,11 +48,11 @@ async function isValidSession(c: Context<{ Bindings: Env }>): Promise<boolean> {
 }
 
 async function isIpBlocked(c: Context<{ Bindings: Env }>, ip: string): Promise<boolean> {
-  const cutoff = new Date(Date.now() - LOGIN_BLOCK_MINUTES * 60 * 1000).toISOString();
+  const cutoff = loginBlockCutoffIso();
   const row = await c.env.DB.prepare(
     "SELECT COUNT(*) as cnt FROM login_attempts WHERE ip = ? AND attempted_at > ?"
   ).bind(ip, cutoff).first<{ cnt: number }>();
-  return (row?.cnt ?? 0) >= MAX_LOGIN_ATTEMPTS;
+  return isBlockedAttemptCount(readAttemptCount(row));
 }
 
 async function recordLoginAttempt(c: Context<{ Bindings: Env }>, ip: string): Promise<void> {
