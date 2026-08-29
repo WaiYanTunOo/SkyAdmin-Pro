@@ -26,6 +26,41 @@ MONTH_STATUS_IN_PROGRESS = "in_progress"
 MONTH_STATUS_CLOSED = "closed"
 
 
+class LoadingIndicator(ctk.CTkFrame):
+    """A simple loading spinner/indicator widget."""
+
+    def __init__(self, master, text: str = "Loading...", **kwargs) -> None:
+        super().__init__(master, fg_color="transparent", **kwargs)
+        self._text = text
+        self._visible = False
+
+        self.grid_columnconfigure(0, weight=1)
+        self.label = ctk.CTkLabel(
+            self,
+            text=text,
+            font=ctk.CTkFont(size=13),
+            text_color=TEXT_MUTED,
+        )
+        self.label.grid(row=0, column=0, pady=20)
+
+    def show(self, text: str | None = None) -> None:
+        """Show the loading indicator."""
+        if text:
+            self.label.configure(text=text)
+        self._visible = True
+        self.grid()
+        self.lift()
+
+    def hide(self) -> None:
+        """Hide the loading indicator."""
+        self._visible = False
+        self.grid_remove()
+
+    @property
+    def is_visible(self) -> bool:
+        return self._visible
+
+
 def bind_escape(top) -> None:
     """Let users close any dialog with the Escape key."""
     top.bind("<Escape>", lambda _event: top.destroy())

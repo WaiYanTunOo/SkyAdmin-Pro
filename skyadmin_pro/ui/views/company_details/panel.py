@@ -2,8 +2,26 @@
 
 from __future__ import annotations
 
+from datetime import date, timedelta
+from pathlib import Path
+from tkinter import filedialog, messagebox
+
 import customtkinter as ctk
 
+from skyadmin_pro.config import (
+    IMPORTANT_DOC_TYPES,
+    SERVICE_PROGRESS,
+    TAX_FILING_FIELDS,
+    TAX_FILING_LABELS,
+    TAX_FILING_STATUSES,
+    TRANSACTION_RANGES,
+)
+from skyadmin_pro.services.file_ops import copy_file, format_thousands, parse_flexible_date, sanitize_amount
+from skyadmin_pro.services.snippets import effective_text, load_snippet_overrides
+from skyadmin_pro.services.tracking import classify_expiry, days_until, effective_expiry_date
+from skyadmin_pro.services.workflow import copy_to_clipboard, create_client_workspace
+from skyadmin_pro.ui.combo_utils import fill_combo
+from skyadmin_pro.ui.theme import CARD_TITLE_SIZE, TEXT_MUTED
 from skyadmin_pro.ui.views.company_details.accounting_setup_tab import AccountingSetupTabMixin
 from skyadmin_pro.ui.views.company_details.filing_tab import FilingTabMixin
 from skyadmin_pro.ui.views.company_details.financial_docs_tab import FinancialDocsTabMixin
@@ -11,9 +29,7 @@ from skyadmin_pro.ui.views.company_details.general_tab import GeneralTabMixin
 from skyadmin_pro.ui.views.company_details.tax_ids_tab import TaxIdsTabMixin
 from skyadmin_pro.ui.views.company_details.vo_csh_setup_tab import VoCshSetupTabMixin
 from skyadmin_pro.ui.views.company_details.vo_csh_tab import VoCshTabMixin
-from skyadmin_pro.ui.theme import TEXT_MUTED
-from skyadmin_pro.ui.widgets import FeedbackLabel
-from skyadmin_pro.ui.combo_utils import fill_combo
+from skyadmin_pro.ui.widgets import DatePickerField, FeedbackLabel, make_modal
 
 
 class CompanyDetailsPanel(

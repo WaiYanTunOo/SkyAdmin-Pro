@@ -67,11 +67,16 @@ class ThemedTreeview(ctk.CTkFrame):
 
     def apply_theme(self) -> None:
         mode = ctk.get_appearance_mode()
-        style = ttk.Style(self)
+        # Reuse existing style to avoid memory leak from creating new Style objects
+        style_name = "Sky.Treeview"
         try:
-            style.theme_use("clam")
+            style = ttk.Style()
+            # Only set theme if not already set (avoids global side effect)
+            if "clam" not in style.theme_names():
+                style.theme_use("clam")
         except ttk.TclError:
             pass
+        style = ttk.Style()
 
         if mode == "Dark":
             background, foreground = "#2b2b2b", "#f4f4f5"
@@ -95,14 +100,18 @@ class ThemedTreeview(ctk.CTkFrame):
             fieldbackground=background,
             rowheight=TABLE_ROW_HEIGHT,
             borderwidth=0,
-            font=("Segoe UI", TABLE_FONT_SIZE),
+            font=("Segoe UI", TABLE_FONT_SIZE) if __import__("sys").platform == "win32" else
+                  ("SF Pro Text", TABLE_FONT_SIZE) if __import__("sys").platform == "darwin" else
+                  ("Ubuntu", TABLE_FONT_SIZE),
         )
         style.configure(
             "Sky.Treeview.Heading",
             background=heading,
             foreground=foreground,
             relief="flat",
-            font=("Segoe UI", TABLE_HEADER_FONT_SIZE, "bold"),
+            font=("Segoe UI", TABLE_HEADER_FONT_SIZE, "bold") if __import__("sys").platform == "win32" else
+                  ("SF Pro Text", TABLE_HEADER_FONT_SIZE, "bold") if __import__("sys").platform == "darwin" else
+                  ("Ubuntu", TABLE_HEADER_FONT_SIZE, "bold"),
         )
         style.map("Sky.Treeview", background=[("selected", selected)])
         self.tree.configure(style="Sky.Treeview")
@@ -177,14 +186,23 @@ class ThemedTreeview(ctk.CTkFrame):
 
     # Excel-like helpers
     def _on_mousewheel(self, event) -> None:
-        # Windows: delta 120 per notch; macOS: smaller
-        delta = int(-event.delta / 120) if event.delta else 0
+        import sys
+        if sys.platform == "darwin":
+            # macOS: delta is ±1 per scroll unit
+            delta = -event.delta
+        else:
+            # Windows: delta 120 per notch
+            delta = int(-event.delta / 120) if event.delta else 0
         if delta:
             self.tree.yview_scroll(delta, "units")
         return "break"
 
     def _on_shift_mousewheel(self, event) -> None:
-        delta = int(-event.delta / 120) if event.delta else 0
+        import sys
+        if sys.platform == "darwin":
+            delta = -event.delta
+        else:
+            delta = int(-event.delta / 120) if event.delta else 0
         if delta:
             self.tree.xview_scroll(delta, "units")
         return "break"

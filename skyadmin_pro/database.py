@@ -417,6 +417,22 @@ CREATE TABLE IF NOT EXISTS notebook_entries (
 );
 CREATE INDEX IF NOT EXISTS idx_notebook_entries_date ON notebook_entries(entry_date);
 CREATE INDEX IF NOT EXISTS idx_notebook_entries_type ON notebook_entries(entry_type);
+
+-- Additional performance indexes
+CREATE INDEX IF NOT EXISTS idx_clients_status ON clients(status);
+CREATE INDEX IF NOT EXISTS idx_tasks_due_date ON tasks(due_date);
+CREATE INDEX IF NOT EXISTS idx_tasks_category ON tasks(category);
+CREATE INDEX IF NOT EXISTS idx_documents_type ON documents(document_type);
+CREATE INDEX IF NOT EXISTS idx_documents_progress ON documents(progress);
+CREATE INDEX IF NOT EXISTS idx_documents_paid ON documents(paid);
+CREATE INDEX IF NOT EXISTS idx_pipeline_step ON pipeline_items(step);
+CREATE INDEX IF NOT EXISTS idx_pipeline_updated ON pipeline_items(updated_at);
+CREATE INDEX IF NOT EXISTS idx_supplier_services_type ON supplier_services(service_type);
+CREATE INDEX IF NOT EXISTS idx_supplier_services_expiry ON supplier_services(expiry_date);
+CREATE INDEX IF NOT EXISTS idx_supplier_payments_supplier ON supplier_payments(supplier_id);
+CREATE INDEX IF NOT EXISTS idx_notebook_client ON notebook_entries(client_id);
+CREATE INDEX IF NOT EXISTS idx_tax_cycle_changed ON tax_cycle_log(changed_at);
+CREATE INDEX IF NOT EXISTS idx_courier_date ON courier_logs(date_sent);
 """
 
 
@@ -440,6 +456,7 @@ class Database:
         conn.execute("PRAGMA synchronous = NORMAL")
         conn.execute("PRAGMA temp_store = MEMORY")
         conn.execute("PRAGMA cache_size = -8000")
+        conn.execute("PRAGMA busy_timeout = 5000")
         if self._wal_enabled is None:
             try:
                 conn.execute("PRAGMA journal_mode=WAL")
@@ -529,6 +546,48 @@ class Database:
             except OSError:
                 pass
         return p
+
+    def restore_backup(self, backup_path: Path) -> bool:
+        """Restore the database from a backup file.
+
+        Creates a safety backup of the current database before restoring.
+        Returns True if restore was successful, False otherwise.
+        """
+        backup_path = Path(backup_path)
+        if not backup_path.exists():
+            self._log.error("Backup file not found: %s", backup_path)
+            return False
+
+        # Create safety backup of current state
+        safety_backup = self.db_file.parent / "backups" / f"skyadmin_pro_pre_restore_{date.today().isoformat()}.db"
+        try:
+            self.backup_to(safety_backup)
+        except Exception:
+            self._log.warning("Could not create safety backup", exc_info=True)
+
+        try:
+            # Verify backup integrity before restoring
+            conn = sqlite3.connect(str(backup_path))
+            try:
+                result = conn.execute("PRAGMA quick_check").fetchone()
+                if result[0] != "ok":
+                    self._log.error("Backup file integrity check failed")
+                    return False
+            finally:
+                conn.close()
+
+            # Copy backup to current database location
+            import shutil
+            shutil.copy2(str(backup_path), str(self.db_file))
+
+            # Reinitialize with the restored database
+            self._wal_enabled = None
+            self._initialize()
+            self._log.info("Database restored from %s", backup_path)
+            return True
+        except Exception:
+            self._log.exception("Failed to restore backup")
+            return False
 
     def shutdown(self) -> None:
         """Fold the WAL back into the main file and update query planner stats.
@@ -1298,10 +1357,6 @@ class Database:
         result = self._load_name_list_setting(SETTING_DEPARTMENT_LIST)
         self._department_list_cache = result
         return list(result)
-
-    def set_organizations(self, names: list[str]) -> None:
-        """Deprecated — organizations are client company names. Clears cache only."""
-        self._organization_list_cache = None
 
     def set_departments(self, names: list[str]) -> None:
         self._department_list_cache = None
@@ -3456,18 +3511,22 @@ class Database:
             WHERE expiry_date IS NOT NULL AND trim(expiry_date) != ''
             """
         )
-        updated = 0
+        # Collect updates to apply in a single transaction
+        updates: list[tuple[str, int]] = []
+        for row in rows:
+            effective = effective_expiry_date(row["expiry_date"], row["document_type"])
+            if effective and effective != row["expiry_date"]:
+                updates.append((effective, int(row["id"])))
+
+        if not updates:
+            return 0
+
         with self.connection() as conn:
-            for row in rows:
-                effective = effective_expiry_date(row["expiry_date"], row["document_type"])
-                if not effective or effective == row["expiry_date"]:
-                    continue
-                conn.execute(
-                    "UPDATE documents SET expiry_date = ? WHERE id = ?",
-                    (effective, int(row["id"])),
-                )
-                updated += 1
-        return updated
+            conn.executemany(
+                "UPDATE documents SET expiry_date = ? WHERE id = ?",
+                updates,
+            )
+        return len(updates)
 
     def count_vo_csh_expiring(self, days: int = 30) -> int:
         """Count of clients with VO or CSH renewal within N days."""

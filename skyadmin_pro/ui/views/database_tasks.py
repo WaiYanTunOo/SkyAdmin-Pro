@@ -39,6 +39,7 @@ from skyadmin_pro.services.workflow import (
     repair_client_workspaces,
     resolve_client_folder,
 )
+from skyadmin_pro.ui.combo_utils import fill_combo
 from skyadmin_pro.ui.treeview import ThemedTreeview
 from skyadmin_pro.ui.theme import CARD_CONTENT_PADX, CARD_RADIUS, CARD_TITLE_SIZE, TEXT_FAINT, TEXT_MUTED
 from skyadmin_pro.ui.views.base import BaseView
@@ -47,8 +48,6 @@ from skyadmin_pro.ui.views.company_details import CompanyDetailsPanel
 
 NONE_TASK = "(none)"
 
-
-from skyadmin_pro.ui.combo_utils import fill_combo
 
 class DatabaseTasksView(BaseView):
     title = "Database & Tasks"
@@ -324,7 +323,7 @@ class TaskPanel(ctk.CTkFrame):
         self.tree.apply_theme()
         names = self.app.db.list_client_names()
         current = self.client_box.get()
-        _fill_combo(self.client_box, names, current)
+        fill_combo(self.client_box, names, current)
 
         choice = self.filter.get()
         status = None
@@ -581,7 +580,7 @@ class CourierPanel(ctk.CTkFrame):
 
     def refresh(self) -> None:
         self.tree.apply_theme()
-        _fill_combo(self.client_box, self.app.db.list_client_names(), self.client_box.get())
+        fill_combo(self.client_box, self.app.db.list_client_names(), self.client_box.get())
         pending = self.app.db.list_tasks(status=TASK_STATUS_PENDING)
         self._task_lookup = {f"#{item['id']}  {item['title']}": int(item["id"]) for item in pending}
         values = [NONE_TASK, *self._task_lookup.keys()]
@@ -794,7 +793,7 @@ class ClientsExpiryPanel(ctk.CTkFrame):
         self._refresh_client_table()
         clients = self.app.db.list_clients()
         names = [item["name"] for item in clients]
-        _fill_combo(self.expiry_client, names, self.expiry_client.get())
+        fill_combo(self.expiry_client, names, self.expiry_client.get())
 
         documents = self.app.db.list_documents(expiring_only=True)
         rows, iids, tags = [], [], []
@@ -1159,7 +1158,7 @@ class RenewalPanel(ctk.CTkFrame):
 
     def _fill_combo(self, current: str) -> None:
         names = self.app.db.list_client_names()
-        _fill_combo(self.company_box, names, current)
+        fill_combo(self.company_box, names, current)
 
     def select_client(self, name: str) -> None:
         self._fill_combo(name)
@@ -1412,7 +1411,7 @@ class ServicePipelinePanel(ctk.CTkFrame):
 
     def refresh(self) -> None:
         self.pipe_tree.apply_theme()
-        _fill_combo(self.pipe_client, self.app.db.list_client_names(), self.pipe_client.get())
+        fill_combo(self.pipe_client, self.app.db.list_client_names(), self.pipe_client.get())
         self.pipe_service.configure(values=self.app.db.list_service_types())
         items = self.app.db.list_pipeline_items()
         rows: list[tuple] = []
@@ -1753,10 +1752,10 @@ class SuppliersPanel(ctk.CTkFrame):
             ],
             iids=[str(s["id"]) for s in suppliers],
         )
-        _fill_combo(
+        fill_combo(
             self.pay_supplier, [s["name"] for s in suppliers], self.pay_supplier.get()
         )
-        _fill_combo(self.pay_client, self.app.db.list_client_names(), self.pay_client.get())
+        fill_combo(self.pay_client, self.app.db.list_client_names(), self.pay_client.get())
         self._refresh_supplier_services()
         payments = self.app.db.list_supplier_payments()
         rows: list[tuple] = []
@@ -1908,12 +1907,12 @@ class SuppliersPanel(ctk.CTkFrame):
             return
         self._editing_payment_id = int(iid)
         self.pay_save_btn.configure(text="Save payment")
-        _fill_combo(
+        fill_combo(
             self.pay_supplier,
             [s["name"] for s in self.app.db.list_suppliers()],
             payment.get("supplier_name") or "",
         )
-        _fill_combo(
+        fill_combo(
             self.pay_client,
             self.app.db.list_client_names(),
             payment.get("client_name") or "",

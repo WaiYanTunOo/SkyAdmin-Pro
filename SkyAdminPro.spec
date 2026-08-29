@@ -11,18 +11,32 @@ import os
 import tkinterdnd2
 
 datas = []
-for dirpath, dirnames, filenames in os.walk(os.path.join(os.path.dirname(tkinterdnd2.__file__), "tkdnd", "win-arm64")):
-    for filename in filenames:
-        src = os.path.join(dirpath, filename)
-        rel = os.path.relpath(dirpath, os.path.dirname(tkinterdnd2.__file__))
-        datas.append((src, rel))
+for _plat in ("win-x64", "win-arm64", "win32"):
+    _tdnd = os.path.join(os.path.dirname(tkinterdnd2.__file__), "tkdnd", _plat)
+    if os.path.isdir(_tdnd):
+        for dirpath, dirnames, filenames in os.walk(_tdnd):
+            for filename in filenames:
+                src = os.path.join(dirpath, filename)
+                rel = os.path.relpath(dirpath, os.path.dirname(tkinterdnd2.__file__))
+                datas.append((src, rel))
 
 a = Analysis(
     ["main.py"],
     pathex=[],
     binaries=[],
     datas=datas,
-    hiddenimports=[],
+    hiddenimports=[
+        "customtkinter",
+        "pandas",
+        "openpyxl",
+        "PIL",
+        "cryptography",
+        "cryptography.hazmat.primitives.ciphers",
+        "cryptography.hazmat.primitives.kdf.pbkdf2",
+        "deep_translator",
+        "pyperclip",
+        "tkinterdnd2",
+    ],
     hookspath=[],
     hooksconfig={},
     runtime_hooks=[],

@@ -8,9 +8,11 @@
     "db:init": "wrangler d1 execute skyadmin-db --remote --file=schema.sql",
     "db:init:local": "wrangler d1 execute skyadmin-db --local --file=schema.sql"
   },
+  "dependencies": {
+    "hono": "^4.0.0"
+  },
   "devDependencies": {
     "@cloudflare/workers-types": "^4.0.0",
-    "hono": "^4.0.0",
     "typescript": "^5.0.0",
     "wrangler": "^3.0.0"
   }
