@@ -1,5 +1,7 @@
 /** Ed25519 signing — private key lives only in Worker env vars (never shipped to clients). */
 
+import { activationDeadline, formatIsoExpiry, licenseExpiryFromPackage } from "./license_policy";
+
 const enc = new TextEncoder();
 
 const LICENSE_SIGNATURE_ALGORITHM = "Ed25519-v1";
@@ -76,6 +78,27 @@ export async function ed25519Sign(privateKeyPemB64: string, payload: string): Pr
   return b64url(new Uint8Array(sig));
 }
 
+function buildLicenseKeyBlob(
+  machineId: string,
+  exp: string | null,
+  iat: string,
+  nonce: string,
+  pkg: string,
+  sig: string,
+): string {
+  const data: Record<string, string | null> = {
+    mid: machineId,
+    exp,
+    sig,
+    iat,
+    n: nonce,
+    pkg,
+    alg: LICENSE_SIGNATURE_ALGORITHM,
+  };
+  const raw = JSON.stringify(data).replace(/,"/g, ',"');
+  return b64url(enc.encode(raw));
+}
+
 /** Generate a signed full license key (Ed25519 only). */
 export async function generateLicenseKey(
   machineId: string,
@@ -87,10 +110,10 @@ export async function generateLicenseKey(
   const pad = (n: number) => String(n).padStart(2, "0");
   const iat = `${now.getFullYear()}-${pad(now.getMonth() + 1)}-${pad(now.getDate())}T${pad(now.getHours())}:${pad(now.getMinutes())}`;
 
+  // Timed packages: exp is the 24h activation window; full period starts on claim.
   let exp: string | null = null;
   if (daysValid !== null) {
-    const d = new Date(now.getTime() + daysValid * 86400000);
-    exp = d.toISOString().replace(/\.\d{3}Z$/, "Z");
+    exp = formatIsoExpiry(activationDeadline(now));
   }
 
   const nonce = [...crypto.getRandomValues(new Uint8Array(6))]
@@ -99,20 +122,26 @@ export async function generateLicenseKey(
   const pkg = daysValid !== null ? String(daysValid) : "";
   const payload = [machineId, exp || "", iat, nonce, pkg].join("|");
   const sig = await ed25519Sign(privateKey, payload);
-
-  const data: Record<string, string | null> = {
-    mid: machineId,
-    exp,
-    sig,
-    iat,
-    n: nonce,
-    pkg,
-    alg: LICENSE_SIGNATURE_ALGORITHM,
-  };
-  const raw = JSON.stringify(data).replace(/,"/g, ',"');
-  const key = b64url(enc.encode(raw));
+  const key = buildLicenseKeyBlob(machineId, exp, iat, nonce, pkg, sig);
 
   return { key, iat, nonce, exp };
+}
+
+/** Re-sign an activated license with the full package period (same nonce/iat). */
+export async function resignActivatedLicense(
+  machineId: string,
+  packageDays: number,
+  ed25519PrivateKeyB64: string,
+  opts: { iat: string; nonce: string; activatedAt?: Date },
+): Promise<{ key: string; exp: string }> {
+  const privateKey = requireEd25519Key(ed25519PrivateKeyB64);
+  const activatedAt = opts.activatedAt ?? new Date();
+  const exp = formatIsoExpiry(licenseExpiryFromPackage(packageDays, activatedAt));
+  const pkg = String(packageDays);
+  const payload = [machineId, exp, opts.iat, opts.nonce, pkg].join("|");
+  const sig = await ed25519Sign(privateKey, payload);
+  const key = buildLicenseKeyBlob(machineId, exp, opts.iat, opts.nonce, pkg, sig);
+  return { key, exp };
 }
 
 /** Generate an Ed25519-signed SKYPASS1 passcode. */
@@ -126,8 +155,7 @@ export async function generatePasscode(
 
   let exp: string | null = null;
   if (daysValid !== null) {
-    const expDt = new Date(Date.now() + daysValid * 86400000);
-    exp = expDt.toISOString().replace(/\.\d{3}Z$/, "Z");
+    exp = formatIsoExpiry(activationDeadline());
   }
 
   const nonce = [...crypto.getRandomValues(new Uint8Array(6))]

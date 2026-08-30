@@ -156,6 +156,7 @@ def check_version_alignment() -> list[str]:
     return errors
 
 
+def run_pytest() -> list[str]:
     errors: list[str] = []
     cmd = [
         sys.executable,

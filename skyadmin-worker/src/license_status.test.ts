@@ -24,6 +24,20 @@ describe("license_status", () => {
     expect(info.time_left).toContain("2 day");
   });
 
+  it("shows activation window for unused pending licenses", () => {
+    const info = describeLicenseExpiry("2026-08-31T12:00:00Z", { used: false, now });
+    expect(info.state).toBe("pending");
+    expect(info.time_left).toContain("left to activate");
+    expect(info.expires_label).toContain("Activate by");
+  });
+
+  it("marks unused licenses past activation window as expired", () => {
+    const info = describeLicenseExpiry("2026-08-29T12:00:00Z", { used: false, now });
+    expect(info.state).toBe("expired");
+    expect(info.is_expired).toBe(true);
+    expect(info.time_left).toBe("Activation expired (unused)");
+  });
+
   it("formats expiry label in UTC", () => {
     expect(formatExpiryLabel("2026-09-04T15:30:00Z")).toBe("2026-09-04 15:30 UTC");
   });
@@ -55,5 +69,22 @@ describe("license_status", () => {
     expect(summary[0].status).toBe("active");
     expect(summary[0].time_left).toContain("2 day");
     expect(summary[0].expiring_soon).toBe(true);
+  });
+
+  it("shows expired for unused licenses past activation window", () => {
+    const rows = [
+      {
+        machine_id: "BBBBBBBBBBBBBBBB",
+        expires_at: "2026-08-29T12:00:00Z",
+        issued_at: "2026-08-28T12:00:00Z",
+        package_days: 7,
+        nonce: "n3",
+        used: false,
+        revoked: false,
+      },
+    ];
+    const summary = summarizeMachines(rows, now);
+    expect(summary[0].status).toBe("expired");
+    expect(summary[0].time_left).toContain("Activation expired");
   });
 });

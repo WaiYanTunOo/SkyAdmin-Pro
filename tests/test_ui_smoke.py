@@ -31,6 +31,19 @@ def app(tmp_path_factory):
         pass
 
 
+def test_sidebar_toggle_collapses_and_expands(app):
+    assert not app._sidebar_collapsed
+    app._toggle_sidebar()
+    app.update()
+    assert app._sidebar_collapsed
+    assert app.sidebar.cget("width") == 56
+    for btn in app._nav_buttons.values():
+        assert "  " not in btn.cget("text")
+    app._toggle_sidebar()
+    app.update()
+    assert not app._sidebar_collapsed
+
+
 def test_sidebar_has_six_nav_buttons(app):
     assert len(app._nav_buttons) == 6
     for _key, btn in app._nav_buttons.items():

@@ -21,6 +21,7 @@ import {
   syncSchemaHandler,
 } from "./routes/sync";
 import { pricingGetHandler, pricingPostHandler } from "./routes/pricing";
+import { purgeLicensesHandler } from "./routes/purge";
 import { signingPublicKeyHandler } from "./routes/signing_info";
 import {
   viewerHandler,
@@ -36,6 +37,16 @@ app.use("*", corsMiddleware);
 // ── Public endpoints (no auth) ──────────────────────────────────────────────
 
 app.get("/api/ping", (c) => c.json({ ok: true, service: "skyadmin-api", ts: new Date().toISOString() }));
+
+const FAVICON_SVG =
+  "<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 32 32'>" +
+  "<rect width='32' height='32' rx='6' fill='#2563eb'/>" +
+  "<text x='16' y='21' text-anchor='middle' font-size='14' fill='white' font-family='sans-serif'>S</text>" +
+  "</svg>";
+
+app.get("/favicon.ico", (c) =>
+  c.body(FAVICON_SVG, 200, { "Content-Type": "image/svg+xml", "Cache-Control": "public, max-age=86400" }),
+);
 
 app.get("/api/control", controlHandler);
 
@@ -74,6 +85,7 @@ app.use("/api/unban", authMiddleware);
 app.use("/api/used", authMiddleware);
 app.use("/api/revoke-pc", authMiddleware);
 app.use("/api/records", authMiddleware);
+app.use("/api/purge-licenses", authMiddleware);
 
 app.post("/api/generate", generateHandler);
 app.post("/api/revoke", revokeHandler);
@@ -84,6 +96,7 @@ app.get("/api/bans", listBansHandler);
 app.post("/api/used", usedHandler);
 app.post("/api/revoke-pc", revokePcHandler);
 app.get("/api/records", recordsHandler);
+app.post("/api/purge-licenses", purgeLicensesHandler);
 
 // ── Hidden admin page (secret path) ──────────────────────────────────────────
 // ADMIN_PATH is a runtime secret — no static route can match it.

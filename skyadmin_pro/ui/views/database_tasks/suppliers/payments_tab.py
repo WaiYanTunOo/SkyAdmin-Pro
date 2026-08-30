@@ -12,7 +12,7 @@ from skyadmin_pro.services.file_ops import format_thousands, parse_flexible_date
 from skyadmin_pro.ui.combo_utils import fill_combo
 from skyadmin_pro.ui.theme import CARD_RADIUS, CARD_TITLE_SIZE, TEXT_MUTED
 from skyadmin_pro.ui.treeview import ThemedTreeview
-from skyadmin_pro.ui.widgets import DatePickerField, make_modal, themed_entry
+from skyadmin_pro.ui.widgets import DatePickerField, make_modal, themed_entry, themed_scrollable_frame
 
 if TYPE_CHECKING:
     from skyadmin_pro.ui.views.database_tasks.suppliers.panel import SuppliersPanel
@@ -27,7 +27,7 @@ class SupplierPaymentsTab:
         self.feedback = host.feedback
         self._editing_payment_id: int | None = None
 
-        scroll = ctk.CTkScrollableFrame(master, fg_color="transparent")
+        scroll = themed_scrollable_frame(master)
         scroll.grid(row=0, column=0, sticky="nsew")
         scroll.grid_columnconfigure(0, weight=1)
 

@@ -25,7 +25,7 @@ from skyadmin_pro.services.file_ops import open_in_file_manager
 from skyadmin_pro.services.workflow import open_portal_and_copy_path
 from skyadmin_pro.ui.theme import CARD_TITLE_SIZE, TEXT_MUTED, TEXT_SUBTLE, WRAP_CARD
 from skyadmin_pro.ui.views.base import BaseView
-from skyadmin_pro.ui.widgets import DatePickerField, DropZone, FeedbackLabel, OrderedPathList, SelectableFileList, themed_entry
+from skyadmin_pro.ui.widgets import DatePickerField, DropZone, FeedbackLabel, OrderedPathList, SelectableFileList, themed_entry, themed_scrollable_frame, themed_tabview
 
 
 def _open_folder(path: Path, parent=None) -> None:
@@ -50,7 +50,7 @@ class DocumentHubView(BaseView):
         self.body.grid_columnconfigure(0, weight=1)
         self.body.grid_rowconfigure(0, weight=1)
 
-        self.tabs = ctk.CTkTabview(self.body, command=self._on_tab_changed)
+        self.tabs = themed_tabview(self.body, command=self._on_tab_changed)
         self.tabs.grid(row=0, column=0, sticky="nsew")
         tab_names = (
             "Smart Renamer",
@@ -746,7 +746,7 @@ class PortalUploadPanel(ctk.CTkFrame):
         desc.grid(row=0, column=0, sticky="ew", padx=16, pady=(14, 8))
         card.bind("<Configure>", lambda e: desc.configure(wraplength=max(300, e.width - 32)))
 
-        self._scroll = ctk.CTkScrollableFrame(card, fg_color=("gray92", "gray17"))
+        self._scroll = themed_scrollable_frame(card)
         self._scroll.grid(row=1, column=0, sticky="nsew", padx=12, pady=(0, 8))
         self._scroll.grid_columnconfigure(0, weight=1)
         self._empty = ctk.CTkLabel(

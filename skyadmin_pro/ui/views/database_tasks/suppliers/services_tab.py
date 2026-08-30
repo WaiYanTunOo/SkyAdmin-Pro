@@ -10,7 +10,7 @@ import customtkinter as ctk
 from skyadmin_pro.services.file_ops import parse_flexible_date
 from skyadmin_pro.ui.theme import CARD_RADIUS, CARD_TITLE_SIZE
 from skyadmin_pro.ui.treeview import ThemedTreeview
-from skyadmin_pro.ui.widgets import DatePickerField, themed_entry
+from skyadmin_pro.ui.widgets import DatePickerField, themed_entry, themed_scrollable_frame
 
 if TYPE_CHECKING:
     from skyadmin_pro.ui.views.database_tasks.suppliers.panel import SuppliersPanel
@@ -25,7 +25,7 @@ class SupplierServicesTab:
         self.feedback = host.feedback
         self._editing_svc_id: int | None = None
 
-        scroll = ctk.CTkScrollableFrame(master, fg_color="transparent")
+        scroll = themed_scrollable_frame(master)
         scroll.grid(row=0, column=0, sticky="nsew")
         scroll.grid_columnconfigure(0, weight=1)
 

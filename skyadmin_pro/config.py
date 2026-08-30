@@ -477,6 +477,7 @@ SETTING_WORKSPACE_ROOT = "workspace_root"
 SETTING_WORKSPACE_CUSTOM = "workspace_custom"  # "1" = user chose folder manually
 SETTING_PORTAL_URL = "portal_url"
 SETTING_WINDOW_GEOMETRY = "window_geometry"
+SETTING_SIDEBAR_COLLAPSED = "sidebar_collapsed"  # "1" = icon-only nav
 SETTING_SNIPPET_OVERRIDES = "snippet_overrides"
 SETTING_SERVICE_TYPES = "service_types"
 SETTING_ORGANIZATION_LIST = "organization_list"

@@ -32,7 +32,7 @@ from skyadmin_pro.ui.theme import (
 )
 from skyadmin_pro.ui.treeview import ThemedTreeview
 from skyadmin_pro.ui.views.base import BaseView
-from skyadmin_pro.ui.widgets import FeedbackLabel, MonthStatusPanel, themed_entry
+from skyadmin_pro.ui.widgets import FeedbackLabel, MonthStatusPanel, themed_entry, themed_scrollable_frame
 
 
 def _days_since(start: str | None, today: str) -> str:
@@ -52,7 +52,7 @@ class DashboardView(BaseView):
 
     def build(self) -> None:
         self.body.grid_rowconfigure(0, weight=1)
-        self._scroll = ctk.CTkScrollableFrame(self.body, fg_color="transparent")
+        self._scroll = themed_scrollable_frame(self.body)
         self._scroll.grid(row=0, column=0, sticky="nsew")
         self._scroll.grid_columnconfigure(0, weight=1)
         self._scroll.grid_rowconfigure(5, weight=1)

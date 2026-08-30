@@ -27,12 +27,16 @@ from skyadmin_pro.ui.theme import (
     FORM_LABEL_FONT_SIZE,
     FORM_LABEL_GAP,
     SECTION_GAP,
+    SURFACE_BG,
     TEXTBOX_BORDER,
     TEXTBOX_FG,
     TEXTBOX_TEXT,
     TEXT_MUTED,
     TEXT_SUBTLE,
     WRAP_CARD,
+    card_style_kwargs,
+    scrollable_style_kwargs,
+    tabview_style_kwargs,
 )
 from skyadmin_pro.ui.treeview import ThemedTreeview
 
@@ -86,6 +90,32 @@ def textbox_style_kwargs(**extra: Any) -> dict[str, Any]:
     }
 
 
+def themed_tabview(master, **kwargs: Any) -> ctk.CTkTabview:
+    """Tabview with consistent surface colors in light and dark mode."""
+    style = tabview_style_kwargs()
+    style.update(kwargs)
+    tabview = ctk.CTkTabview(master, **style)
+    _style_tabview_tabs(tabview)
+    return tabview
+
+
+def themed_scrollable_frame(master, **kwargs: Any) -> ctk.CTkScrollableFrame:
+    """Scrollable frame with readable background (not transparent/white)."""
+    style = scrollable_style_kwargs()
+    if kwargs.get("fg_color") == "transparent":
+        kwargs.pop("fg_color")
+    style.update(kwargs)
+    return ctk.CTkScrollableFrame(master, **style)
+
+
+def _style_tabview_tabs(tabview: ctk.CTkTabview) -> None:
+    for name in getattr(tabview, "_name_list", []):
+        try:
+            tabview.tab(name).configure(fg_color=SURFACE_BG)
+        except Exception:
+            pass
+
+
 def bind_wrap_label(label: ctk.CTkLabel, parent: ctk.Misc, *, pad: int = 32) -> None:
     """Keep label wraplength in sync with parent width."""
 
@@ -113,6 +143,13 @@ def apply_form_theme(root: ctk.Misc) -> None:
     """Re-apply input and table styling after appearance mode changes."""
     if isinstance(root, ThemedTreeview):
         root.apply_theme()
+    elif isinstance(root, ctk.CTkTabview):
+        root.configure(**tabview_style_kwargs())
+        _style_tabview_tabs(root)
+    elif isinstance(root, ctk.CTkScrollableFrame):
+        fg = root.cget("fg_color")
+        if fg in ("transparent", "Transparent", None, ""):
+            root.configure(**scrollable_style_kwargs())
     elif isinstance(root, _INPUT_WIDGET_TYPES):
         _apply_input_theme(root)
 
@@ -135,7 +172,7 @@ class SectionCard(ctk.CTkFrame):
         subtitle: str = "",
         **kwargs,
     ) -> None:
-        super().__init__(master, corner_radius=CARD_RADIUS, **kwargs)
+        super().__init__(master, corner_radius=CARD_RADIUS, **card_style_kwargs(), **kwargs)
         self.grid_columnconfigure(0, weight=1)
         row = 0
         ctk.CTkLabel(
@@ -681,7 +718,7 @@ class SelectableFileList(ctk.CTkFrame):
 
         self.grid_columnconfigure(0, weight=1)
         self.grid_rowconfigure(0, weight=1)
-        self._scroll = ctk.CTkScrollableFrame(self, fg_color=("gray92", "gray17"))
+        self._scroll = themed_scrollable_frame(self)
         self._scroll.grid(row=0, column=0, sticky="nsew")
         self._scroll.grid_columnconfigure(0, weight=1)
         self._empty = ctk.CTkLabel(
@@ -746,7 +783,7 @@ class OrderedPathList(ctk.CTkFrame):
         self.paths: list[Path] = []
         self.grid_columnconfigure(0, weight=1)
         self.grid_rowconfigure(0, weight=1)
-        self._scroll = ctk.CTkScrollableFrame(self, fg_color=("gray92", "gray17"))
+        self._scroll = themed_scrollable_frame(self)
         self._scroll.grid(row=0, column=0, sticky="nsew")
         self._scroll.grid_columnconfigure(1, weight=1)
 

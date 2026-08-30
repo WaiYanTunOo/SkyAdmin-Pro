@@ -9,7 +9,7 @@ import customtkinter as ctk
 
 from skyadmin_pro.ui.theme import CARD_RADIUS, CARD_TITLE_SIZE
 from skyadmin_pro.ui.treeview import ThemedTreeview
-from skyadmin_pro.ui.widgets import themed_entry
+from skyadmin_pro.ui.widgets import themed_entry, themed_scrollable_frame
 
 if TYPE_CHECKING:
     from skyadmin_pro.ui.views.database_tasks.suppliers.panel import SuppliersPanel
@@ -25,7 +25,7 @@ class SupplierDirectoryTab:
         self.selected_supplier_id: int | None = None
         self.on_supplier_selected: Callable[[int | None], None] | None = None
 
-        scroll = ctk.CTkScrollableFrame(master, fg_color="transparent")
+        scroll = themed_scrollable_frame(master)
         scroll.grid(row=0, column=0, sticky="nsew")
         scroll.grid_columnconfigure(0, weight=1)
 

@@ -35,8 +35,8 @@ class ThemedTreeview(ctk.CTkFrame):
             selectmode="browse",
             height=showheight,
         )
-        scrollbar = ttk.Scrollbar(self, orient="vertical", command=self.tree.yview)
-        self.hscrollbar = ttk.Scrollbar(self, orient="horizontal", command=self.tree.xview)
+        scrollbar = ttk.Scrollbar(self, orient="vertical", command=self.tree.yview, style="Sky.Vertical.TScrollbar")
+        self.hscrollbar = ttk.Scrollbar(self, orient="horizontal", command=self.tree.xview, style="Sky.Horizontal.TScrollbar")
         self.tree.configure(yscrollcommand=scrollbar.set, xscrollcommand=self.hscrollbar.set)
         self.tree.grid(row=0, column=0, sticky="nsew")
         scrollbar.grid(row=0, column=1, sticky="ns")
@@ -71,6 +71,8 @@ class ThemedTreeview(ctk.CTkFrame):
         background = palette["background"]
         foreground = palette["foreground"]
         heading = palette["heading"]
+        heading_fg = palette.get("heading_fg", foreground)
+        field_bg = palette.get("fieldbackground", background)
         selected = palette["selected"]
         odd = palette["odd"]
         even = palette["even"]
@@ -83,22 +85,22 @@ class ThemedTreeview(ctk.CTkFrame):
         red = palette["red"]
         done = palette["done"]
         wip = palette["wip"]
+        scrollbar = palette.get("scrollbar", "#4b5563")
+        trough = palette.get("trough", background)
 
-        # Reuse existing style to avoid memory leak from creating new Style objects
+        self.configure(fg_color=background)
+
+        style = ttk.Style()
         try:
-            style = ttk.Style()
-            # Only set theme if not already set (avoids global side effect)
-            if "clam" not in style.theme_names():
-                style.theme_use("clam")
+            style.theme_use("clam")
         except ttk.TclError:
             pass
-        style = ttk.Style()
 
         style.configure(
             "Sky.Treeview",
             background=background,
             foreground=foreground,
-            fieldbackground=background,
+            fieldbackground=field_bg,
             rowheight=TABLE_ROW_HEIGHT,
             borderwidth=0,
             font=("Segoe UI", TABLE_FONT_SIZE)
@@ -110,15 +112,49 @@ class ThemedTreeview(ctk.CTkFrame):
         style.configure(
             "Sky.Treeview.Heading",
             background=heading,
-            foreground=foreground,
+            foreground=heading_fg,
+            fieldbackground=heading,
             relief="flat",
+            borderwidth=0,
             font=("Segoe UI", TABLE_HEADER_FONT_SIZE, "bold")
             if __import__("sys").platform == "win32"
             else ("SF Pro Text", TABLE_HEADER_FONT_SIZE, "bold")
             if __import__("sys").platform == "darwin"
             else ("Ubuntu", TABLE_HEADER_FONT_SIZE, "bold"),
         )
-        style.map("Sky.Treeview", background=[("selected", selected)])
+        style.map(
+            "Sky.Treeview",
+            background=[("selected", selected)],
+            foreground=[("selected", "#ffffff")],
+        )
+        style.map(
+            "Sky.Treeview.Heading",
+            background=[("active", heading), ("!active", heading)],
+            foreground=[("active", heading_fg), ("!active", heading_fg)],
+            relief=[("active", "flat"), ("!active", "flat")],
+        )
+        style.configure(
+            "Sky.Vertical.TScrollbar",
+            background=scrollbar,
+            troughcolor=trough,
+            borderwidth=0,
+            arrowcolor=foreground,
+        )
+        style.configure(
+            "Sky.Horizontal.TScrollbar",
+            background=scrollbar,
+            troughcolor=trough,
+            borderwidth=0,
+            arrowcolor=foreground,
+        )
+        style.map(
+            "Sky.Vertical.TScrollbar",
+            background=[("active", scrollbar), ("!active", scrollbar)],
+        )
+        style.map(
+            "Sky.Horizontal.TScrollbar",
+            background=[("active", scrollbar), ("!active", scrollbar)],
+        )
         self.tree.configure(style="Sky.Treeview")
         self.tree.tag_configure("odd", background=odd)
         self.tree.tag_configure("even", background=even)

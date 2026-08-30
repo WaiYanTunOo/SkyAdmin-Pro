@@ -368,7 +368,7 @@ def test_report_activation_claim_skips_without_api(monkeypatch):
     import skyadmin_pro.config as config
 
     monkeypatch.setattr(config, "API_BASE_URL", "")
-    ok, msg = lic.report_activation_claim("dummy")
+    ok, msg, _key = lic.report_activation_claim("dummy")
     assert ok
     assert "no api" in msg.lower()
 
@@ -400,8 +400,25 @@ def test_report_activation_claim_posts_code(mid, monkeypatch):
         return FakeResp()
 
     monkeypatch.setattr(urllib.request, "urlopen", fake_urlopen)
-    ok, msg = lic.report_activation_claim(key)
+    ok, msg, license_key = lic.report_activation_claim(key)
     assert ok, msg
+    assert license_key is None
     assert captured["url"] == "https://worker.test/api/claim"
     assert captured["body"]["code"] == key
+
+
+def test_daily_sync_status_shows_time_remaining(monkeypatch):
+    """UI sync line shows remaining window, not last-check timestamp."""
+    now = datetime.now()
+    monkeypatch.setattr(lic, "_get_last_sync_time", lambda: now - timedelta(hours=2))
+    ok, msg = lic.get_daily_sync_status()
+    assert ok
+    assert "left" in msg
+    assert "Last online" not in msg
+    assert "h" in msg
+
+    monkeypatch.setattr(lic, "_get_last_sync_time", lambda: now - timedelta(hours=25))
+    ok, msg = lic.get_daily_sync_status()
+    assert not ok
+    assert "Overdue" in msg
 

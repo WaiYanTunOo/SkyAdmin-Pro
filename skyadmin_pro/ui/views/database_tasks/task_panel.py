@@ -15,7 +15,7 @@ from skyadmin_pro.services.file_ops import parse_flexible_date
 from skyadmin_pro.ui.combo_utils import fill_combo
 from skyadmin_pro.ui.theme import CARD_RADIUS, CARD_TITLE_SIZE, FORM_ROW_GAP, FORM_SIDEBAR_MIN_WIDTH, TEXT_MUTED
 from skyadmin_pro.ui.treeview import ThemedTreeview
-from skyadmin_pro.ui.widgets import FeedbackLabel, FormField
+from skyadmin_pro.ui.widgets import FeedbackLabel, FormField, themed_scrollable_frame
 
 FORM_PADX = 16
 
@@ -64,7 +64,7 @@ class TaskPanel(ctk.CTkFrame):
         )
         self.tree.grid(row=1, column=0, sticky="nsew", padx=12, pady=(0, 12))
 
-        form = ctk.CTkScrollableFrame(self, corner_radius=12, width=FORM_SIDEBAR_MIN_WIDTH)
+        form = themed_scrollable_frame(self, corner_radius=12, width=FORM_SIDEBAR_MIN_WIDTH)
         form.grid(row=1, column=1, sticky="nsew")
         form.grid_columnconfigure(0, weight=1)
 

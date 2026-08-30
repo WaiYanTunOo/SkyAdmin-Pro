@@ -17,7 +17,7 @@ from skyadmin_pro.services.workflow import create_client_workspace
 from skyadmin_pro.ui.combo_utils import fill_combo
 from skyadmin_pro.ui.theme import CARD_RADIUS, CARD_TITLE_SIZE
 from skyadmin_pro.ui.treeview import ThemedTreeview
-from skyadmin_pro.ui.widgets import DatePickerField, FeedbackLabel, make_modal, themed_entry
+from skyadmin_pro.ui.widgets import DatePickerField, FeedbackLabel, make_modal, themed_entry, themed_scrollable_frame
 
 
 class ClientsExpiryPanel(ctk.CTkFrame):
@@ -28,7 +28,7 @@ class ClientsExpiryPanel(ctk.CTkFrame):
         self.grid_columnconfigure(0, weight=1)
         self.grid_rowconfigure(0, weight=1)
 
-        scroll = ctk.CTkScrollableFrame(self, fg_color="transparent")
+        scroll = themed_scrollable_frame(self)
         scroll.grid(row=0, column=0, sticky="nsew")
         scroll.grid_columnconfigure(0, weight=1)
 

@@ -12,7 +12,7 @@ from skyadmin_pro.services.tracking import (
 )
 from skyadmin_pro.ui.combo_utils import fill_combo
 from skyadmin_pro.ui.theme import CARD_RADIUS, CARD_TITLE_SIZE, TEXT_MUTED
-from skyadmin_pro.ui.widgets import FeedbackLabel, bind_wrap_label, combo_style_kwargs
+from skyadmin_pro.ui.widgets import FeedbackLabel, bind_wrap_label, combo_style_kwargs, themed_scrollable_frame
 
 
 class RenewalPanel(ctk.CTkFrame):
@@ -77,7 +77,7 @@ class RenewalPanel(ctk.CTkFrame):
         self.progress_bar.set(0)
         self.progress_bar.grid(row=2, column=0, sticky="ew", padx=16, pady=(0, 4))
 
-        self.scroll = ctk.CTkScrollableFrame(card, fg_color="transparent")
+        self.scroll = themed_scrollable_frame(card)
         self.scroll.grid(row=3, column=0, sticky="nsew", padx=12, pady=(0, 8))
         self.scroll.grid_columnconfigure(0, weight=1)
         card.grid_rowconfigure(3, weight=1)

@@ -36,8 +36,7 @@ from skyadmin_pro.ui.theme import (
     HEADER_TITLE_SIZE,
     TEXT_MUTED,
 )
-from skyadmin_pro.ui.widgets import make_modal  # noqa: F401 (dialog helper)
-from skyadmin_pro.ui.widgets import bind_wrap_label, themed_entry, themed_textbox
+from skyadmin_pro.ui.widgets import bind_wrap_label, make_modal, themed_entry, themed_scrollable_frame, themed_textbox
 
 
 def open_whatsapp_chat(message: str = "") -> None:
@@ -76,7 +75,7 @@ class ActivationDialog(ctk.CTkToplevel):
         machine_id = get_machine_id()
 
         # Scrollable content — status + actions stay fixed below so feedback is visible.
-        scroll = ctk.CTkScrollableFrame(self, fg_color="transparent")
+        scroll = themed_scrollable_frame(self)
         scroll.grid(row=0, column=0, sticky="nsew", padx=0, pady=(0, 0))
         scroll.grid_columnconfigure(0, weight=1)
         body = scroll
@@ -398,13 +397,14 @@ class ActivationDialog(ctk.CTkToplevel):
             self.activate_btn.configure(state="disabled", text="Checking…")
             self.update_idletasks()
 
-            def _finish(ok_final: bool, message: str, nonce_final: str | None) -> None:
+            def _finish(ok_final: bool, message: str, nonce_final: str | None, license_key: str | None = None) -> None:
                 self._activating = False
                 self.activate_btn.configure(state="normal", text="Activate Now")
                 if not ok_final:
                     self._set_status(f"✗ {message}", "error")
                     return
-                save_license_file(content)
+                to_save = (license_key or "").strip() or content
+                save_license_file(to_save)
                 if nonce_final:
                     mark_used(nonce_final)
                 self._set_status(f"✓ {message} Activation complete.", "success")
@@ -416,7 +416,7 @@ class ActivationDialog(ctk.CTkToplevel):
                         pass
 
             if not needs_online:
-                _finish(True, msg, nonce)
+                _finish(True, msg, nonce, None)
                 return
 
             self._set_status("Checking license online…", "info")
@@ -425,6 +425,7 @@ class ActivationDialog(ctk.CTkToplevel):
                 result_ok = False
                 result_msg = "Activation failed."
                 result_nonce: str | None = None
+                result_license_key: str | None = None
                 try:
                     net_ok, net_msg = fetch_revocations()
                     if not net_ok:
@@ -436,21 +437,26 @@ class ActivationDialog(ctk.CTkToplevel):
                         if not ok2:
                             result_msg = msg2
                         else:
-                            claim_ok, claim_msg = report_activation_claim(
+                            claim_ok, claim_msg, license_key = report_activation_claim(
                                 content,
                                 allow_already_claimed=_is_repair_activation(content),
                             )
                             if not claim_ok:
                                 result_msg = claim_msg
                             else:
-                                result_ok, result_msg, result_nonce = ok2, msg2, n2
+                                result_ok, result_msg, result_nonce, result_license_key = (
+                                    ok2,
+                                    msg2,
+                                    n2,
+                                    license_key,
+                                )
                 except Exception as exc:
                     result_msg = f"Activation error: {exc}"
 
                 def done() -> None:
                     if not self.winfo_exists():
                         return
-                    _finish(result_ok, result_msg, result_nonce)
+                    _finish(result_ok, result_msg, result_nonce, result_license_key)
 
                 self._schedule_ui(done)
 

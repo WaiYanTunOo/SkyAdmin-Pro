@@ -4,7 +4,7 @@ from __future__ import annotations
 
 import customtkinter as ctk
 
-from skyadmin_pro.ui.widgets import FeedbackLabel
+from skyadmin_pro.ui.widgets import FeedbackLabel, themed_tabview
 
 from skyadmin_pro.ui.views.database_tasks.suppliers.directory_tab import SupplierDirectoryTab
 from skyadmin_pro.ui.views.database_tasks.suppliers.payments_tab import SupplierPaymentsTab
@@ -21,7 +21,7 @@ class SuppliersPanel(ctk.CTkFrame):
         self.grid_columnconfigure(0, weight=1)
         self.grid_rowconfigure(0, weight=1)
 
-        tabs = ctk.CTkTabview(self)
+        tabs = themed_tabview(self)
         tabs.grid(row=0, column=0, sticky="nsew")
         for name in ("Suppliers", "Supplier Services", "Payments (AP)"):
             tabs.add(name)

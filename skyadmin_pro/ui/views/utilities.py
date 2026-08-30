@@ -30,7 +30,7 @@ from skyadmin_pro.services.translate import (
 from skyadmin_pro.services.workflow import copy_to_clipboard
 from skyadmin_pro.ui.theme import CARD_TITLE_SIZE, TEXT_MUTED
 from skyadmin_pro.ui.views.base import BaseView
-from skyadmin_pro.ui.widgets import FeedbackLabel, make_modal, themed_entry, themed_textbox
+from skyadmin_pro.ui.widgets import FeedbackLabel, make_modal, themed_entry, themed_scrollable_frame, themed_textbox
 
 _SECTION_TITLES = (
     ("client", "To Burmese clients (Burmese)", "Messages in Burmese. Click to copy."),
@@ -78,7 +78,7 @@ class UtilitiesView(BaseView):
         self.body.grid_columnconfigure(1, weight=2)
         self.body.grid_rowconfigure(0, weight=1)
 
-        self.hub = ctk.CTkScrollableFrame(self.body, corner_radius=12)
+        self.hub = themed_scrollable_frame(self.body, corner_radius=12)
         self.hub.grid(row=0, column=0, sticky="nsew", padx=(0, 10))
         self.hub.grid_columnconfigure(0, weight=1)
 
@@ -296,7 +296,7 @@ class UtilitiesView(BaseView):
         for child in top.winfo_children():
             child.destroy()
 
-        scroll = ctk.CTkScrollableFrame(top, corner_radius=12)
+        scroll = themed_scrollable_frame(top, corner_radius=12)
         scroll.grid(row=0, column=0, sticky="nsew", padx=12, pady=(12, 0))
         scroll.grid_columnconfigure(0, weight=1)
         top.grid_columnconfigure(0, weight=1)
@@ -554,7 +554,7 @@ class UtilitiesView(BaseView):
         top.grid_columnconfigure(0, weight=1)
         top.grid_rowconfigure(0, weight=1)
 
-        scroll = ctk.CTkScrollableFrame(top, corner_radius=12)
+        scroll = themed_scrollable_frame(top, corner_radius=12)
         scroll.grid(row=0, column=0, sticky="nsew", padx=12, pady=(12, 8))
         scroll.grid_columnconfigure(0, weight=1)
 

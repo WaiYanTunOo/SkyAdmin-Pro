@@ -9,7 +9,7 @@ import customtkinter as ctk
 from skyadmin_pro.services.export import default_export_name, export_to_excel
 from skyadmin_pro.ui.views.base import BaseView
 from skyadmin_pro.ui.views.company_details import CompanyDetailsPanel
-from skyadmin_pro.ui.widgets import FeedbackLabel, MonthStatusPanel
+from skyadmin_pro.ui.widgets import FeedbackLabel, MonthStatusPanel, themed_scrollable_frame, themed_tabview
 
 from skyadmin_pro.ui.views.database_tasks.clients_panel import ClientsExpiryPanel
 from skyadmin_pro.ui.views.database_tasks.courier_panel import CourierPanel
@@ -42,7 +42,7 @@ class DatabaseTasksView(BaseView):
         self.feedback = FeedbackLabel(toolbar)
         self.feedback.grid(row=0, column=1, sticky="ew", padx=(12, 0))
 
-        self.tabs = ctk.CTkTabview(self.body, command=self._on_tab_changed)
+        self.tabs = themed_tabview(self.body, command=self._on_tab_changed)
         self.tabs.grid(row=1, column=0, sticky="nsew")
         for name in (
             "Tasks",
@@ -83,7 +83,7 @@ class DatabaseTasksView(BaseView):
             self.courier_panel.grid(row=0, column=0, sticky="nsew", padx=8, pady=8)
             self._lazy_panels[name] = self.courier_panel
         elif name == "Monthly Tax Status":
-            month_scroll = ctk.CTkScrollableFrame(self.tabs.tab("Monthly Tax Status"), fg_color="transparent")
+            month_scroll = themed_scrollable_frame(self.tabs.tab("Monthly Tax Status"))
             month_scroll.grid(row=0, column=0, sticky="nsew", padx=8, pady=8)
             month_scroll.grid_columnconfigure(0, weight=1)
             self.month_panel = MonthStatusPanel(

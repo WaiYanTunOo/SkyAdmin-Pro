@@ -7,6 +7,7 @@ from __future__ import annotations
 
 # Sidebar — tweaked for density / icons
 SIDEBAR_WIDTH = 260
+SIDEBAR_COLLAPSED_WIDTH = 56
 SIDEBAR_BUTTON_HEIGHT = 44
 SIDEBAR_PADX = 16
 SIDEBAR_PADY = 5
@@ -22,6 +23,12 @@ SIDEBAR_ICONS = {
     "utilities": "✦",
     "settings": "⚙",
 }
+
+# Surfaces — tab panes, scroll areas, cards (readable in light + dark)
+SURFACE_BG = ("#e8e8e8", "#2b2b2b")
+SCROLLABLE_BG = ("#f0f0f0", "#1e1e1e")
+CARD_BG = ("#ebebeb", "#2b2b2b")
+CONTENT_BG = ("#dbdbdb", "#242424")
 
 # Content — airier density
 CONTENT_PAD = 24
@@ -98,16 +105,40 @@ TEXTBOX_BORDER = ENTRY_BORDER
 TEXTBOX_TEXT = ENTRY_TEXT
 
 
+def tabview_style_kwargs() -> dict:
+    """CTkTabview colors that stay readable in light and dark mode."""
+    return {
+        "fg_color": SURFACE_BG,
+        "segmented_button_fg_color": ("#d4d4d4", "#343638"),
+        "segmented_button_selected_color": ACCENT,
+        "segmented_button_selected_hover_color": ACCENT_HOVER,
+        "segmented_button_unselected_color": ("#c8c8c8", "#4a4a4a"),
+        "segmented_button_unselected_hover_color": ("#b8b8b8", "#565b5e"),
+    }
+
+
+def scrollable_style_kwargs() -> dict:
+    return {"fg_color": SCROLLABLE_BG}
+
+
+def card_style_kwargs() -> dict:
+    return {"fg_color": CARD_BG}
+
+
 def table_palette(mode: str) -> dict[str, str]:
     """ttk.Treeview colors for light/dark — used by ThemedTreeview."""
     if mode == "Dark":
         return {
-            "background": "#2b2b2b",
-            "foreground": "#f4f4f5",
-            "heading": "#333333",
+            "background": "#1e1e1e",
+            "foreground": "#e4e4e7",
+            "heading": "#374151",
+            "heading_fg": "#f9fafb",
+            "fieldbackground": "#1e1e1e",
             "selected": "#1f538d",
-            "odd": "#2b2b2b",
-            "even": "#333333",
+            "odd": "#1e1e1e",
+            "even": "#27272a",
+            "scrollbar": "#4b5563",
+            "trough": "#1e1e1e",
             "expired": "#7f1d1d",
             "urgent": "#9a3412",
             "watch": "#854d0e",
@@ -122,9 +153,13 @@ def table_palette(mode: str) -> dict[str, str]:
         "background": "#ffffff",
         "foreground": "#18181b",
         "heading": "#e4e4e7",
+        "heading_fg": "#18181b",
+        "fieldbackground": "#ffffff",
         "selected": "#3b8ed0",
         "odd": "#ffffff",
         "even": "#f4f4f5",
+        "scrollbar": "#d4d4d8",
+        "trough": "#f4f4f5",
         "expired": "#fecaca",
         "urgent": "#fed7aa",
         "watch": "#fde68a",

@@ -55,6 +55,16 @@ export function describeLicenseExpiry(
   const expiresLabel = formatExpiryLabel(expiresAt);
 
   if (ms <= 0) {
+    if (!opts.used) {
+      return {
+        state: "expired",
+        expires_at: expiresAt || null,
+        expires_label: `Activate by ${expiresLabel}`,
+        time_left: "Activation expired (unused)",
+        is_expired: true,
+        ms_remaining: ms,
+      };
+    }
     const agoMs = Math.abs(ms);
     const days = Math.floor(agoMs / 86400000);
     const hours = Math.floor((agoMs % 86400000) / 3600000);
@@ -82,8 +92,19 @@ export function describeLicenseExpiry(
   else if (hours > 0) left = plural(hours, "hour") + (minutes > 0 ? ` ${minutes}m` : "");
   else left = plural(Math.max(minutes, 1), "minute");
 
+  if (!opts.used) {
+    return {
+      state: "pending",
+      expires_at: expiresAt || null,
+      expires_label: `Activate by ${expiresLabel}`,
+      time_left: `${left} left to activate`,
+      is_expired: false,
+      ms_remaining: ms,
+    };
+  }
+
   return {
-    state: opts.used ? "active" : "pending",
+    state: "active",
     expires_at: expiresAt || null,
     expires_label: expiresLabel,
     time_left: `${left} left`,

@@ -341,18 +341,35 @@ def is_daily_sync_stale() -> bool:
     return (datetime.now() - last).total_seconds() > MAX_OFFLINE_SECONDS
 
 
+def _format_sync_remaining(age_seconds: float) -> tuple[bool, str]:
+    """Return (is_ok, short_remaining_text) for daily online check window."""
+    if age_seconds > MAX_OFFLINE_SECONDS:
+        overdue = age_seconds - MAX_OFFLINE_SECONDS
+        hours = int(overdue // 3600)
+        if hours >= 24:
+            days = hours // 24
+            rem_h = hours % 24
+            return False, f"Overdue {days}d {rem_h}h — connect now"
+        return False, f"Overdue {hours}h — connect now"
+    remaining = MAX_OFFLINE_SECONDS - age_seconds
+    hours = int(remaining // 3600)
+    mins = int((remaining % 3600) // 60)
+    if hours >= 24:
+        days = hours // 24
+        rem_h = hours % 24
+        return True, f"{days}d {rem_h}h left"
+    if hours > 0:
+        return True, f"{hours}h {mins}m left"
+    return True, f"{mins}m left"
+
+
 def get_daily_sync_status() -> tuple[bool, str]:
-    """Return (is_ok, human_message) for UI."""
+    """Return (is_ok, human_message) for UI — time remaining until next check."""
     last = _get_last_sync_time()
     if last is None:
-        return False, "Never synced - internet required"
+        return False, "Connect to internet"
     age = (datetime.now() - last).total_seconds()
-    if age > MAX_OFFLINE_SECONDS:
-        hours = int(age // 3600)
-        return False, f"Daily online check overdue ({hours}h ago) - connect to internet"
-    hours = int(age // 3600)
-    mins = int((age % 3600) // 60)
-    return True, f"Last online check: {last.strftime('%Y-%m-%d %H:%M')} ({hours}h {mins}m ago) - OK"
+    return _format_sync_remaining(age)
 
 
 def _license_paths() -> list[Path]:
@@ -430,11 +447,10 @@ def verify_license() -> tuple[bool, str]:
     # If REVOCATION_URL is set, customer must be online at least once per 24h
     # so owner can revoke/ban. Otherwise license is considered stale.
     if is_daily_sync_stale():
-        last = _get_last_sync_time()
-        last_str = last.strftime("%Y-%m-%d %H:%M") if last else "never"
+        _ok, remaining_msg = get_daily_sync_status()
         return False, (
             "Daily online verification required.\n\n"
-            f"Last online check: {last_str}\n"
+            f"{remaining_msg}\n"
             "Please connect to the internet and restart SkyAdmin Pro.\n"
             "The app verifies your license everyday so the owner can\n"
             "revoke/ban if needed. Time-expiry is still checked offline,\n"
@@ -631,13 +647,17 @@ def report_activation_claim(
     *,
     allow_already_claimed: bool = False,
     timeout: float = 8.0,
-) -> tuple[bool, str]:
-    """Report a successful activation to the Worker (global one-time-use burn)."""
+) -> tuple[bool, str, str | None]:
+    """Report a successful activation to the Worker (global one-time-use burn).
+
+    Returns (ok, message, license_key_to_save). When the server re-signs the
+    license after claim, ``license_key_to_save`` is the full-period key.
+    """
     from skyadmin_pro.config import API_BASE_URL
 
     api_url = (API_BASE_URL or "").strip()
     if not api_url:
-        return True, "No API configured."
+        return True, "No API configured.", None
 
     import urllib.request
 
@@ -654,15 +674,16 @@ def report_activation_claim(
             raw = resp.read(64 * 1024).decode("utf-8", errors="replace")
             data = json.loads(raw)
     except Exception as exc:
-        return False, f"Could not report activation to server: {exc}"
+        return False, f"Could not report activation to server: {exc}", None
 
     if not isinstance(data, dict) or not data.get("ok"):
-        return False, str((data or {}).get("error") or "Claim rejected by server.")
+        return False, str((data or {}).get("error") or "Claim rejected by server."), None
+    license_key = str(data.get("license_key") or "").strip() or None
     if data.get("already_used"):
         if allow_already_claimed:
-            return True, "Already claimed on server."
-        return False, "This activation code has already been used on another machine."
-    return True, str(data.get("message") or "Activation claimed.")
+            return True, "Already claimed on server.", license_key
+        return False, "This activation code has already been used on another machine.", None
+    return True, str(data.get("message") or "Activation claimed."), license_key
 
 
 def _payload_of(text: str) -> dict | None:
@@ -1022,12 +1043,12 @@ def license_time_left_text() -> str:
     hours = rem // 3600
     minutes = (rem % 3600) // 60
     if days >= 2:
-        return f"Active — {days} day(s) {hours}h remaining"
+        return f"Active — {days} day(s) {hours}h left"
     if days == 1:
-        return f"Active — 1 day {hours}h remaining"
+        return f"Active — 1 day {hours}h left"
     if hours >= 1:
-        return f"Active — {hours}h {minutes}m remaining"
-    return f"Active — {minutes}m remaining"
+        return f"Active — {hours}h {minutes}m left"
+    return f"Active — {minutes}m left"
 
 
 def license_expiry_text() -> str:
@@ -1115,7 +1136,15 @@ def verify_key_text(text: str) -> tuple[bool, str]:
                 exp_dt = _parse_expiry(exp)
             except ValueError:
                 return False, f"License has invalid expiry: {exp!r}"
+            saved_payload = _read_license_payload()
+            saved_nonce = str((saved_payload or {}).get("n") or "")
+            is_saved_here = bool(nonce and nonce == saved_nonce)
             if datetime.now() >= exp_dt:
+                if not is_saved_here and pkg and str(pkg).isdigit():
+                    return False, (
+                        f"Activation window expired on {exp_dt.strftime('%Y-%m-%d %H:%M')} "
+                        "(must activate within 24 hours). Request a new license."
+                    )
                 return False, (f"License expired on {exp_dt.strftime('%Y-%m-%d %H:%M')}. Request a renewal.")
         if nonce and nonce in revoked_nonces():
             return False, "This license has been revoked by Sky Creation Innovations."

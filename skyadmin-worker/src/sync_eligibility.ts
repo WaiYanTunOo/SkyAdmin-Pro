@@ -59,7 +59,7 @@ export async function checkActivationEligibility(
   }
 
   if (isExpired(claim.exp, now)) {
-    return { ok: false, error: "This activation code has expired." };
+    return { ok: false, error: "Activation window expired — request a new license (24h to activate)." };
   }
 
   return { ok: true };

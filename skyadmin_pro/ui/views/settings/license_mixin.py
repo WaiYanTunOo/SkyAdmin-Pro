@@ -52,7 +52,7 @@ class LicenseMixin:
                 text="Download update" if self._update_url else "No download URL",
                 state="normal" if self._update_url else "disabled",
             )
-            self.update_frame.grid(row=0, column=0, sticky="ew", pady=(0, 14))
+            self.update_frame.grid(row=0, column=0, sticky="ew", pady=(0, 8))
         else:
             self.update_frame.grid_forget()
 
@@ -153,7 +153,7 @@ class LicenseMixin:
                     if not ok2:
                         self._after(lambda: self._activation_fail(msg2))
                         return
-                    claim_ok, claim_msg = report_activation_claim(
+                    claim_ok, claim_msg, license_key = report_activation_claim(
                         code,
                         allow_already_claimed=_is_repair_activation(code),
                     )
@@ -161,7 +161,8 @@ class LicenseMixin:
                         self._after(lambda: self._activation_fail(claim_msg))
                         return
                     ok, msg, nonce = ok2, msg2, nonce2
-                save_license_file(code)
+                to_save = (license_key or "").strip() or code
+                save_license_file(to_save)
                 if nonce:
                     mark_used(nonce)
                 self._after(lambda: self._activation_ok(msg, "passcode"))
@@ -209,7 +210,7 @@ class LicenseMixin:
                     if not ok2:
                         self._after(lambda: self._activation_fail(msg2))
                         return
-                    claim_ok, claim_msg = report_activation_claim(
+                    claim_ok, claim_msg, license_key = report_activation_claim(
                         content,
                         allow_already_claimed=_is_repair_activation(content),
                     )
@@ -217,7 +218,8 @@ class LicenseMixin:
                         self._after(lambda: self._activation_fail(claim_msg))
                         return
                     ok, msg, nonce = ok2, msg2, nonce2
-                save_license_file(content)
+                to_save = (license_key or "").strip() or content
+                save_license_file(to_save)
                 if nonce:
                     mark_used(nonce)
                 self._after(lambda: self._activation_ok(msg, "key"))
@@ -225,6 +227,18 @@ class LicenseMixin:
                 self._after(lambda: self._activation_fail(str(exc)))
 
         threading.Thread(target=worker, daemon=True).start()
+
+    def _activate_pasted(self) -> None:
+        """Activate from the single paste field (license key or SKYPASS1 passcode)."""
+        raw = self.key_paste_var.get().strip()
+        if not raw:
+            self.feedback.error("Paste a license key or passcode first.")
+            return
+        if raw.upper().startswith("SKYPASS1:"):
+            self.passcode_var.set(raw)
+            self._activate_with_passcode()
+        else:
+            self._activate_with_key()
 
     def _activation_fail(self, msg) -> None:
         self.configure(cursor="")
@@ -329,13 +343,16 @@ class LicenseMixin:
                     text=f"✗ No valid license  ·  Machine ID: {get_machine_id()}",
                     text_color=("#b45309", "#fbbf24"),
                 )
-            # Daily online status
+            # Online check — warn only when overdue (no countdown when OK).
             try:
                 sync_ok, sync_msg = get_daily_sync_status()
-                self.daily_sync_label.configure(
-                    text=("✓ " if sync_ok else "⚠ ") + sync_msg,
-                    text_color=("#15803d", "#4ade80") if sync_ok else ("#b45309", "#fbbf24"),
-                )
+                if sync_ok:
+                    self.daily_sync_label.configure(text="")
+                else:
+                    self.daily_sync_label.configure(
+                        text="⚠ " + sync_msg,
+                        text_color=("#b45309", "#fbbf24"),
+                    )
                 self.data_sync_label.configure(text=self._format_data_sync_status())
                 count = self.app.db.count_sync_conflicts()
                 self.conflicts_btn.configure(

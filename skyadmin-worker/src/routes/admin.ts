@@ -72,6 +72,7 @@ function loginPage(adminPath: string, error?: string): string {
   return `<!DOCTYPE html>
 <html lang="en"><head><meta charset="UTF-8"><meta name="viewport" content="width=device-width,initial-scale=1">
 <title>SkyAdmin</title>
+<link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 32 32'%3E%3Crect width='32' height='32' rx='6' fill='%232563eb'/%3E%3Ctext x='16' y='21' text-anchor='middle' font-size='14' fill='white' font-family='sans-serif'%3ES%3C/text%3E%3C/svg%3E">
 <style>
 body{font-family:-apple-system,Helvetica,sans-serif;display:flex;justify-content:center;align-items:center;min-height:100vh;margin:0;background:#111827;color:#f9fafb}
 .box{background:#1f2937;padding:32px;border-radius:16px;width:320px;text-align:center}
@@ -95,9 +96,15 @@ ${error ? '<div class="err">' + error + '</div>' : ''}
 const ADMIN_HTML_BUILDER = (adminPath: string, apiToken: string) => `<!DOCTYPE html>
 <html lang="en"><head><meta charset="UTF-8"><meta name="viewport" content="width=device-width,initial-scale=1">
 <title>SkyAdmin Pro</title>
+<link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 32 32'%3E%3Crect width='32' height='32' rx='6' fill='%232563eb'/%3E%3Ctext x='16' y='21' text-anchor='middle' font-size='14' fill='white' font-family='sans-serif'%3ES%3C/text%3E%3C/svg%3E">
 <style>
 *{box-sizing:border-box}
-body{font-family:-apple-system,Helvetica,Arial,sans-serif;max-width:680px;margin:0 auto;padding:16px;background:#111827;color:#f9fafb;-webkit-text-size-adjust:100%}
+body{font-family:-apple-system,Helvetica,Arial,sans-serif;max-width:680px;margin:0 auto;padding:56px 16px 16px;background:#111827;color:#f9fafb;-webkit-text-size-adjust:100%}
+.topbar{position:fixed;top:0;left:0;right:0;z-index:100;display:flex;align-items:center;justify-content:flex-end;gap:12px;min-height:48px;padding:8px 16px;background:#111827;border-bottom:1px solid #374151}
+.topbar .status{position:static;display:none;margin:0;margin-right:auto;flex:1;min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.logout-form{margin:0;padding:0;flex-shrink:0}
+.topbar button.logout{width:auto;margin-top:0;padding:7px 14px;background:#374151;border:0;color:#e5e7eb;border-radius:8px;font-size:12px;font-weight:600;cursor:pointer}
+.topbar button.logout:active{background:#4b5563}
 h1{font-size:20px;margin:0 0 4px} h2{font-size:16px;margin:22px 0 8px;color:#9ca3af}
 .sub{color:#6b7280;font-size:12px;margin-bottom:16px}
 label{font-weight:600;font-size:13px;display:block;margin:12px 0 5px;color:#d1d5db}
@@ -121,29 +128,43 @@ button.sm{width:auto;padding:7px 12px;font-size:12px;border-radius:8px;margin-to
 .btns{display:flex;gap:6px;flex-wrap:wrap;margin-top:6px}
 .chip{display:inline-flex;align-items:center;gap:4px;background:#7f1d1d;color:#fca5a5;padding:3px 8px;border-radius:99px;font-size:11px;font-weight:600;margin:3px 3px 0 0}
 .chip button{background:none;border:0;color:#fca5a5;font-weight:800;padding:0 2px;margin:0;width:auto;font-size:12px}
-.logout{position:fixed;top:8px;right:8px;background:#374151;border:0;color:#9ca3af;padding:4px 10px;border-radius:8px;font-size:11px}
-.status{position:fixed;top:8px;left:8px;font-size:11px;padding:4px 10px;border-radius:8px;background:#064e3b;color:#6ee7b7;display:none}
+.status{font-size:11px;padding:4px 10px;border-radius:8px;background:#064e3b;color:#6ee7b7}
 .warn-banner{margin:0 0 12px;padding:10px 12px;border-radius:10px;background:#7f1d1d;color:#fecaca;font-size:12px;display:none}
 .pkg-row{display:grid;grid-template-columns:1.2fr .6fr .6fr auto;gap:6px;align-items:center;margin:6px 0}
 .pkg-row input,.pkg-row select{margin:0}
+.pkg-head{font-size:11px;color:#9ca3af;font-weight:700;text-transform:uppercase;letter-spacing:.04em;margin:8px 0 4px}
+.pkg-head span{padding:0 2px}
+.pkg-summary{background:#1f2937;border:1px solid #374151;border-radius:10px;padding:8px 12px;margin:0 0 10px;font-size:13px}
+.pkg-summary .item{display:flex;justify-content:space-between;gap:12px;padding:6px 0;border-bottom:1px solid #374151}
+.pkg-summary .item:last-child{border-bottom:0}
+.pkg-summary .price{color:#6ee7b7;font-weight:600;white-space:nowrap}
+.renew-days{width:76px;padding:7px 8px;font-size:12px;margin:0;border-radius:8px;border:1px solid #4b5563;background:#1f2937;color:#f9fafb}
+.renew-custom{display:inline-flex;align-items:center;gap:6px;flex-wrap:wrap}
+.housekeeping{display:flex;align-items:center;gap:8px;flex-wrap:wrap;margin-top:8px}
 .filt button.on{background:#2563eb;color:#fff;border-color:#2563eb}
 </style></head><body>
-<form method="POST" action="${adminPath}/logout" style="position:fixed;top:8px;right:8px">
-<button class="logout" type="submit">Logout</button>
-</form>
-<div id="status" class="status"></div>
+<div class="topbar">
+  <div id="status" class="status"></div>
+  <form class="logout-form" method="POST" action="${adminPath}/logout">
+    <button class="logout" type="submit">Logout</button>
+  </form>
+</div>
 <h1>SkyAdmin Pro</h1>
 <div class="sub">Sky Creation Innovations</div>
 <div id="keyBanner" class="warn-banner"></div>
 
 <h2>Pricing Packages</h2>
 <div class="hint">Shown on the desktop Pricing &amp; Activation page and iPhone generator.</div>
+<div id="pkgSummary" class="pkg-summary"></div>
+<div id="pkgStatus" class="hint"></div>
+<div class="pkg-head pkg-row"><span>Label</span><span>Days</span><span>Baht</span><span></span></div>
 <div id="pkgEditor"></div>
 <label>Over 1-year message</label>
 <input id="overYear" placeholder="Over 1 Year — discuss on WhatsApp">
 <div class="btns" style="margin-top:8px">
-<button class="sm green" onclick="addPackageRow()">Add package</button>
-<button class="sm gray" onclick="savePricing()">Save packages</button>
+<button type="button" class="sm green" onclick="addPackageRow()">Add package</button>
+<button type="button" class="sm gray" onclick="savePricing()">Save packages</button>
+<button type="button" class="sm gray" onclick="loadPricing(true)">Reload</button>
 </div>
 
 <h2>Generate License</h2>
@@ -154,12 +175,12 @@ button.sm{width:auto;padding:7px 12px;font-size:12px;border-radius:8px;margin-to
 <option value="7" selected>Loading packages…</option>
 </select>
 <div id="cWrap" style="display:none"><label>Custom days</label><input id="cDays" type="number" min="1" max="36500"></div>
-<button id="genBtn" onclick="generate()">Generate</button>
+<button type="button" id="genBtn" onclick="generate()">Generate</button>
 
 <div id="result" style="display:none">
 <label>License Key</label>
 <div id="license" class="out"></div>
-<div class="btns"><button class="sm gray" onclick="copyEl('license')">Copy Key</button><button class="sm gray" onclick="copyEl('passcode')">Copy Passcode</button></div>
+<div class="btns"><button type="button" class="sm gray" onclick="copyEl('license')">Copy Key</button><button type="button" class="sm gray" onclick="copyEl('passcode')">Copy Passcode</button></div>
 <label>Passcode</label>
 <div id="passcode" class="out" style="font-size:18px;letter-spacing:3px;text-align:center"></div>
 </div>
@@ -171,8 +192,8 @@ button.sm{width:auto;padding:7px 12px;font-size:12px;border-radius:8px;margin-to
 <label>Download URL</label>
 <input id="updUrl" placeholder="https://your-cdn/SkyAdminPro.exe">
 <div class="btns" style="margin-top:8px">
-<button class="sm green" onclick="publishUpdate()">Publish update</button>
-<button class="sm gray" onclick="loadUpdateInfo()">Reload</button>
+<button type="button" class="sm green" onclick="publishUpdate()">Publish update</button>
+<button type="button" class="sm gray" onclick="loadUpdateInfo()">Reload</button>
 </div>
 <div id="updStatus" class="hint"></div>
 
@@ -180,12 +201,12 @@ button.sm{width:auto;padding:7px 12px;font-size:12px;border-radius:8px;margin-to
 <label>Ban machine</label>
 <div style="display:flex;gap:6px">
 <input id="banIn" placeholder="Machine ID" spellcheck="false" style="flex:1">
-<button class="sm red" style="margin:0" onclick="addBan()">Ban</button>
+<button type="button" class="sm red" style="margin:0" onclick="addBan()">Ban</button>
 </div>
 <div id="banList"></div>
 
 <h2>Machines <span id="machCnt" style="color:#6b7280;font-size:12px"></span></h2>
-<div class="hint">Current license status per Machine ID (activated license preferred).</div>
+<div class="hint">Per-machine status. Timed packages: <b>24h to activate</b> — full period (e.g. 7 days) starts when they activate on desktop. Use <b>Use ID</b> to fill Generate License, or renew with package buttons / custom days.</div>
 <div class="btns filt" style="margin:8px 0">
 <button type="button" class="sm gray" data-mf="all" onclick="setMachFilter('all')">All</button>
 <button type="button" class="sm gray" data-mf="active" onclick="setMachFilter('active')">Active</button>
@@ -197,6 +218,7 @@ button.sm{width:auto;padding:7px 12px;font-size:12px;border-radius:8px;margin-to
 <div id="machines"></div>
 
 <h2>Records <span id="cnt" style="color:#6b7280;font-size:12px"></span></h2>
+<div class="hint">Every issued key. Copy, quick-renew from packages, revoke, or unrevoke.</div>
 <div class="btns filt" style="margin:8px 0">
 <button type="button" class="sm gray" data-rf="all" onclick="setRecFilter('all')">All</button>
 <button type="button" class="sm gray" data-rf="active" onclick="setRecFilter('active')">Active</button>
@@ -206,6 +228,16 @@ button.sm{width:auto;padding:7px 12px;font-size:12px;border-radius:8px;margin-to
 </div>
 <input id="search" placeholder="Search..." oninput="renderRecords()">
 <div id="records"></div>
+
+<h2>Housekeeping</h2>
+<div class="hint">Archive and remove expired, revoked, or never-activated keys older than N days. Active licenses are kept.</div>
+<div class="housekeeping">
+  <label for="purgeDays" style="margin:0">Older than</label>
+  <input id="purgeDays" type="number" min="1" max="365" value="30" class="renew-days" style="width:80px">
+  <span style="font-size:12px;color:#9ca3af">days</span>
+  <button type="button" class="sm red" onclick="purgeOldLicenses()">Clear old licenses</button>
+</div>
+<div id="purgeResult" class="hint"></div>
 
 <script>
 var API_TOKEN=${JSON.stringify(apiToken)};
@@ -245,6 +277,90 @@ function loadBans(){
 }
 
 function fmtBaht(n){return Number(n||0).toLocaleString();}
+
+var DEFAULT_PACKAGES=[
+  {label:'1 Day',days:1,price_thb:50},
+  {label:'7 Days',days:7,price_thb:500},
+  {label:'30 Days',days:30,price_thb:800},
+  {label:'1 Year',days:365,price_thb:9000}
+];
+
+function mkBtn(t,c,f){var x=document.createElement('button');x.type='button';x.className='sm '+c;x.textContent=t;x.onclick=f;return x;}
+
+function updatePackageViews(){
+  renderPackageSummary();
+  renderPackageEditor();
+  buildDaysSelect();
+  var n=_packages.filter(function(p){return p.days!==null;}).length;
+  document.getElementById('pkgStatus').textContent=n?n+' package(s) ready for Generate and renew buttons.':'No packages — add rows below.';
+  if(document.getElementById('machines').children.length||_machines.length)renderMachines();
+  if(document.getElementById('records').children.length||_recs.length)renderRecords();
+}
+
+function renderPackageSummary(){
+  var box=document.getElementById('pkgSummary');
+  box.innerHTML='';
+  var shown=0;
+  for(var i=0;i<_packages.length;i++){
+    var p=_packages[i];
+    if(p.days===null) continue;
+    shown++;
+    var item=document.createElement('div');
+    item.className='item';
+    item.innerHTML='<span><b>'+p.label+'</b> · '+p.days+' day'+(p.days===1?'':'s')+'</span><span class="price">'+fmtBaht(p.price_thb)+' Baht</span>';
+    box.appendChild(item);
+  }
+  if(!shown) box.innerHTML='<div class="hint" style="padding:4px 0">No packages loaded yet.</div>';
+}
+
+function appendUseMachineId(container, mid){
+  var btn=mkBtn('Use ID','gray',function(id){
+    return function(){
+      document.getElementById('mid').value=id;
+      document.getElementById('mid').scrollIntoView({behavior:'smooth',block:'center'});
+      showStatus('Machine ID filled (Fill MID)');
+    };
+  }(mid));
+  btn.title='Fill MID — copy this Machine ID into Generate License above';
+  container.appendChild(btn);
+}
+
+function appendQuickRenew(container, mid){
+  if(_packages.length){
+    for(var i=0;i<_packages.length;i++){
+      var p=_packages[i];
+      if(p.days===null) continue;
+      (function(d){
+        container.appendChild(mkBtn('+'+d+'d','green',function(m,dd){return function(){renew(m,dd);};}(mid,d)));
+      })(p.days);
+    }
+  } else {
+    container.appendChild(mkBtn('+7d','green',function(m){return function(){renew(m,7);};}(mid)));
+    container.appendChild(mkBtn('+30d','green',function(m){return function(){renew(m,30);};}(mid)));
+  }
+}
+
+function appendRenewControls(container, mid){
+  appendQuickRenew(container, mid);
+  var wrap=document.createElement('span');
+  wrap.className='renew-custom';
+  var inp=document.createElement('input');
+  inp.type='number';
+  inp.min='1';
+  inp.max='36500';
+  inp.placeholder='Days';
+  inp.className='renew-days';
+  inp.title='Custom renewal length in days';
+  wrap.appendChild(inp);
+  wrap.appendChild(mkBtn('Renew','green',function(m,input){
+    return function(){
+      var days=parseInt(input.value,10);
+      if(!days||days<1){alert('Enter days (1–36500)');input.focus();return;}
+      renew(m,days);
+    };
+  }(mid,inp)));
+  container.appendChild(wrap);
+}
 
 function buildDaysSelect(){
   var sel=document.getElementById('days');
@@ -302,14 +418,27 @@ function addPackageRow(pkg){
   box.appendChild(row);
 }
 
-function loadPricing(){
-  return fetch('/api/pricing',{headers:{'Authorization':'Bearer '+API_TOKEN}}).then(function(r){return r.json();}).then(function(d){
-    if(!d.ok) throw new Error(d.error||'pricing failed');
-    _packages=d.packages||[];
-    document.getElementById('overYear').value=d.over_year_text||'';
-    renderPackageEditor();
-    buildDaysSelect();
-  }).catch(function(e){console.error('loadPricing:',e);});
+function loadPricing(showToast){
+  return fetch('/api/pricing',{headers:{'Authorization':'Bearer '+API_TOKEN}})
+    .then(function(r){
+      if(!r.ok) throw new Error('pricing HTTP '+r.status);
+      return r.json();
+    })
+    .then(function(d){
+      if(!d.ok) throw new Error(d.error||'pricing failed');
+      _packages=Array.isArray(d.packages)?d.packages:[];
+      if(!_packages.length) _packages=DEFAULT_PACKAGES.slice();
+      document.getElementById('overYear').value=d.over_year_text||'';
+      updatePackageViews();
+      if(showToast) showStatus('Packages reloaded');
+    })
+    .catch(function(e){
+      console.error('loadPricing:',e);
+      if(!_packages.length) _packages=DEFAULT_PACKAGES.slice();
+      updatePackageViews();
+      document.getElementById('pkgStatus').textContent='Could not load packages from server — showing defaults. Tap Reload to retry.';
+      if(showToast) showStatus('Using default packages');
+    });
 }
 
 function savePricing(){
@@ -320,8 +449,7 @@ function savePricing(){
     over_year_text:document.getElementById('overYear').value.trim()
   }).then(function(d){
     _packages=d.packages||packages;
-    renderPackageEditor();
-    buildDaysSelect();
+    updatePackageViews();
     showStatus('Packages saved');
   }).catch(function(e){alert('Save failed: '+e.message);});
 }
@@ -367,7 +495,7 @@ function timeLeftText(exp, used, revoked){
   if(days>0)left=days+'d'+(hrs?' '+hrs+'h':'');
   else if(hrs>0)left=hrs+'h'+(mins?' '+mins+'m':'');
   else left=Math.max(mins,1)+'m';
-  return left+' left'+(used?'':' (not activated)');
+  return left+' left'+(used?'':' to activate');
 }
 
 function expiryClass(exp, revoked){
@@ -456,7 +584,7 @@ function renderMachines(){
     if(!matchesMachFilter(m))continue;
     shown++;
     var exp=m.expires_at||'never';
-    var left=timeLeftText(exp, m.status==='active'||m.status==='unlimited'||m.status==='used_expired', m.status==='revoked');
+    var left=m.time_left||timeLeftText(exp, m.status==='active'||m.status==='unlimited'||m.status==='used_expired', m.status==='revoked');
     var div=document.createElement('div');div.className='mach';
     var pkg=m.package_days==null?'Unlimited':m.package_days+'d';
     div.innerHTML=
@@ -466,11 +594,8 @@ function renderMachines(){
       (m.issued_at?' · Issued: '+m.issued_at:'')+
       ' · '+m.license_count+' license(s)</div>';
     var b=document.createElement('div');b.className='btns';
-    var mk=function(t,c,f){var x=document.createElement('button');x.className='sm '+c;x.textContent=t;x.onclick=f;return x;};
-    b.appendChild(mk('Fill MID','gray',function(id){return function(){
-      document.getElementById('mid').value=id;showStatus('Machine ID filled');};}(mid)));
-    b.appendChild(mk('+7d','green',function(id){return function(){renew(id,7);};}(mid)));
-    b.appendChild(mk('+30d','green',function(id){return function(){renew(id,30);};}(mid)));
+    appendUseMachineId(b, mid);
+    appendRenewControls(b, mid);
     div.appendChild(b);box.appendChild(div);
   }
   document.getElementById('machCnt').textContent='('+shown+'/'+_machines.length+')';
@@ -525,13 +650,11 @@ function renderRecords(){
       '<div class="row expiry '+expiryClass(exp,isRevoked)+'">'+left+'</div>'+
       '<div class="row">Expires: '+expLabel+' · '+pkgStr+(price?' · '+price+'\u0e3f':'')+' · Issued: '+ts+'</div>';
     var b=document.createElement('div');b.className='btns';
-    var mk=function(t,c,f){var x=document.createElement('button');x.className='sm '+c;x.textContent=t;x.onclick=f;return x;};
-    b.appendChild(mk('Copy key','gray',function(k){return function(){navigator.clipboard.writeText(k);showStatus('Copied');};}(key)));
-    b.appendChild(mk('Copy PC','gray',function(p){return function(){navigator.clipboard.writeText(p);showStatus('Copied');};}(pass)));
-    b.appendChild(mk('+7d','green',function(m){return function(){renew(m,7);};}(mid)));
-    b.appendChild(mk('+30d','green',function(m){return function(){renew(m,30);};}(mid)));
-    if(!isRevoked)b.appendChild(mk('Revoke','red',function(n){return function(){doRevoke(n);};}(nonce)));
-    if(isRevoked)b.appendChild(mk('Unrevoke','gray',function(n){return function(){doUnrevoke(n);};}(nonce)));
+    b.appendChild(mkBtn('Copy key','gray',function(k){return function(){navigator.clipboard.writeText(k);showStatus('Copied');};}(key)));
+    b.appendChild(mkBtn('Copy PC','gray',function(p){return function(){navigator.clipboard.writeText(p);showStatus('Copied');};}(pass)));
+    appendQuickRenew(b, mid);
+    if(!isRevoked)b.appendChild(mkBtn('Revoke','red',function(n){return function(){doRevoke(n);};}(nonce)));
+    if(isRevoked)b.appendChild(mkBtn('Unrevoke','gray',function(n){return function(){doUnrevoke(n);};}(nonce)));
     d.appendChild(b);box.appendChild(d);
   }
   document.getElementById('cnt').textContent='('+shown+'/'+_recs.length+')';
@@ -539,10 +662,22 @@ function renderRecords(){
 }
 
 function renew(mid,days){
+  if(!confirm('Generate a new '+days+'-day license for '+mid+'?'))return;
   var price=priceForDays(days);
   api('POST','/api/generate',{mid:mid,days:days,price:price}).then(function(d){
     navigator.clipboard.writeText(d.license_key);
     showStatus(days+'d generated & copied');
+    return loadRecords();
+  }).catch(function(e){alert(e.message);});
+}
+
+function purgeOldLicenses(){
+  var days=parseInt(document.getElementById('purgeDays').value,10);
+  if(!days||days<1||days>365){alert('Enter days between 1 and 365');return;}
+  if(!confirm('Archive and delete stale license records older than '+days+' days?\\n\\nActive licenses are kept.'))return;
+  api('POST','/api/purge-licenses',{older_than_days:days}).then(function(d){
+    document.getElementById('purgeResult').textContent='Cleared '+d.purged+' record(s), archived '+d.archived+'.';
+    showStatus('Purged '+d.purged);
     return loadRecords();
   }).catch(function(e){alert(e.message);});
 }
@@ -610,6 +745,8 @@ function renderBans(){
 
 function copyEl(id){navigator.clipboard.writeText(document.getElementById(id).textContent);showStatus('Copied');}
 
+_packages=DEFAULT_PACKAGES.slice();
+updatePackageViews();
 loadPricing().then(function(){
   setMachFilter('all');setRecFilter('all');
   loadUpdateInfo();

@@ -24,7 +24,7 @@ from skyadmin_pro.ui.setup_rollout import RolloutAction, SetupRolloutPanel
 from skyadmin_pro.ui.theme import CARD_TITLE_SIZE
 from skyadmin_pro.ui.treeview import ThemedTreeview
 from skyadmin_pro.ui.views.base import BaseView
-from skyadmin_pro.ui.widgets import FeedbackLabel, themed_entry, themed_textbox
+from skyadmin_pro.ui.widgets import FeedbackLabel, themed_entry, themed_textbox, themed_tabview
 
 
 class OfficeHubView(BaseView):
@@ -40,7 +40,7 @@ class OfficeHubView(BaseView):
         self.feedback.grid(row=1, column=0, sticky="ew", pady=(8, 0))
 
         self._lazy_tabs: set[str] = set()
-        self.tabs = ctk.CTkTabview(self.body, command=self._on_tab_changed)
+        self.tabs = themed_tabview(self.body, command=self._on_tab_changed)
         self.tabs.grid(row=0, column=0, sticky="nsew")
         for name in ("Setup", "Contacts", "Passwords", "Notebook"):
             self.tabs.add(name)
@@ -314,7 +314,7 @@ class OfficeHubView(BaseView):
     def _build_passwords_tab(self, parent: ctk.CTkFrame) -> None:
         parent.grid_columnconfigure(0, weight=1)
         parent.grid_rowconfigure(0, weight=1)
-        pw_tabs = ctk.CTkTabview(parent)
+        pw_tabs = themed_tabview(parent)
         pw_tabs.grid(row=0, column=0, sticky="nsew", padx=4, pady=8)
         pw_tabs.add("Client DBD / RD")
         pw_tabs.add("Office accounts")

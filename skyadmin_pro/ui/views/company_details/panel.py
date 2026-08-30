@@ -30,7 +30,7 @@ from skyadmin_pro.ui.views.company_details.general_tab import GeneralTabMixin
 from skyadmin_pro.ui.views.company_details.tax_ids_tab import TaxIdsTabMixin
 from skyadmin_pro.ui.views.company_details.vo_csh_setup_tab import VoCshSetupTabMixin
 from skyadmin_pro.ui.views.company_details.vo_csh_tab import VoCshTabMixin
-from skyadmin_pro.ui.widgets import DatePickerField, FeedbackLabel, bind_wrap_label, make_modal, themed_entry
+from skyadmin_pro.ui.widgets import DatePickerField, FeedbackLabel, bind_wrap_label, make_modal, themed_entry, themed_scrollable_frame, themed_tabview
 
 
 class CompanyDetailsPanel(
@@ -85,7 +85,7 @@ class CompanyDetailsPanel(
             command=self._missing_docs_workflow,
         ).grid(row=0, column=1, sticky="e", padx=(12, 0))
 
-        self.tabs = ctk.CTkTabview(self)
+        self.tabs = themed_tabview(self)
         self.tabs.grid(row=1, column=0, sticky="nsew")
         for name in (
             "Accounting Setup",
@@ -103,7 +103,7 @@ class CompanyDetailsPanel(
             tab.grid_propagate(False)
 
         setup_tab = self.tabs.tab("Accounting Setup")
-        setup_scroll = ctk.CTkScrollableFrame(setup_tab, fg_color="transparent")
+        setup_scroll = themed_scrollable_frame(setup_tab)
         setup_scroll.grid(row=0, column=0, sticky="nsew")
         setup_scroll.grid_columnconfigure(0, weight=1)
         self._accounting_setup_frame = self._build_accounting_setup(setup_scroll)
@@ -111,7 +111,7 @@ class CompanyDetailsPanel(
 
         # General tab — existing content
         general_tab = self.tabs.tab("General")
-        general_scroll = ctk.CTkScrollableFrame(general_tab, fg_color="transparent")
+        general_scroll = themed_scrollable_frame(general_tab)
         general_scroll.grid(row=0, column=0, sticky="nsew")
         general_scroll.grid_columnconfigure(0, weight=1)
         self._company_frame = self._build_company_info(general_scroll)
@@ -123,7 +123,7 @@ class CompanyDetailsPanel(
 
         # Tax IDs tab
         tax_ids_tab = self.tabs.tab("Tax IDs")
-        tax_ids_scroll = ctk.CTkScrollableFrame(tax_ids_tab, fg_color="transparent")
+        tax_ids_scroll = themed_scrollable_frame(tax_ids_tab)
         tax_ids_scroll.grid(row=0, column=0, sticky="nsew")
         tax_ids_scroll.grid_columnconfigure(0, weight=1)
         self._tax_ids_frame = self._build_tax_ids(tax_ids_scroll)
@@ -131,14 +131,14 @@ class CompanyDetailsPanel(
 
         # Filing Statuses tab
         filing_tab = self.tabs.tab("Filing Statuses")
-        filing_scroll = ctk.CTkScrollableFrame(filing_tab, fg_color="transparent")
+        filing_scroll = themed_scrollable_frame(filing_tab)
         filing_scroll.grid(row=0, column=0, sticky="nsew")
         filing_scroll.grid_columnconfigure(0, weight=1)
         self._filing_frame = self._build_filing_statuses(filing_scroll)
         self._filing_frame.grid(row=0, column=0, sticky="ew")
 
         vo_setup_tab = self.tabs.tab("VO/CSH Setup")
-        vo_setup_scroll = ctk.CTkScrollableFrame(vo_setup_tab, fg_color="transparent")
+        vo_setup_scroll = themed_scrollable_frame(vo_setup_tab)
         vo_setup_scroll.grid(row=0, column=0, sticky="nsew")
         vo_setup_scroll.grid_columnconfigure(0, weight=1)
         self._vo_csh_setup_frame = self._build_vo_csh_setup(vo_setup_scroll)
@@ -146,7 +146,7 @@ class CompanyDetailsPanel(
 
         # VO & CSH tab
         vo_tab = self.tabs.tab("VO & CSH")
-        vo_scroll = ctk.CTkScrollableFrame(vo_tab, fg_color="transparent")
+        vo_scroll = themed_scrollable_frame(vo_tab)
         vo_scroll.grid(row=0, column=0, sticky="nsew")
         vo_scroll.grid_columnconfigure(0, weight=1)
         self._vo_frame = self._build_vo_csh(vo_scroll)
@@ -154,7 +154,7 @@ class CompanyDetailsPanel(
 
         # Financial Docs tab
         fin_tab = self.tabs.tab("Financial Docs")
-        fin_scroll = ctk.CTkScrollableFrame(fin_tab, fg_color="transparent")
+        fin_scroll = themed_scrollable_frame(fin_tab)
         fin_scroll.grid(row=0, column=0, sticky="nsew")
         fin_scroll.grid_columnconfigure(0, weight=1)
         self._fin_frame = self._build_financial_docs(fin_scroll)
