@@ -174,6 +174,11 @@ class BackupMixin:
                     restore_encrypted_backup,
                 )
 
+                try:
+                    self.app.db.shutdown()
+                except Exception:
+                    pass
+
                 backup_dir = self.app.db.db_file.parent / "backups"
                 backup_dir.mkdir(parents=True, exist_ok=True)
                 stamp = _dt.now().strftime("%Y%m%d_%H%M%S")
@@ -203,9 +208,18 @@ class BackupMixin:
                     messagebox.showinfo(
                         "Restore complete",
                         f"Backup restored successfully.\n\n{restored}{safety}\n\n"
-                        "Close and reopen SkyAdmin Pro to load the restored data.",
+                        "SkyAdmin Pro will close now. Reopen it to load the restored data.",
                         parent=self.winfo_toplevel(),
                     )
+                    try:
+                        self.app.db.shutdown()
+                    except Exception:
+                        pass
+                    root = self.winfo_toplevel()
+                    try:
+                        root.destroy()
+                    except Exception:
+                        pass
 
             try:
                 self.after(0, _done)

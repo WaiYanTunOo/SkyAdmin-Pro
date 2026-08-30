@@ -106,3 +106,13 @@ class WorkspacePaths:
             self.suppliers,
         ):
             folder.mkdir(parents=True, exist_ok=True)
+
+
+def remove_sqlite_sidecars(db_file: Path) -> None:
+    """Delete WAL/SHM/journal siblings after replacing a SQLite database file."""
+    base = Path(db_file)
+    for suffix in ("-wal", "-shm", "-journal"):
+        try:
+            Path(f"{base}{suffix}").unlink(missing_ok=True)
+        except OSError:
+            pass

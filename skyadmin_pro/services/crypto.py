@@ -14,6 +14,7 @@ import zipfile
 from dataclasses import dataclass
 from pathlib import Path
 
+from skyadmin_pro.paths import remove_sqlite_sidecars
 from skyadmin_pro.services._secret import _derive_secret
 
 logger = logging.getLogger(__name__)
@@ -299,6 +300,7 @@ def restore_encrypted_backup(archive: Path, workspace_root: Path, db_file: Path)
             db_file = Path(db_file)
             db_file.parent.mkdir(parents=True, exist_ok=True)
             db_file.write_bytes(archive_zip.read("skyadmin_pro.db"))
+            remove_sqlite_sidecars(db_file)
 
             restored_files = 0
             for info, target in workspace_entries:

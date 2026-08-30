@@ -43,6 +43,24 @@ def test_restore_returns_summary(tmp_path):
     assert summary.workspace_files_restored == 0
 
 
+def test_restore_removes_sqlite_sidecars(tmp_path):
+    workspace = tmp_path / "workspace"
+    workspace.mkdir()
+    db_file = tmp_path / "skyadmin_pro.db"
+    db_file.write_bytes(b"live-db")
+    (tmp_path / "skyadmin_pro.db-wal").write_bytes(b"stale-wal")
+    (tmp_path / "skyadmin_pro.db-shm").write_bytes(b"stale-shm")
+    archive = tmp_path / "roundtrip.skybackup"
+    crypto.create_encrypted_backup(workspace, db_file, archive)
+
+    target_db = tmp_path / "restored.db"
+    (tmp_path / "restored.db-wal").write_bytes(b"old-wal")
+    crypto.restore_encrypted_backup(archive, tmp_path / "restored_ws", target_db)
+    assert target_db.read_bytes() == b"live-db"
+    assert not (tmp_path / "restored.db-wal").exists()
+    assert not (tmp_path / "restored.db-shm").exists()
+
+
 def test_restore_rejects_archive_without_database(tmp_path):
     workspace = tmp_path / "workspace"
     workspace.mkdir()

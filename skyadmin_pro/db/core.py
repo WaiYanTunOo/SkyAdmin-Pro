@@ -23,7 +23,7 @@ from skyadmin_pro.config import (
     SETTING_WORKSPACE_ROOT,
 )
 from skyadmin_pro.db.schema import SCHEMA_SQL
-from skyadmin_pro.paths import database_path, default_workspace_root
+from skyadmin_pro.paths import database_path, default_workspace_root, remove_sqlite_sidecars
 
 
 class CoreMixin:
@@ -166,6 +166,7 @@ class CoreMixin:
             import shutil
 
             shutil.copy2(str(backup_path), str(self.db_file))
+            remove_sqlite_sidecars(self.db_file)
 
             # Reinitialize with the restored database
             self._wal_enabled = None
@@ -362,22 +363,11 @@ class CoreMixin:
                                COALESCE(contact_name, ''),
                                COALESCE(email, '')
                         FROM clients;
-                        CREATE TRIGGER IF NOT EXISTS clients_fts_ai AFTER INSERT ON clients BEGIN
-                            INSERT INTO clients_fts(rowid, name, contact_name, email)
-                            VALUES (new.id, COALESCE(new.name,''), COALESCE(new.contact_name,''), COALESCE(new.email,''));
-                        END;
-                        CREATE TRIGGER IF NOT EXISTS clients_fts_ad AFTER DELETE ON clients BEGIN
-                            INSERT INTO clients_fts(clients_fts, rowid, name, contact_name, email)
-                            VALUES ('delete', old.id, old.name, old.contact_name, old.email);
-                        END;
-                        CREATE TRIGGER IF NOT EXISTS clients_fts_au AFTER UPDATE ON clients BEGIN
-                            INSERT INTO clients_fts(clients_fts, rowid, name, contact_name, email)
-                            VALUES ('delete', old.id, old.name, old.contact_name, old.email);
-                            INSERT INTO clients_fts(rowid, name, contact_name, email)
-                            VALUES (new.id, COALESCE(new.name,''), COALESCE(new.contact_name,''), COALESCE(new.email,''));
-                        END;
                         """
                     )
+                    self._ensure_clients_fts_triggers(conn)
+                else:
+                    self._ensure_clients_fts_triggers(conn)
             conn.execute("COMMIT")
         except Exception:
             try:
@@ -388,11 +378,49 @@ class CoreMixin:
         finally:
             conn.close()
 
+    @staticmethod
+    def _drop_clients_fts_triggers(conn: sqlite3.Connection) -> None:
+        for name in ("clients_fts_ai", "clients_fts_ad", "clients_fts_au"):
+            conn.execute(f"DROP TRIGGER IF EXISTS {name}")
+
+    @staticmethod
+    def _ensure_clients_fts_triggers(conn: sqlite3.Connection) -> None:
+        CoreMixin._drop_clients_fts_triggers(conn)
+        conn.execute(
+            """
+            CREATE TRIGGER clients_fts_ai AFTER INSERT ON clients BEGIN
+                INSERT INTO clients_fts(rowid, name, contact_name, email)
+                VALUES (new.id, COALESCE(new.name,''), COALESCE(new.contact_name,''), COALESCE(new.email,''));
+            END
+            """
+        )
+        conn.execute(
+            """
+            CREATE TRIGGER clients_fts_ad AFTER DELETE ON clients BEGIN
+                DELETE FROM clients_fts WHERE rowid = old.id;
+            END
+            """
+        )
+        conn.execute(
+            """
+            CREATE TRIGGER clients_fts_au AFTER UPDATE ON clients BEGIN
+                DELETE FROM clients_fts WHERE rowid = old.id;
+                INSERT INTO clients_fts(rowid, name, contact_name, email)
+                VALUES (new.id, COALESCE(new.name,''), COALESCE(new.contact_name,''), COALESCE(new.email,''));
+            END
+            """
+        )
+
     def _backfill_sync_global_ids(self) -> None:
         """Assign stable global_id UUIDs for P4 sync."""
         import uuid
 
         with self.connection() as conn:
+            fts_exists = conn.execute(
+                "SELECT 1 FROM sqlite_master WHERE type='table' AND name='clients_fts'"
+            ).fetchone()
+            if fts_exists:
+                self._drop_clients_fts_triggers(conn)
             for table in ("clients", "tasks", "office_contacts", "notebook_entries"):
                 rows = conn.execute(
                     f"SELECT id FROM {table} WHERE global_id IS NULL OR TRIM(global_id) = ''"
@@ -402,6 +430,12 @@ class CoreMixin:
                         f"UPDATE {table} SET global_id = ? WHERE id = ?",
                         (uuid.uuid4().hex, int(row["id"])),
                     )
+            if fts_exists:
+                self._ensure_clients_fts_triggers(conn)
+                try:
+                    conn.execute("INSERT INTO clients_fts(clients_fts) VALUES('rebuild')")
+                except sqlite3.Error:
+                    self._log.warning("clients_fts rebuild after backfill failed", exc_info=True)
 
     def _migrate_secret_fields(self) -> None:
         """Encrypt legacy plaintext IRD passwords at rest."""
