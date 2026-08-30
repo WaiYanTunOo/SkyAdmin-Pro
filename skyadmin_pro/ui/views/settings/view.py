@@ -11,6 +11,7 @@ from skyadmin_pro.config import (
     CHECKLIST_TEMPLATES,
     DEFAULT_COLOR_THEME,
     DEFAULT_PORTAL_URL,
+    LEGAL_DISCLAIMER_SHORT,
     MOBILE_VIEWER_URL,
     OWNER_EMAIL,
     PRICING_DEFAULT_SERVICE,
@@ -39,6 +40,7 @@ from skyadmin_pro.ui.widgets import (
     option_menu_style_kwargs,
     themed_entry,
     themed_scrollable_frame,
+    card_style_kwargs,
     themed_tabview,
     themed_textbox,
 )
@@ -55,14 +57,15 @@ class SettingsView(BackupMixin, ChecklistMixin, LicenseMixin, PricingMixin, Work
     subtitle = "Appearance, license, business defaults, and local data."
 
     def build(self) -> None:
-        self.body.grid_rowconfigure(1, weight=1)
         self.body.grid_columnconfigure(0, weight=1)
+        self.body.grid_rowconfigure(0, weight=0)
+        self.body.grid_rowconfigure(1, weight=1)
 
         self.feedback = FeedbackLabel(self.body)
-        self.feedback.grid(row=0, column=0, sticky="ew", pady=(0, 8))
+        self.feedback.grid(row=0, column=0, sticky="ew", pady=(0, 6))
 
         self.tabs = themed_tabview(self.body)
-        self.tabs.grid(row=1, column=0, sticky="nsew")
+        self.tabs.grid(row=1, column=0, sticky="nsew", pady=(0, 0))
 
         self._checklist_rows: list[tuple[ctk.CTkFrame, ctk.StringVar, ctk.StringVar]] = []
         self._pricing_rows: dict[str, dict] = {}
@@ -73,6 +76,7 @@ class SettingsView(BackupMixin, ChecklistMixin, LicenseMixin, PricingMixin, Work
             tab = self.tabs.tab(name)
             tab.grid_columnconfigure(0, weight=1)
             tab.grid_rowconfigure(0, weight=1)
+            tab.grid_propagate(True)
 
         self._build_general_tab(self.tabs.tab("General"))
         self._build_license_tab(self.tabs.tab("License"))
@@ -81,7 +85,7 @@ class SettingsView(BackupMixin, ChecklistMixin, LicenseMixin, PricingMixin, Work
 
     def _scroll_tab(self, tab) -> ctk.CTkScrollableFrame:
         scroll = themed_scrollable_frame(tab)
-        scroll.grid(row=0, column=0, sticky="nsew")
+        scroll.grid(row=0, column=0, sticky="nsew", padx=0, pady=0)
         scroll.grid_columnconfigure(0, weight=1)
         return scroll
 
@@ -170,18 +174,21 @@ class SettingsView(BackupMixin, ChecklistMixin, LicenseMixin, PricingMixin, Work
         )
         row += 1
 
-        legal = SectionCard(scroll, title="Legal")
-        legal.grid(row=row, column=0, sticky="ew")
-        legal_body = legal.body
-        legal_body.grid_columnconfigure(0, weight=1)
-        ctk.CTkLabel(
-            legal_body,
-            text="© 2026 Sky Creation Innovations — Proprietary software. All rights reserved.",
+        disclaimer = ctk.CTkFrame(scroll, corner_radius=12, **card_style_kwargs())
+        disclaimer.grid(row=row, column=0, sticky="ew")
+        disclaimer.grid_columnconfigure(0, weight=1)
+        self.disclaimer_label = ctk.CTkLabel(
+            disclaimer,
+            text=LEGAL_DISCLAIMER_SHORT,
             anchor="w",
+            justify="left",
             text_color=TEXT_MUTED,
-        ).grid(row=0, column=0, sticky="ew", pady=(0, 8))
-        legal_btns = ctk.CTkFrame(legal_body, fg_color="transparent")
-        legal_btns.grid(row=1, column=0, sticky="w")
+            font=ctk.CTkFont(size=11),
+        )
+        self.disclaimer_label.grid(row=0, column=0, sticky="ew", padx=16, pady=(12, 8))
+        bind_wrap_label(self.disclaimer_label, disclaimer, pad=32)
+        legal_btns = ctk.CTkFrame(disclaimer, fg_color="transparent")
+        legal_btns.grid(row=1, column=0, sticky="w", padx=16, pady=(0, 12))
         ctk.CTkButton(
             legal_btns,
             text="License Agreement",
@@ -204,7 +211,11 @@ class SettingsView(BackupMixin, ChecklistMixin, LicenseMixin, PricingMixin, Work
         status = SectionCard(
             scroll,
             title="License & sync",
-            subtitle="License status, daily online check, and encrypted data sync.",
+            subtitle=(
+                "License check and optional cloud backup for this PC only. "
+                "Each buyer's data is separate on the server. "
+                "For a second PC, use Data & backup → encrypted backup (.skybackup)."
+            ),
         )
         status.grid(row=row, column=0, sticky="ew", pady=(0, 12))
         body = status.body
@@ -267,11 +278,18 @@ class SettingsView(BackupMixin, ChecklistMixin, LicenseMixin, PricingMixin, Work
                 command=self._open_mobile_viewer,
             ).pack(side="left")
 
-        lic_btns = ctk.CTkFrame(body, fg_color="transparent")
-        lic_btns.grid(row=4, column=0, sticky="ew", pady=(12, 0))
-        lic_btns.grid_columnconfigure(0, weight=1)
-        ctk.CTkButton(lic_btns, text="Activate / Manage License…", command=self._open_activation).grid(
-            row=0, column=0, sticky="ew"
+        self.data_sync_var = ctk.BooleanVar(value=False)
+        sync_opts = ctk.CTkFrame(body, fg_color="transparent")
+        sync_opts.grid(row=4, column=0, sticky="ew", pady=(10, 0))
+        ctk.CTkCheckBox(
+            sync_opts,
+            text="Enable optional cloud data sync (this licensed PC only)",
+            variable=self.data_sync_var,
+            command=self._on_data_sync_toggle,
+        ).pack(anchor="w")
+
+        ctk.CTkButton(body, text="Activate / Manage License…", command=self._open_activation).grid(
+            row=5, column=0, sticky="ew", pady=(12, 0)
         )
         row += 1
 
@@ -699,6 +717,9 @@ class SettingsView(BackupMixin, ChecklistMixin, LicenseMixin, PricingMixin, Work
         self._refresh_backup_banner()
         self._refresh_integrity_banner()
         self._refresh_update_banner()
+        from skyadmin_pro.config import SETTING_DATA_SYNC_ENABLED
+
+        self.data_sync_var.set((self.app.db.get_setting(SETTING_DATA_SYNC_ENABLED) or "0").strip() == "1")
 
     def _path_row(self, info, *, row: int, on_open) -> ctk.CTkLabel:
         frame = ctk.CTkFrame(info, fg_color="transparent")

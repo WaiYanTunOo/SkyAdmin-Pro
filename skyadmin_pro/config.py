@@ -326,6 +326,9 @@ MOBILE_VIEWER_URL = f"{API_BASE_URL.rstrip('/')}/viewer" if API_BASE_URL else ""
 
 # P4 data sync cursor (ISO timestamp of last successful pull).
 SETTING_SYNC_LAST_PULL = "sync_last_pull_at"
+SETTING_SYNC_LAST_PUSH = "sync_last_push_at"
+# Opt-in: cloud sync stores a backup namespace for this licensed PC only (not shared across customers).
+SETTING_DATA_SYNC_ENABLED = "data_sync_enabled"
 
 # Pricing packages shown in the activation dialog (label, days, price in THB).
 PRICING_TIERS: tuple[tuple[str, int, int], ...] = (
@@ -423,6 +426,13 @@ THIS SOFTWARE IS PROPRIETARY AND CONFIDENTIAL. IT IS NOT OPEN SOURCE.
 Contact / licensing: Sky Creation Innovations
 Email: dev.skycreation@gmail.com
 """
+
+# One-line summary shown in Settings → General (full text in LEGAL_DISCLAIMER_TEXT).
+LEGAL_DISCLAIMER_SHORT = (
+    "© 2026 Sky Creation Innovations — All rights reserved. "
+    "SkyAdmin Pro is proprietary, hardware-locked software for licensed use only. "
+    "Unauthorized copying, redistribution, or reverse engineering is prohibited."
+)
 
 # Short-form disclaimer (mirrors DISCLAIMER.md, embedded for in-app viewing).
 LEGAL_DISCLAIMER_TEXT = """\

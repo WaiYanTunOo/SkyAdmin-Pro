@@ -9,7 +9,7 @@ import urllib.parse
 import urllib.request
 from typing import TYPE_CHECKING, Any
 
-from skyadmin_pro.config import API_BASE_URL, SETTING_SYNC_LAST_PULL
+from skyadmin_pro.config import API_BASE_URL, SETTING_DATA_SYNC_ENABLED, SETTING_SYNC_LAST_PULL, SETTING_SYNC_LAST_PUSH
 from skyadmin_pro.services.license import find_license_file, get_machine_id
 
 if TYPE_CHECKING:
@@ -267,6 +267,10 @@ def _row_to_sync_payload(db: Database, table: str, row: dict) -> dict[str, Any]:
     return payload
 
 
+def is_data_sync_enabled(db: Database) -> bool:
+    return (db.get_setting(SETTING_DATA_SYNC_ENABLED) or "0").strip() == "1"
+
+
 def log_sync_conflict(
     db: Database,
     *,
@@ -277,6 +281,16 @@ def log_sync_conflict(
     remote_updated_at: str | None,
 ) -> None:
     with db.connection() as conn:
+        existing = conn.execute(
+            """
+            SELECT 1 FROM sync_conflicts
+            WHERE table_name = ? AND global_id = ? AND direction = ?
+            LIMIT 1
+            """,
+            (table, global_id, direction),
+        ).fetchone()
+        if existing:
+            return
         conn.execute(
             """
             INSERT INTO sync_conflicts (table_name, global_id, direction, local_updated_at, remote_updated_at)
@@ -286,13 +300,24 @@ def log_sync_conflict(
         )
 
 
-def collect_local_changes(db: Database) -> list[dict[str, Any]]:
+def collect_local_changes(db: Database, *, since: str = "") -> list[dict[str, Any]]:
     """Collect active rows and soft-delete tombstones for push."""
     changes: list[dict[str, Any]] = []
+    since = (since or "").strip()
     for table in SYNC_PUSH_ORDER:
-        rows = db._fetch_all(
-            f"SELECT * FROM {table} WHERE global_id IS NOT NULL AND TRIM(global_id) != ''"
-        )
+        if since:
+            rows = db._fetch_all(
+                f"""
+                SELECT * FROM {table}
+                WHERE global_id IS NOT NULL AND TRIM(global_id) != ''
+                  AND updated_at > ?
+                """,
+                (since,),
+            )
+        else:
+            rows = db._fetch_all(
+                f"SELECT * FROM {table} WHERE global_id IS NOT NULL AND TRIM(global_id) != ''"
+            )
         for row in rows:
             deleted_at = row.get("deleted_at")
             changes.append(
@@ -404,6 +429,8 @@ def sync_data(db: Database, *, timeout: float = 25.0) -> tuple[bool, str]:
     """Pull then push business data via the Worker sync API."""
     if not (API_BASE_URL or "").strip():
         return True, "Data sync skipped (no API URL in this build)."
+    if not is_data_sync_enabled(db):
+        return True, "Cloud data sync is off — use encrypted backup (.skybackup) to move data to another PC."
 
     creds = ensure_sync_credentials(timeout=timeout)
     if not creds:
@@ -434,7 +461,7 @@ def sync_data(db: Database, *, timeout: float = 25.0) -> tuple[bool, str]:
     if isinstance(changes, list):
         pulled, pull_conflicts = apply_remote_changes(db, changes)
 
-    local_changes = collect_local_changes(db)
+    local_changes = collect_local_changes(db, since=db.get_setting(SETTING_SYNC_LAST_PUSH) or "")
     push_ok, push_result = _sync_request(
         "POST",
         "/api/sync/push",
@@ -450,6 +477,8 @@ def sync_data(db: Database, *, timeout: float = 25.0) -> tuple[bool, str]:
     server_time = str(pull_data.get("server_time") or push_data.get("server_time") or "")
     if server_time:
         db.set_setting(SETTING_SYNC_LAST_PULL, server_time)
+        if int(push_data.get("applied") or 0) > 0 or not local_changes:
+            db.set_setting(SETTING_SYNC_LAST_PUSH, server_time)
 
     applied = int(push_data.get("applied") or 0)
     push_conflicts = int(push_data.get("conflicts") or 0)

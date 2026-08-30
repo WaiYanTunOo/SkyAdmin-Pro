@@ -110,7 +110,7 @@ def test_settings_sync_status_labels(app):
     assert hasattr(settings, "data_sync_label")
     settings._refresh_license_label()
     app.update()
-    assert "Data sync" in settings.data_sync_label.cget("text")
+    assert "sync" in settings.data_sync_label.cget("text").lower()
 
 
 def test_settings_minimum_geometry(app):

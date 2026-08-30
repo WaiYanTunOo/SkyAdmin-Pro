@@ -165,7 +165,10 @@ def test_burn_blocks_redemption(mid, fake_app_dir, monkeypatch):
 # --- machine ban covers passcode ------------------------------------------
 
 
-def test_machine_ban_blocks_key_and_passcode(mid, fake_app_dir):
+def test_machine_ban_blocks_key_and_passcode(mid, fake_app_dir, monkeypatch):
+    import skyadmin_pro.paths as paths_mod
+
+    monkeypatch.setattr(paths_mod, "app_data_dir", lambda: fake_app_dir)
     hw = fake_app_dir / "hardware.id"
     hw.write_text(mid, encoding="utf-8")
     banned = fake_app_dir / "banned.txt"

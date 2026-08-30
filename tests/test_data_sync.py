@@ -5,7 +5,7 @@ import uuid
 
 import pytest
 
-from skyadmin_pro.config import SETTING_SYNC_LAST_PULL
+from skyadmin_pro.config import SETTING_DATA_SYNC_ENABLED, SETTING_SYNC_LAST_PULL
 from skyadmin_pro.services import data_sync as sync
 
 
@@ -96,6 +96,33 @@ def test_count_sync_conflicts(db):
     assert rows[0]["global_id"] == "abc"
     assert db.clear_sync_conflicts() == 1
     assert db.count_sync_conflicts() == 0
+
+
+def test_log_sync_conflict_dedupes(db):
+    sync.log_sync_conflict(
+        db,
+        table="clients",
+        global_id="abc",
+        direction="pull",
+        local_updated_at="2026-01-03",
+        remote_updated_at="2026-01-02",
+    )
+    sync.log_sync_conflict(
+        db,
+        table="clients",
+        global_id="abc",
+        direction="pull",
+        local_updated_at="2026-01-04",
+        remote_updated_at="2026-01-02",
+    )
+    assert db.count_sync_conflicts() == 1
+
+
+def test_sync_data_disabled_by_default(db, monkeypatch):
+    monkeypatch.setattr(sync, "API_BASE_URL", "https://worker.test")
+    ok, msg = sync.sync_data(db)
+    assert ok
+    assert "off" in msg.lower() or "disabled" in msg.lower()
 
 
 def test_collect_includes_soft_delete_tombstones(db):
@@ -218,6 +245,7 @@ def test_sync_data_pull_push_updates_cursor(db, monkeypatch, fake_app_dir):
         return R()
 
     monkeypatch.setattr(urllib.request, "urlopen", fake_urlopen)
+    db.set_setting(SETTING_DATA_SYNC_ENABLED, "1")
     ok, msg = sync.sync_data(db)
     assert ok, msg
     assert db.get_setting(SETTING_SYNC_LAST_PULL) == "2026-04-01T09:00:00Z"

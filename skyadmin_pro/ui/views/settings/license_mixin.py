@@ -266,7 +266,10 @@ class LicenseMixin:
 
     def _format_data_sync_status(self) -> str:
         from skyadmin_pro.config import SETTING_SYNC_LAST_PULL
+        from skyadmin_pro.services.data_sync import is_data_sync_enabled
 
+        if not is_data_sync_enabled(self.app.db):
+            return "Cloud data sync: off (use encrypted backup for a second PC)"
         last = (self.app.db.get_setting(SETTING_SYNC_LAST_PULL) or "").strip()
         conflicts = self.app.db.count_sync_conflicts()
         parts: list[str] = []
@@ -412,7 +415,8 @@ class LicenseMixin:
         threading.Thread(target=worker, daemon=True).start()
 
     def _open_sync_conflicts(self) -> None:
-        rows = self.app.db.list_sync_conflicts(limit=200)
+        total = self.app.db.count_sync_conflicts()
+        rows = self.app.db.list_sync_conflicts(limit=500)
         if not rows:
             messagebox.showinfo(
                 "Sync conflicts",
@@ -425,58 +429,57 @@ class LicenseMixin:
 
         top = ctk.CTkToplevel(self)
         top.title("SkyAdmin Pro — Sync conflicts")
-        top.geometry("820x480")
-        top.minsize(640, 360)
+        top.geometry("900x520")
+        top.minsize(720, 400)
         make_modal(top)
         top.grid_columnconfigure(0, weight=1)
         top.grid_rowconfigure(1, weight=1)
 
+        shown = len(rows)
+        summary = (
+            f"{total} conflict(s) logged — your local data was kept."
+            if shown >= total
+            else f"Showing {shown} of {total} conflict(s) — your local data was kept."
+        )
         ctk.CTkLabel(
             top,
             text=(
-                f"{len(rows)} conflict(s) logged — your local data was kept. "
-                "These rows were not overwritten because your copy is newer."
+                f"{summary} "
+                "These rows were not overwritten because your copy is newer. "
+                "Scroll the table to review; Clear log removes the audit only."
             ),
             anchor="w",
             justify="left",
             text_color=TEXT_MUTED,
-            wraplength=760,
+            wraplength=840,
         ).grid(row=0, column=0, sticky="ew", padx=16, pady=(14, 8))
 
-        columns = ("logged", "table", "global_id", "direction", "local", "remote")
         tree = ThemedTreeview(
             top,
-            columns=columns,
-            show="headings",
-            height=14,
+            columns=(
+                ("logged", "Logged", 130),
+                ("table", "Table", 100),
+                ("global_id", "Global ID", 180),
+                ("direction", "Dir", 50),
+                ("local", "Local updated", 120),
+                ("remote", "Remote updated", 120),
+            ),
+            showheight=16,
         )
         tree.grid(row=1, column=0, sticky="nsew", padx=16, pady=(0, 8))
-        headings = {
-            "logged": "Logged",
-            "table": "Table",
-            "global_id": "Global ID",
-            "direction": "Dir",
-            "local": "Local updated",
-            "remote": "Remote updated",
-        }
-        widths = {"logged": 130, "table": 110, "global_id": 200, "direction": 50, "local": 130, "remote": 130}
-        for col in columns:
-            tree.heading(col, text=headings[col])
-            tree.column(col, width=widths.get(col, 100), anchor="w")
-
-        for row in rows:
-            tree.insert(
-                "",
-                "end",
-                values=(
+        tree.set_rows(
+            [
+                (
                     str(row.get("logged_at") or "")[:19],
                     row.get("table_name") or "",
                     row.get("global_id") or "",
                     row.get("direction") or "",
                     str(row.get("local_updated_at") or "")[:19],
                     str(row.get("remote_updated_at") or "")[:19],
-                ),
-            )
+                )
+                for row in rows
+            ]
+        )
 
         actions = ctk.CTkFrame(top, fg_color="transparent")
         actions.grid(row=2, column=0, sticky="ew", padx=16, pady=(0, 14))
@@ -485,7 +488,7 @@ class LicenseMixin:
         def _clear() -> None:
             if not messagebox.askyesno(
                 "Clear conflict log",
-                f"Remove all {len(rows)} logged conflict(s)?\n\n"
+                f"Remove all {total} logged conflict(s)?\n\n"
                 "This only clears the audit log — your data is unchanged.",
                 parent=top,
             ):
@@ -499,6 +502,17 @@ class LicenseMixin:
             side="left"
         )
         ctk.CTkButton(actions, text="Close", width=90, command=top.destroy).pack(side="right")
+
+    def _on_data_sync_toggle(self) -> None:
+        from skyadmin_pro.config import SETTING_DATA_SYNC_ENABLED
+
+        enabled = bool(self.data_sync_var.get())
+        self.app.db.set_setting(SETTING_DATA_SYNC_ENABLED, "1" if enabled else "0")
+        self._refresh_license_label()
+        if enabled:
+            self.feedback.info("Cloud data sync enabled for this licensed PC only.")
+        else:
+            self.feedback.info("Cloud data sync disabled — use encrypted backup for a second PC.")
 
     def _sync_now(self) -> None:
         import threading

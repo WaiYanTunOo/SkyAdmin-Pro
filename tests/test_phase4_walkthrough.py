@@ -137,7 +137,7 @@ def test_phase4_settings_phase3_controls(app):
     assert hasattr(settings, "data_sync_label")
     settings._refresh_license_label()
     app.update()
-    assert "Data sync" in settings.data_sync_label.cget("text")
+    assert "sync" in settings.data_sync_label.cget("text").lower()
     assert settings.app.db.quick_check() is True
 
 
@@ -175,11 +175,15 @@ def test_phase4_company_details_vo_fields(app):
     assert hasattr(panel, "shareholder_var")
 
 
-def test_phase5_activation_dialog_offscreen(monkeypatch):
+def test_phase5_activation_dialog_offscreen(monkeypatch, fake_app_dir):
     """Activation dialog builds and accepts a valid dev-signed key offline."""
+    import time
+
+    import skyadmin_pro.paths as paths_mod
     from skyadmin_pro.services.license_authoring import generate_ed25519_license
     from skyadmin_pro.ui.activation import ActivationDialog
 
+    monkeypatch.setattr(paths_mod, "app_data_dir", lambda: fake_app_dir)
     mid = "ABCD1234EFGH5678"
     saved: list[str] = []
 
@@ -202,7 +206,11 @@ def test_phase5_activation_dialog_offscreen(monkeypatch):
     key = generate_ed25519_license(mid, days_valid=7, package_days=7)
     dialog.key_box.insert("1.0", key)
     dialog._activate()
-    dialog.update()
+    for _ in range(80):
+        dialog.update()
+        if saved:
+            break
+        time.sleep(0.05)
     status_text = dialog.status.cget("text")
 
     dialog.destroy()
