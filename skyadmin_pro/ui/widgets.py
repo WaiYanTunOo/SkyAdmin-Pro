@@ -1,4 +1,4 @@
-"""Reusable CustomTkinter widgets for Document Hub."""
+"""Reusable CustomTkinter widgets for Document Hub and shared forms."""
 
 from __future__ import annotations
 
@@ -6,20 +6,272 @@ import calendar
 from collections.abc import Callable
 from datetime import date, datetime
 from pathlib import Path
+from typing import Any
 
 import customtkinter as ctk
 
 from skyadmin_pro.ui.dnd import enable_drop
 from skyadmin_pro.ui.theme import (
+    CARD_RADIUS,
     CARD_TITLE_SIZE,
+    ENTRY_BORDER,
+    ENTRY_FG,
+    ENTRY_PLACEHOLDER,
+    ENTRY_TEXT,
     FEEDBACK_ERROR,
     FEEDBACK_INFO,
     FEEDBACK_SUCCESS,
+    FONT_SIZE_SM,
+    FORM_FIELD_HEIGHT,
+    FORM_LABEL_COLOR,
+    FORM_LABEL_FONT_SIZE,
+    FORM_LABEL_GAP,
+    SECTION_GAP,
+    TEXTBOX_BORDER,
+    TEXTBOX_FG,
+    TEXTBOX_TEXT,
     TEXT_MUTED,
     TEXT_SUBTLE,
     WRAP_CARD,
 )
 from skyadmin_pro.ui.treeview import ThemedTreeview
+
+_INPUT_WIDGET_TYPES = (
+    ctk.CTkEntry,
+    ctk.CTkComboBox,
+    ctk.CTkTextbox,
+    ctk.CTkOptionMenu,
+)
+
+
+def entry_style_kwargs(**extra: Any) -> dict[str, Any]:
+    """Shared CTkEntry styling."""
+    return {
+        "height": FORM_FIELD_HEIGHT,
+        "fg_color": ENTRY_FG,
+        "border_color": ENTRY_BORDER,
+        "text_color": ENTRY_TEXT,
+        "placeholder_text_color": ENTRY_PLACEHOLDER,
+        "border_width": 1,
+        **extra,
+    }
+
+
+def combo_style_kwargs(**extra: Any) -> dict[str, Any]:
+    """CTkComboBox — no placeholder_text_color."""
+    base = entry_style_kwargs()
+    base.pop("placeholder_text_color", None)
+    base.update(extra)
+    return base
+
+
+def option_menu_style_kwargs(**extra: Any) -> dict[str, Any]:
+    """CTkOptionMenu — limited supported kwargs."""
+    return {
+        "height": FORM_FIELD_HEIGHT,
+        "fg_color": ENTRY_FG,
+        "text_color": ENTRY_TEXT,
+        **extra,
+    }
+
+
+def textbox_style_kwargs(**extra: Any) -> dict[str, Any]:
+    """Shared CTkTextbox styling."""
+    return {
+        "fg_color": TEXTBOX_FG,
+        "border_color": TEXTBOX_BORDER,
+        "text_color": TEXTBOX_TEXT,
+        "border_width": 1,
+        **extra,
+    }
+
+
+def bind_wrap_label(label: ctk.CTkLabel, parent: ctk.Misc, *, pad: int = 32) -> None:
+    """Keep label wraplength in sync with parent width."""
+
+    def _resize(event=None) -> None:
+        width = event.width if event is not None else parent.winfo_width()
+        if width > 1:
+            label.configure(wraplength=max(120, width - pad))
+
+    parent.bind("<Configure>", _resize, add="+")
+    parent.after(50, _resize)
+
+
+def _apply_input_theme(widget: ctk.CTkBaseClass) -> None:
+    if isinstance(widget, ctk.CTkTextbox):
+        widget.configure(**textbox_style_kwargs())
+    elif isinstance(widget, ctk.CTkComboBox):
+        widget.configure(**combo_style_kwargs())
+    elif isinstance(widget, ctk.CTkOptionMenu):
+        widget.configure(**option_menu_style_kwargs())
+    elif isinstance(widget, ctk.CTkEntry):
+        widget.configure(**entry_style_kwargs())
+
+
+def apply_form_theme(root: ctk.Misc) -> None:
+    """Re-apply input and table styling after appearance mode changes."""
+    if isinstance(root, ThemedTreeview):
+        root.apply_theme()
+    elif isinstance(root, _INPUT_WIDGET_TYPES):
+        _apply_input_theme(root)
+
+    try:
+        children = root.winfo_children()
+    except Exception:
+        return
+    for child in children:
+        apply_form_theme(child)
+
+
+class SectionCard(ctk.CTkFrame):
+    """Titled form section with optional subtitle."""
+
+    def __init__(
+        self,
+        master,
+        *,
+        title: str,
+        subtitle: str = "",
+        **kwargs,
+    ) -> None:
+        super().__init__(master, corner_radius=CARD_RADIUS, **kwargs)
+        self.grid_columnconfigure(0, weight=1)
+        row = 0
+        ctk.CTkLabel(
+            self,
+            text=title,
+            font=ctk.CTkFont(size=CARD_TITLE_SIZE, weight="bold"),
+            anchor="w",
+        ).grid(row=row, column=0, sticky="w", padx=16, pady=(14, 4 if subtitle else 8))
+        row += 1
+        if subtitle:
+            sub = ctk.CTkLabel(
+                self,
+                text=subtitle,
+                anchor="w",
+                text_color=TEXT_MUTED,
+                justify="left",
+            )
+            sub.grid(row=row, column=0, sticky="ew", padx=16, pady=(0, 8))
+            bind_wrap_label(sub, self, pad=40)
+            row += 1
+        self.body = ctk.CTkFrame(self, fg_color="transparent")
+        self.body.grid(row=row, column=0, sticky="nsew", padx=16, pady=(0, 14))
+        self.body.grid_columnconfigure(0, weight=1)
+
+
+class FormField(ctk.CTkFrame):
+    """Label above a single input — consistent spacing and contrast."""
+
+    def __init__(
+        self,
+        master,
+        *,
+        label: str,
+        kind: str = "entry",
+        textvariable: ctk.StringVar | None = None,
+        values: list[str] | None = None,
+        height: int | None = None,
+        placeholder_text: str = "",
+        **kwargs: Any,
+    ) -> None:
+        super().__init__(master, fg_color="transparent", **kwargs)
+        self.grid_columnconfigure(0, weight=1)
+        self.kind = kind
+
+        ctk.CTkLabel(
+            self,
+            text=label,
+            anchor="w",
+            font=ctk.CTkFont(size=FORM_LABEL_FONT_SIZE),
+            text_color=FORM_LABEL_COLOR,
+        ).grid(row=0, column=0, sticky="w")
+
+        widget_kwargs: dict[str, Any] = {}
+        if kind == "entry":
+            widget_kwargs = entry_style_kwargs(placeholder_text=placeholder_text, **kwargs)
+            if textvariable is not None:
+                widget_kwargs["textvariable"] = textvariable
+            self.widget: ctk.CTkBaseClass = ctk.CTkEntry(self, **widget_kwargs)
+        elif kind == "combo":
+            widget_kwargs = combo_style_kwargs(**kwargs)
+            self.widget = ctk.CTkComboBox(self, values=values or [""], **widget_kwargs)
+        elif kind == "option":
+            widget_kwargs = option_menu_style_kwargs(**kwargs)
+            self.widget = ctk.CTkOptionMenu(self, values=values or [""], **widget_kwargs)
+        elif kind == "textbox":
+            widget_kwargs = textbox_style_kwargs(height=height or 90, **kwargs)
+            self.widget = ctk.CTkTextbox(self, **widget_kwargs)
+        elif kind == "date":
+            self.var = textvariable if textvariable is not None else ctk.StringVar()
+            self.widget = DatePickerField(self, var=self.var)
+        else:
+            raise ValueError(f"Unknown FormField kind: {kind}")
+
+        self.widget.grid(row=1, column=0, sticky="ew", pady=(FORM_LABEL_GAP, 0))
+
+    def get(self) -> str:
+        if self.kind == "date":
+            return self.var.get().strip()
+        if isinstance(self.widget, ctk.CTkTextbox):
+            return self.widget.get("1.0", "end").strip()
+        return str(self.widget.get()).strip()
+
+    def set(self, value: str) -> None:
+        if self.kind == "date":
+            self.var.set(value)
+            return
+        if isinstance(self.widget, ctk.CTkTextbox):
+            self.widget.delete("1.0", "end")
+            if value:
+                self.widget.insert("1.0", value)
+            return
+        self.widget.set(value)
+
+    def clear(self) -> None:
+        self.set("")
+
+    def bind(self, sequence: str, func: Callable, add: str | bool | None = None) -> None:
+        if add is None:
+            self.widget.bind(sequence, func)
+        else:
+            self.widget.bind(sequence, func, add=add)
+
+
+def labeled_entry(
+    master,
+    label: str,
+    *,
+    textvariable: ctk.StringVar | None = None,
+    placeholder_text: str = "",
+    **kwargs: Any,
+) -> FormField:
+    return FormField(
+        master,
+        label=label,
+        kind="entry",
+        textvariable=textvariable,
+        placeholder_text=placeholder_text,
+        **kwargs,
+    )
+
+
+def labeled_combo(master, label: str, *, values: list[str] | None = None, **kwargs: Any) -> FormField:
+    return FormField(master, label=label, kind="combo", values=values, **kwargs)
+
+
+def themed_entry(master, **kwargs: Any) -> ctk.CTkEntry:
+    return ctk.CTkEntry(master, **entry_style_kwargs(**kwargs))
+
+
+def themed_combo(master, **kwargs: Any) -> ctk.CTkComboBox:
+    return ctk.CTkComboBox(master, **combo_style_kwargs(**kwargs))
+
+
+def themed_textbox(master, **kwargs: Any) -> ctk.CTkTextbox:
+    return ctk.CTkTextbox(master, **textbox_style_kwargs(**kwargs))
+
 
 MONTH_STATUS_OPEN = "open"
 MONTH_STATUS_IN_PROGRESS = "in_progress"
@@ -238,7 +490,9 @@ class DatePickerField(ctk.CTkFrame):
         super().__init__(master, fg_color="transparent", **kwargs)
         self.grid_columnconfigure(0, weight=1)
         self.var = var if var is not None else ctk.StringVar()
-        ctk.CTkEntry(self, textvariable=self.var, placeholder_text="YYYY-MM-DD").grid(row=0, column=0, sticky="ew")
+        ctk.CTkEntry(self, textvariable=self.var, placeholder_text="YYYY-MM-DD", **entry_style_kwargs()).grid(
+            row=0, column=0, sticky="ew"
+        )
         ctk.CTkButton(
             self,
             text="Calendar",

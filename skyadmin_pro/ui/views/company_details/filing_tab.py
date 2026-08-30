@@ -9,6 +9,7 @@ from skyadmin_pro.config import (
     TAX_FILING_LABELS,
     TAX_FILING_STATUSES,
 )
+from skyadmin_pro.ui.debounce import debounced_after
 from skyadmin_pro.ui.theme import CARD_RADIUS, CARD_TITLE_SIZE, TEXT_FAINT, TEXT_MUTED
 from skyadmin_pro.ui.treeview import ThemedTreeview
 from skyadmin_pro.ui.widgets import make_modal
@@ -68,6 +69,7 @@ class FilingTabMixin:
         self.filing_vars: dict[str, ctk.StringVar] = {}
         self.filing_labels: dict[str, ctk.CTkLabel] = {}
         self.filing_delete_btns: dict[str, ctk.CTkButton] = {}
+        self._filing_save_schedulers: dict[str, object] = {}
 
         for idx, field in enumerate(TAX_FILING_FIELDS):
             row = idx + 2
@@ -79,7 +81,14 @@ class FilingTabMixin:
 
             var = ctk.StringVar(value="Not Applicable")
             self.filing_vars[field] = var
-            var.trace_add("write", lambda *_a, f=field: self._on_filing_status_change(f))
+
+            def _schedule_save(f: str = field) -> None:
+                if self._filing_suspend_save:
+                    return
+                self._persist_filing_field(f)
+
+            self._filing_save_schedulers[field] = debounced_after(self, _schedule_save, delay_ms=300)
+            var.trace_add("write", lambda *_a, f=field: self._filing_save_schedulers[f]())
             menu = ctk.CTkOptionMenu(frame, values=list(TAX_FILING_STATUSES), variable=var)
             menu.grid(row=row, column=1, sticky="ew", padx=(0, 8), pady=(4, 2))
 
@@ -149,11 +158,6 @@ class FilingTabMixin:
         self.filing_history_tree.grid(row=1, column=0, sticky="ew")
 
         return frame
-
-    def _on_filing_status_change(self, field: str) -> None:
-        if self._filing_suspend_save:
-            return
-        self._persist_filing_field(field)
 
     def _persist_filing_field(self, field: str) -> None:
         client_id = self._selected_client_id()

@@ -8,7 +8,7 @@ from skyadmin_pro.services.file_ops import (
     parse_flexible_date,
 )
 from skyadmin_pro.ui.theme import CARD_RADIUS, CARD_TITLE_SIZE
-from skyadmin_pro.ui.widgets import DatePickerField
+from skyadmin_pro.ui.widgets import DatePickerField, themed_entry
 
 
 class VoCshTabMixin:
@@ -33,18 +33,18 @@ class VoCshTabMixin:
         self.shareholder_var = ctk.StringVar()
 
         ctk.CTkLabel(form, text="VO Address").grid(row=0, column=0, sticky="w", pady=(2, 2))
-        ctk.CTkEntry(form, textvariable=self.vo_address_var).grid(
+        themed_entry(form, textvariable=self.vo_address_var).grid(
             row=1, column=0, columnspan=2, sticky="ew", pady=(0, 4)
         )
         ctk.CTkLabel(form, text="VO Service Provider").grid(row=2, column=0, sticky="w", pady=(6, 2))
-        ctk.CTkEntry(form, textvariable=self.vo_provider_var).grid(
+        themed_entry(form, textvariable=self.vo_provider_var).grid(
             row=3, column=0, sticky="ew", padx=(0, 12), pady=(0, 4)
         )
         ctk.CTkLabel(form, text="VO Renewal Date").grid(row=2, column=1, sticky="w", pady=(6, 2))
         DatePickerField(form, var=self.vo_renewal_var).grid(row=3, column=1, sticky="ew", pady=(0, 4))
 
         ctk.CTkLabel(form, text="CSH Service Provider").grid(row=4, column=0, sticky="w", pady=(6, 2))
-        ctk.CTkEntry(form, textvariable=self.csh_provider_var).grid(
+        themed_entry(form, textvariable=self.csh_provider_var).grid(
             row=5, column=0, sticky="ew", padx=(0, 12), pady=(0, 4)
         )
         ctk.CTkLabel(form, text="CSH Renewal Date").grid(row=4, column=1, sticky="w", pady=(6, 2))
@@ -53,7 +53,7 @@ class VoCshTabMixin:
         ctk.CTkLabel(form, text="Shareholders (e.g. Thai 51%, Foreign 49%)").grid(
             row=6, column=0, sticky="w", pady=(6, 2)
         )
-        ctk.CTkEntry(form, textvariable=self.shareholder_var).grid(
+        themed_entry(form, textvariable=self.shareholder_var).grid(
             row=7, column=0, columnspan=2, sticky="ew", pady=(0, 4)
         )
 

@@ -7,7 +7,7 @@ from tkinter import ttk
 
 import customtkinter as ctk
 
-from skyadmin_pro.ui.theme import TABLE_FONT_SIZE, TABLE_HEADER_FONT_SIZE, TABLE_ROW_HEIGHT
+from skyadmin_pro.ui.theme import TABLE_FONT_SIZE, TABLE_HEADER_FONT_SIZE, TABLE_ROW_HEIGHT, table_palette
 
 
 class ThemedTreeview(ctk.CTkFrame):
@@ -67,6 +67,23 @@ class ThemedTreeview(ctk.CTkFrame):
 
     def apply_theme(self) -> None:
         mode = ctk.get_appearance_mode()
+        palette = table_palette(mode)
+        background = palette["background"]
+        foreground = palette["foreground"]
+        heading = palette["heading"]
+        selected = palette["selected"]
+        odd = palette["odd"]
+        even = palette["even"]
+        expired = palette["expired"]
+        urgent = palette["urgent"]
+        watch = palette["watch"]
+        green = palette["green"]
+        yellow = palette["yellow"]
+        orange = palette["orange"]
+        red = palette["red"]
+        done = palette["done"]
+        wip = palette["wip"]
+
         # Reuse existing style to avoid memory leak from creating new Style objects
         try:
             style = ttk.Style()
@@ -76,21 +93,6 @@ class ThemedTreeview(ctk.CTkFrame):
         except ttk.TclError:
             pass
         style = ttk.Style()
-
-        if mode == "Dark":
-            background, foreground = "#2b2b2b", "#f4f4f5"
-            heading, selected = "#333333", "#1f538d"
-            odd, even = "#2b2b2b", "#333333"
-            expired, urgent, watch = "#7f1d1d", "#9a3412", "#854d0e"
-            green, yellow, orange, red = "#14532d", "#a16207", "#9a3412", "#7f1d1d"
-            done, wip = "#14532d", "#78350f"
-        else:
-            background, foreground = "#ffffff", "#18181b"
-            heading, selected = "#e4e4e7", "#3b8ed0"
-            odd, even = "#ffffff", "#f4f4f5"
-            expired, urgent, watch = "#fecaca", "#fed7aa", "#fde68a"
-            green, yellow, orange, red = "#dcfce7", "#fef08a", "#fed7aa", "#fecaca"
-            done, wip = "#dcfce7", "#fef3c7"
 
         style.configure(
             "Sky.Treeview",
@@ -145,7 +147,9 @@ class ThemedTreeview(ctk.CTkFrame):
     ) -> None:
         # Remember the selection so a refresh doesn't lose the user's place.
         previous = self.tree.selection()
-        self.clear()
+        children = self.tree.get_children()
+        if children:
+            self.tree.delete(*children)
         row_list = list(rows)
         for index, values in enumerate(row_list):
             iid = str(iids[index]) if iids is not None else str(index)

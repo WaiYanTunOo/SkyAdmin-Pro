@@ -1,73 +1,32 @@
 #!/usr/bin/env python3
-"""iPhone License Generator — Sky Creation Innovations
-Run on your iPhone in Pythonista, a-Shell, or any Python 3 app.
-Supports online (Cloudflare API) and offline (local SECRET) modes.
+"""iPhone License Generator — Sky Creation Innovations.
+
+Issues licenses via the Cloudflare Worker API only (no offline signing secret).
 
 Usage:
-  python iphone_license_generator.py
-  # then enter Machine ID shown on the PC
-  # or: python iphone_license_generator.py 72FA00DC6B64525F 365
-
-API mode (preferred — no SECRET on this device):
-  export SKYADMIN_API_URL=https://your-api.workers.dev
+  export SKYADMIN_API_URL=https://skyadmin-worker.skyadmin-pro.workers.dev
   export SKYADMIN_API_TOKEN=your-owner-token
-  python iphone_license_generator.py 72FA00DC6B64525F 365
-
-Offline mode (SECRET stays on device):
   python iphone_license_generator.py 72FA00DC6B64525F 365
 """
 
 from __future__ import annotations
 
-import base64
-import hashlib
-import hmac
+import argparse
+import csv
 import json
 import os
-import secrets as _secrets
 import sys
-from datetime import datetime, timedelta
+from datetime import datetime
 
-# ── XOR-interleaved SECRET (offline fallback only) ──────────────────────────
-# Same derivation as skyadmin_pro/services/license.py.
-_XK = [0x5B, 0x2E]
-_XF = [
-    ([8, 48, 34, 24], [41, 62, 58, 47]),
-    ([71, 65, 64, 103], [64, 64, 65, 88]),
-    ([58, 47, 50, 52], [53, 40, 118, 105]),
-    ([30, 28, 24, 3], [125, 69, 87, 111]),
-    ([63, 54, 50, 53], [11, 41, 52, 120]),
-    ([126, 92, 65, 94], [92, 71, 75, 90]),
-    ([58, 41], [34, 122]),
-]
+DEFAULT_API_URL = "https://skyadmin-worker.skyadmin-pro.workers.dev"
+FALLBACK_PRICE_MAP = {1: 50, 7: 500, 30: 800, 365: 9000}
 
 
-def _derive_secret() -> bytes:
-    parts_a, parts_b = [], []
-    for idx, (ea, eb) in enumerate(_XF):
-        k = _XK[idx % len(_XK)]
-        parts_a.append(bytes(c ^ k for c in ea))
-        parts_b.append(bytes(c ^ k for c in eb))
-    return b"".join(a + b for a, b in zip(parts_a, parts_b, strict=True))
-
-
-SECRET = _derive_secret()
-
-
-def _hmac(payload: str) -> str:
-    return hmac.new(SECRET, payload.encode(), hashlib.sha256).hexdigest()
-
-
-# ── API helper ───────────────────────────────────────────────────────────────
-
-
-def _api_call(method: str, path: str, body: dict | None = None, api_url: str = "", api_token: str = "") -> dict:
-    """Call the Cloudflare Worker API. Raises on error."""
-    import urllib.error
+def _api_call(method: str, path: str, body: dict | None, api_url: str, api_token: str) -> dict:
     import urllib.request
 
     url = api_url.rstrip("/") + path
-    headers = {"Content-Type": "application/json"}
+    headers = {"Content-Type": "application/json", "User-Agent": "SkyAdminPro"}
     if api_token:
         headers["Authorization"] = f"Bearer {api_token}"
     data = json.dumps(body).encode() if body else None
@@ -79,85 +38,58 @@ def _api_call(method: str, path: str, body: dict | None = None, api_url: str = "
     return result
 
 
-# ── Offline generation (local SECRET) ───────────────────────────────────────
+def fetch_pricing_map(api_url: str) -> dict[int, int]:
+    try:
+        data = _api_call("GET", "/api/pricing", None, api_url, "")
+        prices: dict[int, int] = {}
+        for item in data.get("packages") or []:
+            if not isinstance(item, dict):
+                continue
+            days = item.get("days")
+            if days is None:
+                continue
+            prices[int(days)] = int(item.get("price_thb") or item.get("price") or 0)
+        return prices or dict(FALLBACK_PRICE_MAP)
+    except Exception:
+        return dict(FALLBACK_PRICE_MAP)
 
 
-def generate_license_offline(machine_id: str, days_valid: int | None = 365) -> tuple[str, str, str]:
-    """Offline generation. Returns (license_key, issued_at, nonce)."""
-    mid = machine_id.strip().upper()
-    now = datetime.now()
-    exp = None
-    if days_valid is not None:
-        exp = (now + timedelta(days=days_valid)).replace(microsecond=0).isoformat(timespec="seconds")
-    iat = now.strftime("%Y-%m-%dT%H:%M")
-    nonce = _secrets.token_hex(6)
-    pkg = str(days_valid) if days_valid is not None else ""
-    payload = "|".join([mid, exp or "", iat, nonce, pkg])
-    sig = _hmac(payload)
-    data = {"mid": mid, "exp": exp, "sig": sig, "iat": iat, "n": nonce, "pkg": pkg}
-    raw = json.dumps(data, separators=(",", ":")).encode()
-    return base64.urlsafe_b64encode(raw).decode().rstrip("="), iat, nonce
+def check_signing_key_alignment(api_url: str) -> None:
+    from skyadmin_pro.services.license_public import ED25519_PUBLIC_KEY_HEX
 
-
-def generate_passcode_offline(machine_id: str, days_valid: int | None = None) -> str:
-    """Offline passcode: 8-digit legacy or XXXXXXXX:b36(expiry_ts)."""
-    import string as _str
-
-    mid = machine_id.strip().upper()
-    if days_valid is not None:
-        exp_dt = (datetime.now() + timedelta(days=days_valid)).replace(microsecond=0)
-        exp_ts = int(exp_dt.timestamp())
-        sig = _hmac(f"{mid}:passcode:{exp_ts}")
-        num = int(sig[:8], 16) % 100_000_000
-        alphabet = _str.digits + _str.ascii_lowercase
-        enc = ""
-        v = exp_ts
-        if v == 0:
-            enc = "0"
-        else:
-            while v:
-                v, r = divmod(v, 36)
-                enc = alphabet[r] + enc
-        return f"{num:08d}:{enc}"
-    sig = _hmac(f"{mid}:passcode")
-    num = int(sig[:8], 16) % 100_000_000
-    return f"{num:08d}"
-
-
-# ── Online generation (API) ─────────────────────────────────────────────────
+    try:
+        data = _api_call("GET", "/api/signing/public-key", None, api_url, "")
+    except Exception:
+        return
+    worker_hex = str(data.get("public_key_hex") or "").lower()
+    if worker_hex and worker_hex != ED25519_PUBLIC_KEY_HEX.lower():
+        print(
+            "WARNING: Worker signing key does NOT match this desktop build.\n"
+            "Codes from the admin site will fail activation until LICENSE_ED25519_PRIVATE_KEY_B64\n"
+            f"matches license_public.py (client key starts with {ED25519_PUBLIC_KEY_HEX[:8]}…).\n",
+            file=sys.stderr,
+        )
 
 
 def generate_license_online(machine_id: str, days: int | None, price: int, api_url: str, api_token: str) -> dict:
-    """Call POST /api/generate. Returns dict with license_key, passcode, nonce, etc."""
     return _api_call(
         "POST",
         "/api/generate",
-        {
-            "mid": machine_id.strip().upper(),
-            "days": days,
-            "price": price,
-        },
+        {"mid": machine_id.strip().upper(), "days": days, "price": price},
         api_url,
         api_token,
     )
 
 
-# ── CSV logging ──────────────────────────────────────────────────────────────
-
-
 def log_license(csv_path: str, machine_id: str, days_valid, exp, iat, nonce, passcode: str, key: str) -> None:
-    """Append issuance to issued_licenses.csv."""
-    import csv
-    import os
-
     new_file = not os.path.exists(csv_path)
-    with open(csv_path, "a", newline="", encoding="utf-8") as f:
-        w = csv.writer(f)
+    with open(csv_path, "a", newline="", encoding="utf-8") as handle:
+        writer = csv.writer(handle)
         if new_file:
-            w.writerow(
+            writer.writerow(
                 ["issued", "machine_id", "package_days", "expires", "nonce", "passcode", "license_key", "status"]
             )
-        w.writerow(
+        writer.writerow(
             [
                 iat,
                 machine_id,
@@ -171,19 +103,30 @@ def log_license(csv_path: str, machine_id: str, days_valid, exp, iat, nonce, pas
         )
 
 
-# ── Main ─────────────────────────────────────────────────────────────────────
-
-PRICE_MAP = {1: 50, 7: 500, 30: 800, 365: 9000}
-
-
 def main() -> None:
-    api_url = os.environ.get("SKYADMIN_API_URL", "").strip()
-    api_token = os.environ.get("SKYADMIN_API_TOKEN", "").strip()
-    offline_mode = not api_url
+    parser = argparse.ArgumentParser(description="SkyAdmin Pro license generator (Worker API)")
+    parser.add_argument("machine_id", nargs="?", help="16-hex machine ID")
+    parser.add_argument("days", nargs="?", help="Package days or 'never'")
+    parser.add_argument("--api-url", default=os.environ.get("SKYADMIN_API_URL", DEFAULT_API_URL).strip())
+    parser.add_argument("--api-token", default=os.environ.get("SKYADMIN_API_TOKEN", "").strip())
+    args = parser.parse_args()
 
-    if len(sys.argv) >= 2:
-        mid = sys.argv[1]
-        arg = sys.argv[2] if len(sys.argv) >= 3 else ""
+    api_url = (args.api_url or DEFAULT_API_URL).strip()
+    api_token = (args.api_token or "").strip()
+    if not api_url or not api_token:
+        print(
+            "Error: set SKYADMIN_API_URL and SKYADMIN_API_TOKEN (or pass --api-url / --api-token).\n"
+            "Offline signing was removed — licenses must be issued by the Worker API.",
+            file=sys.stderr,
+        )
+        sys.exit(1)
+
+    check_signing_key_alignment(api_url)
+    price_map = fetch_pricing_map(api_url)
+
+    if args.machine_id:
+        mid = args.machine_id
+        arg = args.days or ""
         if arg.lower() == "never":
             days = None
         elif arg.lstrip("-").isdigit() and int(arg) > 0:
@@ -193,14 +136,12 @@ def main() -> None:
     else:
         print("SkyAdmin Pro — License Generator")
         print("Sky Creation Innovations\n")
-        if offline_mode:
-            print("[OFFLINE MODE — using local SECRET]\n")
-        else:
-            print(f"[ONLINE MODE — API: {api_url}]\n")
-        print("Prices: 1 Day=50 Baht | 7 Days=500 Baht | 30 Days=800 Baht | 1 Year=9,000 Baht\n")
+        print(f"[ONLINE MODE — API: {api_url}]\n")
+        tiers = ", ".join(f"{d}d={p:,}฿" for d, p in sorted(price_map.items()))
+        print(f"Prices: {tiers}\n")
         mid = input("Enter Machine ID from PC (16 hex, e.g. 72FA00DC6B64525F): ").strip()
-        print("\nPackage: [1] 1 Day  [7] 7 Days  [30] 30 Days  [365] 1 Year")
-        raw_days = input("Enter days (or a custom number, or 'never'): ").strip()
+        print("\nPackage: enter days (1, 7, 30, 365) or a custom number, or 'never'")
+        raw_days = input("Days: ").strip()
         if raw_days.lower() == "never":
             days = None
         elif raw_days == "":
@@ -216,29 +157,21 @@ def main() -> None:
         print("Error: Machine ID must be 16 hex characters.")
         sys.exit(1)
 
-    price = PRICE_MAP.get(days)
-    mode = "ONLINE" if not offline_mode else "OFFLINE"
+    price = price_map.get(days, 0) if days is not None else 0
+    try:
+        result = generate_license_online(mid, days, price, api_url, api_token)
+    except Exception as exc:
+        print(f"\nAPI call failed: {exc}", file=sys.stderr)
+        sys.exit(1)
 
-    if not offline_mode:
-        try:
-            result = generate_license_online(mid, days, price or 0, api_url, api_token)
-            lic = result["license_key"]
-            code = result["passcode"]
-            iat = result["issued_at"]
-            nonce = result["nonce"]
-            exp_str = result.get("expires_at", "never")
-        except Exception as e:
-            print(f"\nAPI call failed ({e}), falling back to offline mode...\n")
-            offline_mode = True
-
-    if offline_mode:
-        lic, iat, nonce = generate_license_offline(mid, days)
-        code = generate_passcode_offline(mid, days)
-        exp_dt = None if days is None else datetime.now() + timedelta(days=days)
-        exp_str = exp_dt.strftime("%Y-%m-%d %H:%M") if exp_dt else "never"
+    lic = result["license_key"]
+    code = result["passcode"]
+    iat = result["issued_at"]
+    nonce = result["nonce"]
+    exp_str = result.get("expires_at") or "never"
 
     print("\n" + "=" * 60)
-    print(f"Mode       : {mode}")
+    print("Mode       : ONLINE")
     print(f"Machine ID : {mid}")
     print(f"Package    : {'Unlimited' if days is None else f'{days} days'}" + (f"  ({price:,} Baht)" if price else ""))
     print(f"Issued     : {iat}")
@@ -258,10 +191,7 @@ def main() -> None:
 
     print("\nOne-time-use enforcement:")
     print("• The app burns this code locally on first activation.")
-    if not offline_mode:
-        print("• It is also recorded server-side (API) and cannot be reused.")
-    else:
-        print(f"• USED {nonce}")
+    print("• It is also recorded server-side (API) and cannot be reused.")
     print("=" * 60)
 
 

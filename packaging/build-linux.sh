@@ -28,6 +28,9 @@ if [[ -x "$OUT" ]]; then
     echo "Built: $OUT (${SIZE_MB} MB)"
     echo "Run:   $OUT"
     echo "Or copy dist/SkyAdminPro anywhere and double-click (mark executable)."
+    echo ""
+    echo "Running release checks..."
+    "$VENV_PY" "$ROOT/scripts/release_check.py" --skip-pytest --linux-binary "$OUT"
 else
     echo "Build failed — dist/SkyAdminPro not found." >&2
     exit 1

@@ -88,3 +88,24 @@ def test_settings_workspace_field(app):
     settings = app._views["settings"]
     assert hasattr(settings, "workspace_var")
     assert settings.workspace_var.get().strip()
+
+
+def test_settings_sync_status_labels(app):
+    app.show_view("settings")
+    app.update()
+    settings = app._views["settings"]
+    assert hasattr(settings, "data_sync_label")
+    settings._refresh_license_label()
+    app.update()
+    assert "Data sync" in settings.data_sync_label.cget("text")
+
+
+def test_settings_minimum_geometry(app):
+    app.geometry("1100x700")
+    app.update()
+    for key in ("dashboard", "document_hub", "database_tasks", "office_hub", "utilities", "settings"):
+        app.show_view(key)
+        app.update()
+        view = app._views[key]
+        assert view.winfo_width() > 0
+        assert view.winfo_height() > 0

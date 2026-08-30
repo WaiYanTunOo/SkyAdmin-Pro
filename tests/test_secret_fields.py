@@ -1,4 +1,4 @@
-"""IRD password encryption at rest."""
+"""Secret field encryption — fail-closed reads and migration helpers."""
 
 import sqlite3
 
@@ -7,6 +7,7 @@ from skyadmin_pro.services.secret_fields import (
     decrypt_secret,
     encrypt_secret,
     is_encrypted_secret,
+    read_plaintext_for_migration,
 )
 
 
@@ -19,7 +20,39 @@ def test_secret_round_trip(fake_app_dir, monkeypatch):
     stored = encrypt_secret(plain)
     assert is_encrypted_secret(stored)
     assert decrypt_secret(stored) == plain
-    assert decrypt_secret(plain) == plain  # legacy plaintext passthrough
+
+
+def test_legacy_plaintext_blocked_by_default(fake_app_dir, monkeypatch):
+    monkeypatch.setattr(
+        "skyadmin_pro.services.secret_fields.get_machine_id",
+        lambda: "TESTMACHINE00001",
+    )
+    plain = "legacy-plaintext-pass"
+    assert decrypt_secret(plain) == ""
+    assert decrypt_secret(plain, allow_legacy_plaintext=True) == plain
+
+
+def test_read_plaintext_for_migration_accepts_both_formats(fake_app_dir, monkeypatch):
+    monkeypatch.setattr(
+        "skyadmin_pro.services.secret_fields.get_machine_id",
+        lambda: "TESTMACHINE00001",
+    )
+    plain = "migrate-me"
+    assert read_plaintext_for_migration(plain) == plain
+    assert read_plaintext_for_migration(encrypt_secret(plain)) == plain
+
+
+def test_wrong_machine_decrypt_returns_empty(fake_app_dir, monkeypatch):
+    monkeypatch.setattr(
+        "skyadmin_pro.services.secret_fields.get_machine_id",
+        lambda: "TESTMACHINE00001",
+    )
+    stored = encrypt_secret("machine-bound")
+    monkeypatch.setattr(
+        "skyadmin_pro.services.secret_fields.get_machine_id",
+        lambda: "OTHERMACHINE0002",
+    )
+    assert decrypt_secret(stored) == ""
 
 
 def test_database_encrypts_and_decrypts_ird_password(tmp_path, fake_app_dir, monkeypatch):

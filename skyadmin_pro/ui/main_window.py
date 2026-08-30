@@ -192,6 +192,9 @@ class MainWindow(dnd_base_class()):
             anchor="w",
         )
         self.status_label.grid(row=0, column=0, sticky="ew", padx=16, pady=6)
+        from skyadmin_pro.ui.widgets import bind_wrap_label
+
+        bind_wrap_label(self.status_label, self.status_bar, pad=180)
 
         db_ok = "Database ready" if self.db.ping() else "Database error"
         ctk.CTkLabel(
@@ -219,6 +222,18 @@ class MainWindow(dnd_base_class()):
         on_show = getattr(view, "on_show", None)
         if callable(on_show):
             on_show()
+        self.apply_app_theme(view)
+
+    def apply_app_theme(self, root: ctk.Misc | None = None) -> None:
+        """Re-apply form input and table styling after appearance changes."""
+        from skyadmin_pro.ui.widgets import apply_form_theme
+
+        if root is not None:
+            apply_form_theme(root)
+            return
+        apply_form_theme(self)
+        for view in self._views.values():
+            apply_form_theme(view)
 
     def open_office_hub_client_credentials(
         self,
@@ -277,7 +292,17 @@ class MainWindow(dnd_base_class()):
 
     def refresh_sidebar_status(self) -> None:
         """Update sidebar version/sync line and tagline."""
-        from skyadmin_pro.services.license import get_daily_sync_status, requires_online_check
+        from skyadmin_pro.services.license import (
+            available_update,
+            get_daily_sync_status,
+            requires_online_check,
+        )
+
+        update = available_update()
+        if update:
+            ver = update.get("version", "?")
+            self.version_label.configure(text=f"v{APP_VERSION}  ·  Update: v{ver}")
+            return
 
         if requires_online_check():
             sync_ok, sync_msg = get_daily_sync_status()

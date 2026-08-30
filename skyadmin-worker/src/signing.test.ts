@@ -5,7 +5,10 @@ import {
   MAX_LOGIN_ATTEMPTS,
   readAttemptCount,
 } from "./admin_security";
-import { generatePasscode, hmacSign } from "./signing";
+import { generatePasscode, hmacSign, PASSCODE_PREFIX } from "./signing";
+
+const DEV_ED25519_KEY_B64 =
+  "LS0tLS1CRUdJTiBQUklWQVRFIEtFWS0tLS0tCk1DNENBUUF3QlFZREsyVndCQ0lFSUxVUFV2UlpLendzR1MvU0l6N0VIK2hiamd6VjFzT1I3ZFdGbmh5SWkxdlgKLS0tLS1FTkQgUFJJVkFURSBLRVktLS0tLQo=";
 
 describe("admin_security", () => {
   it("blocks at the configured attempt threshold", () => {
@@ -31,10 +34,11 @@ describe("signing", () => {
     expect(await hmacSign("secret-key", "payload")).toBe(sig);
   });
 
-  it("generates deterministic passcodes for fixed inputs", async () => {
-    const first = await generatePasscode("secret", "ABCD-1234-EFGH-5678", 30);
-    const second = await generatePasscode("secret", "ABCD-1234-EFGH-5678", 30);
-    expect(first).toMatch(/^\d{8}:[0-9a-z]+$/);
-    expect(first).toBe(second);
+  it("generates Ed25519 SKYPASS1 passcodes", async () => {
+    const first = await generatePasscode("ABCD1234EFGH5678", 30, DEV_ED25519_KEY_B64);
+    const second = await generatePasscode("ABCD1234EFGH5678", 30, DEV_ED25519_KEY_B64);
+    expect(first.startsWith(PASSCODE_PREFIX)).toBe(true);
+    expect(second.startsWith(PASSCODE_PREFIX)).toBe(true);
+    expect(first).not.toBe(second);
   });
 });

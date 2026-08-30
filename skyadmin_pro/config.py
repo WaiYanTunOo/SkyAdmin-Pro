@@ -2,9 +2,35 @@
 
 from __future__ import annotations
 
+import sys
+from pathlib import Path
+
+
+def _resolve_app_version() -> str:
+    """Read version from pyproject.toml (dev + frozen bundle) with safe fallback."""
+    try:
+        import tomllib
+
+        candidates: list[Path] = []
+        if getattr(sys, "frozen", False) and hasattr(sys, "_MEIPASS"):
+            candidates.append(Path(sys._MEIPASS) / "pyproject.toml")
+        root = Path(__file__).resolve().parents[1]
+        candidates.extend([root / "pyproject.toml", Path.cwd() / "pyproject.toml"])
+        for path in candidates:
+            if not path.is_file():
+                continue
+            data = tomllib.loads(path.read_text(encoding="utf-8"))
+            version = data.get("project", {}).get("version")
+            if version:
+                return str(version)
+    except Exception:
+        pass
+    return "0.3.1"
+
+
 APP_NAME = "SkyAdmin Pro"
 APP_TAGLINE = "Wai Yan Tun Oo (SKY)"
-APP_VERSION = "0.3.0"
+APP_VERSION = _resolve_app_version()
 
 # Default appearance — Settings will override from SQLite.
 DEFAULT_APPEARANCE_MODE = "dark"  # "dark" | "light" | "system"
@@ -294,6 +320,12 @@ _API_URL_PARTS = [
     ),  # "https://skyadmin-worker.skyadmin-pro.workers.dev"
 ]
 API_BASE_URL = b"".join(_API_URL_PARTS).decode()
+
+# P4.1 read-only mobile/PWA viewer (Worker-hosted).
+MOBILE_VIEWER_URL = f"{API_BASE_URL.rstrip('/')}/viewer" if API_BASE_URL else ""
+
+# P4 data sync cursor (ISO timestamp of last successful pull).
+SETTING_SYNC_LAST_PULL = "sync_last_pull_at"
 
 # Pricing packages shown in the activation dialog (label, days, price in THB).
 PRICING_TIERS: tuple[tuple[str, int, int], ...] = (

@@ -1,8 +1,11 @@
-# Local development secrets (gitignored)
-# Copy to .dev.vars and fill in your values.
-# Never commit real secrets to version control.
+# Copy to .dev.vars (never commit) for local wrangler dev.
+# Admin session cookie salt (legacy name LICENSE_SECRET; prefer ADMIN_SESSION_SECRET).
+LICENSE_SECRET=replace-with-random-admin-session-salt
+# ADMIN_SESSION_SECRET=optional-preferred-name-for-cookie-salt
+API_TOKEN=replace-with-owner-bearer-token
+ADMIN_PATH=replace-with-random-admin-path
+ADMIN_PASS=replace-with-strong-admin-password
 
-LICENSE_SECRET="your-license-hmac-secret-here"
-API_TOKEN="your-owner-api-token-here"
-ADMIN_PATH="your-secret-admin-path-hex"
-ADMIN_PASS="your-admin-password"
+# Ed25519 PKCS#8 PEM (standard base64) — must match skyadmin_pro/services/license_public.py
+# Generate with: python -c "from cryptography.hazmat.primitives.asymmetric.ed25519 import Ed25519PrivateKey; ..."
+LICENSE_ED25519_PRIVATE_KEY_B64=LS0tLS1CRUdJTiBQUklWQVRFIEtFWS0tLS0tCk1DNENBUUF3QlFZREsyVndCQ0lFSUxVUFV2UlpLendzR1MvU0l6N0VIK2hiamd6VjFzT1I3ZFdGbmh5SWkxdlgKLS0tLS1FTkQgUFJJVkFURSBLRVktLS0tLQo=

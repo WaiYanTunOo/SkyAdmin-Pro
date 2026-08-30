@@ -8,106 +8,256 @@ from __future__ import annotations
 
 import base64
 import hashlib
+import logging
+import tempfile
+import zipfile
+from dataclasses import dataclass
 from pathlib import Path
 
 from skyadmin_pro.services._secret import _derive_secret
 
+logger = logging.getLogger(__name__)
+
 MAGIC = b"SKYENCRYPTED_v1\n"
+WORKSPACE_PREFIX = "Workspace/"
+
+
+@dataclass(frozen=True)
+class BackupArchiveInfo:
+    has_database: bool
+    database_bytes: int
+    workspace_file_count: int
+    workspace_bytes: int
+    encrypted_bytes: int
+
+
+@dataclass(frozen=True)
+class RestoreSummary:
+    database_bytes: int
+    workspace_files_restored: int
+    workspace_bytes: int
+
+
+def format_byte_size(num_bytes: int) -> str:
+    size = float(max(num_bytes, 0))
+    for unit in ("B", "KB", "MB", "GB"):
+        if size < 1024 or unit == "GB":
+            if unit == "B":
+                return f"{int(size)} {unit}"
+            return f"{size:.1f} {unit}"
+        size /= 1024
+    return f"{size:.1f} GB"
 
 
 def _derive_fernet_key(machine_id: str) -> bytes:
-    """32-byte urlsafe base64 key for Fernet — machine-bound."""
-    raw = hashlib.pbkdf2_hmac("sha256", _derive_secret(), machine_id.encode(), 100_000, dklen=32)
+    """Return a 32-byte urlsafe base64 Fernet key bound to *machine_id*."""
+    raw = hashlib.pbkdf2_hmac(
+        "sha256", _derive_secret(), machine_id.encode(), 100_000, dklen=32
+    )
     return base64.urlsafe_b64encode(raw)
 
 
 def _derive_backup_key() -> bytes:
-    """Universal key for encrypted backups — same on every licensed copy."""
-    raw = hashlib.pbkdf2_hmac("sha256", _derive_secret(), b"SkyAdminBackupSalt2026", 100_000, dklen=32)
+    """Return the universal Fernet key used for encrypted ``.skybackup`` archives."""
+    raw = hashlib.pbkdf2_hmac(
+        "sha256", _derive_secret(), b"SkyAdminBackupSalt2026", 100_000, dklen=32
+    )
     return base64.urlsafe_b64encode(raw)
 
 
+def _resolve_member_under(base: Path, relative_name: str) -> Path:
+    """Resolve a zip member path safely under *base* (rejects Zip Slip).
+
+    Args:
+        base: Root directory that extracted files must stay inside.
+        relative_name: Archive member path relative to *base* (no leading slash).
+
+    Returns:
+        Absolute resolved path under *base*.
+
+    Raises:
+        ValueError: If the member path escapes *base* or is absolute.
+    """
+    clean = (relative_name or "").replace("\\", "/").lstrip("/")
+    if not clean or clean.endswith("/"):
+        raise ValueError(f"Invalid archive member path: {relative_name!r}")
+    if Path(clean).is_absolute():
+        raise ValueError(f"Absolute archive paths are not allowed: {relative_name!r}")
+
+    root = base.resolve()
+    target = (root / clean).resolve()
+    if not target.is_relative_to(root):
+        raise ValueError(
+            f"Archive member escapes destination directory: {relative_name!r}"
+        )
+    return target
+
+
 def is_encrypted(path: Path) -> bool:
+    """Return True when *path* begins with the SkyAdmin encrypted-file header."""
     try:
-        with open(path, "rb") as f:
-            return f.read(len(MAGIC)) == MAGIC
+        with open(path, "rb") as handle:
+            return handle.read(len(MAGIC)) == MAGIC
     except OSError:
         return False
 
 
 def encrypt_file(path: Path, machine_id: str) -> bool:
-    """Encrypt file in-place (adds MAGIC header). Returns True when encrypted."""
+    """Encrypt *path* in place (prepends :data:`MAGIC`). Returns True on success."""
     if is_encrypted(path):
         return True
     try:
+        import os
+        import tempfile
+
         from cryptography.fernet import Fernet
 
-        key = _derive_fernet_key(machine_id)
-        f = Fernet(key)
+        fernet = Fernet(_derive_fernet_key(machine_id))
         data = path.read_bytes()
-        token = f.encrypt(data)
-        path.write_bytes(MAGIC + token)
+        encrypted = MAGIC + fernet.encrypt(data)
+        path = Path(path)
+        tmp_fd, tmp_name = tempfile.mkstemp(
+            dir=path.parent,
+            prefix=f".{path.name}.",
+            suffix=".encrypting",
+        )
+        try:
+            with os.fdopen(tmp_fd, "wb") as handle:
+                handle.write(encrypted)
+            os.replace(tmp_name, path)
+        except Exception:
+            try:
+                os.unlink(tmp_name)
+            except OSError:
+                pass
+            raise
         return True
-    except Exception as exc:
-        import logging
-
-        logging.getLogger(__name__).warning("encrypt_file failed for %s: %s", path, exc, exc_info=True)
+    except OSError as exc:
+        logger.warning("encrypt_file failed for %s: %s", path, exc)
+        return False
+    except Exception:
+        logger.exception("encrypt_file failed for %s", path)
         return False
 
 
 def decrypt_file(path: Path, machine_id: str) -> bool:
-    """Decrypt file in-place if it was encrypted. Returns True if decrypted."""
+    """Decrypt *path* in place when encrypted. Returns True if decrypted."""
     if not is_encrypted(path):
         return False
     try:
-        from cryptography.fernet import Fernet
+        import os
+        import tempfile
 
-        key = _derive_fernet_key(machine_id)
-        f = Fernet(key)
+        from cryptography.fernet import Fernet, InvalidToken
+
+        fernet = Fernet(_derive_fernet_key(machine_id))
         blob = path.read_bytes()
-        token = blob[len(MAGIC) :]
-        data = f.decrypt(token)
-        path.write_bytes(data)
+        data = fernet.decrypt(blob[len(MAGIC) :])
+        path = Path(path)
+        tmp_fd, tmp_name = tempfile.mkstemp(
+            dir=path.parent,
+            prefix=f".{path.name}.",
+            suffix=".decrypting",
+        )
+        try:
+            with os.fdopen(tmp_fd, "wb") as handle:
+                handle.write(data)
+            os.replace(tmp_name, path)
+        except Exception:
+            try:
+                os.unlink(tmp_name)
+            except OSError:
+                pass
+            raise
         return True
-    except Exception:
+    except (InvalidToken, OSError, ValueError):
+        logger.exception("decrypt_file failed for %s", path)
         return False
 
 
-# ---- Encrypted backup for data folder copy (universal key) ----
+def _decrypt_backup_zip(archive: Path) -> Path:
+    """Decrypt a .skybackup archive to a temporary zip file."""
+    from cryptography.fernet import Fernet, InvalidToken
+
+    archive = Path(archive)
+    if not is_encrypted(archive):
+        raise ValueError("Not a valid SkyAdmin encrypted backup (missing header).")
+
+    fernet = Fernet(_derive_backup_key())
+    try:
+        data = fernet.decrypt(archive.read_bytes()[len(MAGIC) :])
+    except InvalidToken as exc:
+        raise ValueError("Encrypted backup could not be decrypted.") from exc
+
+    tmp = tempfile.NamedTemporaryFile(delete=False, suffix=".zip")
+    tmp_path = Path(tmp.name)
+    tmp.write(data)
+    tmp.close()
+    return tmp_path
+
+
+def inspect_encrypted_backup(archive: Path) -> BackupArchiveInfo:
+    """Read backup metadata without restoring anything."""
+    archive = Path(archive)
+    tmp_path = _decrypt_backup_zip(archive)
+    try:
+        with zipfile.ZipFile(tmp_path, "r") as archive_zip:
+            names = archive_zip.namelist()
+            has_db = "skyadmin_pro.db" in names
+            db_bytes = 0
+            if has_db:
+                db_bytes = archive_zip.getinfo("skyadmin_pro.db").file_size
+            workspace_files = 0
+            workspace_bytes = 0
+            for info in archive_zip.infolist():
+                if not info.filename.startswith(WORKSPACE_PREFIX):
+                    continue
+                rel = info.filename[len(WORKSPACE_PREFIX) :]
+                if not rel or info.is_dir() or rel.endswith("/"):
+                    continue
+                workspace_files += 1
+                workspace_bytes += info.file_size
+        return BackupArchiveInfo(
+            has_database=has_db,
+            database_bytes=db_bytes,
+            workspace_file_count=workspace_files,
+            workspace_bytes=workspace_bytes,
+            encrypted_bytes=archive.stat().st_size,
+        )
+    finally:
+        try:
+            tmp_path.unlink(missing_ok=True)
+        except OSError:
+            pass
 
 
 def create_encrypted_backup(workspace_root: Path, db_file: Path, dest: Path) -> Path:
-    """Create an encrypted .skybackup archive of DB + Workspace.
-    The backup can be restored on any licensed PC (universal key)."""
+    """Create an encrypted ``.skybackup`` archive of the DB and workspace tree."""
     import tempfile
-    import zipfile
 
     from cryptography.fernet import Fernet
 
     dest = Path(dest)
     dest.parent.mkdir(parents=True, exist_ok=True)
-    key = _derive_backup_key()
-    f = Fernet(key)
+    fernet = Fernet(_derive_backup_key())
 
     with tempfile.NamedTemporaryFile(delete=False, suffix=".zip") as tmp:
         tmp_path = Path(tmp.name)
     try:
-        with zipfile.ZipFile(tmp_path, "w", zipfile.ZIP_DEFLATED) as z:
+        with zipfile.ZipFile(tmp_path, "w", zipfile.ZIP_DEFLATED) as archive:
             if db_file.exists():
-                z.write(db_file, arcname="skyadmin_pro.db")
+                archive.write(db_file, arcname="skyadmin_pro.db")
             ws = Path(workspace_root)
             if ws.exists():
-                for p in ws.rglob("*"):
-                    if p.is_file():
-                        # Avoid including huge archive subfolders recursively
-                        try:
-                            arc = p.relative_to(ws)
-                        except ValueError:
-                            continue
-                        z.write(p, arcname=f"Workspace/{arc}")
-        data = tmp_path.read_bytes()
-        token = f.encrypt(data)
-        dest.write_bytes(MAGIC + token)
+                for file_path in ws.rglob("*"):
+                    if not file_path.is_file():
+                        continue
+                    try:
+                        arc = file_path.relative_to(ws)
+                    except ValueError:
+                        continue
+                    archive.write(file_path, arcname=f"{WORKSPACE_PREFIX}{arc.as_posix()}")
+        dest.write_bytes(MAGIC + fernet.encrypt(tmp_path.read_bytes()))
         return dest
     finally:
         try:
@@ -116,43 +266,54 @@ def create_encrypted_backup(workspace_root: Path, db_file: Path, dest: Path) -> 
             pass
 
 
-def restore_encrypted_backup(archive: Path, workspace_root: Path, db_file: Path) -> None:
-    """Decrypt and restore an encrypted backup. Overwrites current DB + Workspace."""
-    import tempfile
-    import zipfile
-
-    from cryptography.fernet import Fernet
-
-    if not is_encrypted(archive):
-        raise ValueError("Not a valid SkyAdmin encrypted backup (missing header).")
-    key = _derive_backup_key()
-    f = Fernet(key)
-    blob = Path(archive).read_bytes()
-    data = f.decrypt(blob[len(MAGIC) :])
-
-    with tempfile.NamedTemporaryFile(delete=False, suffix=".zip") as tmp:
-        tmp_path = Path(tmp.name)
-        tmp_path.write_bytes(data)
+def restore_encrypted_backup(archive: Path, workspace_root: Path, db_file: Path) -> RestoreSummary:
+    """Decrypt and restore an encrypted backup. Overwrites DB and workspace files."""
+    archive = Path(archive)
+    tmp_path = _decrypt_backup_zip(archive)
     try:
-        with zipfile.ZipFile(tmp_path, "r") as z:
-            if "skyadmin_pro.db" not in z.namelist():
-                raise ValueError("Backup archive is missing skyadmin_pro.db — restore aborted.")
-            db_data = z.read("skyadmin_pro.db")
-            db_file.parent.mkdir(parents=True, exist_ok=True)
-            db_file.write_bytes(db_data)
-            # Restore Workspace
+        with zipfile.ZipFile(tmp_path, "r") as archive_zip:
+            names = archive_zip.namelist()
+            if "skyadmin_pro.db" not in names:
+                raise ValueError(
+                    "Backup archive is missing skyadmin_pro.db — restore aborted."
+                )
+
             ws = Path(workspace_root)
-            for info in z.infolist():
-                if info.filename.startswith("Workspace/"):
-                    rel = info.filename[len("Workspace/") :]
-                    if not rel:
-                        continue
-                    target = ws / rel
-                    if info.is_dir():
-                        target.mkdir(parents=True, exist_ok=True)
-                    else:
-                        target.parent.mkdir(parents=True, exist_ok=True)
-                        target.write_bytes(z.read(info.filename))
+            ws.mkdir(parents=True, exist_ok=True)
+
+            # Validate every workspace member before overwriting live data.
+            workspace_entries: list[tuple[zipfile.ZipInfo, Path]] = []
+            workspace_bytes = 0
+            for info in archive_zip.infolist():
+                if not info.filename.startswith(WORKSPACE_PREFIX):
+                    continue
+                rel = info.filename[len(WORKSPACE_PREFIX) :]
+                if not rel:
+                    continue
+                target = _resolve_member_under(ws, rel)
+                workspace_entries.append((info, target))
+                if not info.is_dir() and not rel.endswith("/"):
+                    workspace_bytes += info.file_size
+
+            db_info = archive_zip.getinfo("skyadmin_pro.db")
+            db_file = Path(db_file)
+            db_file.parent.mkdir(parents=True, exist_ok=True)
+            db_file.write_bytes(archive_zip.read("skyadmin_pro.db"))
+
+            restored_files = 0
+            for info, target in workspace_entries:
+                rel = info.filename[len(WORKSPACE_PREFIX) :]
+                if info.is_dir() or rel.endswith("/"):
+                    target.mkdir(parents=True, exist_ok=True)
+                    continue
+                target.parent.mkdir(parents=True, exist_ok=True)
+                target.write_bytes(archive_zip.read(info.filename))
+                restored_files += 1
+        return RestoreSummary(
+            database_bytes=db_info.file_size,
+            workspace_files_restored=restored_files,
+            workspace_bytes=workspace_bytes,
+        )
     finally:
         try:
             tmp_path.unlink(missing_ok=True)

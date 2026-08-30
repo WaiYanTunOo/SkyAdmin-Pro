@@ -2,7 +2,11 @@
 
 export interface Env {
   DB: D1Database;
+  /** Legacy name — admin session cookie salt only (not license signing). */
   LICENSE_SECRET: string;
+  /** Preferred name for admin session cookie salt. Falls back to LICENSE_SECRET when unset. */
+  ADMIN_SESSION_SECRET?: string;
+  LICENSE_ED25519_PRIVATE_KEY_B64?: string;
   API_TOKEN: string;
   ADMIN_PATH: string;
   ADMIN_PASS: string;

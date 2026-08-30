@@ -23,7 +23,10 @@
  .rec.revoked{border-color:#fca5a5;background:#fef2f2}
  .rec .row{margin:2px 0} .rec b{font-size:13px}
  .tag{display:inline-block;padding:2px 8px;border-radius:99px;font-size:11px;font-weight:700}
- .tag.ok{background:#d1fae5;color:#065f46}.tag.exp{background:#fee2e2;color:#991b1b}.tag.rev{background:#e5e7eb;color:#374151}
+ .tag.ok{background:#d1fae5;color:#065f46}.tag.exp{background:#fee2e2;color:#991b1b}.tag.rev{background:#e5e7eb;color:#374151}.tag.pend{background:#dbeafe;color:#1d4ed8}
+ .expiry{font-weight:600;color:#059669}.expiry.expired{color:#dc2626}.expiry.pending{color:#2563eb}
+ .filt .small.on{background:#2563eb;color:#fff;border-color:#2563eb}
+ .mach{background:white;border:1px solid #e5e7eb;border-radius:12px;padding:12px;margin:8px 0;font-size:13px}
  .btns{display:flex;gap:8px;flex-wrap:wrap;margin-top:8px}
  .chip{display:inline-flex;align-items:center;gap:6px;background:#fee2e2;color:#991b1b;padding:4px 10px;border-radius:99px;font-size:12px;font-weight:600;margin:4px 4px 0 0}
  .chip button{background:none;border:0;color:#991b1b;font-weight:800;padding:0 2px;margin:0;width:auto;font-size:13px}
@@ -38,7 +41,7 @@ Open in Safari or any modern browser.</div>
 <h2>API Connection</h2>
 <div class="card">
  <label>API URL</label>
- <input id="apiUrl" placeholder="https://skyadmin-api.your-subdomain.workers.dev">
+ <input id="apiUrl" placeholder="https://skyadmin-worker.skyadmin-pro.workers.dev" value="https://skyadmin-worker.skyadmin-pro.workers.dev">
  <label>API Token (Bearer)</label>
  <input id="apiToken" type="password" placeholder="Your owner API token" spellcheck="false">
  <div class="btns" style="margin-top:12px">
@@ -48,18 +51,25 @@ Open in Safari or any modern browser.</div>
  <div id="apiStatus" class="hint"></div>
 </div>
 
+<h2>Machines <span id="machCount" style="color:#6b7280;font-size:13px"></span></h2>
+<div class="hint">Synced from API when connected — shows expiry and time left per Machine ID.</div>
+<div class="btns filt" style="margin-top:8px">
+ <button type="button" class="small gray on" data-mf="all" onclick="setMachFilter('all')">All</button>
+ <button type="button" class="small gray" data-mf="active" onclick="setMachFilter('active')">Active</button>
+ <button type="button" class="small gray" data-mf="expiring" onclick="setMachFilter('expiring')">Expiring &lt;7d</button>
+ <button type="button" class="small gray" data-mf="pending" onclick="setMachFilter('pending')">Pending</button>
+ <button type="button" class="small gray" data-mf="expired" onclick="setMachFilter('expired')">Expired</button>
+</div>
+<input id="machSearch" placeholder="Search machine ID…" oninput="renderMachines()">
+<div id="machines"></div>
+
 <h2>Generate License</h2>
 <label>Machine ID (from the customer's activation dialog)</label>
 <input id="mid" placeholder="e.g. 72FA00DC6B64525F" autocomplete="off" autocapitalize="characters" spellcheck="false">
 
 <label>Package / Duration</label>
 <select id="days" onchange="toggleCustom()">
- <option value="1">1 Day — 50 Baht (expires in exactly 24h)</option>
- <option value="7" selected>7 Days — 500 Baht</option>
- <option value="30">30 Days — 800 Baht</option>
- <option value="365">1 Year — 9,000 Baht</option>
- <option value="__custom__">Custom days…</option>
- <option value="">Never expires (owner only)</option>
+ <option value="7" selected>Loading packages…</option>
 </select>
 <div id="customWrap" style="display:none">
  <label>Custom number of days</label>
@@ -73,7 +83,7 @@ Open in Safari or any modern browser.</div>
  <div id="license" class="out"></div>
  <div id="meta" class="out" style="font-family:inherit"></div>
  <div class="btns"><button class="small gray" onclick="copyText('license')">Copy Key</button>
- <button class="small gray" onclick="copyText('passcodeTxt')">Copy Passcode</button></div>
+ <button class="small gray" onclick="copyText('passcode')">Copy Passcode</button></div>
  <label>Passcode (alternative)</label>
  <div id="passcode" class="out" style="font-size:22px;letter-spacing:4px;text-align:center"></div>
 </div>
@@ -96,6 +106,13 @@ Open in Safari or any modern browser.</div>
 </div>
 
 <h2>Issued Licenses <span id="recCount" style="color:#6b7280;font-size:13px"></span></h2>
+<div class="btns filt" style="margin-top:0">
+ <button type="button" class="small gray on" data-rf="all" onclick="setRecFilter('all')">All</button>
+ <button type="button" class="small gray" data-rf="active" onclick="setRecFilter('active')">Active</button>
+ <button type="button" class="small gray" data-rf="expiring" onclick="setRecFilter('expiring')">Expiring &lt;7d</button>
+ <button type="button" class="small gray" data-rf="pending" onclick="setRecFilter('pending')">Pending</button>
+ <button type="button" class="small gray" data-rf="expired" onclick="setRecFilter('expired')">Expired</button>
+</div>
 <div class="btns">
  <button class="small gray" onclick="exportCSV()">Export CSV</button>
  <button class="small gray" onclick="backupAll()">Backup data</button>
@@ -107,7 +124,13 @@ Open in Safari or any modern browser.</div>
 <div class="hint">Each record's Revoke/Mark USED buttons sync to the API immediately.</div>
 
 <script>
-const PRICES = {1:50, 7:500, 30:800, 365:9000};
+const DEFAULT_API_URL = "https://skyadmin-worker.skyadmin-pro.workers.dev";
+let PRICES = {1:50, 7:500, 30:800, 365:9000};
+let PACKAGES = [];
+let _machines = [];
+let _machFilter = 'all';
+let _recFilter = 'all';
+let _tickTimer = null;
 
 const _mem = {};
 function storeGet(k){ try{return localStorage.getItem(k);}catch(e){return _mem[k]??null;} }
@@ -128,7 +151,7 @@ function saveApiSettings(){
   document.getElementById('apiStatus').style.color = "#065f46";
 }
 function fillApiSettings(){
-  document.getElementById('apiUrl').value = storeGet("sky_api_url")||"";
+  document.getElementById('apiUrl').value = storeGet("sky_api_url") || DEFAULT_API_URL;
   document.getElementById('apiToken').value = storeGet("sky_api_token")||"";
 }
 
@@ -148,6 +171,126 @@ async function apiCall(method, path, body){
   return data;
 }
 
+async function loadPricingPackages(){
+  try{
+    const url = getApiUrl();
+    if(!url) return;
+    const resp = await fetch(url + "/api/pricing");
+    const data = await resp.json();
+    if(!data.ok) return;
+    PACKAGES = data.packages || [];
+    PRICES = {};
+    for(const p of PACKAGES){
+      if(p.days != null) PRICES[p.days] = p.price_thb || 0;
+    }
+    const sel = document.getElementById('days');
+    sel.innerHTML = "";
+    for(const p of PACKAGES){
+      if(p.days == null) continue;
+      const opt = document.createElement('option');
+      opt.value = String(p.days);
+      opt.textContent = `${p.label} — ${Number(p.price_thb||0).toLocaleString()} Baht`;
+      if(p.days === 7) opt.selected = true;
+      sel.appendChild(opt);
+    }
+    const custom = document.createElement('option');
+    custom.value = "__custom__"; custom.textContent = "Custom days…";
+    sel.appendChild(custom);
+    const never = document.createElement('option');
+    never.value = ""; never.textContent = "Never expires (owner only)";
+    sel.appendChild(never);
+  }catch(e){ console.warn('pricing load failed', e); }
+}
+
+function priceForDays(days){
+  if(days == null) return 0;
+  return PRICES[days] !== undefined ? PRICES[days] : 0;
+}
+
+function parseExp(exp){
+  if(!exp || exp==='never') return null;
+  const t = String(exp);
+  const d = new Date(t.endsWith('Z') ? t : t+'Z');
+  return isNaN(d.getTime()) ? null : d;
+}
+function msRemaining(exp){
+  const d = parseExp(exp);
+  return d ? d.getTime()-Date.now() : null;
+}
+function isExpiredAt(exp){
+  const ms = msRemaining(exp);
+  return ms !== null && ms <= 0;
+}
+function isExpiringSoon(exp, revoked){
+  if(revoked) return false;
+  const ms = msRemaining(exp);
+  return ms !== null && ms > 0 && ms <= 7*86400000;
+}
+function timeLeftText(exp, used, revoked){
+  if(revoked) return 'Revoked';
+  const d = parseExp(exp);
+  if(!d) return used ? 'Unlimited (activated)' : 'Unlimited (pending)';
+  const ms = d.getTime()-Date.now();
+  if(ms <= 0){
+    const ago = Math.abs(ms), days = Math.floor(ago/86400000), hrs = Math.floor((ago%86400000)/3600000);
+    if(days>0) return `Expired ${days}d${hrs?` ${hrs}h`:''} ago`;
+    if(hrs>0) return `Expired ${hrs}h ago`;
+    return 'Expired';
+  }
+  const days = Math.floor(ms/86400000), hrs = Math.floor((ms%86400000)/3600000), mins = Math.floor((ms%3600000)/60000);
+  let left = '';
+  if(days>0) left = `${days}d${hrs?` ${hrs}h`:''}`;
+  else if(hrs>0) left = `${hrs}h${mins?` ${mins}m`:''}`;
+  else left = `${Math.max(mins,1)}m`;
+  return `${left} left${used?'':' (not activated)'}`;
+}
+function expiryClass(exp, revoked){
+  if(revoked) return 'expired';
+  const d = parseExp(exp);
+  if(!d) return 'pending';
+  return d.getTime()<=Date.now() ? 'expired' : '';
+}
+function machStatusTag(st){
+  const map = {active:'ok',pending:'pend',expired:'exp',used_expired:'exp',revoked:'rev',unlimited:'ok',none:'rev'};
+  const lbl = {active:'ACTIVE',pending:'PENDING',expired:'EXPIRED',used_expired:'USED+EXPIRED',revoked:'REVOKED',unlimited:'UNLIMITED',none:'NONE'};
+  return `<span class="tag ${map[st]||'rev'}">${lbl[st]||String(st).toUpperCase()}</span>`;
+}
+function setMachFilter(f){
+  _machFilter = f;
+  document.querySelectorAll('[data-mf]').forEach(b=>{
+    b.className = 'small gray' + (b.getAttribute('data-mf')===f ? ' on' : '');
+  });
+  renderMachines();
+}
+function setRecFilter(f){
+  _recFilter = f;
+  document.querySelectorAll('[data-rf]').forEach(b=>{
+    b.className = 'small gray' + (b.getAttribute('data-rf')===f ? ' on' : '');
+  });
+  renderRecords();
+}
+function matchesMachFilter(m){
+  if(_machFilter==='all') return true;
+  if(_machFilter==='active') return m.status==='active'||m.status==='unlimited';
+  if(_machFilter==='expiring') return !!m.expiring_soon;
+  if(_machFilter==='pending') return m.status==='pending';
+  if(_machFilter==='expired') return m.is_expired||m.status==='expired'||m.status==='used_expired';
+  return true;
+}
+function matchesRecFilter(r){
+  if(_recFilter==='all') return true;
+  const exp = r.exp || r.expires_at || 'never';
+  const isRevoked = !!r.revoked;
+  const isUsed = !!r.used;
+  const isExpired = !!r.is_expired || isExpiredAt(exp);
+  const expSoon = !!r.expiring_soon || isExpiringSoon(exp, isRevoked);
+  if(_recFilter==='active') return !isRevoked && !isExpired && isUsed;
+  if(_recFilter==='expiring') return !isRevoked && !isExpired && expSoon;
+  if(_recFilter==='pending') return !isRevoked && !isUsed && !isExpired;
+  if(_recFilter==='expired') return !isRevoked && isExpired;
+  return true;
+}
+
 async function testApi(){
   const st = document.getElementById('apiStatus');
   st.textContent = "Testing…"; st.style.color="#6b7280";
@@ -156,9 +299,82 @@ async function testApi(){
     if(!url){ st.textContent="Enter API URL first."; st.style.color="#b91c1c"; return; }
     const resp = await fetch(url + "/api/ping");
     const data = await resp.json();
-    if(data.ok){ st.textContent="✓ Connected to "+data.service+" at "+data.ts; st.style.color="#065f46"; }
+    if(data.ok){ st.textContent="✓ Connected to "+data.service+" at "+data.ts; st.style.color="#065f46";
+      await loadPricingPackages();
+      await syncRemoteRecords();
+    }
     else{ st.textContent="✗ Unexpected response"; st.style.color="#b91c1c"; }
   }catch(e){ st.textContent="✗ "+e.message; st.style.color="#b91c1c"; }
+}
+
+async function syncRemoteRecords(){
+  try{
+    const data = await apiCall('GET', '/api/records?limit=500');
+    _machines = data.machines || [];
+    const remote = data.licenses || [];
+    const recs = loadRecs();
+    const have = new Set(recs.map(r=>r.nonce));
+    for(const row of remote){
+      if(have.has(row.nonce)) continue;
+      recs.push({
+        ts: row.issued_at,
+        mid: row.machine_id,
+        pkg: row.package_days==null ? '∞' : String(row.package_days),
+        exp: row.expires_at || 'never',
+        price: row.price_thb,
+        nonce: row.nonce,
+        pass: row.passcode,
+        key: row.license_key,
+        revoked: !!row.revoked,
+        used: !!row.used,
+        is_expired: !!row.is_expired,
+        expiring_soon: !!row.expiring_soon,
+        expires_label: row.expires_label,
+        time_left: row.time_left,
+      });
+    }
+    saveRecs(recs);
+    renderMachines();
+    renderRecords();
+    startExpiryTicker();
+  }catch(e){ console.warn('records sync failed', e); }
+}
+
+function startExpiryTicker(){
+  if(_tickTimer) clearInterval(_tickTimer);
+  _tickTimer = setInterval(()=>{ renderMachines(); renderRecords(); }, 60000);
+}
+
+function renderMachines(){
+  const q = (document.getElementById('machSearch').value||'').toUpperCase();
+  const box = document.getElementById('machines');
+  box.innerHTML = '';
+  let shown = 0;
+  for(const m of _machines){
+    const mid = m.machine_id || '';
+    if(q && !mid.includes(q)) continue;
+    if(!matchesMachFilter(m)) continue;
+    shown++;
+    const exp = m.expires_at || 'never';
+    const left = m.time_left || timeLeftText(exp, m.status==='active'||m.status==='unlimited', m.status==='revoked');
+    const div = document.createElement('div');
+    div.className = 'mach';
+    const pkg = m.package_days==null ? 'Unlimited' : `${m.package_days}d`;
+    div.innerHTML =
+      `<div class="row"><b>${mid}</b> ${machStatusTag(m.status)}</div>`+
+      `<div class="row expiry ${expiryClass(exp, m.status==='revoked')}">${left}</div>`+
+      `<div class="row">Expires: ${m.expires_label||exp} · Package: ${pkg}`+
+      (m.issued_at?` · Issued: ${m.issued_at}`:'')+` · ${m.license_count||1} license(s)</div>`;
+    const btns = document.createElement('div'); btns.className='btns';
+    const mk=(t,c,fn)=>{const b=document.createElement('button');b.className='small '+c;b.textContent=t;b.onclick=fn;return b;};
+    btns.appendChild(mk('Fill MID','gray',()=>{ document.getElementById('mid').value=mid; }));
+    btns.appendChild(mk('+7d','green',()=>quickRenew(mid,7)));
+    btns.appendChild(mk('+30d','green',()=>quickRenew(mid,30)));
+    div.appendChild(btns);
+    box.appendChild(div);
+  }
+  document.getElementById('machCount').textContent = `(${shown}/${_machines.length})`;
+  if(!box.children.length) box.innerHTML='<div class="hint">No machines match (connect API token to sync).</div>';
 }
 
 /* ---------------- Generation (API) ---------------- */
@@ -183,7 +399,7 @@ async function generate(){
   btn.disabled = true; btn.textContent = 'Generating…';
   try{
     const data = await apiCall("POST", "/api/generate", {
-      mid, days, price: PRICES[days] !== undefined ? PRICES[days] : 0,
+      mid, days, price: priceForDays(days),
     });
     document.getElementById('license').textContent = data.license_key;
     document.getElementById('meta').textContent =
@@ -193,41 +409,49 @@ async function generate(){
 
     const recs = loadRecs();
     recs.unshift({ts:data.issued_at, mid:mid, pkg:data.package_days?String(data.package_days):"∞",
-                  exp:data.expires_at||"never", price:PRICES[days]||null,
-                  nonce:data.nonce, pass:data.passcode, key:data.license_key, revoked:false});
+                  exp:data.expires_at||"never", price:priceForDays(days),
+                  nonce:data.nonce, pass:data.passcode, key:data.license_key, revoked:false, used:false,
+                  is_expired:false, expiring_soon:isExpiringSoon(data.expires_at,false),
+                  time_left:timeLeftText(data.expires_at||'never', false, false)});
     saveRecs(recs); renderRecords();
+    if(getApiToken()) syncRemoteRecords();
   }catch(e){ alert('Generation failed: '+e.message); }
   finally{ btn.disabled=false; btn.textContent='Generate Signed License + Passcode'; }
 }
 
 /* ---------------- Records ---------------- */
-function isExpired(rec){ return rec.exp!=="never" && new Date(rec.exp) < new Date(); }
+function isExpired(rec){ return !!rec.is_expired || isExpiredAt(rec.exp); }
 
 function renderRecords(){
   const recs = loadRecs();
   const q = (document.getElementById('search').value||"").toUpperCase();
   const box = document.getElementById('records'); box.innerHTML="";
-  document.getElementById('recCount').textContent = `(${recs.length})`;
+  let shown = 0;
   for(const r of recs){
     if(q && !r.mid.includes(q)) continue;
+    if(!matchesRecFilter(r)) continue;
+    shown++;
     const div = document.createElement('div');
     div.className = 'rec' + (r.revoked?' revoked':'');
-    const expired = r.exp!=='never' && new Date(r.exp) < new Date();
+    const expired = isExpired(r);
     const tag = r.revoked ? '<span class="tag rev">REVOKED</span>'
-              : r.used    ? '<span class="tag rev">USED</span>'
               : expired   ? '<span class="tag exp">EXPIRED</span>'
-                          : '<span class="tag ok">ACTIVE</span>';
+              : r.used      ? '<span class="tag ok">ACTIVE</span>'
+                            : '<span class="tag pend">PENDING</span>';
+    const left = r.time_left || timeLeftText(r.exp, !!r.used, !!r.revoked);
+    const expLabel = r.expires_label || (r.exp==='never' ? 'Never expires' : r.exp);
     div.innerHTML =
       `<div class="row"><b>${r.mid}</b> ${tag}</div>`+
-      `<div class="row">Package: ${r.pkg==='∞'?'Unlimited':r.pkg+' day(s)'}${r.price?` · ${r.price.toLocaleString()} ฿`:''}`+
-      ` · Issued: ${r.ts}<br>Expires: ${r.exp} · Nonce: ${r.nonce}</div>`;
+      `<div class="row expiry ${expiryClass(r.exp, r.revoked)}">${left}</div>`+
+      `<div class="row">Expires: ${expLabel} · Package: ${r.pkg==='∞'?'Unlimited':r.pkg+' day(s)'}${r.price?` · ${r.price.toLocaleString()} ฿`:''}`+
+      ` · Issued: ${r.ts}<br>Nonce: ${r.nonce}</div>`;
     const btns = document.createElement('div'); btns.className='btns';
     const mk=(txt,cls,fn)=>{const b=document.createElement('button');b.className='small '+cls;b.textContent=txt;b.onclick=fn;return b;};
     btns.appendChild(mk('Copy key','gray',()=>navigator.clipboard.writeText(r.key)));
     btns.appendChild(mk('Copy passcode','gray',()=>navigator.clipboard.writeText(r.pass)));
-    btns.appendChild(mk('+7d','green',()=>quickRenew(r.mid,7,500)));
-    btns.appendChild(mk('+30d','green',()=>quickRenew(r.mid,30,800)));
-    btns.appendChild(mk('+1yr','green',()=>quickRenew(r.mid,365,9000)));
+    btns.appendChild(mk('+7d','green',()=>quickRenew(r.mid,7)));
+    btns.appendChild(mk('+30d','green',()=>quickRenew(r.mid,30)));
+    btns.appendChild(mk('+1yr','green',()=>quickRenew(r.mid,365)));
     if(!r.revoked && !r.used)
       btns.appendChild(mk('Mark USED','red',()=>markUsed(r.nonce)));
     if(!r.revoked) btns.appendChild(mk('Revoke','red',()=>revoke(r.nonce)));
@@ -235,10 +459,12 @@ function renderRecords(){
     div.appendChild(btns);
     box.appendChild(div);
   }
-  if(!box.children.length) box.innerHTML='<div class="hint">No records yet.</div>';
+  document.getElementById('recCount').textContent = `(${shown}/${recs.length})`;
+  if(!box.children.length) box.innerHTML='<div class="hint">No records match this filter.</div>';
 }
 
-async function quickRenew(mid, days, price){
+async function quickRenew(mid, days){
+  const price = priceForDays(days);
   try{
     const data = await apiCall("POST", "/api/generate", { mid, days, price });
     const recs = loadRecs();
@@ -359,7 +585,8 @@ function copyText(id){
   const full=document.getElementById(id).textContent.split("\n")[0];
   navigator.clipboard.writeText(full).then(()=>alert('Copied!'));
 }
-fillApiSettings(); renderRecords(); renderBans();
+fillApiSettings(); renderRecords(); renderBans(); loadPricingPackages();
+if(getApiToken()) syncRemoteRecords(); else renderMachines();
 </script>
 </body>
 </html>

@@ -1,0 +1,59 @@
+name: Release
+
+on:
+  push:
+    tags:
+      - "v*"
+  workflow_dispatch:
+
+jobs:
+  windows-release:
+    runs-on: windows-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+
+      - name: Install dependencies
+        run: |
+          python -m pip install --upgrade pip
+          pip install -r requirements.txt -r requirements-dev.txt
+
+      - name: Run tests
+        run: pytest tests/ -q --tb=short
+        env:
+          SKYADMIN_SKIP_DAILY_CHECK: "1"
+
+      - name: Build portable exe
+        run: |
+          python packaging\make_icon.py
+          pyinstaller SkyAdminPro.spec --noconfirm --log-level WARN
+
+      - name: Release check
+        run: python scripts\release_check.py --skip-pytest
+        env:
+          SKYADMIN_SKIP_DAILY_CHECK: "1"
+
+      - name: Upload SkyAdminPro.exe
+        uses: actions/upload-artifact@v4
+        with:
+          name: SkyAdminPro-windows
+          path: dist/SkyAdminPro.exe
+
+  worker:
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: skyadmin-worker
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: "22"
+          cache: npm
+          cache-dependency-path: skyadmin-worker/package-lock.json
+      - run: npm ci
+      - run: npm run typecheck
+      - run: npm test

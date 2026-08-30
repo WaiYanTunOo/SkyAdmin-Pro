@@ -1,6 +1,6 @@
 """Hardware-bound license verification — Sky Creation Innovations.
 
-Offline verification with HMAC-SHA256 signed activation codes.
+Offline verification with Ed25519-signed activation codes.
 Machine-bound, one-time-use with remote revocation support.
 """
 
@@ -8,7 +8,6 @@ from __future__ import annotations
 
 import base64
 import hashlib
-import hmac
 import json
 import logging
 import platform
@@ -17,14 +16,21 @@ import uuid
 from datetime import date, datetime, timedelta, timezone
 from pathlib import Path
 
-from skyadmin_pro.services._secret import _derive_secret
+from skyadmin_pro.services.license_crypto import (
+    parse_control_envelope_v2,
+    verify_ed25519_passcode_envelope,
+    verify_license_signature,
+)
+from skyadmin_pro.services.license_public import (
+    CONTROL_ENVELOPE_V2_PREFIX,
+    LEGACY_FORMAT_SUNSET_MESSAGE,
+    LICENSE_SIGNATURE_ALGORITHM,
+    PASSCODE_PREFIX,
+)
 
 
 def _verify_integrity() -> bool:
     """Verify that critical license functions haven't been patched."""
-    # In frozen exe inspect.getsource fails (no .py) - fallback to SECRET sanity + bytecode check
-    if b"\x00" * len(SECRET) == SECRET or len(SECRET) < 16:
-        return False
     try:
         import inspect as _inspect
 
@@ -33,7 +39,7 @@ def _verify_integrity() -> bool:
             return False
         if "revoked_nonces" not in src:
             return False
-        return "hmac.compare_digest" in src
+        return "verify_license_signature" in src
     except Exception:
         # Frozen: verify via reading compiled file for key strings
         try:
@@ -49,7 +55,20 @@ def _verify_integrity() -> bool:
         return True
 
 
-SECRET = _derive_secret()
+def generate_license(*_args: object, **_kwargs: object) -> str:
+    """Disabled in the desktop client — licenses are issued by the Worker API."""
+    raise RuntimeError(
+        "License generation is server-side only. "
+        "Use POST /api/generate on the SkyAdmin Worker (owner tools), not the desktop app."
+    )
+
+
+def generate_passcode(*_args: object, **_kwargs: object) -> str:
+    """Disabled in the desktop client — passcodes are issued by the Worker API."""
+    raise RuntimeError(
+        "Passcode generation is server-side only. "
+        "Use POST /api/generate on the SkyAdmin Worker (owner tools), not the desktop app."
+    )
 
 
 def _check_debugger() -> None:
@@ -273,7 +292,7 @@ def _is_rate_limited() -> bool:
         recent = [t for t in recent if now - t < _ATTEMPT_WINDOW]
         return len(recent) >= _MAX_ATTEMPTS
     except Exception:
-        return False
+        return True
 
 
 def _record_attempt(success: bool) -> None:
@@ -336,43 +355,6 @@ def get_daily_sync_status() -> tuple[bool, str]:
     return True, f"Last online check: {last.strftime('%Y-%m-%d %H:%M')} ({hours}h {mins}m ago) - OK"
 
 
-def _hmac(payload: str) -> str:
-    return hmac.new(SECRET, payload.encode(), hashlib.sha256).hexdigest()
-
-
-def generate_license(
-    machine_id: str | None = None,
-    days_valid: int | None = 365,
-    *,
-    issued_at: str | None = None,
-    nonce: str | None = None,
-    package_days: int | None = None,
-) -> str:
-    """Generate a UNIQUE license key for the given machine (author tool).
-
-    Every issuance embeds an issue timestamp (`iat`), a random `nonce`, and
-    the purchased `package_days` into the signed payload. The expiry is a
-    full TIMESTAMP (`exp`) — a 1-day key bought at 15:00 expires exactly
-    24 hours later, not at midnight.
-    """
-    mid = (machine_id or get_machine_id()).strip().upper()
-    exp = None
-    if days_valid is not None:
-        exp = (
-            (datetime.now(timezone.utc) + timedelta(days=days_valid))
-            .replace(microsecond=0)
-            .strftime("%Y-%m-%dT%H:%M:%SZ")
-        )
-    iat = issued_at or datetime.now().strftime("%Y-%m-%dT%H:%M")
-    n = nonce or uuid.uuid4().hex[:12]
-    pkg = str(package_days) if package_days is not None else (str(days_valid) if days_valid is not None else "")
-    payload = "|".join([mid, exp or "", iat, n, pkg])
-    sig = _hmac(payload)
-    data = {"mid": mid, "exp": exp, "sig": sig, "iat": iat, "n": n, "pkg": pkg}
-    raw = json.dumps(data, separators=(",", ":")).encode()
-    return base64.urlsafe_b64encode(raw).decode().rstrip("=")
-
-
 def _license_paths() -> list[Path]:
     # Portable mode disabled — only app data dir. Keep portable check only for
     # backward compat if an old license.key was left next to the exe.
@@ -394,76 +376,11 @@ def _license_paths() -> list[Path]:
     return paths
 
 
-def generate_passcode(machine_id: str | None = None, days_valid: int | None = None) -> str:
-    """8-digit numeric passcode — short alternative to full license key.
-
-    When *days_valid* is given the expiry is embedded in the passcode
-    (format ``XXXXXXXX:TIMESTAMP``) so it expires like a full key.
-    Legacy 8-digit-only passcodes (no expiry) are still accepted for
-    backward compatibility.
-    """
-    import string as _str
-
-    mid = (machine_id or get_machine_id()).strip().upper()
-    if days_valid is not None:
-        exp_dt = (datetime.now() + timedelta(days=days_valid)).replace(microsecond=0)
-        exp_ts = int(exp_dt.timestamp())
-        sig = _hmac(f"{mid}:passcode:{exp_ts}")
-        num = int(sig[:8], 16) % 100_000_000
-        # Encode expiry as base36 for compactness:  XXXXXXXX:XXXXXXXXX
-        alphabet = _str.digits + _str.ascii_lowercase
-        enc = ""
-        v = exp_ts
-        if v == 0:
-            enc = "0"
-        else:
-            while v:
-                v, r = divmod(v, 36)
-                enc = alphabet[r] + enc
-        return f"{num:08d}:{enc}"
-    sig = _hmac(f"{mid}:passcode")
-    num = int(sig[:8], 16) % 100_000_000
-    return f"{num:08d}"
-
-
-def _decode_passcode_expiry(pc: str) -> datetime | None:
-    """Decode the expiry timestamp embedded in a passcode string.
-
-    Returns the expiry datetime, or ``None`` for legacy passcodes without
-    an embedded timestamp (these are treated as having *no* expiry for
-    backward compatibility).
-    """
-    if ":" not in pc:
-        return None  # legacy format — no expiry
-    try:
-        digit_part, b36_part = pc.rsplit(":", 1)
-        ts = 0
-        for ch in b36_part.lower():
-            ts = ts * 36 + (ord(ch) - (48 if ch.isdigit() else 87))
-        return datetime.fromtimestamp(ts)
-    except Exception:
-        return None
-
-
 def verify_passcode(code: str, machine_id: str | None = None) -> bool:
-    """Check if a passcode is valid for the given machine."""
-    code = code.strip()
+    """Check if an Ed25519 ``SKYPASS1:`` passcode is valid for this machine."""
     mid = (machine_id or get_machine_id()).strip().upper()
-    # Try new expiry-embedded format first
-    if ":" in code:
-        parts = code.rsplit(":", 1)
-        if len(parts) == 2 and parts[0].isdigit() and len(parts[0]) == 8:
-            exp_dt = _decode_passcode_expiry(code)
-            if exp_dt is not None:
-                exp_ts = int(exp_dt.timestamp())
-                sig = _hmac(f"{mid}:passcode:{exp_ts}")
-                num = int(sig[:8], 16) % 100_000_000
-                if f"{num:08d}" == parts[0]:
-                    return datetime.now() < exp_dt
-    # Legacy8-digit passcode
-    if code.isdigit() and len(code) == 8:
-        return hmac.compare_digest(generate_passcode(mid, None), code)
-    return False
+    ok, _msg, _nonce = verify_ed25519_passcode_envelope(code.strip(), mid)
+    return ok
 
 
 def find_license_file() -> Path | None:
@@ -497,17 +414,17 @@ def verify_license() -> tuple[bool, str]:
         return False, f"License file unreadable: {exc}"
 
     # Integrity seal check: detect manual edits to the license file.
-    try:
-        from skyadmin_pro.services._protect_core import verify_seal
+    seal_path = lic_path.parent / ".license.seal"
+    if seal_path.exists():
+        try:
+            from skyadmin_pro.services._protect_core import verify_seal
 
-        seal_path = lic_path.parent / ".license.seal"
-        if seal_path.exists():
             sealed_data = seal_path.read_text(encoding="utf-8").strip()
             extracted = verify_seal(sealed_data)
             if extracted is not None and extracted != raw.strip():
                 return False, "License file was modified — integrity check failed."
-    except Exception:
-        pass
+        except Exception:
+            return False, "License integrity check failed — contact support."
 
     # --- Everyday online enforcement ---
     # If REVOCATION_URL is set, customer must be online at least once per 24h
@@ -556,19 +473,29 @@ def license_status_text() -> str:
 
 
 def _read_license_payload() -> dict | None:
-    """Parse the license file into its JSON payload (passcode → None)."""
+    """Parse the license file into its JSON payload (passcode → minimal dict)."""
     path = find_license_file()
     if path is None:
         return None
     try:
         raw = "".join(path.read_text(encoding="utf-8").split())
+        if raw.startswith(PASSCODE_PREFIX):
+            ok, _msg, nonce = verify_ed25519_passcode_envelope(raw, get_machine_id())
+            if not ok:
+                return None
+            wrapped = raw[len(PASSCODE_PREFIX) :]
+            wrapped += "=" * (-len(wrapped) % 4)
+            data = json.loads(base64.urlsafe_b64decode(wrapped.encode()).decode())
+            return {
+                "mid": str(data.get("mid") or get_machine_id()).strip().upper(),
+                "exp": data.get("exp"),
+                "n": nonce or str(data.get("n") or ""),
+                "passcode": True,
+            }
         if raw.isdigit() and len(raw) == 8:
-            return {"mid": get_machine_id(), "exp": None}  # legacy passcode
-        # New expiry-embedded passcode: XXXXXXXX:TIMESTAMP
+            return {"mid": get_machine_id(), "exp": None}
         if ":" in raw and raw.split(":")[0].isdigit() and len(raw.split(":")[0]) == 8:
-            exp_dt = _decode_passcode_expiry(raw)
-            exp_iso = exp_dt.isoformat(timespec="seconds") if exp_dt else None
-            return {"mid": get_machine_id(), "exp": exp_iso}
+            return None
         b64 = raw.replace("-", "+").replace("_", "/")
         b64 += "=" * (-len(b64) % 4)
         data = json.loads(base64.b64decode(b64).decode())
@@ -678,10 +605,87 @@ def mark_used(nonce: str) -> None:
         pass
 
 
+def _saved_license_text() -> str | None:
+    try:
+        from skyadmin_pro.paths import app_data_dir
+
+        path = app_data_dir() / LICENSE_FILENAME
+        if path.exists():
+            text = path.read_text(encoding="utf-8").strip()
+            return text or None
+    except Exception:
+        pass
+    return None
+
+
+def _is_repair_activation(code: str) -> bool:
+    """True when re-pasting the exact code already stored on this machine."""
+    saved = _saved_license_text()
+    if not saved:
+        return False
+    return "".join((code or "").split()) == "".join(saved.split())
+
+
+def report_activation_claim(
+    code: str,
+    *,
+    allow_already_claimed: bool = False,
+    timeout: float = 8.0,
+) -> tuple[bool, str]:
+    """Report a successful activation to the Worker (global one-time-use burn)."""
+    from skyadmin_pro.config import API_BASE_URL
+
+    api_url = (API_BASE_URL or "").strip()
+    if not api_url:
+        return True, "No API configured."
+
+    import urllib.request
+
+    url = api_url.rstrip("/") + "/api/claim"
+    payload = json.dumps({"code": (code or "").strip()}).encode("utf-8")
+    req = urllib.request.Request(
+        url,
+        data=payload,
+        method="POST",
+        headers={"Content-Type": "application/json", "User-Agent": "SkyAdminPro"},
+    )
+    try:
+        with urllib.request.urlopen(req, timeout=timeout) as resp:
+            raw = resp.read(64 * 1024).decode("utf-8", errors="replace")
+            data = json.loads(raw)
+    except Exception as exc:
+        return False, f"Could not report activation to server: {exc}"
+
+    if not isinstance(data, dict) or not data.get("ok"):
+        return False, str((data or {}).get("error") or "Claim rejected by server.")
+    if data.get("already_used"):
+        if allow_already_claimed:
+            return True, "Already claimed on server."
+        return False, "This activation code has already been used on another machine."
+    return True, str(data.get("message") or "Activation claimed.")
+
+
 def _payload_of(text: str) -> dict | None:
-    """Decode a full license key back into its JSON payload (or None)."""
+    """Decode a full license key or SKYPASS1 passcode into a payload dict."""
     raw = "".join((text or "").split())
-    if not raw or (raw.isdigit() and len(raw) == 8):
+    if not raw:
+        return None
+    if raw.startswith(PASSCODE_PREFIX):
+        ok, _msg, nonce = verify_ed25519_passcode_envelope(raw, get_machine_id())
+        if not ok:
+            return None
+        try:
+            wrapped = raw[len(PASSCODE_PREFIX) :]
+            wrapped += "=" * (-len(wrapped) % 4)
+            data = json.loads(base64.urlsafe_b64decode(wrapped.encode()).decode())
+            if not isinstance(data, dict):
+                return None
+            data["n"] = nonce or str(data.get("n") or "")
+            data["passcode"] = True
+            return data
+        except Exception:
+            return None
+    if raw.isdigit() and len(raw) == 8:
         return None
     try:
         b64 = raw.replace("-", "+").replace("_", "/")
@@ -772,7 +776,7 @@ def fetch_revocations(timeout: float = 6.0) -> tuple[bool, str]:
 
 
 def _fetch_control_from_api(api_url: str, timeout: float) -> tuple[bool, str | None]:
-    """Fetch SKYCTRL1 text from the Cloudflare Worker API.
+    """Fetch SKYCTRL2 text from the Cloudflare Worker API.
     Returns (ok, text_or_None). None means empty (no entries)."""
     import urllib.request
 
@@ -792,15 +796,15 @@ def _fetch_control_from_api(api_url: str, timeout: float) -> tuple[bool, str | N
             if not text:
                 return True, None
             # Must be a signed envelope — reject unsigned responses
-            if not text.startswith("SKYCTRL1:"):
-                return False, "API: unsigned response refused"
+            if not (text.startswith(CONTROL_ENVELOPE_V2_PREFIX)):
+                return False, "API: unsigned or legacy control list refused"
             return True, text
     except Exception as exc:
         return False, f"API: {exc}"
 
 
 def _fetch_control_from_gist(timeout: float) -> tuple[bool, str]:
-    """Fetch SKYCTRL1 text from the legacy GitHub Gist URL."""
+    """Fetch SKYCTRL2 text from the legacy GitHub Gist URL."""
     from skyadmin_pro.config import REVOCATION_URL
 
     url = (REVOCATION_URL or "").strip()
@@ -824,35 +828,21 @@ def _fetch_control_from_gist(timeout: float) -> tuple[bool, str]:
             text = raw_bytes.decode("utf-8", errors="replace").strip()
     except Exception as exc:
         return False, f"Internet check failed: {exc}"
-    # Gist source: require SKYCTRL1 signature — reject unsigned plaintext
-    if not text.startswith("SKYCTRL1:"):
-        return False, "Control list not signed (SKYCTRL1) — refusing"
+    # Gist source: require signed envelope — reject unsigned plaintext
+    if not text.startswith(CONTROL_ENVELOPE_V2_PREFIX):
+        return False, "Control list must use SKYCTRL2 (Ed25519) — refusing legacy format."
     return _apply_control_list(text, "Gist")
 
 
 def _apply_control_list(text: str, source: str) -> tuple[bool, str]:
-    """Parse and apply a SKYCTRL1-signed control list.
+    """Parse and apply an Ed25519-signed SKYCTRL2 control list."""
+    if not text.startswith(CONTROL_ENVELOPE_V2_PREFIX):
+        return False, f"Control list from {source} is not SKYCTRL2 — refusing."
 
-    Only SKYCTRL1 envelopes are accepted (HMAC-verified). Unsigned
-    plaintext from network sources is rejected to prevent proxy/captive-
-    portal responses from wiping local revocation files.
-    """
-    if not text.startswith("SKYCTRL1:"):
-        return False, f"Control list from {source} is not signed — refusing."
-
-    try:
-        wrapped = text.split(":", 1)[1]
-        wrapped += "=" * (-len(wrapped) % 4)
-        obj = json.loads(base64.urlsafe_b64decode(wrapped.encode()).decode())
-        payload_b64 = str(obj.get("payload", "")).replace("-", "+").replace("_", "/")
-        payload_b64 += "=" * (-len(payload_b64) % 4)
-        plaintext = base64.b64decode(payload_b64).decode("utf-8")
-        expected_sig = _hmac(plaintext)
-        if not hmac.compare_digest(expected_sig, str(obj.get("sig", ""))):
-            return False, ("Control list signature invalid — refusing to apply (possible tampering).")
-        text = plaintext
-    except Exception as exc:
-        return False, f"Control list unreadable: {exc}"
+    plaintext, error = parse_control_envelope_v2(text)
+    if error:
+        return False, error
+    text = plaintext or ""
 
     revokes: list[str] = []
     bans: list[str] = []
@@ -980,6 +970,22 @@ def is_newer_version(candidate: str, current: str) -> bool:
     return _version_tuple(candidate) > _version_tuple(current)
 
 
+def available_update() -> dict | None:
+    """Return update info when control list advertises a version newer than this build."""
+    from skyadmin_pro.config import APP_VERSION
+
+    info = read_update_info()
+    if info and is_newer_version(str(info.get("version") or ""), APP_VERSION):
+        return info
+    return None
+
+
+def check_for_updates(timeout: float = 6.0) -> tuple[bool, str, dict | None]:
+    """Fetch control list and return (sync_ok, message, update_info_or_none)."""
+    ok, msg = fetch_revocations(timeout=timeout)
+    return ok, msg, available_update()
+
+
 def license_remaining_days() -> int | None:
     """Whole days left (floor). Hour-precision via license_time_left_text()."""
     data = _read_license_payload()
@@ -1040,65 +1046,39 @@ def license_expiry_text() -> str:
 
 
 def verify_key_text(text: str) -> tuple[bool, str]:
-    """Validate a PASTED full license key OR 8-digit passcode for this machine.
-
-    Does not touch any file — call save_license_file() after success.
-    Machine-level BAN applies to every format (checked first).
-    """
-    # Timing anti-debug: if a debugger is stepping through HMAC, the
-    # computation takes abnormally long (>200ms for a trivial HMAC).
+    """Validate a pasted Ed25519 license key or ``SKYPASS1:`` passcode."""
     import time as _time
 
     _t0 = _time.monotonic()
-    _probe = hmac.new(SECRET, b"timing-check", hashlib.sha256).digest()
+    _ = uuid.uuid4().hex
     _elapsed = _time.monotonic() - _t0
     if _elapsed > 0.8:
         return False, "Verification failed."
 
-    raw = "".join((text or "").split())  # strip ALL whitespace/newlines from email paste
+    raw = "".join((text or "").split())
     if not raw:
-        return False, "Paste the license key or 8-digit passcode."
+        return False, "Paste the license key or passcode."
 
     current_mid = get_machine_id()
-    # Remote machine block — applies before any format-specific logic,
-    # so a banned machine cannot sneak through with a passcode either.
     if current_mid in banned_machines():
         return False, "This machine has been blocked by Sky Creation Innovations."
 
-    # 8-digit passcode (legacy, no expiry) or XXXXXXXX:TIMESTAMP (new, with expiry)
-    if raw.isdigit() and len(raw) == 8:
-        # Legacy passcode — check HMAC only (no embedded expiry)
-        if hmac.compare_digest(generate_passcode(current_mid, None), raw):
-            if raw in revoked_passcodes():
-                return False, "This passcode has been revoked by Sky Creation Innovations."
-            return True, f"Passcode accepted for machine {current_mid}."
-        return False, f"Passcode is not valid for this machine ({current_mid})."
+    if raw.startswith(PASSCODE_PREFIX):
+        ok, msg, _nonce = verify_ed25519_passcode_envelope(raw, current_mid)
+        if not ok:
+            return False, msg
+        if raw in revoked_passcodes():
+            return False, "This passcode has been revoked by Sky Creation Innovations."
+        return True, msg
 
-    # New expiry-embedded passcode: XXXXXXXX:TIMESTAMP (base36)
+    if raw.isdigit() and len(raw) == 8:
+        return False, LEGACY_FORMAT_SUNSET_MESSAGE
+
     if ":" in raw:
         parts = raw.rsplit(":", 1)
         if len(parts) == 2 and parts[0].isdigit() and len(parts[0]) == 8:
-            exp_dt = _decode_passcode_expiry(raw)
-            matched = False
-            if exp_dt is not None:
-                exp_ts = int(exp_dt.timestamp())
-                sig = _hmac(f"{current_mid}:passcode:{exp_ts}")
-                num = int(sig[:8], 16) % 100_000_000
-                if f"{num:08d}" == parts[0]:
-                    matched = True
-            if matched:
-                if raw in revoked_passcodes():
-                    return False, "This passcode has been revoked by Sky Creation Innovations."
-                if datetime.now() >= exp_dt:
-                    return False, (f"Passcode expired on {exp_dt.strftime('%Y-%m-%d %H:%M')}. Request a renewal.")
-                return True, (
-                    f"Passcode accepted for machine {current_mid} (expires: {exp_dt.strftime('%Y-%m-%d %H:%M')})."
-                )
-            return False, f"Passcode is not valid for this machine ({current_mid})."
+            return False, LEGACY_FORMAT_SUNSET_MESSAGE
 
-    # Full base64 license key — supports BOTH formats:
-    #   NEW (unique): sig over "mid|exp|iat|nonce|pkg"
-    #   LEGACY:       sig over "mid:exp"
     try:
         b64 = raw.replace("-", "+").replace("_", "/")
         b64 += "=" * (-len(b64) % 4)
@@ -1109,20 +1089,27 @@ def verify_key_text(text: str) -> tuple[bool, str]:
         iat = str(data.get("iat") or "")
         nonce = str(data.get("n") or "")
         pkg = str(data.get("pkg") or "")
+        algorithm = str(data.get("alg") or "")
 
-        if iat or nonce or pkg:
-            payload_new = "|".join([mid, exp or "", iat, nonce, pkg])
-            ok_sig = hmac.compare_digest(_hmac(payload_new), sig)
-        else:
-            ok_sig = False
-        if not ok_sig:
-            legacy_payload = f"{mid}:{exp or ''}"
-            if not hmac.compare_digest(_hmac(legacy_payload), sig):
-                return False, "License signature invalid — key was altered or issued with a different secret."
+        if algorithm != LICENSE_SIGNATURE_ALGORITHM:
+            return False, LEGACY_FORMAT_SUNSET_MESSAGE
+
+        if not verify_license_signature(
+            mid=mid,
+            exp=str(exp) if exp is not None else None,
+            iat=iat,
+            nonce=nonce,
+            pkg=pkg,
+            signature=sig,
+            algorithm=algorithm,
+        ):
+            return False, (
+                "License signature invalid — key was altered, issued with a different signing key, "
+                "or the Worker LICENSE_ED25519_PRIVATE_KEY_B64 does not match this app build."
+            )
 
         if mid != "ANY" and mid != current_mid:
             return False, f"Key is for machine {mid}, but this machine is {current_mid}."
-        # Machine-level ban already checked at the top of this function.
         if exp:
             try:
                 exp_dt = _parse_expiry(exp)
@@ -1130,7 +1117,6 @@ def verify_key_text(text: str) -> tuple[bool, str]:
                 return False, f"License has invalid expiry: {exp!r}"
             if datetime.now() >= exp_dt:
                 return False, (f"License expired on {exp_dt.strftime('%Y-%m-%d %H:%M')}. Request a renewal.")
-        # Revocation list (optional file ~/.skyadmin_pro/revoked.txt, one nonce per line)
         if nonce and nonce in revoked_nonces():
             return False, "This license has been revoked by Sky Creation Innovations."
         extra = []
@@ -1141,7 +1127,7 @@ def verify_key_text(text: str) -> tuple[bool, str]:
         suffix = f" ({', '.join(extra)})" if extra else ""
         return True, f"Licensed to {mid} (expires: {exp or 'never'}){suffix}."
     except Exception as exc:
-        return False, f"Could not read the key ({exc}). Paste the full key or the 8-digit passcode."
+        return False, f"Could not read the key ({exc}). Paste a current license key or SKYPASS1 passcode."
 
 
 def _shadow_path() -> Path | None:

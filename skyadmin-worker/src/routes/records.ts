@@ -1,8 +1,8 @@
-/** GET /api/records — List issued licenses with pagination.
- *  POST /api/update — Set the LATEST version + URL. */
+/** GET /api/records — List issued licenses with pagination. */
 
 import { Context } from "hono";
-import { Env, setMeta, bumpVersion } from "../db";
+import { Env } from "../db";
+import { describeLicenseExpiry, summarizeMachines } from "../license_status";
 
 export async function recordsHandler(c: Context<{ Bindings: Env }>) {
   const page = Math.max(1, parseInt(c.req.query("page") || "1", 10));
@@ -28,7 +28,39 @@ export async function recordsHandler(c: Context<{ Bindings: Env }>) {
     (await c.env.DB.prepare("SELECT nonce FROM used_nonces").all<{ nonce: string }>()).results?.map(r => r.nonce) || []
   );
 
-  const enriched = (results || []).map((r: any) => ({
+  const enriched = (results || []).map((r: Record<string, unknown>) => {
+    const expiry = describeLicenseExpiry(
+      (r.expires_at as string | null | undefined) ?? null,
+      { revoked: revSet.has(String(r.nonce || "")), used: usedSet.has(String(r.nonce || "")) },
+    );
+    return {
+      ...r,
+      revoked: revSet.has(String(r.nonce || "")),
+      used: usedSet.has(String(r.nonce || "")),
+      expires_label: expiry.expires_label,
+      time_left: expiry.time_left,
+      is_expired: expiry.is_expired,
+      expiry_state: expiry.state,
+      expiring_soon:
+        !revSet.has(String(r.nonce || "")) &&
+        !expiry.is_expired &&
+        expiry.ms_remaining !== null &&
+        expiry.ms_remaining > 0 &&
+        expiry.ms_remaining <= 7 * 86400000,
+    };
+  });
+
+  const allRows = await c.env.DB.prepare(
+    "SELECT machine_id, expires_at, issued_at, package_days, nonce FROM issued_licenses ORDER BY id DESC",
+  ).all<{
+    machine_id: string;
+    expires_at: string | null;
+    issued_at: string;
+    package_days: number | null;
+    nonce: string;
+  }>();
+
+  const allEnriched = (allRows.results || []).map((r) => ({
     ...r,
     revoked: revSet.has(r.nonce),
     used: usedSet.has(r.nonce),
@@ -37,6 +69,7 @@ export async function recordsHandler(c: Context<{ Bindings: Env }>) {
   return c.json({
     ok: true,
     licenses: enriched,
+    machines: summarizeMachines(allEnriched),
     pagination: {
       page,
       limit,
@@ -44,15 +77,4 @@ export async function recordsHandler(c: Context<{ Bindings: Env }>) {
       pages: Math.ceil(total / limit),
     },
   });
-}
-
-export async function updateHandler(c: Context<{ Bindings: Env }>) {
-  const { version, url } = await c.req.json<{ version?: string; url?: string }>();
-  if (!version?.trim()) return c.json({ ok: false, error: "version required" }, 400);
-
-  await setMeta(c.env.DB, "latest_version", version.trim());
-  await setMeta(c.env.DB, "latest_url", (url || "").trim());
-  await bumpVersion(c.env.DB);
-
-  return c.json({ ok: true, message: `Latest version set to ${version}.` });
 }

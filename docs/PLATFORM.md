@@ -2,7 +2,7 @@
 
 SkyAdmin Pro is designed so **one SQLite database** remains the source of truth on desktop today, while mobile and additional desktop OS targets can share the same data model later through the existing Cloudflare Worker API (`skyadmin-worker/`).
 
-## Current status (v0.3.0)
+## Current status (v0.3.1)
 
 | Platform | Status | Notes |
 |---|---|---|
@@ -33,27 +33,34 @@ New in **Office Hub** (sidebar):
 - Linux/macOS dev runs without code changes
 - PyInstaller builds per OS when packaging pipeline is ready
 
-### Phase 2 — Sync layer (foundation exists)
+### Phase 2 — Sync layer (**implemented — v0.3.1+**)
 
-The Worker already exposes signed license/control endpoints. Extend with authenticated sync routes:
+The Worker exposes authenticated sync routes (device token from `/api/sync/register`):
 
-| Endpoint (proposed) | Purpose |
+| Endpoint | Purpose |
 |---|---|
-| `GET/POST /api/sync/pull` | Incremental changes since `updated_at` |
-| `POST /api/sync/push` | Upload encrypted row batches from mobile |
+| `POST /api/sync/register` | Exchange active license for device sync token |
 | `GET /api/sync/schema` | Versioned table manifest |
+| `GET /api/sync/pull?since=` | Incremental changes since last pull |
+| `POST /api/sync/push` | Upload row batches (last-write-wins on `updated_at`) |
 
-Tables prioritized for sync: `office_contacts`, `vault_entries`, `notebook_entries`, `tasks`, `clients` (metadata only — not full PDF blobs).
+**Synced tables:** `clients` (metadata only — no `ird_password`), `tasks`, `office_contacts`, `notebook_entries`.
+
+**Not synced:** vault passwords (`client_credentials` / `office_credentials`) — machine-bound encryption.
+
+Desktop: **Settings → Sync Now** runs license control sync + `data_sync.sync_data()`.
 
 ### Phase 3 — Mobile clients
 
+**PWA viewer (live):** `/viewer` on the Worker — read-only **clients**, **tasks**, **office contacts**, and **notebook** after desktop **Sync Now**.
+
 | Option | Pros | Cons |
 |---|---|---|
+| **PWA** (current `/viewer`) | Reuse Worker API; home-screen install | No vault; limited offline |
 | **Flutter** | One codebase for Android + iOS | Rewrite UI |
 | **React Native / Expo** | Web skills transfer | Heavier runtime |
-| **PWA + Capacitor** | Reuse Worker API quickly | Limited offline vault UX |
 
-Recommended: **Flutter or .NET MAUI** if vault biometrics matter; **PWA** for read-only notebook/contacts first.
+Recommended: **PWA** for day-to-day read-only ops; **Flutter or .NET MAUI** if vault biometrics matter later.
 
 ### Security rules for mobile
 
@@ -87,5 +94,5 @@ All three tables use ISO date strings and `updated_at` for future sync conflict 
 | `skyadmin_pro/ui/views/office_hub.py` | Office Hub UI |
 | `skyadmin_pro/services/vault.py` | Vault encrypt/decrypt |
 | `skyadmin_pro/services/secret_fields.py` | Shared machine-bound Fernet |
-| `skyadmin-worker/` | Cloudflare API (extend for sync) |
+| `skyadmin_pro/services/data_sync.py` | P4 Worker sync (pull/push) |
 | `main.py` | Cross-platform single-instance lock |

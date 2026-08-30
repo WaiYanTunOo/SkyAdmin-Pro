@@ -19,11 +19,12 @@ from skyadmin_pro.services.office_hub_rollout import (
     seed_liaison_contacts,
 )
 from skyadmin_pro.services.workflow import copy_to_clipboard
+from skyadmin_pro.ui.debounce import debounced_after
 from skyadmin_pro.ui.setup_rollout import RolloutAction, SetupRolloutPanel
 from skyadmin_pro.ui.theme import CARD_TITLE_SIZE
 from skyadmin_pro.ui.treeview import ThemedTreeview
 from skyadmin_pro.ui.views.base import BaseView
-from skyadmin_pro.ui.widgets import FeedbackLabel
+from skyadmin_pro.ui.widgets import FeedbackLabel, themed_entry, themed_textbox
 
 
 class OfficeHubView(BaseView):
@@ -38,12 +39,14 @@ class OfficeHubView(BaseView):
         self.feedback = FeedbackLabel(self.body)
         self.feedback.grid(row=1, column=0, sticky="ew", pady=(8, 0))
 
-        self.tabs = ctk.CTkTabview(self.body)
+        self._lazy_tabs: set[str] = set()
+        self.tabs = ctk.CTkTabview(self.body, command=self._on_tab_changed)
         self.tabs.grid(row=0, column=0, sticky="nsew")
-        self.tabs.add("Setup")
-        self.tabs.add("Contacts")
-        self.tabs.add("Passwords")
-        self.tabs.add("Notebook")
+        for name in ("Setup", "Contacts", "Passwords", "Notebook"):
+            self.tabs.add(name)
+            tab = self.tabs.tab(name)
+            tab.grid_columnconfigure(0, weight=1)
+            tab.grid_rowconfigure(0, weight=1)
 
         self._selected_contact_id: int | None = None
         self._selected_client_cred_id: int | None = None
@@ -53,9 +56,7 @@ class OfficeHubView(BaseView):
         self._office_pw_visible = False
 
         self._build_setup_tab(self.tabs.tab("Setup"))
-        self._build_contacts_tab(self.tabs.tab("Contacts"))
-        self._build_passwords_tab(self.tabs.tab("Passwords"))
-        self._build_notebook_tab(self.tabs.tab("Notebook"))
+        self._lazy_tabs.add("Setup")
 
     # ------------------------------------------------------------------ #
     # Setup — Wave D migration queue
@@ -146,6 +147,7 @@ class OfficeHubView(BaseView):
             self.feedback.error("Select a client first.")
             return
         name = (row.get("name") or "").strip()
+        self._ensure_tab("Contacts")
         self.tabs.set("Contacts")
         self.contact_search_var.set(name)
         self._refresh_contacts()
@@ -216,10 +218,10 @@ class OfficeHubView(BaseView):
         toolbar.grid(row=0, column=0, sticky="ew", pady=(8, 8))
         toolbar.grid_columnconfigure(1, weight=1)
         self.contact_search_var = ctk.StringVar()
-        ctk.CTkEntry(toolbar, textvariable=self.contact_search_var, placeholder_text="Search contacts…").grid(
+        themed_entry(toolbar, textvariable=self.contact_search_var, placeholder_text="Search contacts…").grid(
             row=0, column=0, columnspan=2, sticky="ew", padx=(0, 8)
         )
-        self.contact_search_var.trace_add("write", lambda *_: self._refresh_contacts())
+        self.contact_search_var.trace_add("write", debounced_after(self, self._refresh_contacts))
         self.contact_category_menu = ctk.CTkOptionMenu(
             toolbar, values=["All"] + list(CONTACT_CATEGORIES), command=lambda _v: self._refresh_contacts(), width=150
         )
@@ -271,7 +273,7 @@ class OfficeHubView(BaseView):
         ]
         for label, var, row, col in simple_fields:
             ctk.CTkLabel(form, text=label, anchor="w").grid(row=row, column=col, sticky="w", padx=16, pady=4)
-            ctk.CTkEntry(form, textvariable=var).grid(row=row, column=col + 1, sticky="ew", padx=(0, 16), pady=4)
+            themed_entry(form, textvariable=var).grid(row=row, column=col + 1, sticky="ew", padx=(0, 16), pady=4)
 
         ctk.CTkLabel(form, text="Company", anchor="w").grid(row=2, column=0, sticky="w", padx=16, pady=4)
         self.c_org_menu.grid(row=2, column=1, sticky="ew", padx=(0, 16), pady=4)
@@ -328,10 +330,10 @@ class OfficeHubView(BaseView):
         toolbar.grid(row=0, column=0, sticky="ew", pady=(4, 8))
         toolbar.grid_columnconfigure(0, weight=1)
         self.client_cred_search_var = ctk.StringVar()
-        ctk.CTkEntry(
+        themed_entry(
             toolbar, textvariable=self.client_cred_search_var, placeholder_text="Search client, DBD/RD no…"
         ).grid(row=0, column=0, sticky="ew", padx=(0, 8))
-        self.client_cred_search_var.trace_add("write", lambda *_: self._refresh_client_credentials())
+        self.client_cred_search_var.trace_add("write", debounced_after(self, self._refresh_client_credentials))
         self.client_cred_type_menu = ctk.CTkOptionMenu(
             toolbar,
             values=["All"] + list(CLIENT_CREDENTIAL_TYPES),
@@ -388,13 +390,13 @@ class OfficeHubView(BaseView):
             elif kind == "widget":
                 var.grid(row=row, column=col + 1, sticky="ew", padx=(0, 16), pady=4)
             else:
-                ctk.CTkEntry(form, textvariable=var).grid(row=row, column=col + 1, sticky="ew", padx=(0, 16), pady=4)
+                themed_entry(form, textvariable=var).grid(row=row, column=col + 1, sticky="ew", padx=(0, 16), pady=4)
 
         ctk.CTkLabel(form, text="Password", anchor="w").grid(row=3, column=0, sticky="w", padx=16, pady=4)
         pw_row = ctk.CTkFrame(form, fg_color="transparent")
         pw_row.grid(row=3, column=1, columnspan=3, sticky="ew", padx=(0, 16), pady=4)
         pw_row.grid_columnconfigure(0, weight=1)
-        self.cc_pw_entry = ctk.CTkEntry(pw_row, textvariable=self.cc_password, show="*")
+        self.cc_pw_entry = themed_entry(pw_row, textvariable=self.cc_password, show="*")
         self.cc_pw_entry.grid(row=0, column=0, sticky="ew")
         ctk.CTkButton(pw_row, text="Show", width=64, command=self._toggle_client_pw).grid(row=0, column=1, padx=(8, 0))
         ctk.CTkButton(pw_row, text="Copy", width=64, command=self._copy_client_pw).grid(row=0, column=2, padx=(8, 0))
@@ -424,10 +426,10 @@ class OfficeHubView(BaseView):
         toolbar.grid(row=0, column=0, sticky="ew", pady=(4, 8))
         toolbar.grid_columnconfigure(0, weight=1)
         self.office_cred_search_var = ctk.StringVar()
-        ctk.CTkEntry(
+        themed_entry(
             toolbar, textvariable=self.office_cred_search_var, placeholder_text="Search office accounts…"
         ).grid(row=0, column=0, sticky="ew", padx=(0, 8))
-        self.office_cred_search_var.trace_add("write", lambda *_: self._refresh_office_credentials())
+        self.office_cred_search_var.trace_add("write", debounced_after(self, self._refresh_office_credentials))
         self.office_cred_type_menu = ctk.CTkOptionMenu(
             toolbar,
             values=["All"] + list(OFFICE_SYSTEM_TYPES),
@@ -487,13 +489,13 @@ class OfficeHubView(BaseView):
                     row=row, column=col + 1, sticky="w", padx=(0, 16), pady=4
                 )
             else:
-                ctk.CTkEntry(form, textvariable=var).grid(row=row, column=col + 1, sticky="ew", padx=(0, 16), pady=4)
+                themed_entry(form, textvariable=var).grid(row=row, column=col + 1, sticky="ew", padx=(0, 16), pady=4)
 
         ctk.CTkLabel(form, text="Password", anchor="w").grid(row=4, column=0, sticky="w", padx=16, pady=4)
         pw_row = ctk.CTkFrame(form, fg_color="transparent")
         pw_row.grid(row=4, column=1, columnspan=3, sticky="ew", padx=(0, 16), pady=4)
         pw_row.grid_columnconfigure(0, weight=1)
-        self.oc_pw_entry = ctk.CTkEntry(pw_row, textvariable=self.oc_password, show="*")
+        self.oc_pw_entry = themed_entry(pw_row, textvariable=self.oc_password, show="*")
         self.oc_pw_entry.grid(row=0, column=0, sticky="ew")
         ctk.CTkButton(pw_row, text="Show", width=64, command=self._toggle_office_pw).grid(row=0, column=1, padx=(8, 0))
         ctk.CTkButton(pw_row, text="Copy", width=64, command=self._copy_office_pw).grid(row=0, column=2, padx=(8, 0))
@@ -527,10 +529,10 @@ class OfficeHubView(BaseView):
         toolbar.grid(row=0, column=0, sticky="ew", pady=(8, 8))
         toolbar.grid_columnconfigure(0, weight=1)
         self.note_search_var = ctk.StringVar()
-        ctk.CTkEntry(toolbar, textvariable=self.note_search_var, placeholder_text="Search notebook…").grid(
+        themed_entry(toolbar, textvariable=self.note_search_var, placeholder_text="Search notebook…").grid(
             row=0, column=0, sticky="ew", padx=(0, 8)
         )
-        self.note_search_var.trace_add("write", lambda *_: self._refresh_notes())
+        self.note_search_var.trace_add("write", debounced_after(self, self._refresh_notes))
         type_labels = ["All"] + [label for _key, label in NOTEBOOK_ENTRY_TYPES]
         self.note_type_menu = ctk.CTkOptionMenu(
             toolbar, values=type_labels, command=lambda _v: self._refresh_notes(), width=170
@@ -589,7 +591,7 @@ class OfficeHubView(BaseView):
                     row=row, column=col + 1, sticky="w", padx=(0, 16), pady=4
                 )
             else:
-                ctk.CTkEntry(form, textvariable=var).grid(row=row, column=col + 1, sticky="ew", padx=(0, 16), pady=4)
+                themed_entry(form, textvariable=var).grid(row=row, column=col + 1, sticky="ew", padx=(0, 16), pady=4)
 
         ctk.CTkLabel(form, text="Body", anchor="w").grid(row=4, column=0, sticky="nw", padx=16, pady=4)
         self.n_body_box = ctk.CTkTextbox(form, height=120)
@@ -606,19 +608,52 @@ class OfficeHubView(BaseView):
         self._note_from_date: str | None = None
         self._note_to_date: str | None = None
 
+    def _ensure_tab(self, name: str) -> None:
+        if name in self._lazy_tabs:
+            return
+        if name == "Contacts":
+            self._build_contacts_tab(self.tabs.tab("Contacts"))
+        elif name == "Passwords":
+            self._build_passwords_tab(self.tabs.tab("Passwords"))
+        elif name == "Notebook":
+            self._build_notebook_tab(self.tabs.tab("Notebook"))
+        self._lazy_tabs.add(name)
+
+    def _on_tab_changed(self) -> None:
+        try:
+            current = self.tabs.get()
+        except Exception:
+            current = "Setup"
+        self._ensure_tab(current)
+        self._refresh_active_tab(current)
+
+    def _refresh_active_tab(self, tab_name: str) -> None:
+        if tab_name == "Setup":
+            self.refresh_setup()
+        elif tab_name == "Contacts":
+            self._refresh_contact_pickers()
+            self._refresh_contacts()
+        elif tab_name == "Passwords":
+            self._refresh_contact_pickers()
+            clients = [""] + self.app.db.list_client_names()
+            if hasattr(self, "cc_client_menu"):
+                self.cc_client_menu.configure(values=clients)
+            self._refresh_client_credentials()
+            self._refresh_office_credentials()
+        elif tab_name == "Notebook":
+            self._refresh_notes()
+
     # ------------------------------------------------------------------ #
     # Lifecycle
     # ------------------------------------------------------------------ #
 
     def on_show(self) -> None:
-        self._refresh_contact_pickers()
-        clients = [""] + self.app.db.list_client_names()
-        self.cc_client_menu.configure(values=clients)
-        self.refresh_setup()
-        self._refresh_contacts()
-        self._refresh_client_credentials()
-        self._refresh_office_credentials()
-        self._refresh_notes()
+        try:
+            current = self.tabs.get()
+        except Exception:
+            current = "Setup"
+        self._ensure_tab(current)
+        self._refresh_active_tab(current)
         pending = getattr(self, "_pending_client_credentials", None)
         if pending:
             self._pending_client_credentials = None
@@ -639,6 +674,7 @@ class OfficeHubView(BaseView):
         clean = (client_name or "").strip()
         if not clean:
             return
+        self._ensure_tab("Passwords")
         self.tabs.set("Passwords")
         self._password_subtabs.set("Client DBD / RD")
         type_filter = credential_type if credential_type else "All"
@@ -714,6 +750,8 @@ class OfficeHubView(BaseView):
         self.c_client_menu.configure(values=clients)
 
     def _refresh_contacts(self) -> None:
+        if "Contacts" not in self._lazy_tabs:
+            return
         cat = self.contact_category_menu.get()
         category = None if cat == "All" else cat
         rows = self.app.db.list_office_contacts(query=self.contact_search_var.get(), category=category)
@@ -822,6 +860,8 @@ class OfficeHubView(BaseView):
     # Client credentials CRUD ------------------------------------------------
 
     def _refresh_client_credentials(self) -> None:
+        if "Passwords" not in self._lazy_tabs:
+            return
         cred_type = self.client_cred_type_menu.get()
         ctype = None if cred_type == "All" else cred_type
         rows = self.app.db.list_client_credentials(query=self.client_cred_search_var.get(), credential_type=ctype)
@@ -916,6 +956,8 @@ class OfficeHubView(BaseView):
     # Office credentials CRUD ------------------------------------------------
 
     def _refresh_office_credentials(self) -> None:
+        if "Passwords" not in self._lazy_tabs:
+            return
         system = self.office_cred_type_menu.get()
         stype = None if system == "All" else system
         rows = self.app.db.list_office_credentials(query=self.office_cred_search_var.get(), system_type=stype)
@@ -1010,6 +1052,8 @@ class OfficeHubView(BaseView):
     # Notebook CRUD ---------------------------------------------------------
 
     def _refresh_notes(self) -> None:
+        if "Notebook" not in self._lazy_tabs:
+            return
         type_label = self.note_type_menu.get()
         entry_type = None if type_label == "All" else self._notebook_type_key(type_label)
         rows = self.app.db.list_notebook_entries(

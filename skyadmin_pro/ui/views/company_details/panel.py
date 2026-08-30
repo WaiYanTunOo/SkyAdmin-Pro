@@ -30,7 +30,7 @@ from skyadmin_pro.ui.views.company_details.general_tab import GeneralTabMixin
 from skyadmin_pro.ui.views.company_details.tax_ids_tab import TaxIdsTabMixin
 from skyadmin_pro.ui.views.company_details.vo_csh_setup_tab import VoCshSetupTabMixin
 from skyadmin_pro.ui.views.company_details.vo_csh_tab import VoCshTabMixin
-from skyadmin_pro.ui.widgets import DatePickerField, FeedbackLabel, make_modal
+from skyadmin_pro.ui.widgets import DatePickerField, FeedbackLabel, bind_wrap_label, make_modal, themed_entry
 
 
 class CompanyDetailsPanel(
@@ -58,17 +58,32 @@ class CompanyDetailsPanel(
         selector = ctk.CTkFrame(self, fg_color="transparent")
         selector.grid(row=0, column=0, sticky="ew", pady=(0, 8))
         selector.grid_columnconfigure(1, weight=1)
-        ctk.CTkLabel(selector, text="Company / Client:").grid(row=0, column=0, sticky="w")
-        self.company_box = ctk.CTkComboBox(selector, values=[""], command=self._on_company)
-        self.company_box.grid(row=0, column=1, sticky="ew")
-        self.company_info = ctk.CTkLabel(selector, text="", text_color=TEXT_MUTED, anchor="e")
-        self.company_info.grid(row=0, column=2, sticky="e", padx=(12, 0))
-        ctk.CTkButton(
+
+        ctk.CTkLabel(selector, text="Company / Client:", anchor="w").grid(
+            row=0, column=0, sticky="w", padx=(0, 10)
+        )
+        from skyadmin_pro.ui.widgets import bind_wrap_label, combo_style_kwargs
+
+        self.company_box = ctk.CTkComboBox(
             selector,
+            values=[""],
+            command=self._on_company,
+            **combo_style_kwargs(),
+        )
+        self.company_box.grid(row=0, column=1, sticky="ew")
+
+        actions = ctk.CTkFrame(selector, fg_color="transparent")
+        actions.grid(row=1, column=0, columnspan=2, sticky="ew", pady=(8, 0))
+        actions.grid_columnconfigure(0, weight=1)
+        self.company_info = ctk.CTkLabel(actions, text="", text_color=TEXT_MUTED, anchor="w", justify="left")
+        self.company_info.grid(row=0, column=0, sticky="ew")
+        bind_wrap_label(self.company_info, actions, pad=200)
+        ctk.CTkButton(
+            actions,
             text="Missing docs workflow",
             width=180,
             command=self._missing_docs_workflow,
-        ).grid(row=0, column=3, padx=(8, 0))
+        ).grid(row=0, column=1, sticky="e", padx=(12, 0))
 
         self.tabs = ctk.CTkTabview(self)
         self.tabs.grid(row=1, column=0, sticky="nsew")
@@ -500,16 +515,18 @@ class CompanyDetailsPanel(
             text_color=TEXT_MUTED,
             anchor="w",
         ).grid(row=1, column=0, sticky="w", padx=20)
-        ctk.CTkLabel(
+        renew_hint = ctk.CTkLabel(
             top,
             text=(
                 "Renew / extend before it expires — the current expiry is saved "
                 "in the history before the new one is applied."
             ),
-            wraplength=460,
             justify="left",
             text_color=TEXT_MUTED,
-        ).grid(row=2, column=0, sticky="w", padx=20, pady=(8, 6))
+            anchor="w",
+        )
+        renew_hint.grid(row=2, column=0, sticky="ew", padx=20, pady=(8, 6))
+        bind_wrap_label(renew_hint, top, pad=44)
 
         ctk.CTkLabel(top, text="New expiry date", anchor="w").grid(row=3, column=0, sticky="w", padx=20, pady=(6, 2))
         renew_var = ctk.StringVar()
@@ -517,7 +534,7 @@ class CompanyDetailsPanel(
 
         ctk.CTkLabel(top, text="Note (optional)", anchor="w").grid(row=5, column=0, sticky="w", padx=20, pady=(8, 2))
         note_var = ctk.StringVar()
-        ctk.CTkEntry(top, textvariable=note_var).grid(row=6, column=0, sticky="ew", padx=20, pady=(0, 10))
+        themed_entry(top, textvariable=note_var).grid(row=6, column=0, sticky="ew", padx=20, pady=(0, 10))
 
         needs_docs_var = ctk.BooleanVar(
             value=self.app.db.renewal_docs_default(service.get("client_id"), service.get("document_type") or "")
@@ -528,7 +545,7 @@ class CompanyDetailsPanel(
             variable=needs_docs_var,
         )
         needs_docs.grid(row=7, column=0, sticky="w", padx=20, pady=(0, 2))
-        ctk.CTkLabel(
+        docs_hint = ctk.CTkLabel(
             top,
             text=(
                 "Whether documents are needed depends on this company's task — "
@@ -536,10 +553,12 @@ class CompanyDetailsPanel(
                 "per renewal (and in Renewal history). Your last choice for this "
                 "company + service is remembered."
             ),
-            wraplength=460,
             justify="left",
             text_color=TEXT_MUTED,
-        ).grid(row=8, column=0, sticky="w", padx=20)
+            anchor="w",
+        )
+        docs_hint.grid(row=8, column=0, sticky="ew", padx=20)
+        bind_wrap_label(docs_hint, top, pad=44)
 
         def _do_record() -> None:
             try:

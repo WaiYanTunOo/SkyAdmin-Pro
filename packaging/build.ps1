@@ -1,5 +1,6 @@
 # Builds the portable SkyAdmin Pro single-file exe.
-# Usage:  .\packaging\build.ps1
+# Usage:  .\packaging\build.cmd
+#         (or: powershell -ExecutionPolicy Bypass -File .\packaging\build.ps1)
 $ErrorActionPreference = "Stop"
 $Root = Split-Path -Parent $PSScriptRoot
 Set-Location $Root
@@ -18,3 +19,7 @@ if ($LASTEXITCODE -ne 0) { throw "PyInstaller failed with exit code $LASTEXITCOD
 $Exe = Join-Path $Root "dist\SkyAdminPro.exe"
 Write-Host ""
 Write-Host "Built: $Exe ($([math]::Round((Get-Item $Exe).Length / 1MB, 1)) MB)"
+Write-Host ""
+Write-Host "Running release checks..."
+& $Py scripts\release_check.py --skip-pytest
+if ($LASTEXITCODE -ne 0) { throw "release_check failed with exit code $LASTEXITCODE" }

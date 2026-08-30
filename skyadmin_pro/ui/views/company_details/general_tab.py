@@ -13,7 +13,7 @@ from skyadmin_pro.services.file_ops import (
 )
 from skyadmin_pro.ui.theme import CARD_RADIUS, CARD_TITLE_SIZE, TEXT_MUTED
 from skyadmin_pro.ui.treeview import ThemedTreeview
-from skyadmin_pro.ui.widgets import DatePickerField
+from skyadmin_pro.ui.widgets import DatePickerField, bind_wrap_label, themed_entry, themed_textbox
 
 
 class GeneralTabMixin:
@@ -30,11 +30,11 @@ class GeneralTabMixin:
             frame,
             text="—",
             anchor="w",
-            wraplength=880,
             justify="left",
             font=ctk.CTkFont(weight="bold"),
         )
         self.company_name_label.grid(row=1, column=0, sticky="ew", padx=16, pady=(0, 6))
+        bind_wrap_label(self.company_name_label, frame, pad=40)
 
         grid = ctk.CTkFrame(frame, fg_color="transparent")
         grid.grid(row=2, column=0, sticky="ew", padx=16)
@@ -58,7 +58,7 @@ class GeneralTabMixin:
         )
         for row, col, label, var in labels:
             ctk.CTkLabel(grid, text=label).grid(row=row, column=col, sticky="w", pady=(2, 2))
-            ctk.CTkEntry(grid, textvariable=var).grid(
+            themed_entry(grid, textvariable=var).grid(
                 row=row + 1,
                 column=col,
                 columnspan=2,
@@ -68,12 +68,12 @@ class GeneralTabMixin:
             )
 
         ctk.CTkLabel(grid, text="Business address").grid(row=6, column=0, sticky="w", pady=(6, 2))
-        ctk.CTkEntry(grid, textvariable=self.info_address).grid(
+        themed_entry(grid, textvariable=self.info_address).grid(
             row=7, column=0, columnspan=4, sticky="ew", padx=(0, 12), pady=(0, 4)
         )
 
         ctk.CTkLabel(frame, text="Business objectives").grid(row=3, column=0, sticky="w", padx=16, pady=(6, 2))
-        self.info_objectives = ctk.CTkTextbox(frame, height=80, wrap="word")
+        self.info_objectives = themed_textbox(frame, height=80, wrap="word")
         self.info_objectives.grid(row=4, column=0, sticky="ew", padx=16, pady=(0, 8))
 
         buttons = ctk.CTkFrame(frame, fg_color="transparent")
@@ -163,7 +163,7 @@ class GeneralTabMixin:
 
         ctk.CTkLabel(form, text="Amount").grid(row=3, column=0, sticky="w", pady=(10, 2))
         self.service_amount = ctk.StringVar()
-        amount_entry = ctk.CTkEntry(form, textvariable=self.service_amount)
+        amount_entry = themed_entry(form, textvariable=self.service_amount)
         amount_entry.bind(
             "<FocusOut>",
             lambda _e: self.service_amount.set(format_thousands(self.service_amount.get())),
@@ -255,7 +255,7 @@ class GeneralTabMixin:
         file_row.grid_columnconfigure(0, weight=1)
         self.doc_file = ctk.StringVar()
         self.doc_path = ctk.StringVar()
-        ctk.CTkEntry(file_row, textvariable=self.doc_file).grid(row=0, column=0, sticky="ew")
+        themed_entry(file_row, textvariable=self.doc_file).grid(row=0, column=0, sticky="ew")
         ctk.CTkButton(
             file_row,
             text="Pick file…",

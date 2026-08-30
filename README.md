@@ -12,7 +12,7 @@ Disclaimer).
 ### End users (packaged app)
 
 - Windows 10 / 11 (64-bit)
-- No Python required — run the packaged `SkyAdminPro.exe`
+- No Python required — install `SkyAdminPro-Setup-<version>.exe`
 - Internet for **activation**, **daily license sync** (once per 24 hours when
   remote control is enabled), and optional online tools (e.g. translation)
 
@@ -23,14 +23,18 @@ Disclaimer).
 - Run from project root: `python main.py`
 - Optional: Cloudflare Worker in `skyadmin-worker/` for API-based license control
 
-## 2. Install (new PC — packaged exe)
+## 2. Install (new PC)
 
-1. Copy `SkyAdminPro.exe` into any folder
-2. Double-click → the **Pricing & Activation** window appears, showing your
-   **Machine ID** (16 hex characters)
-3. Send your Machine ID to the owner (email button or WhatsApp button inside
-   the window)
-4. Paste the received License Key or 8-digit Passcode → **Activate Now**
+### Option A — Installer (recommended)
+
+1. Run `SkyAdminPro-Setup-<version>.exe` (build with `packaging\build-installer.cmd`)
+2. Follow the wizard → Start Menu shortcut is created
+3. Launch → **Pricing & Activation** window shows your **Machine ID**
+
+**Activation:**
+
+3. Send your Machine ID to the owner (email or WhatsApp in the activation window)
+4. Paste the **License Key** or **Passcode** (`SKYPASS1:…`) → **Activate Now**
 5. Folders are created automatically:
 
 | Location | Contents |
@@ -66,7 +70,7 @@ Machine ID — the owner replies with a code.
 ## 5. Activating / Renewing
 
 - Launch unlicensed/expired → Pricing & Activation opens automatically
-- Paste the **License Key** (long) **or** the **8-digit Passcode** → Activate Now
+- Paste the **License Key** (long base64) **or** the **Passcode** (`SKYPASS1:…`) → Activate Now
 - Requires internet once (the app downloads the owner's signed control list)
 - Renew any time: Settings → Activate / Manage License…, or paste a key/passcode
   under Settings → License
@@ -96,16 +100,20 @@ Open `LicenseGenerator_iPhone.html` on your phone (Files → Safari, offline):
 2. Pick package (or custom days / never)
 3. Send the **License Key** or **Passcode** back by email/WhatsApp
 
-Every key is unique (issue-time + nonce + package, HMAC-SHA256 signed),
+Every key is unique (issue-time + nonce + package, **Ed25519-signed**),
 hardware-bound, and cannot be forged, edited, extended, or moved.
+Passcodes use the `SKYPASS1:` envelope format.
 
 ### Remote control (internet)
 
-Two supported backends (configured at build time):
+Preferred backend (configured at build time):
 
-1. **Cloudflare Worker API** (`skyadmin-worker/`) — recommended; signed
-   `/api/control` endpoint
-2. **Legacy GitHub Gist** — `skyadmin-control.txt` with `SKYCTRL1` envelope
+1. **Cloudflare Worker API** (`skyadmin-worker/`) — signed `/api/control`
+   (`SKYCTRL2:` envelope) and `/api/claim` for global one-time-use burns
+
+Optional legacy fallback when `API_BASE_URL` is empty:
+
+2. **GitHub Gist** — must publish `SKYCTRL2:` (Ed25519); `SKYCTRL1` is retired
 
 In the generator's 🌐 Remote Control section:
 
@@ -141,10 +149,12 @@ Legacy IRD passwords saved under Company Details are auto-imported into **Client
 
 See `docs/PLATFORM.md` for the Windows / Linux / macOS / Android / iOS roadmap.
 
+**Engineering plan:** `docs/ROADMAP.md` — stability, security, UI/UX, performance, and release phases after v0.3.1.
+
 ## 9. Self-Protection Features
 
 - Hardware-locked: keys work on one machine only
-- Signed opaque control list (`SKYCTRL1`): even a leaked gist URL reveals
+- Signed opaque control list (`SKYCTRL2` / Ed25519): even a leaked URL reveals
   nothing and cannot be forged
 - Self-healing: if `license.key` is deleted by a cleaner tool, the app
   restores it from its shadow copy automatically
@@ -207,12 +217,13 @@ Data locations on Linux:
 | `~/.skyadmin_pro/` | Database, license, backups, logs |
 | `~/Documents/SkyAdmin Pro/` | Client workspace (dev / script launch) |
 
-Build Worker (optional):
+Build Worker (optional — see `skyadmin-worker/DEPLOY.md` for production):
 
 ```bash
 cd skyadmin-worker
 npm install
-npx wrangler dev
+npx wrangler dev          # local
+npm run deploy              # production (after secrets + D1 init)
 ```
 
 ## 12. Contacts

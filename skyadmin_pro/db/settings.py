@@ -109,6 +109,32 @@ class SettingsMixin:
                 (key, value),
             )
 
+    def count_sync_conflicts(self) -> int:
+        with self.connection() as conn:
+            row = conn.execute("SELECT COUNT(*) AS c FROM sync_conflicts").fetchone()
+        return int(row["c"]) if row else 0
+
+    def list_sync_conflicts(self, limit: int = 100) -> list[dict]:
+        lim = max(1, min(int(limit), 500))
+        with self.connection() as conn:
+            rows = conn.execute(
+                """
+                SELECT id, table_name, global_id, direction, local_updated_at, remote_updated_at, logged_at
+                FROM sync_conflicts
+                ORDER BY logged_at DESC, id DESC
+                LIMIT ?
+                """,
+                (lim,),
+            ).fetchall()
+        return [dict(r) for r in rows]
+
+    def clear_sync_conflicts(self) -> int:
+        with self.connection() as conn:
+            row = conn.execute("SELECT COUNT(*) AS c FROM sync_conflicts").fetchone()
+            count = int(row["c"]) if row else 0
+            conn.execute("DELETE FROM sync_conflicts")
+        return count
+
     def list_service_types(self) -> list[str]:
         if self._service_types_cache is not None:
             return list(self._service_types_cache)

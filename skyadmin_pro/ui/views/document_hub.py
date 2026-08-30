@@ -25,7 +25,7 @@ from skyadmin_pro.services.file_ops import open_in_file_manager
 from skyadmin_pro.services.workflow import open_portal_and_copy_path
 from skyadmin_pro.ui.theme import CARD_TITLE_SIZE, TEXT_MUTED, TEXT_SUBTLE, WRAP_CARD
 from skyadmin_pro.ui.views.base import BaseView
-from skyadmin_pro.ui.widgets import DatePickerField, DropZone, FeedbackLabel, OrderedPathList, SelectableFileList
+from skyadmin_pro.ui.widgets import DatePickerField, DropZone, FeedbackLabel, OrderedPathList, SelectableFileList, themed_entry
 
 
 def _open_folder(path: Path, parent=None) -> None:
@@ -46,10 +46,11 @@ class DocumentHubView(BaseView):
     def build(self) -> None:
         self._polling = False
         self._poll_after: str | None = None
+        self._lazy_panels: dict[str, object] = {}
         self.body.grid_columnconfigure(0, weight=1)
         self.body.grid_rowconfigure(0, weight=1)
 
-        self.tabs = ctk.CTkTabview(self.body, command=self.refresh_all)
+        self.tabs = ctk.CTkTabview(self.body, command=self._on_tab_changed)
         self.tabs.grid(row=0, column=0, sticky="nsew")
         tab_names = (
             "Smart Renamer",
@@ -67,29 +68,58 @@ class DocumentHubView(BaseView):
 
         self.renamer = SmartRenamerPanel(self.tabs.tab("Smart Renamer"), self.app)
         self.renamer.grid(row=0, column=0, sticky="nsew", padx=8, pady=8)
+        self._lazy_panels["Smart Renamer"] = self.renamer
 
-        self.converter = ImageToPdfPanel(self.tabs.tab("Image to PDF"), self.app)
-        self.converter.grid(row=0, column=0, sticky="nsew", padx=8, pady=8)
+        self.converter = None
+        self.merger = None
+        self.portal = None
+        self.archive = None
+        self.financial = None
 
-        self.merger = AgentBundlePanel(self.tabs.tab("Agent Bundle"), self.app)
-        self.merger.grid(row=0, column=0, sticky="nsew", padx=8, pady=8)
+    def _ensure_panel(self, name: str) -> None:
+        if name in self._lazy_panels:
+            return
+        tab = self.tabs.tab(name)
+        if name == "Image to PDF":
+            self.converter = ImageToPdfPanel(tab, self.app)
+            self.converter.grid(row=0, column=0, sticky="nsew", padx=8, pady=8)
+            self._lazy_panels[name] = self.converter
+        elif name == "Agent Bundle":
+            self.merger = AgentBundlePanel(tab, self.app)
+            self.merger.grid(row=0, column=0, sticky="nsew", padx=8, pady=8)
+            self._lazy_panels[name] = self.merger
+        elif name == "Portal Upload":
+            self.portal = PortalUploadPanel(tab, self.app)
+            self.portal.grid(row=0, column=0, sticky="nsew", padx=8, pady=8)
+            self._lazy_panels[name] = self.portal
+        elif name == "Archive & Clean":
+            self.archive = ArchivePanel(tab, self.app)
+            self.archive.grid(row=0, column=0, sticky="nsew", padx=8, pady=8)
+            self._lazy_panels[name] = self.archive
+        elif name == "Financial Docs":
+            self.financial = FinancialDocsPanel(tab, self.app)
+            self.financial.grid(row=0, column=0, sticky="nsew", padx=8, pady=8)
+            self._lazy_panels[name] = self.financial
 
-        self.portal = PortalUploadPanel(self.tabs.tab("Portal Upload"), self.app)
-        self.portal.grid(row=0, column=0, sticky="nsew", padx=8, pady=8)
-
-        self.archive = ArchivePanel(self.tabs.tab("Archive & Clean"), self.app)
-        self.archive.grid(row=0, column=0, sticky="nsew", padx=8, pady=8)
-
-        self.financial = FinancialDocsPanel(self.tabs.tab("Financial Docs"), self.app)
-        self.financial.grid(row=0, column=0, sticky="nsew", padx=8, pady=8)
+    def _on_tab_changed(self) -> None:
+        try:
+            current = self.tabs.get()
+        except Exception:
+            current = ""
+        if current:
+            self._ensure_panel(current)
+        self.refresh_all()
 
     def refresh_all(self) -> None:
-        if not hasattr(self, "portal"):
+        if not hasattr(self, "renamer"):
             return
         self.renamer.refresh()
-        self.portal.refresh()
-        self.archive.refresh()
-        self.financial.refresh()
+        if self.portal is not None:
+            self.portal.refresh()
+        if self.archive is not None:
+            self.archive.refresh()
+        if self.financial is not None:
+            self.financial.refresh()
 
     def on_show(self) -> None:
         self._polling = True
@@ -117,11 +147,15 @@ class DocumentHubView(BaseView):
         if not self._polling or not self.winfo_exists():
             return
         try:
-            self.renamer.refresh(files_only=True)
-            self.portal.refresh()
-            self.archive.refresh()
-        except Exception:
-            pass
+            if self.renamer is not None:
+                self.renamer.refresh(files_only=True)
+            if self.portal is not None:
+                self.portal.refresh()
+            if self.archive is not None:
+                self.archive.refresh()
+        except Exception as exc:
+            if hasattr(self, "feedback"):
+                self.feedback.error(f"Document Hub refresh failed: {exc}")
         if self._polling and self.winfo_exists():
             self._poll_after = self.after(2000, self._poll)
 
@@ -216,7 +250,7 @@ class SmartRenamerPanel(ctk.CTkFrame):
         self.amount_wrap.grid_columnconfigure(0, weight=1)
         ctk.CTkLabel(self.amount_wrap, text="Amount", anchor="w").grid(row=0, column=0, sticky="w")
         self.amount_var = ctk.StringVar()
-        amount_entry = ctk.CTkEntry(
+        amount_entry = themed_entry(
             self.amount_wrap,
             textvariable=self.amount_var,
             placeholder_text="e.g. 15000",
@@ -578,7 +612,7 @@ class AgentBundlePanel(ctk.CTkFrame):
 
         ctk.CTkLabel(form, text="Output name").grid(row=0, column=0, sticky="w", padx=(0, 8))
         self.output_var = ctk.StringVar(value=f"{date.today().strftime('%Y%m%d')}_AgentBundle.pdf")
-        ctk.CTkEntry(form, textvariable=self.output_var).grid(row=0, column=1, sticky="ew")
+        themed_entry(form, textvariable=self.output_var).grid(row=0, column=1, sticky="ew")
 
         ctk.CTkLabel(form, text="Save to").grid(row=1, column=0, sticky="w", padx=(0, 8), pady=(10, 0))
         self.dest_menu = ctk.CTkOptionMenu(form, values=[FOLDER_READY, FOLDER_STAGING])
@@ -942,7 +976,7 @@ class FinancialDocsPanel(ctk.CTkFrame):
         ctk.CTkLabel(bar, text="Search:", font=("Segoe UI", 12)).grid(row=0, column=0, padx=(0, 4))
         self.search_var = ctk.StringVar()
         self._search_after: str | None = None
-        self.search_entry = ctk.CTkEntry(
+        self.search_entry = themed_entry(
             bar, textvariable=self.search_var, placeholder_text="File name, description..."
         )
         self.search_entry.grid(row=0, column=1, sticky="ew", padx=(0, 8))

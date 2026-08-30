@@ -26,11 +26,14 @@ export async function generateHandler(c: Context<{ Bindings: Env }>) {
     return c.json({ ok: false, error: "Days must be 1–36500 or null for never." }, 400);
   }
 
-  const secret = c.env.LICENSE_SECRET;
+  const ed25519Key = (c.env.LICENSE_ED25519_PRIVATE_KEY_B64 || "").trim();
+  if (!ed25519Key) {
+    return c.json({ ok: false, error: "Ed25519 signing key not configured on Worker." }, 503);
+  }
 
-  // Generate license key + passcode
-  const { key, iat, nonce, exp } = await generateLicenseKey(secret, mid, days);
-  const passcode = await generatePasscode(secret, mid, days);
+  // Generate license key + passcode (Ed25519 only)
+  const { key, iat, nonce, exp } = await generateLicenseKey(mid, days, ed25519Key);
+  const passcode = await generatePasscode(mid, days, ed25519Key);
 
   // Store in D1
   await c.env.DB.prepare(

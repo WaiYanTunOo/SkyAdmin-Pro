@@ -9,12 +9,19 @@ from pathlib import Path
 from skyadmin_pro.database import Database
 
 
+def _assert_export_columns_safe(columns) -> None:
+    bad = FORBIDDEN_EXPORT_COLUMNS.intersection(str(c).lower() for c in columns)
+    if bad:
+        raise ValueError(f"Refusing export — forbidden column(s): {', '.join(sorted(bad))}")
+
+
 def _sheet(frame, mapping: dict[str, str]):
     import pandas as pd
 
     if frame is None or frame.empty:
         return pd.DataFrame(columns=list(mapping.values()))
     keep = [column for column in mapping if column in frame.columns]
+    _assert_export_columns_safe(keep)
     return frame[keep].rename(columns=mapping)
 
 
@@ -178,6 +185,31 @@ _FINANCIAL_DOC_COLUMNS = {
     "doc_date": "Date",
     "description": "Description",
 }
+
+# Column names that must never appear in Excel exports (defense in depth).
+FORBIDDEN_EXPORT_COLUMNS = frozenset(
+    {
+        "ird_password",
+        "secret_value",
+        "password",
+        "vault",
+        "login_id",
+        "registration_number",
+    }
+)
+
+_ALL_EXPORT_COLUMN_MAPS = (
+    _TASK_COLUMNS,
+    _CLIENT_COLUMNS,
+    _DOCUMENT_COLUMNS,
+    _COURIER_COLUMNS,
+    _SUPPLIER_COLUMNS,
+    _SUPPLIER_PAYMENT_COLUMNS,
+    _SUPPLIER_SERVICE_COLUMNS,
+    _PIPELINE_COLUMNS,
+    _RENEWAL_COLUMNS,
+    _FINANCIAL_DOC_COLUMNS,
+)
 
 
 def export_monthly_report(db: Database, year: int, month: int, dest: Path) -> Path:

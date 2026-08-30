@@ -22,7 +22,7 @@ from skyadmin_pro.services.workflow import (
 )
 from skyadmin_pro.ui.theme import CARD_RADIUS, CARD_TITLE_SIZE, TEXT_MUTED
 from skyadmin_pro.ui.treeview import ThemedTreeview
-from skyadmin_pro.ui.widgets import DatePickerField, make_modal
+from skyadmin_pro.ui.widgets import DatePickerField, make_modal, themed_entry
 
 
 class FinancialDocsTabMixin:
@@ -173,7 +173,7 @@ class FinancialDocsTabMixin:
         )
         ctk.CTkLabel(dialog, text="Amount:").grid(row=2, column=0, padx=16, pady=(4, 4), sticky="w")
         amt_var = ctk.StringVar()
-        ctk.CTkEntry(dialog, textvariable=amt_var, width=200).grid(
+        themed_entry(dialog, textvariable=amt_var, width=200).grid(
             row=2, column=1, padx=(0, 16), pady=(4, 4), sticky="ew"
         )
         ctk.CTkLabel(dialog, text="Date:").grid(row=3, column=0, padx=16, pady=(4, 4), sticky="w")
@@ -181,7 +181,7 @@ class FinancialDocsTabMixin:
         DatePickerField(dialog, var=date_var).grid(row=3, column=1, padx=(0, 16), pady=(4, 4), sticky="ew")
         ctk.CTkLabel(dialog, text="Description:").grid(row=4, column=0, padx=16, pady=(4, 4), sticky="w")
         desc_var = ctk.StringVar()
-        ctk.CTkEntry(dialog, textvariable=desc_var, width=200).grid(
+        themed_entry(dialog, textvariable=desc_var, width=200).grid(
             row=4, column=1, padx=(0, 16), pady=(4, 4), sticky="ew"
         )
 

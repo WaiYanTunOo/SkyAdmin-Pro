@@ -10,7 +10,11 @@ import os
 
 import tkinterdnd2
 
+_spec_dir = os.path.dirname(os.path.abspath(SPEC))
+_pyproject = os.path.join(_spec_dir, "pyproject.toml")
 datas = []
+if os.path.isfile(_pyproject):
+    datas.append((_pyproject, "."))
 for _plat in ("win-x64", "win-arm64", "win32"):
     _tdnd = os.path.join(os.path.dirname(tkinterdnd2.__file__), "tkdnd", _plat)
     if os.path.isdir(_tdnd):
@@ -40,7 +44,9 @@ a = Analysis(
     hookspath=[],
     hooksconfig={},
     runtime_hooks=[],
-    excludes=[],
+    excludes=[
+        "skyadmin_pro.services.license_authoring",
+    ],
     noarchive=False,
     optimize=0,
 )

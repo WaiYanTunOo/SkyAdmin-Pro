@@ -5,6 +5,7 @@ from __future__ import annotations
 import customtkinter as ctk
 
 from skyadmin_pro.ui.theme import CONTENT_PAD, HEADER_SUBTITLE_SIZE, HEADER_TITLE_SIZE, TEXT_MUTED
+from skyadmin_pro.ui.widgets import bind_wrap_label
 
 
 class BaseView(ctk.CTkFrame):
@@ -38,13 +39,16 @@ class BaseView(ctk.CTkFrame):
         ).grid(row=0, column=0, sticky="w")
 
         if self.subtitle:
-            ctk.CTkLabel(
+            self._subtitle_label = ctk.CTkLabel(
                 header,
                 text=self.subtitle,
                 font=ctk.CTkFont(size=HEADER_SUBTITLE_SIZE),
                 text_color=TEXT_MUTED,
                 anchor="w",
-            ).grid(row=1, column=0, sticky="w", pady=(2, 0))
+                justify="left",
+            )
+            self._subtitle_label.grid(row=1, column=0, sticky="ew", pady=(2, 0))
+            bind_wrap_label(self._subtitle_label, header, pad=8)
 
     def build(self) -> None:
         """Override in subclasses to populate self.body."""

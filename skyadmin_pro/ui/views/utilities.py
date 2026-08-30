@@ -30,7 +30,7 @@ from skyadmin_pro.services.translate import (
 from skyadmin_pro.services.workflow import copy_to_clipboard
 from skyadmin_pro.ui.theme import CARD_TITLE_SIZE, TEXT_MUTED
 from skyadmin_pro.ui.views.base import BaseView
-from skyadmin_pro.ui.widgets import FeedbackLabel, make_modal
+from skyadmin_pro.ui.widgets import FeedbackLabel, make_modal, themed_entry, themed_textbox
 
 _SECTION_TITLES = (
     ("client", "To Burmese clients (Burmese)", "Messages in Burmese. Click to copy."),
@@ -97,14 +97,17 @@ class UtilitiesView(BaseView):
             font=ctk.CTkFont(size=16, weight="bold"),
             anchor="w",
         ).grid(row=0, column=0, sticky="w", padx=16, pady=(16, 4))
-        ctk.CTkLabel(
+        translator_sub = ctk.CTkLabel(
             translator,
             text="Burmese ↔ English for clients. Thai → English to read supplier papers. Needs internet.",
-            wraplength=360,
             justify="left",
             text_color=TEXT_MUTED,
             anchor="w",
-        ).grid(row=1, column=0, sticky="ew", padx=16, pady=(0, 8))
+        )
+        translator_sub.grid(row=1, column=0, sticky="ew", padx=16, pady=(0, 8))
+        from skyadmin_pro.ui.widgets import bind_wrap_label
+
+        bind_wrap_label(translator_sub, translator, pad=36)
 
         self.direction = ctk.CTkOptionMenu(
             translator,
@@ -343,10 +346,10 @@ class UtilitiesView(BaseView):
         card = ctk.CTkFrame(master, corner_radius=8)
         card.grid(row=row, column=0, sticky="ew", padx=8, pady=4)
         card.grid_columnconfigure(0, weight=1)
-        label_entry = ctk.CTkEntry(card, placeholder_text="Button label", font=_editor_font())
+        label_entry = themed_entry(card, placeholder_text="Button label", font=_editor_font())
         label_entry.insert(0, item["label"])
         label_entry.grid(row=0, column=0, sticky="ew", padx=10, pady=(8, 4))
-        text_box = ctk.CTkTextbox(card, height=76, wrap="word", font=_editor_font())
+        text_box = themed_textbox(card, height=76, wrap="word", font=_editor_font())
         text_box.insert("1.0", item["text"])
         text_box.grid(row=1, column=0, sticky="ew", padx=10, pady=(0, 8))
         card._draft_item = item
@@ -702,7 +705,7 @@ class UtilitiesView(BaseView):
         entries: dict[str, ctk.CTkEntry] = {}
         for row, token in enumerate(tokens):
             ctk.CTkLabel(fields, text=token, anchor="w").grid(row=row, column=0, sticky="w", padx=(0, 10), pady=5)
-            entry = ctk.CTkEntry(fields)
+            entry = themed_entry(fields)
             entry.insert(0, defaults.get(token, ""))
             entry.grid(row=row, column=1, sticky="ew", pady=5)
             entries[token] = entry

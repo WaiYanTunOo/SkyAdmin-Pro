@@ -32,7 +32,7 @@ from skyadmin_pro.ui.theme import (
 )
 from skyadmin_pro.ui.treeview import ThemedTreeview
 from skyadmin_pro.ui.views.base import BaseView
-from skyadmin_pro.ui.widgets import FeedbackLabel, MonthStatusPanel
+from skyadmin_pro.ui.widgets import FeedbackLabel, MonthStatusPanel, themed_entry
 
 
 def _days_since(start: str | None, today: str) -> str:
@@ -101,7 +101,7 @@ class DashboardView(BaseView):
 
         workflow = ctk.CTkFrame(self._scroll, corner_radius=12)
         workflow.grid(row=3, column=0, sticky="ew", pady=(0, 12))
-        workflow.grid_columnconfigure(2, weight=1)
+        workflow.grid_columnconfigure(1, weight=1)
 
         ctk.CTkButton(
             workflow,
@@ -111,12 +111,11 @@ class DashboardView(BaseView):
         ).grid(row=0, column=0, padx=(16, 8), pady=14, sticky="w")
 
         self.onboard_var = ctk.StringVar()
-        ctk.CTkEntry(
+        themed_entry(
             workflow,
             textvariable=self.onboard_var,
             placeholder_text="New client name",
-            width=220,
-        ).grid(row=0, column=1, padx=(8, 8), pady=14)
+        ).grid(row=0, column=1, padx=(8, 8), pady=14, sticky="ew")
         ctk.CTkButton(
             workflow,
             text="Generate Workspace",
@@ -487,14 +486,18 @@ class DashboardView(BaseView):
         card.grid(row=0, column=column, sticky="nsew", padx=(0 if column == 0 else 8, 0))
         card.grid_propagate(False)
         card.grid_columnconfigure(0, weight=1)
-        ctk.CTkLabel(
+        title_lbl = ctk.CTkLabel(
             card,
             text=label,
             text_color=TEXT_MUTED,
             anchor="w",
-            wraplength=0,
             font=ctk.CTkFont(size=12),
-        ).grid(row=0, column=0, sticky="nw", padx=16, pady=(18, 0))
+            justify="left",
+        )
+        title_lbl.grid(row=0, column=0, sticky="new", padx=16, pady=(18, 0))
+        from skyadmin_pro.ui.widgets import bind_wrap_label
+
+        bind_wrap_label(title_lbl, card, pad=24)
         value_label = ctk.CTkLabel(card, text=value, font=ctk.CTkFont(size=28, weight="bold"), anchor="w")
         value_label.grid(row=1, column=0, sticky="sw", padx=16, pady=(6, 16))
         return value_label
@@ -580,7 +583,18 @@ class DashboardView(BaseView):
         self.refresh()
 
     def refresh(self) -> None:
-        counts = self.app.db.dashboard_counts()
+        if getattr(self, "_tree_refresh_after", None):
+            try:
+                self.after_cancel(self._tree_refresh_after)
+            except Exception:
+                pass
+            self._tree_refresh_after = None
+
+        snap = self.app.db.dashboard_snapshot()
+        counts = snap["counts"]
+        pending_filings = snap["pending_filings"]
+        revenue = snap["revenue"]
+        vo_csh_expiring = snap["vo_csh_expiring"]
 
         self.card_pending.configure(text=str(counts["pending"]))
         self.card_done.configure(text=str(counts["completed_today"]))
@@ -589,18 +603,11 @@ class DashboardView(BaseView):
         self.card_clients.configure(text=str(counts["clients"]))
         self.card_supplier.configure(text=str(counts["supplier_due"]))
         self.card_ongoing.configure(text=str(counts["ongoing"]))
-
-        pending_filings = self.app.db.count_pending_filings()
         self.card_pending_filings.configure(text=str(pending_filings))
-        revenue = self.app.db.get_revenue_summary(date.today().year, date.today().month)
         self.card_revenue.configure(text=f"{revenue:,}")
-        vo_csh_expiring = self.app.db.count_vo_csh_expiring(30)
         self.card_vo_csh.configure(text=str(vo_csh_expiring))
 
-        self.month_panel.refresh()
         self._refresh_report()
-        self._refresh_tax_overview()
-        self.timeline_canvas.after(50, self._draw_timeline)
 
         if counts["expiring"]:
             self.card_expiring.configure(text_color=("#b45309", "#fbbf24"))
@@ -627,6 +634,17 @@ class DashboardView(BaseView):
         else:
             self.card_vo_csh.configure(text_color=("gray10", "gray90"))
 
+        self._tree_refresh_after = self.after(100, lambda s=snap: self._refresh_trees_from_snap(s))
+
+    def _refresh_trees_from_snap(self, snap: dict) -> None:
+        self._tree_refresh_after = None
+        if not self.winfo_exists():
+            return
+
+        self.month_panel.refresh()
+        self._refresh_tax_overview(snap.get("accounting_clients"))
+        self.timeline_canvas.after(50, self._draw_timeline)
+
         self.expiry_tree.apply_theme()
         self.pending_tree.apply_theme()
         self.overdue_tree.apply_theme()
@@ -634,13 +652,13 @@ class DashboardView(BaseView):
         self.ongoing_tree.apply_theme()
         self.next_tree.apply_theme()
 
-        expiring = self.app.db.list_expiring_documents()
-        supplier_expiring = self.app.db.list_expiring_supplier_services()
-        overdue = self.app.db.list_overdue_services()
-        supplier_due = self.app.db.list_pending_supplier_payments()
-        pending = self.app.db.list_tasks(status="pending")
-        ongoing = self.app.db.list_ongoing_services()
-        renewal_due = self.app.db.list_renewal_items_due()
+        expiring = snap["expiring"]
+        supplier_expiring = snap["supplier_expiring"]
+        overdue = snap["overdue"]
+        supplier_due = snap["supplier_due"]
+        pending = snap["pending"]
+        ongoing = snap["ongoing"]
+        renewal_due = snap["renewal_due"]
         self._refresh_next_actions(overdue, supplier_due, expiring, supplier_expiring, pending, ongoing, renewal_due)
 
         rows = []
@@ -679,62 +697,97 @@ class DashboardView(BaseView):
             )
             tags.append((tag,) if tag else ())
             iids.append(f"ss-{item['id']}")
-        self.expiry_tree.set_rows(rows, iids=iids, tags=tags)
+        if rows:
+            self.expiry_tree.set_rows(rows, iids=iids, tags=tags)
+        else:
+            self.expiry_tree.set_rows(
+                [("No expiring documents in the next 45 days.", "—", "—", "—")],
+                iids=["empty"],
+                tags=[("inactive",)],
+            )
 
-        self.overdue_tree.set_rows(
-            [
-                (
-                    item.get("client_name") or "—",
-                    item.get("document_type") or "—",
-                    item.get("amount") or "—",
-                    item.get("payment_date") or "—",
-                )
-                for item in overdue
-            ],
-            iids=[str(item["id"]) for item in overdue],
-            tags=[("urgent",)] * len(overdue),
-        )
+        if overdue:
+            self.overdue_tree.set_rows(
+                [
+                    (
+                        item.get("client_name") or "—",
+                        item.get("document_type") or "—",
+                        item.get("amount") or "—",
+                        item.get("payment_date") or "—",
+                    )
+                    for item in overdue
+                ],
+                iids=[str(item["id"]) for item in overdue],
+                tags=[("urgent",)] * len(overdue),
+            )
+        else:
+            self.overdue_tree.set_rows(
+                [("No overdue payments.", "—", "—", "—")],
+                iids=["empty"],
+                tags=[("inactive",)],
+            )
 
-        self.supplier_due_tree.set_rows(
-            [
-                (
-                    item.get("supplier_name") or "—",
-                    item.get("client_name") or "—",
-                    item.get("amount") or "—",
-                    item.get("due_date") or "—",
-                )
-                for item in supplier_due
-            ],
-            iids=[str(item["id"]) for item in supplier_due],
-            tags=[("urgent",)] * len(supplier_due),
-        )
+        if supplier_due:
+            self.supplier_due_tree.set_rows(
+                [
+                    (
+                        item.get("supplier_name") or "—",
+                        item.get("client_name") or "—",
+                        item.get("amount") or "—",
+                        item.get("due_date") or "—",
+                    )
+                    for item in supplier_due
+                ],
+                iids=[str(item["id"]) for item in supplier_due],
+                tags=[("urgent",)] * len(supplier_due),
+            )
+        else:
+            self.supplier_due_tree.set_rows(
+                [("No supplier payments due.", "—", "—", "—")],
+                iids=["empty"],
+                tags=[("inactive",)],
+            )
 
-        self.pending_tree.set_rows(
-            [
-                (
-                    item.get("client_name") or "—",
-                    item.get("title") or "—",
-                    item.get("due_date") or "—",
-                )
-                for item in pending[:12]
-            ],
-            iids=[str(item["id"]) for item in pending[:12]],
-        )
+        if pending:
+            self.pending_tree.set_rows(
+                [
+                    (
+                        item.get("client_name") or "—",
+                        item.get("title") or "—",
+                        item.get("due_date") or "—",
+                    )
+                    for item in pending[:12]
+                ],
+                iids=[str(item["id"]) for item in pending[:12]],
+            )
+        else:
+            self.pending_tree.set_rows(
+                [("No pending tasks — you're caught up.", "—", "—")],
+                iids=["empty"],
+                tags=[("inactive",)],
+            )
 
         today_iso = date.today().isoformat()
-        self.ongoing_tree.set_rows(
-            [
-                (
-                    item.get("client_name") or "—",
-                    item.get("document_type") or "—",
-                    item.get("start_date") or "—",
-                    _days_since(item.get("start_date") or item.get("created_at"), today_iso),
-                )
-                for item in ongoing
-            ],
-            iids=[str(item["id"]) for item in ongoing],
-            tags=[("wip",)] * len(ongoing),
-        )
+        if ongoing:
+            self.ongoing_tree.set_rows(
+                [
+                    (
+                        item.get("client_name") or "—",
+                        item.get("document_type") or "—",
+                        item.get("start_date") or "—",
+                        _days_since(item.get("start_date") or item.get("created_at"), today_iso),
+                    )
+                    for item in ongoing
+                ],
+                iids=[str(item["id"]) for item in ongoing],
+                tags=[("wip",)] * len(ongoing),
+            )
+        else:
+            self.ongoing_tree.set_rows(
+                [("No ongoing services in progress.", "—", "—", "—")],
+                iids=["empty"],
+                tags=[("inactive",)],
+            )
 
     def _refresh_next_actions(
         self,
@@ -1112,9 +1165,9 @@ class DashboardView(BaseView):
         self.workflow_feedback.success(msg)
         self.refresh()
 
-    def _refresh_tax_overview(self) -> None:
+    def _refresh_tax_overview(self, clients=None) -> None:
         self.tax_overview_tree.apply_theme()
-        clients = self.app.db.list_accounting_clients()
+        clients = self.app.db.list_accounting_clients() if clients is None else clients
         if not clients:
             self.tax_overview_tree.set_rows(
                 [("No accounting clients configured yet.", "", "", "", "", "", "", "", "")],

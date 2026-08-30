@@ -1,12 +1,15 @@
-/** GET /api/control — Return the SKYCTRL1-signed control list. */
+/** GET /api/control — Return the SKYCTRL2-signed control list. */
 
 import { Context } from "hono";
 import { Env, listRevocations, listBans, listUsedNonces, listRevokedPasscodes, getMeta } from "../db";
-import { buildControlEnvelope } from "../signing";
+import { buildControlEnvelopeV2 } from "../signing";
 
 export async function controlHandler(c: Context<{ Bindings: Env }>) {
   const db = c.env.DB;
-  const secret = c.env.LICENSE_SECRET;
+  const ed25519Key = (c.env.LICENSE_ED25519_PRIVATE_KEY_B64 || "").trim();
+  if (!ed25519Key) {
+    return new Response("Ed25519 signing key not configured.", { status: 503 });
+  }
 
   const revocations = await listRevocations(db);
   const bans = await listBans(db);
@@ -42,7 +45,7 @@ export async function controlHandler(c: Context<{ Bindings: Env }>) {
   lines.push("");
 
   const plaintext = lines.join("\n");
-  const envelope = await buildControlEnvelope(secret, plaintext);
+  const envelope = await buildControlEnvelopeV2(ed25519Key, plaintext);
 
   return new Response(envelope, {
     headers: {

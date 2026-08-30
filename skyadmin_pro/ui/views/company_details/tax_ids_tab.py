@@ -18,7 +18,7 @@ from skyadmin_pro.services.workflow import (
 )
 from skyadmin_pro.ui.theme import CARD_RADIUS, CARD_TITLE_SIZE, TEXT_MUTED
 from skyadmin_pro.ui.treeview import ThemedTreeview
-from skyadmin_pro.ui.widgets import DatePickerField
+from skyadmin_pro.ui.widgets import DatePickerField, themed_entry
 
 
 class TaxIdsTabMixin:
@@ -43,7 +43,7 @@ class TaxIdsTabMixin:
         self.headcount_var = ctk.StringVar()
 
         ctk.CTkLabel(form, text="Tax ID").grid(row=0, column=0, columnspan=2, sticky="w", pady=(2, 2))
-        ctk.CTkEntry(form, textvariable=self.tax_id_var).grid(row=1, column=0, columnspan=2, sticky="ew", pady=(0, 4))
+        themed_entry(form, textvariable=self.tax_id_var).grid(row=1, column=0, columnspan=2, sticky="ew", pady=(0, 4))
 
         ctk.CTkLabel(form, text="VAT Registered").grid(row=2, column=0, sticky="w", pady=(6, 2))
         self.vat_registered_var = ctk.BooleanVar()
@@ -61,7 +61,7 @@ class TaxIdsTabMixin:
         self.acct_txn_volume.grid(row=5, column=1, sticky="ew", pady=(0, 4))
 
         ctk.CTkLabel(form, text="Service Fee (THB)").grid(row=6, column=0, sticky="w", pady=(6, 2))
-        ctk.CTkEntry(form, textvariable=self.service_fee_var).grid(
+        themed_entry(form, textvariable=self.service_fee_var).grid(
             row=7, column=0, sticky="ew", padx=(0, 12), pady=(0, 4)
         )
         ctk.CTkLabel(form, text="Payment Status").grid(row=6, column=1, sticky="w", pady=(6, 2))
@@ -69,9 +69,9 @@ class TaxIdsTabMixin:
         self.acct_payment_status.grid(row=7, column=1, sticky="ew", pady=(0, 4))
 
         ctk.CTkLabel(form, text="SLA (hours)").grid(row=8, column=0, sticky="w", pady=(6, 2))
-        ctk.CTkEntry(form, textvariable=self.sla_var).grid(row=9, column=0, sticky="ew", padx=(0, 12), pady=(0, 4))
+        themed_entry(form, textvariable=self.sla_var).grid(row=9, column=0, sticky="ew", padx=(0, 12), pady=(0, 4))
         ctk.CTkLabel(form, text="Headcount").grid(row=8, column=1, sticky="w", pady=(6, 2))
-        ctk.CTkEntry(form, textvariable=self.headcount_var).grid(row=9, column=1, sticky="ew", pady=(0, 4))
+        themed_entry(form, textvariable=self.headcount_var).grid(row=9, column=1, sticky="ew", pady=(0, 4))
 
         cred_card = ctk.CTkFrame(frame, corner_radius=12)
         cred_card.grid(row=2, column=0, sticky="ew", padx=16, pady=(4, 8))
@@ -107,7 +107,7 @@ class TaxIdsTabMixin:
         cred_detail.grid(row=3, column=0, sticky="ew", padx=16, pady=(0, 8))
         cred_detail.grid_columnconfigure(1, weight=1)
         ctk.CTkLabel(cred_detail, text="Password", anchor="w").grid(row=0, column=0, sticky="w", padx=(0, 8))
-        self.cred_pw_entry = ctk.CTkEntry(cred_detail, textvariable=self.cred_pw_var, show="*", state="disabled")
+        self.cred_pw_entry = themed_entry(cred_detail, textvariable=self.cred_pw_var, show="*", state="disabled")
         self.cred_pw_entry.grid(row=0, column=1, sticky="ew")
         ctk.CTkButton(cred_detail, text="Copy", width=70, command=self._copy_client_cred_password).grid(
             row=0, column=2, padx=(8, 0)

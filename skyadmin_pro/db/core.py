@@ -70,6 +70,7 @@ class CoreMixin:
         self._migrate()
         with self.connection() as conn:
             conn.executescript(SCHEMA_SQL)
+        self._backfill_sync_global_ids()
         self._migrate_secret_fields()
         self._migrate_legacy_vault()
         self._migrate_ird_to_client_credentials()
@@ -333,6 +334,50 @@ class CoreMixin:
                 )
                 conn.execute("CREATE INDEX IF NOT EXISTS idx_financial_docs_client ON financial_documents(client_id)")
                 conn.execute("CREATE INDEX IF NOT EXISTS idx_financial_docs_category ON financial_documents(category)")
+            for sync_table in ("clients", "tasks", "office_contacts", "notebook_entries"):
+                if sync_table not in existing:
+                    continue
+                sync_cols = {row["name"] for row in conn.execute(f"PRAGMA table_info({sync_table})")}
+                if "global_id" not in sync_cols:
+                    conn.execute(f"ALTER TABLE {sync_table} ADD COLUMN global_id TEXT")
+                if "deleted_at" not in sync_cols:
+                    conn.execute(f"ALTER TABLE {sync_table} ADD COLUMN deleted_at TEXT")
+                conn.execute(
+                    f"CREATE UNIQUE INDEX IF NOT EXISTS idx_{sync_table}_global_id "
+                    f"ON {sync_table}(global_id) WHERE global_id IS NOT NULL"
+                )
+            if "clients" in existing:
+                fts_row = conn.execute(
+                    "SELECT name FROM sqlite_master WHERE type='table' AND name='clients_fts'"
+                ).fetchone()
+                if not fts_row:
+                    conn.executescript(
+                        """
+                        CREATE VIRTUAL TABLE clients_fts USING fts5(
+                            name, contact_name, email, tokenize='unicode61'
+                        );
+                        INSERT INTO clients_fts(rowid, name, contact_name, email)
+                        SELECT id,
+                               COALESCE(name, ''),
+                               COALESCE(contact_name, ''),
+                               COALESCE(email, '')
+                        FROM clients;
+                        CREATE TRIGGER IF NOT EXISTS clients_fts_ai AFTER INSERT ON clients BEGIN
+                            INSERT INTO clients_fts(rowid, name, contact_name, email)
+                            VALUES (new.id, COALESCE(new.name,''), COALESCE(new.contact_name,''), COALESCE(new.email,''));
+                        END;
+                        CREATE TRIGGER IF NOT EXISTS clients_fts_ad AFTER DELETE ON clients BEGIN
+                            INSERT INTO clients_fts(clients_fts, rowid, name, contact_name, email)
+                            VALUES ('delete', old.id, old.name, old.contact_name, old.email);
+                        END;
+                        CREATE TRIGGER IF NOT EXISTS clients_fts_au AFTER UPDATE ON clients BEGIN
+                            INSERT INTO clients_fts(clients_fts, rowid, name, contact_name, email)
+                            VALUES ('delete', old.id, old.name, old.contact_name, old.email);
+                            INSERT INTO clients_fts(rowid, name, contact_name, email)
+                            VALUES (new.id, COALESCE(new.name,''), COALESCE(new.contact_name,''), COALESCE(new.email,''));
+                        END;
+                        """
+                    )
             conn.execute("COMMIT")
         except Exception:
             try:
@@ -342,6 +387,21 @@ class CoreMixin:
             raise
         finally:
             conn.close()
+
+    def _backfill_sync_global_ids(self) -> None:
+        """Assign stable global_id UUIDs for P4 sync."""
+        import uuid
+
+        with self.connection() as conn:
+            for table in ("clients", "tasks", "office_contacts", "notebook_entries"):
+                rows = conn.execute(
+                    f"SELECT id FROM {table} WHERE global_id IS NULL OR TRIM(global_id) = ''"
+                ).fetchall()
+                for row in rows:
+                    conn.execute(
+                        f"UPDATE {table} SET global_id = ? WHERE id = ?",
+                        (uuid.uuid4().hex, int(row["id"])),
+                    )
 
     def _migrate_secret_fields(self) -> None:
         """Encrypt legacy plaintext IRD passwords at rest."""
@@ -420,11 +480,7 @@ class CoreMixin:
 
     def _migrate_ird_to_client_credentials(self) -> int:
         """Import legacy clients.ird_password into Office Hub RD credentials."""
-        from skyadmin_pro.services.secret_fields import (
-            decrypt_secret,
-            encrypt_secret,
-            is_encrypted_secret,
-        )
+        from skyadmin_pro.services.secret_fields import encrypt_secret, read_plaintext_for_migration
 
         migrated = 0
         with self.connection() as conn:
@@ -446,7 +502,7 @@ class CoreMixin:
                 if existing:
                     continue
                 raw = str(client["ird_password"] or "")
-                plain = decrypt_secret(raw) if is_encrypted_secret(raw) else raw
+                plain = read_plaintext_for_migration(raw)
                 if not plain:
                     continue
                 conn.execute(

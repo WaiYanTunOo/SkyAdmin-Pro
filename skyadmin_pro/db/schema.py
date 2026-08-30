@@ -42,6 +42,8 @@ CREATE TABLE IF NOT EXISTS clients (
     csh_service_provider  TEXT,
     csh_renewal_date      TEXT,
     shareholder_info      TEXT,
+    global_id             TEXT UNIQUE,
+    deleted_at            TEXT,
     created_at            TEXT    NOT NULL DEFAULT (datetime('now', 'localtime')),
     updated_at            TEXT    NOT NULL DEFAULT (datetime('now', 'localtime'))
 );
@@ -59,6 +61,8 @@ CREATE TABLE IF NOT EXISTS tasks (
     pipeline_item_id INTEGER,
     pipeline_step    INTEGER,
     source_document_id INTEGER,
+    global_id     TEXT UNIQUE,
+    deleted_at    TEXT,
     created_at    TEXT    NOT NULL DEFAULT (datetime('now', 'localtime')),
     updated_at    TEXT    NOT NULL DEFAULT (datetime('now', 'localtime')),
     FOREIGN KEY (client_id) REFERENCES clients(id) ON DELETE SET NULL
@@ -277,6 +281,8 @@ CREATE TABLE IF NOT EXISTS office_contacts (
     client_id       INTEGER,
     notes           TEXT,
     is_favorite     INTEGER NOT NULL DEFAULT 0,
+    global_id       TEXT UNIQUE,
+    deleted_at      TEXT,
     created_at      TEXT    NOT NULL DEFAULT (datetime('now', 'localtime')),
     updated_at      TEXT    NOT NULL DEFAULT (datetime('now', 'localtime')),
     FOREIGN KEY (client_id) REFERENCES clients(id) ON DELETE SET NULL
@@ -330,6 +336,8 @@ CREATE TABLE IF NOT EXISTS notebook_entries (
     author          TEXT,
     follow_up_date  TEXT,
     is_pinned       INTEGER NOT NULL DEFAULT 0,
+    global_id       TEXT UNIQUE,
+    deleted_at      TEXT,
     created_at      TEXT    NOT NULL DEFAULT (datetime('now', 'localtime')),
     updated_at      TEXT    NOT NULL DEFAULT (datetime('now', 'localtime')),
     FOREIGN KEY (client_id) REFERENCES clients(id) ON DELETE SET NULL
@@ -352,4 +360,16 @@ CREATE INDEX IF NOT EXISTS idx_supplier_payments_supplier ON supplier_payments(s
 CREATE INDEX IF NOT EXISTS idx_notebook_client ON notebook_entries(client_id);
 CREATE INDEX IF NOT EXISTS idx_tax_cycle_changed ON tax_cycle_log(changed_at);
 CREATE INDEX IF NOT EXISTS idx_courier_date ON courier_logs(date_sent);
+
+-- P4.1: sync conflict audit log (last-write-wins skips)
+CREATE TABLE IF NOT EXISTS sync_conflicts (
+    id                  INTEGER PRIMARY KEY AUTOINCREMENT,
+    table_name          TEXT    NOT NULL,
+    global_id           TEXT    NOT NULL,
+    direction           TEXT    NOT NULL,
+    local_updated_at    TEXT,
+    remote_updated_at   TEXT,
+    logged_at           TEXT    NOT NULL DEFAULT (datetime('now', 'localtime'))
+);
+CREATE INDEX IF NOT EXISTS idx_sync_conflicts_logged ON sync_conflicts(logged_at);
 """

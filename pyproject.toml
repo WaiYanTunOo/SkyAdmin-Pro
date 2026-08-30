@@ -4,7 +4,7 @@ build-backend = "setuptools.build_meta"
 
 [project]
 name = "skyadmin-pro"
-version = "0.3.0"
+version = "0.3.1"
 description = "Offline desktop workflow for corporate services administrators"
 readme = "README.md"
 requires-python = ">=3.10"
@@ -37,3 +37,7 @@ known-first-party = ["skyadmin_pro"]
 
 [tool.pytest.ini_options]
 testpaths = ["tests"]
+markers = [
+    "release: pre-ship build and integration gates (run via scripts/release_check.py)",
+    "walkthrough: offscreen UI walkthrough helpers (Phase 4/5)",
+]

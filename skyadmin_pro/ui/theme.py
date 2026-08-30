@@ -78,3 +78,60 @@ ACCENT_HOVER = ("#1e40af", "#1d4ed8")
 TABLE_ROW_HEIGHT = 30
 TABLE_FONT_SIZE = 10
 TABLE_HEADER_FONT_SIZE = 10
+
+# Form layout — label above field, consistent spacing (Phase 0)
+FORM_ROW_GAP = 12
+FORM_LABEL_GAP = 4
+FORM_FIELD_HEIGHT = 36
+FORM_SIDEBAR_MIN_WIDTH = 320
+SECTION_GAP = 20
+FORM_LABEL_COLOR = TEXT_INVERSE
+FORM_LABEL_FONT_SIZE = FONT_SIZE_SM
+
+# Input contrast — readable in light and dark (entries, combos, textboxes)
+ENTRY_FG = ("#ffffff", "#1a1f2e")
+ENTRY_BORDER = ("#94a3b8", "#5b6578")
+ENTRY_TEXT = ("#111827", "#f3f4f6")
+ENTRY_PLACEHOLDER = ("#6b7280", "#9ca3af")
+TEXTBOX_FG = ENTRY_FG
+TEXTBOX_BORDER = ENTRY_BORDER
+TEXTBOX_TEXT = ENTRY_TEXT
+
+
+def table_palette(mode: str) -> dict[str, str]:
+    """ttk.Treeview colors for light/dark — used by ThemedTreeview."""
+    if mode == "Dark":
+        return {
+            "background": "#2b2b2b",
+            "foreground": "#f4f4f5",
+            "heading": "#333333",
+            "selected": "#1f538d",
+            "odd": "#2b2b2b",
+            "even": "#333333",
+            "expired": "#7f1d1d",
+            "urgent": "#9a3412",
+            "watch": "#854d0e",
+            "green": "#14532d",
+            "yellow": "#a16207",
+            "orange": "#9a3412",
+            "red": "#7f1d1d",
+            "done": "#14532d",
+            "wip": "#78350f",
+        }
+    return {
+        "background": "#ffffff",
+        "foreground": "#18181b",
+        "heading": "#e4e4e7",
+        "selected": "#3b8ed0",
+        "odd": "#ffffff",
+        "even": "#f4f4f5",
+        "expired": "#fecaca",
+        "urgent": "#fed7aa",
+        "watch": "#fde68a",
+        "green": "#dcfce7",
+        "yellow": "#fef08a",
+        "orange": "#fed7aa",
+        "red": "#fecaca",
+        "done": "#dcfce7",
+        "wip": "#fef3c7",
+    }

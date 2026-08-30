@@ -7,7 +7,6 @@ with a signed code from the phone generator → paste → activated instantly.
 
 from __future__ import annotations
 
-import tkinter as tk
 from urllib.parse import quote
 from webbrowser import open as _open_url
 
@@ -38,6 +37,7 @@ from skyadmin_pro.ui.theme import (
     TEXT_MUTED,
 )
 from skyadmin_pro.ui.widgets import make_modal  # noqa: F401 (dialog helper)
+from skyadmin_pro.ui.widgets import bind_wrap_label, themed_entry, themed_textbox
 
 
 def open_whatsapp_chat(message: str = "") -> None:
@@ -75,11 +75,15 @@ class ActivationDialog(ctk.CTkToplevel):
 
         machine_id = get_machine_id()
 
-        # Everything scrolls vertically (Excel-like comfort on small screens).
+        # Scrollable content — status + actions stay fixed below so feedback is visible.
         scroll = ctk.CTkScrollableFrame(self, fg_color="transparent")
-        scroll.grid(row=0, column=0, sticky="nsew")
+        scroll.grid(row=0, column=0, sticky="nsew", padx=0, pady=(0, 0))
         scroll.grid_columnconfigure(0, weight=1)
         body = scroll
+
+        footer = ctk.CTkFrame(self, fg_color="transparent")
+        footer.grid(row=1, column=0, sticky="ew", padx=16, pady=(0, 16))
+        footer.grid_columnconfigure(0, weight=1)
 
         # Header — includes remaining days when relevant
         ctk.CTkLabel(
@@ -106,55 +110,11 @@ class ActivationDialog(ctk.CTkToplevel):
         )
 
         # ---- Pricing packages ----
-        price_card = ctk.CTkFrame(body, corner_radius=CARD_RADIUS)
-        price_card.grid(row=2, column=0, sticky="ew", padx=16, pady=(0, 12))
-        price_card.grid_columnconfigure((0, 1), weight=1, uniform="tiers")
-        ctk.CTkLabel(
-            price_card,
-            text="Packages",
-            anchor="w",
-            font=ctk.CTkFont(size=13, weight="bold"),
-        ).grid(row=0, column=0, columnspan=2, sticky="w", padx=16, pady=(12, 4))
-        for i, (label, _days, baht) in enumerate(PRICING_TIERS):
-            r, c = divmod(i, 2)
-            tier = ctk.CTkFrame(price_card, corner_radius=10)
-            tier.grid(row=r + 1, column=c, sticky="nsew", padx=8, pady=4)
-            ctk.CTkLabel(tier, text=label, font=ctk.CTkFont(size=14, weight="bold")).pack(
-                anchor="w", padx=12, pady=(8, 0)
-            )
-            ctk.CTkLabel(
-                tier,
-                text=f"{baht:,} Baht",
-                font=ctk.CTkFont(size=16, weight="bold"),
-                text_color="#2563eb" if ctk.get_appearance_mode() == "Light" else "#60a5fa",
-            ).pack(anchor="w", padx=12, pady=(0, 8))
-        rows_used = (len(PRICING_TIERS) + 1) // 2
-        over = ctk.CTkFrame(price_card, corner_radius=10, fg_color=("gray90", "gray20"))
-        over.grid(row=rows_used + 1, column=0, columnspan=2, sticky="ew", padx=8, pady=(4, 12))
-        over.grid_columnconfigure(1, weight=1)
-        ctk.CTkLabel(over, text=PRICING_OVER_YEAR_TEXT, anchor="w").grid(row=0, column=0, sticky="w", padx=12, pady=10)
-        ctk.CTkButton(
-            over,
-            text="WhatsApp us",
-            width=130,
-            height=30,
-            fg_color="#128C7E",
-            hover_color="#075E54",
-            command=lambda: open_whatsapp_chat(
-                f"SkyAdmin Pro — I'm interested in a license over 1 year.\nMachine ID: {machine_id}"
-            ),
-        ).grid(row=0, column=1, sticky="e", padx=12, pady=6)
-
-        ctk.CTkLabel(
-            price_card,
-            text=(
-                "Payment: contact us on WhatsApp or email —\n"
-                f"{OWNER_WHATSAPP_DISPLAY} · {OWNER_EMAIL}\n"
-                "After payment you receive a one-time activation code."
-            ),
-            justify="center",
-            text_color=TEXT_MUTED,
-        ).grid(row=rows_used + 2, column=0, columnspan=2, sticky="ew", padx=8, pady=(0, 12))
+        self._price_card = ctk.CTkFrame(body, corner_radius=CARD_RADIUS)
+        self._price_card.grid(row=2, column=0, sticky="ew", padx=16, pady=(0, 12))
+        self._over_year_text = PRICING_OVER_YEAR_TEXT
+        self._render_pricing_tiers(PRICING_TIERS)
+        self._refresh_pricing_from_api()
 
         # ---- Machine ID card ----
         mid_card = ctk.CTkFrame(body, corner_radius=CARD_RADIUS)
@@ -185,7 +145,7 @@ class ActivationDialog(ctk.CTkToplevel):
             anchor="w",
         ).grid(row=4, column=0, sticky="ew", padx=16, pady=(0, 4))
         self.email_var = ctk.StringVar()
-        ctk.CTkEntry(
+        themed_entry(
             body,
             textvariable=self.email_var,
             placeholder_text="yourname@gmail.com",
@@ -204,41 +164,41 @@ class ActivationDialog(ctk.CTkToplevel):
             hover_color="#075E54",
             command=lambda: open_whatsapp_chat(activation_request_message(self._customer_email())),
         ).grid(row=1, column=0, sticky="ew", pady=(6, 0))
-        ctk.CTkLabel(
+        contact_hint = ctk.CTkLabel(
             req_row,
             text=f"Email: {OWNER_EMAIL}   ·   WhatsApp: {OWNER_WHATSAPP_DISPLAY}",
             text_color=TEXT_MUTED,
             anchor="w",
-            wraplength=500,
             justify="left",
-        ).grid(row=2, column=0, sticky="ew", pady=(8, 0))
+        )
+        contact_hint.grid(row=2, column=0, sticky="ew", pady=(8, 0))
+        bind_wrap_label(contact_hint, req_row, pad=16)
 
         # ---- Step 2: paste code ----
         ctk.CTkLabel(
             body,
-            text="2. Paste the License Key or 8-digit Passcode you received:",
+            text="2. Paste the License Key or Passcode you received:",
             anchor="w",
         ).grid(row=7, column=0, sticky="ew", padx=16, pady=(14, 4))
-        self.key_box = ctk.CTkTextbox(body, height=80, wrap="char")
-        self.key_box.grid(row=8, column=0, sticky="ew", padx=16)
+        self.key_box = themed_textbox(body, height=80, wrap="char")
+        self.key_box.grid(row=8, column=0, sticky="ew", padx=16, pady=(0, 8))
+        self.key_box.bind("<Control-Return>", lambda _e: self._activate())
+        self.key_box.bind("<Return>", lambda _e: self._activate())
 
         self.status = ctk.CTkLabel(
-            body,
-            text="",
+            footer,
+            text="Paste your license key or passcode above, then click Activate Now.",
             anchor="w",
             justify="left",
-            wraplength=520,
+            text_color=TEXT_MUTED,
         )
-        self.status.grid(row=9, column=0, sticky="ew", padx=16, pady=(8, 0))
+        self.status.grid(row=0, column=0, sticky="ew", pady=(0, 8))
+        bind_wrap_label(self.status, footer, pad=0)
 
-        # ---- Actions ----
-        actions = ctk.CTkFrame(body, fg_color="transparent")
-        actions.grid(row=10, column=0, sticky="ew", padx=16, pady=(10, 20))
-        actions.grid_columnconfigure(0, weight=1)
-        self.activate_btn = ctk.CTkButton(actions, text="Activate Now", height=42, command=self._activate)
-        self.activate_btn.grid(row=0, column=0, sticky="ew")
-        bottom = ctk.CTkFrame(actions, fg_color="transparent")
-        bottom.grid(row=1, column=0, sticky="ew", pady=(8, 14))
+        self.activate_btn = ctk.CTkButton(footer, text="Activate Now", height=42, command=self._activate)
+        self.activate_btn.grid(row=1, column=0, sticky="ew")
+        bottom = ctk.CTkFrame(footer, fg_color="transparent")
+        bottom.grid(row=2, column=0, sticky="ew", pady=(8, 0))
         self.continue_btn = ctk.CTkButton(
             bottom,
             text="Continue to App",
@@ -275,8 +235,99 @@ class ActivationDialog(ctk.CTkToplevel):
 
         self.bind("<Escape>", lambda _e: self._close())
         self.protocol("WM_DELETE_WINDOW", self._close)
+        self.after(100, self._focus_key_box)
 
     # ------------------------------------------------------------------ #
+    def _render_pricing_tiers(self, tiers: tuple[tuple[str, int, int], ...]) -> None:
+        card = self._price_card
+        for child in card.winfo_children():
+            child.destroy()
+        card.grid_columnconfigure((0, 1), weight=1, uniform="tiers")
+        ctk.CTkLabel(
+            card,
+            text="Packages",
+            anchor="w",
+            font=ctk.CTkFont(size=13, weight="bold"),
+        ).grid(row=0, column=0, columnspan=2, sticky="w", padx=16, pady=(12, 4))
+        for i, (label, _days, baht) in enumerate(tiers):
+            r, c = divmod(i, 2)
+            tier = ctk.CTkFrame(card, corner_radius=10)
+            tier.grid(row=r + 1, column=c, sticky="nsew", padx=8, pady=4)
+            ctk.CTkLabel(tier, text=label, font=ctk.CTkFont(size=14, weight="bold")).pack(
+                anchor="w", padx=12, pady=(8, 0)
+            )
+            ctk.CTkLabel(
+                tier,
+                text=f"{baht:,} Baht",
+                font=ctk.CTkFont(size=16, weight="bold"),
+                text_color="#2563eb" if ctk.get_appearance_mode() == "Light" else "#60a5fa",
+            ).pack(anchor="w", padx=12, pady=(0, 8))
+        rows_used = (len(tiers) + 1) // 2
+        over = ctk.CTkFrame(card, corner_radius=10, fg_color=("gray90", "gray20"))
+        over.grid(row=rows_used + 1, column=0, columnspan=2, sticky="ew", padx=8, pady=(4, 12))
+        over.grid_columnconfigure(1, weight=1)
+        ctk.CTkLabel(over, text=self._over_year_text, anchor="w").grid(
+            row=0, column=0, sticky="w", padx=12, pady=10
+        )
+        ctk.CTkButton(
+            over,
+            text="WhatsApp us",
+            width=130,
+            height=30,
+            fg_color="#128C7E",
+            hover_color="#075E54",
+            command=lambda: open_whatsapp_chat(
+                f"SkyAdmin Pro — I'm interested in a license over 1 year.\nMachine ID: {get_machine_id()}"
+            ),
+        ).grid(row=0, column=1, sticky="e", padx=12, pady=6)
+        ctk.CTkLabel(
+            card,
+            text=(
+                "Payment: contact us on WhatsApp or email —\n"
+                f"{OWNER_WHATSAPP_DISPLAY} · {OWNER_EMAIL}\n"
+                "After payment you receive a one-time activation code."
+            ),
+            justify="center",
+            text_color=TEXT_MUTED,
+        ).grid(row=rows_used + 2, column=0, columnspan=2, sticky="ew", padx=8, pady=(0, 12))
+
+    def _refresh_pricing_from_api(self) -> None:
+        import threading
+
+        def worker() -> None:
+            from skyadmin_pro.services.remote_pricing import fetch_pricing_tiers, fetch_signing_key_status
+
+            tiers, over_year = fetch_pricing_tiers()
+            key_ok, key_msg = fetch_signing_key_status()
+
+            def done() -> None:
+                if not self.winfo_exists():
+                    return
+                self._over_year_text = over_year
+                self._render_pricing_tiers(tiers)
+                if not key_ok and key_msg:
+                    self._set_status(f"⚠ {key_msg}", "error")
+
+            self._schedule_ui(done)
+
+        threading.Thread(target=worker, daemon=True).start()
+
+    def _focus_key_box(self) -> None:
+        try:
+            self.key_box.focus_set()
+        except Exception:
+            pass
+
+    def _schedule_ui(self, fn) -> None:
+        """Run *fn* on the Tk main thread (required after worker threads)."""
+        try:
+            self.after(0, fn)
+        except Exception:
+            try:
+                fn()
+            except Exception:
+                pass
+
     def _customer_email(self) -> str:
         return " ".join(self.email_var.get().split())
 
@@ -319,73 +370,97 @@ class ActivationDialog(ctk.CTkToplevel):
     def _activate(self) -> None:
         if getattr(self, "_activating", False):
             return
-        content = "".join(self.key_box.get("1.0", "end").split())
-        # One-time-use gate: signature/machine/expiry + burn-list check
-        ok, msg, nonce = check_activation_usable(content)
-        if not ok:
-            self._set_status(f"✗ {msg}", "error")
-            return
+        try:
+            content = "".join(self.key_box.get("1.0", "end").split())
+            if not content:
+                self._set_status("✗ Paste the license key or passcode first.", "error")
+                return
 
-        from skyadmin_pro.services.license import requires_online_check
+            self._set_status("Checking license…", "info")
+            self.update_idletasks()
 
-        needs_online = requires_online_check()
-        self._activating = True
-        self.activate_btn.configure(state="disabled", text="Checking…")
+            ok, msg, nonce = check_activation_usable(content)
+            if not ok:
+                self._set_status(f"✗ {msg}", "error")
+                return
 
-        def _finish(ok_final: bool, message: str, nonce_final: str | None) -> None:
+            from skyadmin_pro.services.license import (
+                fetch_revocations,
+                mark_used,
+                report_activation_claim,
+                requires_online_check,
+                save_license_file,
+                _is_repair_activation,
+            )
+
+            needs_online = requires_online_check()
+            self._activating = True
+            self.activate_btn.configure(state="disabled", text="Checking…")
+            self.update_idletasks()
+
+            def _finish(ok_final: bool, message: str, nonce_final: str | None) -> None:
+                self._activating = False
+                self.activate_btn.configure(state="normal", text="Activate Now")
+                if not ok_final:
+                    self._set_status(f"✗ {message}", "error")
+                    return
+                save_license_file(content)
+                if nonce_final:
+                    mark_used(nonce_final)
+                self._set_status(f"✓ {message} Activation complete.", "success")
+                self.continue_btn.configure(state="normal")
+                if self._on_activated is not None:
+                    try:
+                        self._on_activated()
+                    except Exception:
+                        pass
+
+            if not needs_online:
+                _finish(True, msg, nonce)
+                return
+
+            self._set_status("Checking license online…", "info")
+
+            def worker() -> None:
+                result_ok = False
+                result_msg = "Activation failed."
+                result_nonce: str | None = None
+                try:
+                    net_ok, net_msg = fetch_revocations()
+                    if not net_ok:
+                        result_msg = (
+                            "Internet connection is required to activate. Please connect and try again."
+                        )
+                    else:
+                        ok2, msg2, n2 = check_activation_usable(content)
+                        if not ok2:
+                            result_msg = msg2
+                        else:
+                            claim_ok, claim_msg = report_activation_claim(
+                                content,
+                                allow_already_claimed=_is_repair_activation(content),
+                            )
+                            if not claim_ok:
+                                result_msg = claim_msg
+                            else:
+                                result_ok, result_msg, result_nonce = ok2, msg2, n2
+                except Exception as exc:
+                    result_msg = f"Activation error: {exc}"
+
+                def done() -> None:
+                    if not self.winfo_exists():
+                        return
+                    _finish(result_ok, result_msg, result_nonce)
+
+                self._schedule_ui(done)
+
+            import threading
+
+            threading.Thread(target=worker, daemon=True).start()
+        except Exception as exc:
             self._activating = False
             self.activate_btn.configure(state="normal", text="Activate Now")
-            if not ok_final:
-                self._set_status(f"✗ {message}", "error")
-                return
-            save_license_file(content)
-            # Burn the code: it can never be redeemed again on any machine.
-            if nonce_final:
-                mark_used(nonce_final)
-            self._set_status(f"✓ {message} Activation complete.", "success")
-            self.continue_btn.configure(state="normal")
-            if self._on_activated is not None:
-                try:
-                    self._on_activated()
-                except Exception:
-                    pass
-
-        if not needs_online:
-            _finish(True, msg, nonce)
-            return
-
-        # Online activation: refresh the owner's control list in a worker so
-        # a slow connection never freezes the dialog (6s timeout max).
-        self._set_status("Checking license online…", "info")
-
-        def worker():
-            net_ok, net_msg = fetch_revocations()
-            if not net_ok:
-                result_ok, result_msg, result_nonce = (
-                    False,
-                    ("Internet connection is required to activate. Please connect and try again."),
-                    None,
-                )
-            else:
-                # Re-run the FULL gate AFTER syncing revocations/bans/used —
-                # remotely revoked, banned or already-used codes must be
-                # rejected here.
-                ok2, msg2, n2 = check_activation_usable(content)
-                result_ok, result_msg, result_nonce = ok2, msg2, n2
-
-            def done():
-                if not self.winfo_exists():
-                    return
-                _finish(result_ok, result_msg, result_nonce)
-
-            try:
-                self.after(0, done)
-            except Exception:
-                pass
-
-        import threading
-
-        threading.Thread(target=worker, daemon=True).start()
+            self._set_status(f"✗ Activation error: {exc}", "error")
 
     def _show_license_text(self) -> None:
         """Full agreement from inside the app (works in packaged exe)."""
@@ -448,20 +523,30 @@ def run_activation_standalone() -> bool:
     if ok:
         return True
 
-    result = {"done": False}
-    root = tk.Tk()
-    root.withdraw()
+    app = ctk.CTk()
+    app.withdraw()
 
     def _finish() -> None:
-        result["done"] = True
-        root.quit()
+        try:
+            app.quit()
+        except Exception:
+            pass
 
-    dialog = ActivationDialog(None, allow_quit=True, on_close_request=_finish)
-    root.mainloop()
+    dialog = ActivationDialog(app, allow_quit=True, on_close_request=_finish)
+    try:
+        dialog.attributes("-topmost", True)
+        dialog.lift()
+        dialog.focus_force()
+    except Exception:
+        pass
+    app.mainloop()
     try:
         dialog.destroy()
     except Exception:
         pass
-    root.destroy()
+    try:
+        app.destroy()
+    except Exception:
+        pass
     ok, _msg = verify_license()
     return ok

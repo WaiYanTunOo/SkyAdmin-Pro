@@ -1,12 +1,7 @@
-"""Shared secret derivation — anti-extraction hardening.
+"""PBKDF2 key material for encrypted databases and ``.skybackup`` archives.
 
-The secret is NEVER stored as plaintext. It is split into 7 blocks,
-XOR-encoded with a rolling key, and stored as integer lists. At runtime the
-blocks are decoded, interleaved, and verified with a SHA-256 digest.
-
-A `strings` dump or naive bytecode reader sees only unrelated integers;
-reconstructing requires understanding the decode+interleave algorithm AND
-having all 7 blocks in correct order with the correct XOR key.
+This is separate from license signing (Ed25519 public key in ``license_public.py``).
+The material must remain stable so existing encrypted files can be decrypted.
 """
 
 from __future__ import annotations
@@ -25,19 +20,12 @@ _XF = [
     ([58, 41], [34, 122]),
 ]
 
-_SECRET_CHECK = "e86108ca6a82c8026ac57ed7556f466576a903a626b45e40e0b1b8d70267a2ce"
-
 _SECRET: bytes | None = None
 _SECRET_LOCK = threading.Lock()
 
 
 def _derive_secret() -> bytes:
-    """Derive the signing secret from XOR-interleaved fragments.
-
-    Includes integrity verification (CRC check on fragments) so bytecode
-    tampering — patching the XOR key, fragment values, or hash — produces
-    garbage that won't match any legitimate license.
-    """
+    """Derive stable PBKDF2 input for file/backup encryption."""
     global _SECRET
     if _SECRET is not None:
         return _SECRET
@@ -45,14 +33,12 @@ def _derive_secret() -> bytes:
         if _SECRET is not None:
             return _SECRET
 
-        # --- integrity: CRC32 of _XF + _XK must match the embedded value ---
         import binascii as _binascii
 
         crc_data = repr(_XF).encode() + repr(_XK).encode()
         expected_crc = 0x868E28D8
         actual_crc = _binascii.crc32(crc_data) & 0xFFFFFFFF
         if actual_crc != expected_crc:
-            # Fragments were tampered with — return garbage
             _SECRET = b"\x00" * 32
             return _SECRET
 

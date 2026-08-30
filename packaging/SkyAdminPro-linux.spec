@@ -42,7 +42,9 @@ a = Analysis(
     hookspath=[],
     hooksconfig={},
     runtime_hooks=[],
-    excludes=[],
+    excludes=[
+        "skyadmin_pro.services.license_authoring",
+    ],
     noarchive=False,
     optimize=0,
 )

@@ -10,6 +10,7 @@ import customtkinter as ctk
 
 from skyadmin_pro.ui.theme import CARD_RADIUS, CARD_TITLE_SIZE, TEXT_MUTED
 from skyadmin_pro.ui.treeview import ThemedTreeview
+from skyadmin_pro.ui.widgets import bind_wrap_label
 
 _SETUP_FILTERS = ("All", "Needs setup", "Ready")
 _STATUS_TAGS = {
@@ -68,14 +69,15 @@ class SetupRolloutPanel(ctk.CTkFrame):
             text=title,
             font=ctk.CTkFont(size=CARD_TITLE_SIZE, weight="bold"),
         ).grid(row=0, column=0, sticky="w", padx=16, pady=(14, 4))
-        ctk.CTkLabel(
+        desc_label = ctk.CTkLabel(
             container,
             text=description,
-            wraplength=760,
             justify="left",
             text_color=TEXT_MUTED,
             anchor="w",
-        ).grid(row=1, column=0, sticky="ew", padx=16, pady=(0, 8))
+        )
+        desc_label.grid(row=1, column=0, sticky="ew", padx=16, pady=(0, 8))
+        bind_wrap_label(desc_label, container, pad=40)
 
         toolbar = ctk.CTkFrame(container, fg_color="transparent")
         toolbar.grid(row=2, column=0, sticky="ew", padx=16, pady=(0, 8))
