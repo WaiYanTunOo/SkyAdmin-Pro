@@ -20,6 +20,7 @@ from skyadmin_pro.services.file_ops import copy_file, format_thousands, parse_fl
 from skyadmin_pro.services.snippets import effective_text, load_snippet_overrides
 from skyadmin_pro.services.tracking import classify_expiry, days_until, effective_expiry_date
 from skyadmin_pro.services.workflow import copy_to_clipboard, create_client_workspace
+from skyadmin_pro.ui.canvas_scroll import CanvasScrollFrame
 from skyadmin_pro.ui.combo_utils import fill_combo
 from skyadmin_pro.ui.theme import CARD_TITLE_SIZE, TEXT_MUTED
 from skyadmin_pro.ui.treeview import ThemedTreeview
@@ -30,7 +31,14 @@ from skyadmin_pro.ui.views.company_details.general_tab import GeneralTabMixin
 from skyadmin_pro.ui.views.company_details.tax_ids_tab import TaxIdsTabMixin
 from skyadmin_pro.ui.views.company_details.vo_csh_setup_tab import VoCshSetupTabMixin
 from skyadmin_pro.ui.views.company_details.vo_csh_tab import VoCshTabMixin
-from skyadmin_pro.ui.widgets import DatePickerField, FeedbackLabel, bind_wrap_label, make_modal, themed_entry, themed_scrollable_frame, themed_tabview
+from skyadmin_pro.ui.widgets import (
+    DatePickerField,
+    FeedbackLabel,
+    bind_wrap_label,
+    make_modal,
+    themed_entry,
+    themed_tabview,
+)
 
 
 class CompanyDetailsPanel(
@@ -52,6 +60,7 @@ class CompanyDetailsPanel(
         self._editing_service_id: int | None = None
         self._editing_doc_id: int | None = None
         self._filing_suspend_save = False
+        self._lazy_tabs: set[str] = set()
         self.grid_columnconfigure(0, weight=1)
         self.grid_rowconfigure(1, weight=1)
 
@@ -59,9 +68,7 @@ class CompanyDetailsPanel(
         selector.grid(row=0, column=0, sticky="ew", pady=(0, 8))
         selector.grid_columnconfigure(1, weight=1)
 
-        ctk.CTkLabel(selector, text="Company / Client:", anchor="w").grid(
-            row=0, column=0, sticky="w", padx=(0, 10)
-        )
+        ctk.CTkLabel(selector, text="Company / Client:", anchor="w").grid(row=0, column=0, sticky="w", padx=(0, 10))
         from skyadmin_pro.ui.widgets import bind_wrap_label, combo_style_kwargs
 
         self.company_box = ctk.CTkComboBox(
@@ -85,7 +92,7 @@ class CompanyDetailsPanel(
             command=self._missing_docs_workflow,
         ).grid(row=0, column=1, sticky="e", padx=(12, 0))
 
-        self.tabs = themed_tabview(self)
+        self.tabs = themed_tabview(self, command=self._on_subtab_changed)
         self.tabs.grid(row=1, column=0, sticky="nsew")
         for name in (
             "Accounting Setup",
@@ -100,65 +107,89 @@ class CompanyDetailsPanel(
             tab = self.tabs.tab(name)
             tab.grid_columnconfigure(0, weight=1)
             tab.grid_rowconfigure(0, weight=1)
-            tab.grid_propagate(False)
 
-        setup_tab = self.tabs.tab("Accounting Setup")
-        setup_scroll = themed_scrollable_frame(setup_tab)
-        setup_scroll.grid(row=0, column=0, sticky="nsew")
-        setup_scroll.grid_columnconfigure(0, weight=1)
-        self._accounting_setup_frame = self._build_accounting_setup(setup_scroll)
-        self._accounting_setup_frame.grid(row=0, column=0, sticky="ew")
+    def _current_subtab(self) -> str:
+        try:
+            return self.tabs.get()
+        except Exception:
+            return "Accounting Setup"
 
-        # General tab — existing content
-        general_tab = self.tabs.tab("General")
-        general_scroll = themed_scrollable_frame(general_tab)
-        general_scroll.grid(row=0, column=0, sticky="nsew")
-        general_scroll.grid_columnconfigure(0, weight=1)
-        self._company_frame = self._build_company_info(general_scroll)
-        self._company_frame.grid(row=0, column=0, sticky="ew", pady=(0, 8))
-        self._services_frame = self._build_services(general_scroll)
-        self._services_frame.grid(row=1, column=0, sticky="ew", pady=(0, 8))
-        self._docs_frame = self._build_documents(general_scroll)
-        self._docs_frame.grid(row=2, column=0, sticky="ew")
+    def _on_subtab_changed(self) -> None:
+        self._ensure_lazy_tab(self._current_subtab())
+        self.refresh()
 
-        # Tax IDs tab
-        tax_ids_tab = self.tabs.tab("Tax IDs")
-        tax_ids_scroll = themed_scrollable_frame(tax_ids_tab)
-        tax_ids_scroll.grid(row=0, column=0, sticky="nsew")
-        tax_ids_scroll.grid_columnconfigure(0, weight=1)
-        self._tax_ids_frame = self._build_tax_ids(tax_ids_scroll)
-        self._tax_ids_frame.grid(row=0, column=0, sticky="ew")
-
-        # Filing Statuses tab
-        filing_tab = self.tabs.tab("Filing Statuses")
-        filing_scroll = themed_scrollable_frame(filing_tab)
-        filing_scroll.grid(row=0, column=0, sticky="nsew")
-        filing_scroll.grid_columnconfigure(0, weight=1)
-        self._filing_frame = self._build_filing_statuses(filing_scroll)
-        self._filing_frame.grid(row=0, column=0, sticky="ew")
-
-        vo_setup_tab = self.tabs.tab("VO/CSH Setup")
-        vo_setup_scroll = themed_scrollable_frame(vo_setup_tab)
-        vo_setup_scroll.grid(row=0, column=0, sticky="nsew")
-        vo_setup_scroll.grid_columnconfigure(0, weight=1)
-        self._vo_csh_setup_frame = self._build_vo_csh_setup(vo_setup_scroll)
-        self._vo_csh_setup_frame.grid(row=0, column=0, sticky="ew")
-
-        # VO & CSH tab
-        vo_tab = self.tabs.tab("VO & CSH")
-        vo_scroll = themed_scrollable_frame(vo_tab)
-        vo_scroll.grid(row=0, column=0, sticky="nsew")
-        vo_scroll.grid_columnconfigure(0, weight=1)
-        self._vo_frame = self._build_vo_csh(vo_scroll)
-        self._vo_frame.grid(row=0, column=0, sticky="ew")
-
-        # Financial Docs tab
-        fin_tab = self.tabs.tab("Financial Docs")
-        fin_scroll = themed_scrollable_frame(fin_tab)
-        fin_scroll.grid(row=0, column=0, sticky="nsew")
-        fin_scroll.grid_columnconfigure(0, weight=1)
-        self._fin_frame = self._build_financial_docs(fin_scroll)
-        self._fin_frame.grid(row=0, column=0, sticky="ew")
+    def _ensure_lazy_tab(self, name: str) -> None:
+        if name in self._lazy_tabs:
+            return
+        tab = self.tabs.tab(name)
+        if name == "Accounting Setup":
+            tab.grid_columnconfigure(0, weight=1)
+            tab.grid_rowconfigure(0, weight=1)
+            setup_scroll = CanvasScrollFrame(tab)
+            setup_scroll.grid(row=0, column=0, sticky="nsew")
+            setup_scroll.content.grid_columnconfigure(0, weight=1)
+            setup_scroll.content.grid_rowconfigure(0, weight=1)
+            self._accounting_setup_frame = self._build_accounting_setup(setup_scroll.content)
+            self._accounting_setup_frame.grid(row=0, column=0, sticky="nsew")
+        elif name == "General":
+            tab.grid_columnconfigure(0, weight=1)
+            tab.grid_rowconfigure(0, weight=1)
+            general_scroll = CanvasScrollFrame(tab)
+            general_scroll.grid(row=0, column=0, sticky="nsew")
+            general_scroll.content.grid_columnconfigure(0, weight=1)
+            general_scroll.content.grid_rowconfigure(1, weight=1)
+            general_scroll.content.grid_rowconfigure(2, weight=1)
+            self._company_frame = self._build_company_info(general_scroll.content)
+            self._company_frame.grid(row=0, column=0, sticky="ew", pady=(0, 8))
+            self._services_frame = self._build_services(general_scroll.content)
+            self._services_frame.grid(row=1, column=0, sticky="nsew", pady=(0, 8))
+            self._docs_frame = self._build_documents(general_scroll.content)
+            self._docs_frame.grid(row=2, column=0, sticky="nsew")
+        elif name == "Tax IDs":
+            tab.grid_columnconfigure(0, weight=1)
+            tab.grid_rowconfigure(0, weight=1)
+            tax_ids_scroll = CanvasScrollFrame(tab)
+            tax_ids_scroll.grid(row=0, column=0, sticky="nsew")
+            tax_ids_scroll.content.grid_columnconfigure(0, weight=1)
+            self._tax_ids_frame = self._build_tax_ids(tax_ids_scroll.content)
+            self._tax_ids_frame.grid(row=0, column=0, sticky="ew")
+        elif name == "Filing Statuses":
+            tab.grid_columnconfigure(0, weight=1)
+            tab.grid_rowconfigure(0, weight=1)
+            filing_scroll = CanvasScrollFrame(tab)
+            filing_scroll.grid(row=0, column=0, sticky="nsew")
+            filing_scroll.content.grid_columnconfigure(0, weight=1)
+            self._filing_form_frame = self._build_filing_statuses_form(filing_scroll.content)
+            self._filing_form_frame.grid(row=0, column=0, sticky="ew")
+            self._filing_history_frame = self._build_filing_history(filing_scroll.content)
+            self._filing_history_frame.grid(row=1, column=0, sticky="nsew", pady=(8, 0))
+        elif name == "VO/CSH Setup":
+            tab.grid_columnconfigure(0, weight=1)
+            tab.grid_rowconfigure(0, weight=1)
+            vo_setup_scroll = CanvasScrollFrame(tab)
+            vo_setup_scroll.grid(row=0, column=0, sticky="nsew")
+            vo_setup_scroll.content.grid_columnconfigure(0, weight=1)
+            vo_setup_scroll.content.grid_rowconfigure(0, weight=1)
+            self._vo_csh_setup_frame = self._build_vo_csh_setup(vo_setup_scroll.content)
+            self._vo_csh_setup_frame.grid(row=0, column=0, sticky="nsew")
+        elif name == "VO & CSH":
+            tab.grid_columnconfigure(0, weight=1)
+            tab.grid_rowconfigure(0, weight=1)
+            vo_scroll = CanvasScrollFrame(tab)
+            vo_scroll.grid(row=0, column=0, sticky="nsew")
+            vo_scroll.content.grid_columnconfigure(0, weight=1)
+            self._vo_frame = self._build_vo_csh(vo_scroll.content)
+            self._vo_frame.grid(row=0, column=0, sticky="ew")
+        elif name == "Financial Docs":
+            fin_tab = self.tabs.tab("Financial Docs")
+            fin_tab.grid_columnconfigure(0, weight=1)
+            fin_tab.grid_rowconfigure(0, weight=1)
+            fin_scroll = CanvasScrollFrame(fin_tab)
+            fin_scroll.grid(row=0, column=0, sticky="nsew")
+            fin_scroll.content.grid_columnconfigure(0, weight=1)
+            self._fin_frame = self._build_financial_docs(fin_scroll.content)
+            self._fin_frame.grid(row=0, column=0, sticky="nsew")
+        self._lazy_tabs.add(name)
 
     # --- shared client selection & refresh ---
 
@@ -181,18 +212,111 @@ class CompanyDetailsPanel(
         self._editing_doc_id = None
         self.refresh()
 
-    def refresh(self) -> None:
-        self._fill_combo(self.company_box.get())
-        client_id = self._selected_client_id()
-
-        self.service_tree.apply_theme()
-        self.doc_tree.apply_theme()
-
+    def _update_company_info_line(
+        self,
+        client_id: int | None,
+        *,
+        service_count: int | None = None,
+        document_count: int | None = None,
+    ) -> None:
         if client_id is None:
             self.company_info.configure(text="Select a company to see services and documents.")
+            return
+        if service_count is None:
+            service_count = len(self.app.db.list_client_services(client_id))
+        if document_count is None:
+            document_count = len(self.app.db.list_client_documents(client_id))
+        self.company_info.configure(text=f"{service_count} service(s) \u00b7 {document_count} document(s)")
+
+    def refresh(self) -> None:
+        """Refresh company selector, header, and the active sub-tab."""
+        self.refresh_active_subtab(update_combo=True, update_header=True)
+
+    def refresh_active_subtab(self, *, update_combo: bool = False, update_header: bool = True) -> None:
+        """Reload only the visible Company Details sub-tab."""
+        if update_combo:
+            self._fill_combo(self.company_box.get())
+        client_id = self._selected_client_id()
+        if update_header:
+            self._update_company_info_line(client_id)
+        tab = self._current_subtab()
+        self._ensure_lazy_tab(tab)
+        client = self.app.db.get_client(client_id) if client_id is not None else None
+        self._refresh_subtab(tab, client_id, client)
+
+    def _refresh_general_mutation(self) -> None:
+        """After General-tab service/document edits — refresh trees and header counts only."""
+        client_id = self._selected_client_id()
+        client = self.app.db.get_client(client_id) if client_id is not None else None
+        services = self.app.db.list_client_services(client_id) if client_id is not None else []
+        documents = self.app.db.list_client_documents(client_id) if client_id is not None else []
+        self._update_company_info_line(
+            client_id,
+            service_count=len(services),
+            document_count=len(documents),
+        )
+        self._refresh_general_subtab(client_id, client, services, documents)
+        self.app.invalidate_dashboard()
+
+    def _refresh_filing_mutation(self) -> None:
+        client_id = self._selected_client_id()
+        client = self.app.db.get_client(client_id) if client_id is not None else None
+        self._refresh_filing_subtab(client_id, client)
+        self.app.invalidate_dashboard()
+
+    def _refresh_tax_ids_mutation(self) -> None:
+        client_id = self._selected_client_id()
+        client = self.app.db.get_client(client_id) if client_id is not None else None
+        self._refresh_tax_ids_subtab(client_id, client)
+        self.app.invalidate_dashboard()
+
+    def _refresh_vo_csh_mutation(self) -> None:
+        client_id = self._selected_client_id()
+        client = self.app.db.get_client(client_id) if client_id is not None else None
+        self._refresh_vo_csh_subtab(client)
+        self.app.invalidate_dashboard()
+
+    def _refresh_subtab(
+        self,
+        tab_name: str,
+        client_id: int | None,
+        client: dict | None,
+        *,
+        services: list | None = None,
+        documents: list | None = None,
+    ) -> None:
+        if tab_name == "Accounting Setup":
+            self.refresh_accounting_setup()
+        elif tab_name == "General":
+            if services is None:
+                services = self.app.db.list_client_services(client_id) if client_id is not None else []
+            if documents is None:
+                documents = self.app.db.list_client_documents(client_id) if client_id is not None else []
+            self._refresh_general_subtab(client_id, client, services, documents)
+        elif tab_name == "Tax IDs":
+            self._refresh_tax_ids_subtab(client_id, client)
+        elif tab_name == "Filing Statuses":
+            self._refresh_filing_subtab(client_id, client)
+        elif tab_name == "VO/CSH Setup":
+            self.refresh_vo_csh_setup()
+        elif tab_name == "VO & CSH":
+            self._refresh_vo_csh_subtab(client)
+        elif tab_name == "Financial Docs":
+            self._refresh_financial_docs()
+
+    def _refresh_general_subtab(
+        self,
+        client_id: int | None,
+        client: dict | None,
+        services: list,
+        documents: list,
+    ) -> None:
+        self.service_tree.apply_theme()
+        self.doc_tree.apply_theme()
+        if client_id is None:
             self.company_name_label.configure(text="—")
-            self.service_tree.set_rows([])
-            self.doc_tree.set_rows([])
+            self.service_tree.set_rows([], empty_message="Select a client to view services.")
+            self.doc_tree.set_rows([], empty_message="Select a client to view documents.")
             for var in (
                 self.info_reg_number,
                 self.info_director,
@@ -204,30 +328,8 @@ class CompanyDetailsPanel(
             ):
                 var.set("")
             self.info_objectives.delete("1.0", "end")
-            self.tax_id_var.set("")
-            self._load_client_credentials_display(None)
-            self.vat_registered_var.set(False)
-            self.vat_reg_date_var.set("")
-            self.acct_service_type.set("")
-            self.acct_txn_volume.set("")
-            self.service_fee_var.set("")
-            self.acct_payment_status.set("")
-            self.sla_var.set("")
-            self.headcount_var.set("")
-            for field in TAX_FILING_FIELDS:
-                if field in self.filing_vars:
-                    self.filing_vars[field].set("Not Applicable")
-            for _key, lbl in self.filing_summary_labels.items():
-                lbl.configure(text="0")
-            self.refresh_accounting_setup()
-            self.refresh_vo_csh_setup()
             return
 
-        services = self.app.db.list_client_services(client_id)
-        documents = self.app.db.list_client_documents(client_id)
-        self.company_info.configure(text=f"{len(services)} service(s) \u00b7 {len(documents)} document(s)")
-
-        client = self.app.db.get_client(client_id)
         self.company_name_label.configure(text=client["name"] if client else "\u2014")
         self.info_reg_number.set((client or {}).get("registration_number") or "")
         self.info_director.set((client or {}).get("director") or "")
@@ -239,7 +341,72 @@ class CompanyDetailsPanel(
         self.info_objectives.delete("1.0", "end")
         self.info_objectives.insert("1.0", (client or {}).get("business_objectives") or "")
 
-        # Tax IDs sub-tab
+        rows, iids, tags = [], [], []
+        for item in services:
+            progress = item.get("progress") or "Not started"
+            row_tags = []
+            if progress == "Completed":
+                row_tags.append("done")
+            elif progress == "Ongoing":
+                row_tags.append("wip")
+            expiry = item.get("expiry_date")
+            eff = effective_expiry_date(expiry, item.get("document_type"))
+            left = days_until(eff) if eff else None
+            if left is not None:
+                tag = classify_expiry(left)
+                if tag:
+                    row_tags.append(tag)
+            rows.append(
+                (
+                    item.get("document_type") or "\u2014",
+                    item.get("start_date") or "\u2014",
+                    eff or "\u2014",
+                    item.get("payment_date") or "\u2014",
+                    format_thousands(item.get("amount")) if item.get("amount") else "\u2014",
+                    progress,
+                    "Yes" if item.get("paid") else "\u2014",
+                )
+            )
+            iids.append(str(item["id"]))
+            tags.append(tuple(row_tags))
+        self.service_tree.set_rows(rows, iids=iids, tags=tags, empty_message="No services recorded for this client.")
+
+        rows, iids, tags = [], [], []
+        for item in documents:
+            expiry = item.get("expiry_date")
+            eff = effective_expiry_date(expiry, item.get("document_type"))
+            left = days_until(eff) if eff else None
+            row_tags = []
+            if left is not None:
+                tag = classify_expiry(left)
+                if tag:
+                    row_tags.append(tag)
+            rows.append(
+                (
+                    item.get("document_type") or "\u2014",
+                    item.get("file_name") or "\u2014",
+                    eff or "\u2014",
+                    (item.get("created_at") or "")[:10],
+                )
+            )
+            iids.append(str(item["id"]))
+            tags.append(tuple(row_tags))
+        self.doc_tree.set_rows(rows, iids=iids, tags=tags, empty_message="No documents recorded for this client.")
+
+    def _refresh_tax_ids_subtab(self, client_id: int | None, client: dict | None) -> None:
+        if client_id is None:
+            self.tax_id_var.set("")
+            self._load_client_credentials_display(None)
+            self.vat_registered_var.set(False)
+            self.vat_reg_date_var.set("")
+            self.acct_service_type.set("")
+            self.acct_txn_volume.set("")
+            self.service_fee_var.set("")
+            self.acct_payment_status.set("")
+            self.sla_var.set("")
+            self.headcount_var.set("")
+            return
+
         self.tax_id_var.set((client or {}).get("tax_id") or "")
         self._load_client_credentials_display(client_id)
         self.vat_registered_var.set(bool((client or {}).get("vat_registered")))
@@ -256,7 +423,18 @@ class CompanyDetailsPanel(
         hc = (client or {}).get("headcount")
         self.headcount_var.set(str(hc) if hc is not None else "")
 
-        # Filing Statuses sub-tab
+    def _refresh_filing_subtab(self, client_id: int | None, client: dict | None) -> None:
+        if client_id is None:
+            for field in TAX_FILING_FIELDS:
+                if field in self.filing_vars:
+                    self.filing_vars[field].set("Not Applicable")
+            for _key, lbl in self.filing_summary_labels.items():
+                lbl.configure(text="0")
+            self.filing_last_changed_label.configure(text="")
+            self.filing_history_tree.apply_theme()
+            self.filing_history_tree.set_rows([], empty_message="Select a client to view filing history.")
+            return
+
         counts = {"complete": 0, "ongoing": 0, "pending": 0, "na": 0}
         self._filing_suspend_save = True
         try:
@@ -286,12 +464,10 @@ class CompanyDetailsPanel(
             self._filing_suspend_save = False
         for key, lbl in self.filing_summary_labels.items():
             lbl.configure(text=str(counts[key]))
-        # Last changed timestamp
-        last_changed = self.app.db.get_filing_last_changed(client_id) if client_id else None
+        last_changed = self.app.db.get_filing_last_changed(client_id)
         self.filing_last_changed_label.configure(text=f"Last changed: {last_changed}" if last_changed else "")
-        # Filing change history
         self.filing_history_tree.apply_theme()
-        history = self.app.db.get_filing_change_history(client_id) if client_id else []
+        history = self.app.db.get_filing_change_history(client_id)
         hist_rows, hist_iids = [], []
         for h in history:
             hist_rows.append(
@@ -303,74 +479,19 @@ class CompanyDetailsPanel(
                 )
             )
             hist_iids.append(str(h["id"]))
-        self.filing_history_tree.set_rows(hist_rows, iids=hist_iids)
+        self.filing_history_tree.set_rows(
+            hist_rows,
+            iids=hist_iids,
+            empty_message="No filing status changes recorded yet.",
+        )
 
-        # VO & CSH sub-tab
+    def _refresh_vo_csh_subtab(self, client: dict | None) -> None:
         self.vo_address_var.set((client or {}).get("vo_address") or "")
         self.vo_provider_var.set((client or {}).get("vo_service_provider") or "")
         self.vo_renewal_var.set((client or {}).get("vo_renewal_date") or "")
         self.csh_provider_var.set((client or {}).get("csh_service_provider") or "")
         self.csh_renewal_var.set((client or {}).get("csh_renewal_date") or "")
         self.shareholder_var.set((client or {}).get("shareholder_info") or "")
-
-        # Financial Docs sub-tab
-        self._refresh_financial_docs()
-
-        # Services treeview
-        rows, iids, tags = [], [], []
-        for item in services:
-            progress = item.get("progress") or "Not started"
-            row_tags = []
-            if progress == "Completed":
-                row_tags.append("done")
-            elif progress == "Ongoing":
-                row_tags.append("wip")
-            expiry = item.get("expiry_date")
-            eff = effective_expiry_date(expiry, item.get("document_type"))
-            left = days_until(eff) if eff else None
-            if left is not None:
-                tag = classify_expiry(left)
-                if tag:
-                    row_tags.append(tag)
-            rows.append(
-                (
-                    item.get("document_type") or "\u2014",
-                    item.get("start_date") or "\u2014",
-                    eff or "\u2014",
-                    item.get("payment_date") or "\u2014",
-                    format_thousands(item.get("amount")) if item.get("amount") else "\u2014",
-                    progress,
-                    "Yes" if item.get("paid") else "\u2014",
-                )
-            )
-            iids.append(str(item["id"]))
-            tags.append(tuple(row_tags))
-        self.service_tree.set_rows(rows, iids=iids, tags=tags)
-
-        # Documents treeview
-        rows, iids, tags = [], [], []
-        for item in documents:
-            expiry = item.get("expiry_date")
-            eff = effective_expiry_date(expiry, item.get("document_type"))
-            left = days_until(eff) if eff else None
-            row_tags = []
-            if left is not None:
-                tag = classify_expiry(left)
-                if tag:
-                    row_tags.append(tag)
-            rows.append(
-                (
-                    item.get("document_type") or "\u2014",
-                    item.get("file_name") or "\u2014",
-                    eff or "\u2014",
-                    (item.get("created_at") or "")[:10],
-                )
-            )
-            iids.append(str(item["id"]))
-            tags.append(tuple(row_tags))
-        self.doc_tree.set_rows(rows, iids=iids, tags=tags)
-        self.refresh_accounting_setup()
-        self.refresh_vo_csh_setup()
 
     def _parse_date(self, var: ctk.StringVar) -> str | None:
         raw = var.get().strip()
@@ -483,7 +604,7 @@ class CompanyDetailsPanel(
         self.service_amount.set("")
         self.service_progress.set(SERVICE_PROGRESS[0])
         self.service_paid.deselect()
-        self.refresh()
+        self._refresh_general_mutation()
 
     def _renew_service(self) -> None:
         iid = self.service_tree.selected_iid()
@@ -581,7 +702,7 @@ class CompanyDetailsPanel(
                 return
             top.destroy()
             self.feedback.success("Service renewed — expiry updated and recorded.")
-            self.refresh()
+            self._refresh_general_mutation()
 
         ctk.CTkButton(top, text="Record renewal", command=_do_record).grid(
             row=9, column=0, sticky="ew", padx=20, pady=(6, 18)
@@ -722,7 +843,7 @@ class CompanyDetailsPanel(
         self.doc_expiry.set("")
         self.doc_file.set("")
         self.doc_path.set("")
-        self.refresh()
+        self._refresh_general_mutation()
 
     def _delete_service(self) -> None:
         iid = self.service_tree.selected_iid()
@@ -735,7 +856,7 @@ class CompanyDetailsPanel(
             return
         self.app.db.delete_document(int(iid))
         self.feedback.success("Service record deleted.")
-        self.refresh()
+        self._refresh_general_mutation()
 
     def _delete_document(self) -> None:
         iid = self.doc_tree.selected_iid()
@@ -748,7 +869,7 @@ class CompanyDetailsPanel(
             return
         self.app.db.delete_document(int(iid))
         self.feedback.success("Document record deleted.")
-        self.refresh()
+        self._refresh_general_mutation()
 
     def _missing_docs_workflow(self) -> None:
         client_id = self._selected_client_id()
@@ -809,6 +930,6 @@ class CompanyDetailsPanel(
             f"(today, +2d email, +3d call)." + (" Request email copied." if copied else "")
         )
         self.app.set_status(f"Missing-docs follow-up scheduled for {client}.")
-        view = self.app._views.get("database_tasks")
-        if view is not None and hasattr(view, "tasks_panel"):
+        view = self.app.get_view("database_tasks")
+        if view is not None and getattr(view, "tasks_panel", None) is not None:
             view.tasks_panel.refresh()

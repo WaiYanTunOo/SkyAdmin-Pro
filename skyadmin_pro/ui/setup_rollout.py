@@ -56,6 +56,8 @@ class SetupRolloutPanel(ctk.CTkFrame):
             if tree_row_weight:
                 container.grid_rowconfigure(3, weight=tree_row_weight)
         self.grid_columnconfigure(0, weight=1)
+        if tree_row_weight:
+            self.grid_rowconfigure(0, weight=1)
         if tree_row_weight and not use_card:
             self.grid_rowconfigure(3, weight=tree_row_weight)
 
@@ -158,7 +160,7 @@ class SetupRolloutPanel(ctk.CTkFrame):
             tree_rows.append(self._row_cells_fn(row))
             status = row.get("setup_status")
             tags.append(_STATUS_TAGS.get(status, ("urgent",)))
-        self.tree.set_rows(tree_rows, iids=iids, tags=tags)
+        self.tree.set_rows(tree_rows, iids=iids, tags=tags, empty_message="No clients in this rollout queue.")
 
     def selected_row(self) -> dict[str, Any] | None:
         if self._selected_id is None:

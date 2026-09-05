@@ -2,8 +2,12 @@
 ; Build:  packaging\build-installer.ps1
 ; Requires: Inno Setup 6 — https://jrsoftware.org/isdl.php
 
-#ifndef AppVersion
-#define AppVersion "0.3.1"
+#ifdef AppVersion
+  #if AppVersion == ""
+    #error "AppVersion must be non-empty — pass /DAppVersion via ISCC or build-installer.ps1"
+  #endif
+#else
+  #error "AppVersion not defined — build via packaging/build-installer.ps1 which passes /DAppVersion=APP_VERSION"
 #endif
 
 #define AppName "SkyAdmin Pro"
@@ -19,6 +23,12 @@ AppVerName={#AppName} {#AppVersion}
 AppPublisher={#AppPublisher}
 AppPublisherURL={#AppURL}
 AppSupportURL={#AppURL}
+VersionInfoVersion={#AppVersion}
+VersionInfoProductName={#AppName}
+VersionInfoDescription={#AppName} v{#AppVersion}
+VersionInfoCopyright=Sky Creation Innovations
+AppCopyright=Sky Creation Innovations
+UninstallDisplayName={#AppName} {#AppVersion}
 DefaultDirName={autopf}\{#AppName}
 DefaultGroupName={#AppName}
 DisableProgramGroupPage=yes
@@ -32,6 +42,7 @@ Compression=lzma2/ultra64
 SolidCompression=yes
 WizardStyle=modern
 PrivilegesRequired=lowest
+PrivilegesRequiredOverridesAllowed=dialog
 ArchitecturesAllowed=x64compatible arm64
 ArchitecturesInstallIn64BitMode=x64compatible arm64
 MinVersion=10.0

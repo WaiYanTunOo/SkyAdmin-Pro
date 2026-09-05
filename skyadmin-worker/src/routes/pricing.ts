@@ -2,6 +2,7 @@
 
 import { Context } from "hono";
 import { Env, getMeta, setMeta } from "../db";
+import { isRateLimited } from "../rate_limit";
 import {
   DEFAULT_OVER_YEAR_TEXT,
   DEFAULT_PRICING_PACKAGES,
@@ -28,10 +29,29 @@ export async function pricingGetHandler(c: Context<{ Bindings: Env }>) {
 }
 
 export async function pricingPostHandler(c: Context<{ Bindings: Env }>) {
-  const body = await c.req.json<{ packages?: PricingPackage[]; over_year_text?: string }>();
-  const packages = parsePricingPackages(
-    serializePricingPackages(Array.isArray(body.packages) ? body.packages : DEFAULT_PRICING_PACKAGES),
-  );
+  const ip = c.req.header("cf-connecting-ip") || "unknown";
+  if (await isRateLimited(c.env.DB, `pricing:${ip}`, { windowSeconds: 60, max: 10 })) {
+    return c.json({ ok: false, error: "rate limited" }, 429);
+  }
+
+  let body: { packages?: PricingPackage[]; over_year_text?: string };
+  try {
+    body = await c.req.json<{ packages?: PricingPackage[]; over_year_text?: string }>();
+  } catch {
+    return c.json({ ok: false, error: "invalid json" }, 400);
+  }
+  if (!Array.isArray(body.packages)) {
+    return c.json({ ok: false, error: "packages must be an array" }, 400);
+  }
+  let packages: PricingPackage[];
+  try {
+    packages = parsePricingPackages(serializePricingPackages(body.packages));
+  } catch {
+    return c.json({ ok: false, error: "invalid packages" }, 400);
+  }
+  if (!packages.length) {
+    return c.json({ ok: false, error: "at least one package required" }, 400);
+  }
   await setMeta(c.env.DB, PRICING_META_KEY, serializePricingPackages(packages));
   if (typeof body.over_year_text === "string" && body.over_year_text.trim()) {
     await setMeta(c.env.DB, PRICING_OVER_YEAR_KEY, body.over_year_text.trim());

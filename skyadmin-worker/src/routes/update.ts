@@ -2,6 +2,7 @@
 
 import { Context } from "hono";
 import { Env, bumpVersion, getMeta, setMeta } from "../db";
+import { isRateLimited } from "../rate_limit";
 
 export async function updateGetHandler(c: Context<{ Bindings: Env }>) {
   const version = (await getMeta(c.env.DB, "latest_version")) || "";
@@ -14,17 +15,37 @@ export async function updateGetHandler(c: Context<{ Bindings: Env }>) {
 }
 
 export async function updatePostHandler(c: Context<{ Bindings: Env }>) {
-  const body = await c.req.json<{ version?: string; url?: string }>();
+  const ip = c.req.header("cf-connecting-ip") || "unknown";
+  if (await isRateLimited(c.env.DB, `update:${ip}`, { windowSeconds: 60, max: 10 })) {
+    return c.json({ ok: false, error: "rate limited" }, 429);
+  }
+
+  let body: { version?: string; url?: string };
+  try {
+    body = await c.req.json<{ version?: string; url?: string }>();
+  } catch {
+    return c.json({ ok: false, error: "invalid json" }, 400);
+  }
   const version = (body.version || "").trim();
   const url = (body.url || "").trim();
   if (!version) {
     return c.json({ ok: false, error: "version required" }, 400);
   }
-  if (!/^\d+\.\d+\.\d+/.test(version)) {
+  if (!/^\d+\.\d+\.\d+$/.test(version)) {
     return c.json({ ok: false, error: "version should look like 0.3.1" }, 400);
   }
-  if (url && !/^https:\/\//i.test(url)) {
-    return c.json({ ok: false, error: "url must start with https://" }, 400);
+  if (url) {
+    if (!/^https:\/\//i.test(url)) {
+      return c.json({ ok: false, error: "url must start with https://" }, 400);
+    }
+    if (url.length > 2048) {
+      return c.json({ ok: false, error: "url too long" }, 400);
+    }
+    try {
+      new URL(url);
+    } catch {
+      return c.json({ ok: false, error: "invalid url" }, 400);
+    }
   }
 
   await setMeta(c.env.DB, "latest_version", version);

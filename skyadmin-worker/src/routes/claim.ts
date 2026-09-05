@@ -2,36 +2,12 @@
 
 import { Context } from "hono";
 import { Env, bumpVersion } from "../db";
+import { isRateLimited } from "../rate_limit";
 import { resignActivatedLicense } from "../signing";
 import { parseActivationClaim } from "../verification";
 import { checkActivationEligibility } from "../sync_eligibility";
 
-const CLAIM_WINDOW_SECONDS = 60;
-const CLAIM_MAX_PER_WINDOW = 20;
-
-async function isRateLimited(db: D1Database, key: string): Promise<boolean> {
-  const cutoff = new Date(Date.now() - CLAIM_WINDOW_SECONDS * 1000).toISOString();
-  await db.prepare("DELETE FROM rate_limits WHERE window_start < ?").bind(cutoff).run();
-  const row = await db
-    .prepare("SELECT count FROM rate_limits WHERE key = ?")
-    .bind(key)
-    .first<{ count: number }>();
-  if (!row) {
-    await db
-      .prepare("INSERT INTO rate_limits (key, window_start, count) VALUES (?, datetime('now'), 1)")
-      .bind(key)
-      .run();
-    return false;
-  }
-  if ((row.count || 0) >= CLAIM_MAX_PER_WINDOW) {
-    return true;
-  }
-  await db
-    .prepare("UPDATE rate_limits SET count = count + 1 WHERE key = ?")
-    .bind(key)
-    .run();
-  return false;
-}
+const CLAIM_RATE_LIMIT = { windowSeconds: 60, max: 20 } as const;
 
 function licenseIatFromKey(licenseKey: string): string | null {
   try {
@@ -51,7 +27,12 @@ export async function claimHandler(c: Context<{ Bindings: Env }>) {
     return c.json({ ok: false, error: "Too many claim attempts — try again shortly." }, 429);
   }
 
-  const body = await c.req.json<{ code?: string }>();
+  let body: { code?: string };
+  try {
+    body = await c.req.json<{ code?: string }>();
+  } catch {
+    return c.json({ ok: false, error: "invalid json" }, 400);
+  }
   const code = (body.code || "").trim();
   if (!code) {
     return c.json({ ok: false, error: "code required" }, 400);
@@ -107,7 +88,7 @@ export async function claimHandler(c: Context<{ Bindings: Env }>) {
     const iat =
       licenseIatFromKey(row.license_key) ||
       String(row.issued_at || "").trim() ||
-      activatedAt.toISOString().slice(0, 16);
+      activatedAt.toISOString();
     const resigned = await resignActivatedLicense(row.machine_id, row.package_days, ed25519Key, {
       iat,
       nonce: claim.nonce,
@@ -126,6 +107,11 @@ export async function claimHandler(c: Context<{ Bindings: Env }>) {
     .bind(claim.nonce)
     .run();
   await bumpVersion(c.env.DB);
+
+  // Periodic cleanup of stale rate_limits entries (older than 1 hour)
+  await c.env.DB.prepare(
+    "DELETE FROM rate_limits WHERE window_start < datetime('now', '-1 hour')",
+  ).run();
 
   return c.json({
     ok: true,

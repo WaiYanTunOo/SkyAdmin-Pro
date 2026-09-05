@@ -106,7 +106,7 @@ class FinancialDocsTabMixin:
         client_id = self._selected_client_id()
         self.fin_doc_tree.apply_theme()
         if client_id is None:
-            self.fin_doc_tree.set_rows([])
+            self.fin_doc_tree.set_rows([], empty_message="Select a client to view financial documents.")
             self.fin_summary_label.configure(text="")
             return
         cat_filter = self.fin_category_filter.get()
@@ -129,7 +129,7 @@ class FinancialDocsTabMixin:
                 )
             )
             iids.append(str(d["id"]))
-        self.fin_doc_tree.set_rows(rows, iids=iids)
+        self.fin_doc_tree.set_rows(rows, iids=iids, empty_message="No financial documents for this client yet.")
 
     def _add_financial_doc(self) -> None:
         from skyadmin_pro.config import FINANCIAL_DOC_CATEGORIES

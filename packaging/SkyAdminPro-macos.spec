@@ -6,11 +6,16 @@ import sys
 
 ROOT = os.path.dirname(os.path.abspath(SPECPATH))
 
+datas = []
+_pyproject = os.path.join(ROOT, "pyproject.toml")
+if os.path.isfile(_pyproject):
+    datas.append((_pyproject, "."))
+
 a = Analysis(
     [os.path.join(ROOT, "main.py")],
     pathex=[ROOT],
     binaries=[],
-    datas=[],
+    datas=datas,
     hiddenimports=[
         "customtkinter",
         "pandas",
@@ -21,6 +26,8 @@ a = Analysis(
         "cryptography.hazmat.primitives.kdf.pbkdf2",
         "deep_translator",
         "pyperclip",
+        "pypdf",
+        "tkinterdnd2",
     ],
     hookspath=[],
     hooksconfig={},
@@ -69,7 +76,7 @@ app = BUNDLE(
     icon=os.path.join(ROOT, "icon.png"),
     bundle_identifier="com.skycreation.skyadminpro",
     info_plist={
-        "CFBundleShortVersionString": "0.3.1",
+        "CFBundleShortVersionString": "0.3.2",
         "NSHighResolutionCapable": True,
     },
 )

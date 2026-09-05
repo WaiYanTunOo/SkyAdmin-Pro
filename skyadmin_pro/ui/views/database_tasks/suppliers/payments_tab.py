@@ -128,7 +128,7 @@ class SupplierPaymentsTab:
             )
             iids.append(str(payment["id"]))
             tags.append(["completed"] if payment.get("paid") else [])
-        self.pay_tree.set_rows(rows, iids=iids, tags=tags)
+        self.pay_tree.set_rows(rows, iids=iids, tags=tags, empty_message="No supplier payments recorded.")
 
     def _format_pay_amount(self) -> None:
         value = format_thousands(self.pay_amount.get())

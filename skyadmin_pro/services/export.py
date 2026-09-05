@@ -5,6 +5,10 @@ from __future__ import annotations
 import os
 from datetime import date
 from pathlib import Path
+from typing import TYPE_CHECKING
+
+if TYPE_CHECKING:
+    import pandas as pd
 
 from skyadmin_pro.database import Database
 
@@ -15,7 +19,7 @@ def _assert_export_columns_safe(columns) -> None:
         raise ValueError(f"Refusing export — forbidden column(s): {', '.join(sorted(bad))}")
 
 
-def _sheet(frame, mapping: dict[str, str]):
+def _sheet(frame, mapping: dict[str, str]) -> pd.DataFrame:
     import pandas as pd
 
     if frame is None or frame.empty:
@@ -46,7 +50,15 @@ def _atomic_excel_write(writer_builder, dest: Path) -> Path:
     return dest
 
 
-def export_to_excel(db: Database, dest: Path) -> Path:
+def export_to_excel(
+    db: Database,
+    dest: Path,
+    *,
+    date_from: str | None = None,
+    date_to: str | None = None,
+    status: str | None = None,
+    client_ids: list[int] | None = None,
+) -> Path:
     import pandas as pd
 
     tasks = db.list_tasks()
@@ -59,6 +71,28 @@ def export_to_excel(db: Database, dest: Path) -> Path:
     pipeline = db.list_pipeline_items()
     renewals = db.all_service_renewals()
     financial_docs = db.all_financial_documents()
+
+    # Apply client_id filter if provided
+    if client_ids:
+        id_set = set(client_ids)
+        clients = [c for c in clients if c.get("id") in id_set]
+        client_name_set = {c.get("name", "") for c in clients}
+        documents = [d for d in documents if d.get("client_name") in client_name_set]
+        tasks = [t for t in tasks if t.get("client_name") in client_name_set]
+
+    # Apply status filter
+    if status:
+        s = status.strip().lower()
+        tasks = [t for t in tasks if (t.get("status") or "").lower() == s]
+        clients = [c for c in clients if (c.get("status") or "").lower() == s]
+
+    # Apply date range filter (on created_at / due_date / expiry_date)
+    if date_from:
+        tasks = [t for t in tasks if (t.get("created_at") or "") >= date_from]
+        documents = [d for d in documents if (d.get("expiry_date") or "") >= date_from]
+    if date_to:
+        tasks = [t for t in tasks if (t.get("created_at") or "") <= date_to]
+        documents = [d for d in documents if (d.get("expiry_date") or "") <= date_to]
 
     def build(target: Path) -> None:
         payments_frame = pd.DataFrame(supplier_payments)
@@ -217,24 +251,24 @@ def export_monthly_report(db: Database, year: int, month: int, dest: Path) -> Pa
     import pandas as pd
 
     rows = db.list_incentive_services(year, month)
-    mapping = {
-        "client_name": "Client",
-        "service": "Service",
-        "amount": "Amount",
-        "service_date": "Start date",
-        "source": "Source",
-    }
+    columns = ["No.", "Date", "Client", "Service", "Amount"]
+    records = []
+    for index, row in enumerate(rows, start=1):
+        service_date = (row.get("service_date") or "")[:10]
+        records.append(
+            {
+                "No.": index,
+                "Date": service_date or None,
+                "Client": row.get("client_name") or "",
+                "Service": row.get("service") or "",
+                "Amount": row.get("amount") if row.get("amount") not in (None, "") else None,
+            }
+        )
 
     def build(target: Path) -> None:
-        df = pd.DataFrame(rows)
-        if df.empty:
-            df = pd.DataFrame(columns=list(mapping.values()))
-        else:
-            keep = [col for col in mapping if col in df.columns]
-            df = df[keep].rename(columns=mapping)
-            df["Source"] = df["Source"].map({"doc": "Document", "pipe": "Pipeline"}).fillna(df["Source"])
+        df = pd.DataFrame(records, columns=columns)
         with pd.ExcelWriter(target, engine="openpyxl") as writer:
-            df.to_excel(writer, sheet_name="Incentive services", index=False)
+            df.to_excel(writer, sheet_name="Pipeline", index=False)
 
     return _atomic_excel_write(build, Path(dest))
 

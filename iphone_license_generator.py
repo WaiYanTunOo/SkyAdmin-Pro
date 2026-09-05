@@ -16,7 +16,6 @@ import csv
 import json
 import os
 import sys
-from datetime import datetime
 
 DEFAULT_API_URL = "https://skyadmin-worker.skyadmin-pro.workers.dev"
 FALLBACK_PRICE_MAP = {1: 50, 7: 500, 30: 800, 365: 9000}

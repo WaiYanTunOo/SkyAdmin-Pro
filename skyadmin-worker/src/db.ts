@@ -22,10 +22,15 @@ export async function setMeta(db: D1Database, key: string, value: string): Promi
 }
 
 export async function bumpVersion(db: D1Database): Promise<number> {
-  const current = await getMeta(db, "control_version");
-  const next = (parseInt(current) || 0) + 1;
-  await setMeta(db, "control_version", String(next));
-  return next;
+  const row = await db
+    .prepare(
+      `INSERT INTO control_meta (key, value) VALUES ('control_version', '1')
+       ON CONFLICT(key) DO UPDATE SET value = CAST(CAST(value AS INTEGER) + 1 AS TEXT)
+       RETURNING value`
+    )
+    .first<{ value: string }>();
+  const val = parseInt(row?.value || "1", 10);
+  return isNaN(val) ? 1 : val;
 }
 
 export async function listRevocations(db: D1Database): Promise<string[]> {

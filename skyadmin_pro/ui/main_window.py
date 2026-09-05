@@ -91,8 +91,63 @@ class MainWindow(dnd_base_class()):
         self._build_content()
         self._build_status_bar()
         self.show_view(NAV_DASHBOARD)
+        self._bind_keyboard_shortcuts()
+        self._start_auto_backup()
 
         self.protocol("WM_DELETE_WINDOW", self._on_close)
+
+    def _bind_keyboard_shortcuts(self) -> None:
+        """Global keyboard shortcuts — Ctrl+S save, Ctrl+E export, Ctrl+B backup, Ctrl+F find."""
+        self.bind("<Control-s>", lambda _e: self._shortcut_action("save"))
+        self.bind("<Control-S>", lambda _e: self._shortcut_action("save"))
+        self.bind("<Control-e>", lambda _e: self._shortcut_action("export"))
+        self.bind("<Control-E>", lambda _e: self._shortcut_action("export"))
+        self.bind("<Control-b>", lambda _e: self._shortcut_action("backup"))
+        self.bind("<Control-B>", lambda _e: self._shortcut_action("backup"))
+        self.bind("<Control-f>", lambda _e: self.open_global_search())
+        self.bind("<Control-F>", lambda _e: self.open_global_search())
+        self.bind("<Control-n>", lambda _e: self._shortcut_action("new"))
+        self.bind("<Control-N>", lambda _e: self._shortcut_action("new"))
+        self.bind("<Control-d>", lambda _e: self._toggle_dark_light())
+        self.bind("<Control-D>", lambda _e: self._toggle_dark_light())
+
+    def _toggle_dark_light(self) -> None:
+        """Toggle between Dark and Light mode (Ctrl+D)."""
+        import customtkinter as _ctk
+        from skyadmin_pro.config import SETTING_APPEARANCE_MODE
+        current = _ctk.get_appearance_mode()
+        new_mode = "light" if current == "Dark" else "dark"
+        _ctk.set_appearance_mode(new_mode)
+        self.db.set_setting(SETTING_APPEARANCE_MODE, new_mode)
+        self.apply_app_theme()
+        # Sync settings view if open
+        settings = self._views.get("settings")
+        if settings is not None and hasattr(settings, "appearance_menu"):
+            settings.appearance_menu.set(new_mode.capitalize())
+
+    def open_global_search(self) -> None:
+        """Open the global search dialog (Ctrl+F)."""
+        from skyadmin_pro.ui.views.global_search import GlobalSearchDialog
+        GlobalSearchDialog(self)
+
+    def _shortcut_action(self, action: str) -> None:
+        """Dispatch keyboard shortcut to the active view."""
+        if self._active_key is None:
+            return
+        view = self._views.get(self._active_key)
+        if view is None:
+            return
+        handler = getattr(view, f"_on_shortcut_{action}", None)
+        if callable(handler):
+            handler()
+
+    def _start_auto_backup(self) -> None:
+        try:
+            from skyadmin_pro.services.auto_backup import AutoBackupScheduler
+            self._auto_backup = AutoBackupScheduler(self)
+            self._auto_backup.start()
+        except Exception:
+            pass  # non-critical — don't crash on backup scheduler failure
 
     def _build_sidebar(self) -> None:
         # Plain logical width — CustomTkinter scales it for Windows DPI itself;
@@ -230,12 +285,20 @@ class MainWindow(dnd_base_class()):
         self._views[key] = view
         return view
 
+    def get_view(self, key: str) -> ctk.CTkFrame | None:
+        """Public accessor for views — replaces private _views access from other modules."""
+        return self._views.get(key)
+
     def _build_status_bar(self) -> None:
-        self.status_bar = ctk.CTkFrame(self, height=STATUS_BAR_HEIGHT, corner_radius=0)
+        # Scale height with DPI to avoid clipping at 150% (32*1.35=43)
+        try:
+            scale = float(self.tk.call("tk", "scaling"))
+        except Exception:
+            scale = 1.0
+        scaled_h = int(STATUS_BAR_HEIGHT * max(1.0, min(1.35, scale)))
+        self.status_bar = ctk.CTkFrame(self, height=scaled_h, corner_radius=0)
         self.status_bar.grid(row=1, column=1, sticky="ew")
         self.status_bar.grid_columnconfigure(0, weight=1)
-        # Let text dictate height at high DPI instead of clipping.
-        self.status_bar.grid_propagate(False)
         self.status_bar.grid_rowconfigure(0, weight=1)
 
         self.status_label = ctk.CTkLabel(
@@ -280,11 +343,13 @@ class MainWindow(dnd_base_class()):
 
     def apply_app_theme(self, root: ctk.Misc | None = None) -> None:
         """Re-apply form input and table styling after appearance changes."""
-        from skyadmin_pro.ui.widgets import apply_form_theme
+        from skyadmin_pro.ui.widgets import apply_form_theme, should_apply_theme
 
         if root is not None:
             apply_form_theme(root)
             return
+        if not should_apply_theme():
+            return  # skip full walk if mode unchanged
         apply_form_theme(self)
         for view in self._views.values():
             apply_form_theme(view)
@@ -375,6 +440,12 @@ class MainWindow(dnd_base_class()):
 
     def set_status(self, message: str) -> None:
         self.status_label.configure(text=message)
+
+    def invalidate_dashboard(self) -> None:
+        """Mark the dashboard cache stale after data changes in other views."""
+        view = self._views.get("dashboard")
+        if view is not None and hasattr(view, "mark_stale"):
+            view.mark_stale()
 
     def _on_close(self) -> None:
         # Give the active view a chance to cancel polling / after handles so

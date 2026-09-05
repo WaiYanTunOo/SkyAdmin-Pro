@@ -2,33 +2,9 @@
 
 from __future__ import annotations
 
+from datetime import date
 from pathlib import Path
 from tkinter import filedialog, messagebox
-
-import customtkinter as ctk
-
-from skyadmin_pro.config import (
-    CHECKLIST_TEMPLATES,
-    DEFAULT_COLOR_THEME,
-    DEFAULT_PORTAL_URL,
-    MOBILE_VIEWER_URL,
-    OWNER_EMAIL,
-    PRICING_DEFAULT_SERVICE,
-    SERVICE_TYPES,
-    SETTING_APPEARANCE_MODE,
-    SETTING_COLOR_THEME,
-    SETTING_PORTAL_URL,
-    SETTING_WORKSPACE_CUSTOM,
-    SETTING_WORKSPACE_ROOT,
-    pricing_uses_transaction_ranges,
-)
-from skyadmin_pro.paths import WorkspacePaths
-from skyadmin_pro.services.data_hygiene import run_data_hygiene
-from skyadmin_pro.services.file_ops import open_in_file_manager
-from skyadmin_pro.services.workflow import normalize_portal_url, repair_client_workspaces
-from skyadmin_pro.ui.theme import TEXT_MUTED
-from skyadmin_pro.ui.treeview import ThemedTreeview
-from skyadmin_pro.ui.widgets import FeedbackLabel, bind_wrap_label, make_modal, themed_entry
 
 
 class BackupMixin:
@@ -61,55 +37,74 @@ class BackupMixin:
                 text_color=("#15803d", "#4ade80"),
             )
 
+    def _toggle_auto_backup(self) -> None:
+        from skyadmin_pro.services.auto_backup import (
+            SETTING_AUTO_BACKUP_ENABLED,
+            SETTING_AUTO_BACKUP_INTERVAL,
+        )
+        enabled = self._auto_backup_enabled_var.get()
+        interval = self._auto_backup_interval_var.get()
+        self.app.db.set_setting(SETTING_AUTO_BACKUP_ENABLED, enabled)
+        self.app.db.set_setting(SETTING_AUTO_BACKUP_INTERVAL, interval)
+        if enabled == "1":
+            self.feedback.info(f"Auto-backup enabled ({interval}).")
+        else:
+            self.feedback.info("Auto-backup disabled.")
+
     def _backup_encrypted(self) -> None:
         dest = filedialog.asksaveasfilename(
             parent=self.winfo_toplevel(),
             title="Save Encrypted Backup",
             defaultextension=".skybackup",
-            initialfile=f"SkyAdminPro_Backup_{__import__('datetime').date.today().isoformat()}.skybackup",
+            initialfile=f"SkyAdminPro_Backup_{date.today().isoformat()}.skybackup",
             filetypes=[("SkyAdmin Backup", "*.skybackup"), ("All files", "*.*")],
         )
         if not dest:
             return
         self.feedback.info("Creating encrypted backup… please wait.")
         self.configure(cursor="watch")
+        for btn in (getattr(self, "backup_action_btn", None), getattr(self, "restore_backup_btn", None)):
+            if btn is not None:
+                btn.configure(state="disabled")
         self.update_idletasks()
-        import threading
+        from skyadmin_pro.ui.async_ui import run_background
 
-        def _worker():
-            err = None
-            try:
-                from skyadmin_pro.services.crypto import create_encrypted_backup
+        dest_path = Path(dest)
 
-                create_encrypted_backup(self.app.paths.root, self.app.db.db_file, Path(dest))
-            except Exception as exc:
-                err = str(exc)
+        def work() -> Path:
+            from skyadmin_pro.services.crypto import create_encrypted_backup
 
-            def _done():
-                if not self.winfo_exists():
-                    return
-                self.configure(cursor="")
-                if err:
-                    self.feedback.error(f"Backup failed: {err}")
-                else:
-                    from skyadmin_pro.services.crypto import format_byte_size
+            create_encrypted_backup(self.app.paths.root, self.app.db.db_file, dest_path)
+            return dest_path
 
-                    size = format_byte_size(Path(dest).stat().st_size)
-                    self.feedback.success(f"Encrypted backup saved: {Path(dest).name} ({size})")
-                    from datetime import date as _d
+        def on_success(saved: Path) -> None:
+            from skyadmin_pro.services.crypto import format_byte_size
 
-                    from skyadmin_pro.config import SETTING_LAST_ENCRYPTED_BACKUP
+            size = format_byte_size(saved.stat().st_size)
+            self.feedback.success(f"Encrypted backup saved: {saved.name} ({size})")
+            from datetime import date as _d
 
-                    self.app.db.set_setting(SETTING_LAST_ENCRYPTED_BACKUP, _d.today().isoformat())
-                    self._refresh_backup_banner()
-                    self.app.set_status(f"Backup saved to {dest}")
+            from skyadmin_pro.config import SETTING_LAST_ENCRYPTED_BACKUP
 
-            try:
-                self.after(0, _done)
-            except Exception:
-                pass
+            self.app.db.set_setting(SETTING_LAST_ENCRYPTED_BACKUP, _d.today().isoformat())
+            self._refresh_backup_banner()
+            self.app.set_status(f"Backup saved to {dest}")
 
-        threading.Thread(target=_worker, daemon=True).start()
+        def _enable_backup_buttons() -> None:
+            self.configure(cursor="")
+            if getattr(self, "backup_action_btn", None) is not None:
+                self.backup_action_btn.configure(state="normal")
+            if getattr(self, "restore_backup_btn", None) is not None:
+                self.restore_backup_btn.configure(state="normal")
+
+        run_background(
+            self,
+            work=work,
+            on_success=on_success,
+            on_error=lambda err: self.feedback.error(f"Backup failed: {err}"),
+            finally_fn=_enable_backup_buttons,
+            feedback=self.feedback,
+        )
 
     def _restore_encrypted(self) -> None:
         src = filedialog.askopenfilename(
@@ -159,72 +154,73 @@ class BackupMixin:
             return
         self.feedback.info("Restoring encrypted backup… please wait.")
         self.configure(cursor="watch")
+        for btn in (getattr(self, "backup_action_btn", None), getattr(self, "restore_backup_btn", None)):
+            if btn is not None:
+                btn.configure(state="disabled")
         self.update_idletasks()
-        import threading
+        from skyadmin_pro.ui.async_ui import run_background
 
-        def _worker():
-            err = None
-            safety_path = None
-            summary = None
-            try:
-                from datetime import datetime as _dt
+        def work() -> None:
+            from datetime import datetime as _dt
 
-                from skyadmin_pro.services.crypto import (
-                    create_encrypted_backup,
-                    restore_encrypted_backup,
-                )
-
-                try:
-                    self.app.db.shutdown()
-                except Exception:
-                    pass
-
-                backup_dir = self.app.db.db_file.parent / "backups"
-                backup_dir.mkdir(parents=True, exist_ok=True)
-                stamp = _dt.now().strftime("%Y%m%d_%H%M%S")
-                safety_path = backup_dir / f"pre_restore_{stamp}.skybackup"
-                create_encrypted_backup(self.app.paths.root, self.app.db.db_file, safety_path)
-                summary = restore_encrypted_backup(src_path, self.app.paths.root, self.app.db.db_file)
-            except Exception as exc:
-                err = str(exc)
-
-            def _done():
-                if not self.winfo_exists():
-                    return
-                self.configure(cursor="")
-                if err:
-                    self.feedback.error(f"Restore failed: {err}")
-                else:
-                    from skyadmin_pro.services.crypto import format_byte_size
-
-                    restored = (
-                        f"Database: {format_byte_size(summary.database_bytes)}\n"
-                        f"Workspace: {summary.workspace_files_restored} file(s), "
-                        f"{format_byte_size(summary.workspace_bytes)}"
-                    )
-                    safety = f"\n\nSafety backup:\n{safety_path}" if safety_path is not None else ""
-                    self.feedback.success("Restore complete — please restart the app.")
-                    self.app.set_status("Restore complete — restart required")
-                    messagebox.showinfo(
-                        "Restore complete",
-                        f"Backup restored successfully.\n\n{restored}{safety}\n\n"
-                        "SkyAdmin Pro will close now. Reopen it to load the restored data.",
-                        parent=self.winfo_toplevel(),
-                    )
-                    try:
-                        self.app.db.shutdown()
-                    except Exception:
-                        pass
-                    root = self.winfo_toplevel()
-                    try:
-                        root.destroy()
-                    except Exception:
-                        pass
+            from skyadmin_pro.services.crypto import (
+                create_encrypted_backup,
+                restore_encrypted_backup,
+            )
 
             try:
-                self.after(0, _done)
+                self.app.db.shutdown()
             except Exception:
                 pass
 
-        threading.Thread(target=_worker, daemon=True).start()
+            backup_dir = self.app.db.db_file.parent / "backups"
+            backup_dir.mkdir(parents=True, exist_ok=True)
+            stamp = _dt.now().strftime("%Y%m%d_%H%M%S")
+            safety_path = backup_dir / f"pre_restore_{stamp}.skybackup"
+            create_encrypted_backup(self.app.paths.root, self.app.db.db_file, safety_path)
+            summary = restore_encrypted_backup(src_path, self.app.paths.root, self.app.db.db_file)
+            return safety_path, summary
 
+        def on_success(result) -> None:
+            from skyadmin_pro.services.crypto import format_byte_size
+
+            safety_path, summary = result
+            restored = (
+                f"Database: {format_byte_size(summary.database_bytes)}\n"
+                f"Workspace: {summary.workspace_files_restored} file(s), "
+                f"{format_byte_size(summary.workspace_bytes)}"
+            )
+            safety = f"\n\nSafety backup:\n{safety_path}" if safety_path is not None else ""
+            self.feedback.success("Restore complete — please restart the app.")
+            self.app.set_status("Restore complete — restart required")
+            messagebox.showinfo(
+                "Restore complete",
+                f"Backup restored successfully.\n\n{restored}{safety}\n\n"
+                "SkyAdmin Pro will close now. Reopen it to load the restored data.",
+                parent=self.winfo_toplevel(),
+            )
+            try:
+                self.app.db.shutdown()
+            except Exception:
+                pass
+            root = self.winfo_toplevel()
+            try:
+                root.destroy()
+            except Exception:
+                pass
+
+        def _enable_backup_buttons() -> None:
+            self.configure(cursor="")
+            if getattr(self, "backup_action_btn", None) is not None:
+                self.backup_action_btn.configure(state="normal")
+            if getattr(self, "restore_backup_btn", None) is not None:
+                self.restore_backup_btn.configure(state="normal")
+
+        run_background(
+            self,
+            work=work,
+            on_success=on_success,
+            on_error=lambda err: self.feedback.error(f"Restore failed: {err}"),
+            finally_fn=_enable_backup_buttons,
+            feedback=self.feedback,
+        )

@@ -35,6 +35,7 @@ class CoreMixin:
         self._organization_list_cache: list[str] | None = None
         self._department_list_cache: list[str] | None = None
         self._wal_enabled: bool | None = None
+        self._pooled_conn: sqlite3.Connection | None = None
         self._initialize()
 
     def _connect(self) -> sqlite3.Connection:
@@ -45,45 +46,90 @@ class CoreMixin:
         conn.execute("PRAGMA temp_store = MEMORY")
         conn.execute("PRAGMA cache_size = -8000")
         conn.execute("PRAGMA busy_timeout = 5000")
-        if self._wal_enabled is None:
-            try:
-                conn.execute("PRAGMA journal_mode=WAL")
-                self._wal_enabled = True
-            except sqlite3.Error:
-                self._log.warning("WAL mode unavailable; staying in rollback-journal mode")
+        try:
+            cur = conn.execute("PRAGMA journal_mode=WAL")
+            mode = cur.fetchone()
+            # WAL returns 'wal' on success; log if fallback
+            if mode and str(mode[0]).lower() != "wal":
+                self._log.warning("WAL mode not enabled, got %s", mode[0])
                 self._wal_enabled = False
+            else:
+                self._wal_enabled = True
+        except sqlite3.Error:
+            self._log.warning("WAL mode unavailable; staying in rollback-journal mode")
+            self._wal_enabled = False
+        return conn
+
+    def _get_pooled_conn(self) -> sqlite3.Connection:
+        """Return the reused connection, creating it on first call.
+
+        Validates the connection is still alive with a lightweight query.
+        """
+        conn = self._pooled_conn
+        if conn is not None:
+            try:
+                conn.execute("SELECT 1")
+                return conn
+            except (sqlite3.ProgrammingError, sqlite3.OperationalError):
+                # Connection was closed or broken; create a fresh one.
+                try:
+                    conn.close()
+                except Exception:
+                    pass
+                self._pooled_conn = None
+        conn = self._connect()
+        self._pooled_conn = conn
         return conn
 
     @contextmanager
     def connection(self) -> Generator[sqlite3.Connection, None, None]:
-        conn = self._connect()
+        conn = self._get_pooled_conn()
         try:
             yield conn
             conn.commit()
         except Exception:
             conn.rollback()
             raise
-        finally:
-            conn.close()
+
+    def _fetch_all(self, sql: str, params: tuple = ()) -> list[dict]:
+        with self.connection() as conn:
+            rows = conn.execute(sql, params).fetchall()
+        return [dict(row) for row in rows]
+
+    def _fetch_one(self, sql: str, params: tuple = ()) -> dict | None:
+        with self.connection() as conn:
+            row = conn.execute(sql, params).fetchone()
+        return dict(row) if row is not None else None
 
     def _initialize(self) -> None:
-        self._migrate()
+        from skyadmin_pro.db.migrations import run_pending_migrations
+
+        run_pending_migrations(self, max_version=1)
         with self.connection() as conn:
             conn.executescript(SCHEMA_SQL)
-        self._backfill_sync_global_ids()
-        self._migrate_secret_fields()
-        self._migrate_legacy_vault()
-        self._migrate_ird_to_client_credentials()
-        self._migrate_pricing_matrix_services()
-        self._migrate_client_credentials_login_id()
+        run_pending_migrations(self, min_version=2)
         self._seed_settings()
         self._seed_checklist_templates()
         self._seed_pricing_matrix()
         # Safety net: verify integrity once, then take today's snapshot.
+        ok = True
         try:
-            self.quick_check()
+            ok = self.quick_check()
         except Exception:
             self._log.warning("Integrity check failed", exc_info=True)
+            ok = False
+        if not ok:
+            # Persist flag for UI banner (Settings will surface)
+            try:
+                self.set_setting("db_integrity_failed", "1")
+            except Exception:
+                self._log.debug("Could not set db_integrity_failed flag", exc_info=True)
+            self._log.error("DB integrity FAILED — UI should show banner; restore from backups if needed")
+        else:
+            try:
+                self.set_setting("db_integrity_failed", "0")
+            except Exception:
+                self._log.debug("Could not clear db_integrity_failed flag", exc_info=True)
         try:
             self.auto_backup()
         except Exception:
@@ -170,6 +216,7 @@ class CoreMixin:
 
             # Reinitialize with the restored database
             self._wal_enabled = None
+            self._close_pooled_conn()
             self._initialize()
             self._log.info("Database restored from %s", backup_path)
             return True
@@ -189,6 +236,18 @@ class CoreMixin:
                 conn.execute("PRAGMA wal_checkpoint(TRUNCATE)")
         except Exception:
             self._log.warning("Shutdown checkpoint failed", exc_info=True)
+        finally:
+            self._close_pooled_conn()
+
+    def _close_pooled_conn(self) -> None:
+        """Close the pooled connection if open."""
+        conn = self._pooled_conn
+        if conn is not None:
+            try:
+                conn.close()
+            except Exception:
+                pass
+            self._pooled_conn = None
 
     def _migrate(self) -> None:
         """Add columns introduced after the first release (idempotent).

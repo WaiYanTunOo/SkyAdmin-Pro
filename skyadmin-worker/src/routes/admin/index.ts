@@ -1,0 +1,1 @@
+export { adminHandler } from "./handler";

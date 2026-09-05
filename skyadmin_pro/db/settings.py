@@ -135,6 +135,36 @@ class SettingsMixin:
             conn.execute("DELETE FROM sync_conflicts")
         return count
 
+    def list_audit_log(self, limit: int = 200) -> list[dict]:
+        """Unified audit log: tax_cycle_log + sync_conflicts, newest first."""
+        lim = max(1, min(int(limit), 1000))
+        with self.connection() as conn:
+            tax_rows = conn.execute(
+                """
+                SELECT t.id, c.name AS client_name, t.field, t.old_value, t.new_value,
+                       t.changed_at AS timestamp, 'tax_change' AS log_type
+                FROM tax_cycle_log t
+                LEFT JOIN clients c ON c.id = t.client_id
+                ORDER BY t.changed_at DESC
+                LIMIT ?
+                """,
+                (lim,),
+            ).fetchall()
+            sync_rows = conn.execute(
+                """
+                SELECT id, table_name, global_id, direction,
+                       local_updated_at, remote_updated_at, logged_at AS timestamp,
+                       'sync_conflict' AS log_type
+                FROM sync_conflicts
+                ORDER BY logged_at DESC
+                LIMIT ?
+                """,
+                (lim,),
+            ).fetchall()
+        combined = [dict(r) for r in tax_rows] + [dict(r) for r in sync_rows]
+        combined.sort(key=lambda r: r.get("timestamp") or "", reverse=True)
+        return combined[:lim]
+
     def list_service_types(self) -> list[str]:
         if self._service_types_cache is not None:
             return list(self._service_types_cache)

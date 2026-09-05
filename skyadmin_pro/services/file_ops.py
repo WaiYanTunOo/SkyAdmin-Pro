@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import logging
 import os
 import re
 import shutil
@@ -10,6 +11,10 @@ import sys
 from dataclasses import dataclass, field
 from datetime import date, datetime
 from pathlib import Path
+from typing import TYPE_CHECKING
+
+if TYPE_CHECKING:
+    from PIL import Image
 
 from skyadmin_pro.config import (
     DOC_TYPE_PASSPORT_VISA,
@@ -17,6 +22,8 @@ from skyadmin_pro.config import (
     PDF_SUFFIX,
 )
 from skyadmin_pro.paths import WorkspacePaths
+
+logger = logging.getLogger(__name__)
 
 _UNSAFE_CHARS = re.compile(r'[<>:"/\\|?*]+')
 _WHITESPACE = re.compile(r"\s+")
@@ -189,6 +196,9 @@ def copy_file(source: Path, dest_dir: Path, new_name: str | None = None) -> Path
 
 def open_in_file_manager(path: Path) -> None:
     resolved = path.resolve()
+    if not resolved.exists():
+        raise RuntimeError(f"Path does not exist: {resolved}")
+    logger.info("Opening in file manager: %s", resolved)
     try:
         if sys.platform == "win32":
             os.startfile(resolved)  # type: ignore[attr-defined]
@@ -200,7 +210,7 @@ def open_in_file_manager(path: Path) -> None:
         raise RuntimeError(f"Could not open folder: {resolved}") from exc
 
 
-def _as_rgb(image):
+def _as_rgb(image: Image.Image) -> Image.Image:
     from PIL import Image
 
     if image.mode == "RGB":

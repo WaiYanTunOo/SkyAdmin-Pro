@@ -9,6 +9,8 @@ Translations live in this file. Missing keys fall back to English.
 
 from __future__ import annotations
 
+import threading
+
 _TRANSLATIONS = {
     "my": {
         # Navigation
@@ -57,15 +59,18 @@ _TRANSLATIONS = {
 }
 
 _current_lang = "en"
+_lang_lock = threading.Lock()
 
 
 def set_language(lang: str) -> None:
     global _current_lang
-    _current_lang = lang
+    with _lang_lock:
+        _current_lang = lang
 
 
 def get_language() -> str:
-    return _current_lang
+    with _lang_lock:
+        return _current_lang
 
 
 def available_languages() -> list[str]:

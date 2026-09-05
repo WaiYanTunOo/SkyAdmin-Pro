@@ -49,8 +49,12 @@ function mockEnv(overrides: Partial<Env> & { dbState?: Record<string, unknown> }
           return { results: [] };
         },
         run: async () => {
-          if (sql.toLowerCase().includes("insert into sync_devices")) {
+          const sqlLower = sql.toLowerCase();
+          if (sqlLower.includes("insert into sync_devices")) {
             state.sync_devices.set(String(args[0]), String(args[1]));
+          }
+          if (sqlLower.includes("update sync_devices set token")) {
+            state.sync_devices.set(String(args[1]), String(args[0]));
           }
           return { success: true };
         },
@@ -120,5 +124,25 @@ describe("POST /api/sync/register", () => {
       body: JSON.stringify({ code: pass }),
     }, env);
     expect(res.status).toBe(403);
+  });
+
+  it("rotates sync token on repeat register", async () => {
+    const pass = await generatePasscode(MID, 7, DEV_ED25519_KEY_B64);
+    const env = mockEnv();
+    const first = await app.request("http://localhost/api/sync/register", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ code: pass }),
+    }, env);
+    const firstBody = await first.json();
+    const second = await app.request("http://localhost/api/sync/register", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ code: pass }),
+    }, env);
+    const secondBody = await second.json();
+    expect(firstBody.sync_token).toBeTruthy();
+    expect(secondBody.sync_token).toBeTruthy();
+    expect(secondBody.sync_token).not.toBe(firstBody.sync_token);
   });
 });

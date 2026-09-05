@@ -2,8 +2,9 @@
 
 from __future__ import annotations
 
+from collections.abc import Callable
 from tkinter import messagebox
-from typing import TYPE_CHECKING, Callable
+from typing import TYPE_CHECKING
 
 import customtkinter as ctk
 
@@ -101,6 +102,7 @@ class SupplierDirectoryTab:
                 for s in suppliers
             ],
             iids=[str(s["id"]) for s in suppliers],
+            empty_message="No suppliers yet — add one above.",
         )
         return suppliers
 
@@ -156,7 +158,7 @@ class SupplierDirectoryTab:
             return
         self.feedback.success("Supplier saved.")
         self._new_supplier()
-        self.host.refresh()
+        self.host.refresh_after_directory_change()
 
     def _new_supplier(self) -> None:
         self.selected_supplier_id = None
@@ -181,4 +183,4 @@ class SupplierDirectoryTab:
         self.app.db.delete_supplier(int(iid))
         self.feedback.success("Supplier deleted (payments removed too).")
         self._new_supplier()
-        self.host.refresh()
+        self.host.refresh_after_directory_change()

@@ -21,18 +21,16 @@ from skyadmin_pro.ui.theme import (
     FEEDBACK_ERROR,
     FEEDBACK_INFO,
     FEEDBACK_SUCCESS,
-    FONT_SIZE_SM,
     FORM_FIELD_HEIGHT,
     FORM_LABEL_COLOR,
     FORM_LABEL_FONT_SIZE,
     FORM_LABEL_GAP,
-    SECTION_GAP,
     SURFACE_BG,
+    TEXT_MUTED,
+    TEXT_SUBTLE,
     TEXTBOX_BORDER,
     TEXTBOX_FG,
     TEXTBOX_TEXT,
-    TEXT_MUTED,
-    TEXT_SUBTLE,
     WRAP_CARD,
     card_style_kwargs,
     scrollable_style_kwargs,
@@ -139,8 +137,13 @@ def _apply_input_theme(widget: ctk.CTkBaseClass) -> None:
         widget.configure(**entry_style_kwargs())
 
 
+_LAST_THEME_MODE: str | None = None
+
+
 def apply_form_theme(root: ctk.Misc) -> None:
     """Re-apply input and table styling after appearance mode changes."""
+    from skyadmin_pro.ui.canvas_scroll import CanvasScrollFrame
+
     if isinstance(root, ThemedTreeview):
         root.apply_theme()
     elif isinstance(root, ctk.CTkTabview):
@@ -150,6 +153,8 @@ def apply_form_theme(root: ctk.Misc) -> None:
         fg = root.cget("fg_color")
         if fg in ("transparent", "Transparent", None, ""):
             root.configure(**scrollable_style_kwargs())
+    elif isinstance(root, CanvasScrollFrame):
+        root.refresh_theme()
     elif isinstance(root, _INPUT_WIDGET_TYPES):
         _apply_input_theme(root)
 
@@ -159,6 +164,16 @@ def apply_form_theme(root: ctk.Misc) -> None:
         return
     for child in children:
         apply_form_theme(child)
+
+
+def should_apply_theme() -> bool:
+    """Return True if the appearance mode changed since last call. Skips redundant full walks."""
+    global _LAST_THEME_MODE
+    current = ctk.get_appearance_mode()
+    if current == _LAST_THEME_MODE:
+        return False
+    _LAST_THEME_MODE = current
+    return True
 
 
 class SectionCard(ctk.CTkFrame):
@@ -358,7 +373,7 @@ def bind_escape(top) -> None:
 def make_modal(top) -> None:
     """Standard dialog setup: grab focus (best effort) + Escape to close."""
 
-    def _grab():
+    def _grab() -> None:
         try:
             top.grab_set()
         except Exception:
@@ -520,6 +535,28 @@ def _step_month(view: date, delta: int) -> date:
     return date(total // 12, total % 12 + 1, 1)
 
 
+def calendar_popup_position(
+    *,
+    anchor_x: int,
+    anchor_y: int,
+    anchor_w: int,
+    anchor_h: int,
+    popup_w: int,
+    popup_h: int,
+    screen_w: int,
+    screen_h: int,
+    margin: int = 8,
+) -> tuple[int, int]:
+    """Place a calendar popup below the anchor field, flipping up near the screen bottom."""
+    x = anchor_x
+    if x + popup_w > screen_w - margin:
+        x = max(margin, screen_w - popup_w - margin)
+    y = anchor_y + anchor_h
+    if y + popup_h > screen_h - margin:
+        y = max(margin, anchor_y - popup_h)
+    return x, y
+
+
 class DatePickerField(ctk.CTkFrame):
     """Text entry plus a calendar popup; the StringVar always holds ISO YYYY-MM-DD."""
 
@@ -527,15 +564,38 @@ class DatePickerField(ctk.CTkFrame):
         super().__init__(master, fg_color="transparent", **kwargs)
         self.grid_columnconfigure(0, weight=1)
         self.var = var if var is not None else ctk.StringVar()
-        ctk.CTkEntry(self, textvariable=self.var, placeholder_text="YYYY-MM-DD", **entry_style_kwargs()).grid(
-            row=0, column=0, sticky="ew"
-        )
+        self._calendar_top: ctk.CTkToplevel | None = None
+        self._dismiss_bind_id: str | None = None
+        self._entry = ctk.CTkEntry(self, textvariable=self.var, placeholder_text="YYYY-MM-DD", **entry_style_kwargs())
+        self._entry.grid(row=0, column=0, sticky="ew")
         ctk.CTkButton(
             self,
             text="Calendar",
             width=96,
             command=self._open_calendar,
         ).grid(row=0, column=1, padx=(8, 0))
+        # Cleanup if parent destroyed while popup open
+        self.bind("<Destroy>", self._on_destroy)
+        # Validate manual entry on focus out
+        self._entry.bind("<FocusOut>", lambda _e: self._validate_entry())
+
+    def _on_destroy(self, event) -> None:
+        if event.widget is self:
+            self._close_calendar()
+
+    def _validate_entry(self) -> None:
+        value = self.var.get().strip()
+        if not value:
+            self._entry.configure(border_color=ENTRY_BORDER)
+            return
+        for fmt in ("%Y-%m-%d", "%d/%m/%Y", "%d-%m-%Y"):
+            try:
+                datetime.strptime(value, fmt).date()
+                self._entry.configure(border_color=ENTRY_BORDER)
+                return
+            except ValueError:
+                continue
+        self._entry.configure(border_color=FEEDBACK_ERROR)
 
     def _initial_date(self) -> date:
         value = self.var.get().strip()
@@ -546,23 +606,97 @@ class DatePickerField(ctk.CTkFrame):
                 continue
         return date.today()
 
+    def _close_calendar(self) -> None:
+        top = self._calendar_top
+        root = self.winfo_toplevel()
+        if self._dismiss_bind_id is not None:
+            try:
+                root.unbind("<Button-1>", self._dismiss_bind_id)
+            except Exception:
+                pass
+            self._dismiss_bind_id = None
+        if top is not None and top.winfo_exists():
+            try:
+                top.grab_release()
+            except Exception:
+                pass
+            top.destroy()
+        self._calendar_top = None
+
+    def _bind_dismiss_on_click_outside(self, top: ctk.CTkToplevel) -> None:
+        root = self.winfo_toplevel()
+        # Close any other open DatePickerField calendar on the same root
+        for child in root.winfo_children():
+            try:
+                if hasattr(child, "_calendar_top") and child._calendar_top is not None and child is not self:
+                    child._close_calendar()
+            except Exception:
+                pass
+
+        def _contains(widget, root_x: int, root_y: int) -> bool:
+            try:
+                if not widget.winfo_exists():
+                    return False
+                x = widget.winfo_rootx()
+                y = widget.winfo_rooty()
+                return x <= root_x <= x + widget.winfo_width() and y <= root_y <= y + widget.winfo_height()
+            except Exception:
+                return False
+
+        def _on_click(event) -> None:
+            if not top.winfo_exists():
+                return
+            if _contains(top, event.x_root, event.y_root) or _contains(self, event.x_root, event.y_root):
+                return
+            self._close_calendar()
+
+        self._dismiss_bind_id = root.bind("<Button-1>", _on_click, add="+")
+        # Also dismiss on Escape from root
+        top.bind("<Escape>", lambda _e: self._close_calendar())
+        root.bind("<Escape>", lambda _e: self._close_calendar() if self._calendar_top else None, add="+")
+
+    def _place_calendar_popup(self, top: ctk.CTkToplevel, width: int, height: int) -> None:
+        top.update_idletasks()
+        # Use widget's screen for multi-monitor; fallback to top's screen
+        try:
+            screen_w = self.winfo_screenwidth()
+            screen_h = self.winfo_screenheight()
+        except Exception:
+            screen_w = top.winfo_screenwidth()
+            screen_h = top.winfo_screenheight()
+        # Scale popup for DPI (CustomTkinter scaling)
+        try:
+            scaling = float(self.tk.call("tk", "scaling"))  # type: ignore[attr-defined]
+            if scaling and scaling != 1.0:
+                # Keep logical size but ensure placement accounts for scaled screen
+                pass
+        except Exception:
+            pass
+        x, y = calendar_popup_position(
+            anchor_x=self.winfo_rootx(),
+            anchor_y=self.winfo_rooty(),
+            anchor_w=max(self.winfo_width(), 1),
+            anchor_h=max(self.winfo_height(), 1),
+            popup_w=width,
+            popup_h=height,
+            screen_w=screen_w,
+            screen_h=screen_h,
+        )
+        top.geometry(f"{width}x{height}+{x}+{y}")
+
     def _open_calendar(self) -> None:
+        self._close_calendar()
         today = date.today()
         view = self._initial_date().replace(day=1)
 
-        top = ctk.CTkToplevel(self)
+        root = self.winfo_toplevel()
+        top = ctk.CTkToplevel(root)
+        self._calendar_top = top
         top.title("Pick a date")
         top.resizable(False, False)
-        top.attributes("-topmost", True)
-        top.transient(self.winfo_toplevel())
-        # Center over parent so it doesn't spawn off-screen in the frozen build.
-        try:
-            px, py = self.winfo_rootx(), self.winfo_rooty()
-            pw, ph = self.winfo_width(), self.winfo_height()
-            top.geometry(f"+{px + max(0, pw // 2 - 160)}+{py + max(0, ph // 2 - 160)}")
-        except Exception:
-            pass
-        make_modal(top)
+        top.transient(root)
+        top.protocol("WM_DELETE_WINDOW", self._close_calendar)
+        width, height = 360, 420
 
         body = ctk.CTkFrame(top, corner_radius=12)
         body.grid(row=0, column=0, padx=12, pady=12)
@@ -612,7 +746,7 @@ class DatePickerField(ctk.CTkFrame):
             width=80,
             fg_color="transparent",
             border_width=1,
-            command=top.destroy,
+            command=self._close_calendar,
         ).pack(side="right")
 
         def draw() -> None:
@@ -674,10 +808,34 @@ class DatePickerField(ctk.CTkFrame):
         _sync_year_menu()
         _sync_month_menu()
         draw()
+        self._place_calendar_popup(top, width, height)
+        self._bind_dismiss_on_click_outside(top)
+        top.deiconify()
+        top.lift()
+        try:
+            top.attributes("-topmost", True)
+            top.after(200, lambda: top.attributes("-topmost", False) if top.winfo_exists() else None)
+        except Exception:
+            pass
+
+        # Best-effort grab for modal dismissal
+        def _try_grab() -> None:
+            try:
+                if top.winfo_exists():
+                    top.grab_set()
+            except Exception:
+                pass
+
+        top.after(80, _try_grab)
+        try:
+            top.focus_force()
+        except Exception:
+            pass
+        bind_escape(top)
 
     def _pick(self, top: ctk.CTkToplevel, chosen: date) -> None:
         self.var.set(chosen.isoformat())
-        top.destroy()
+        self._close_calendar()
 
 
 class FeedbackLabel(ctk.CTkLabel):

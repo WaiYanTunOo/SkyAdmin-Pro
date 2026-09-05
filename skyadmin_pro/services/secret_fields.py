@@ -30,7 +30,7 @@ def encrypt_secret(value: str) -> str:
         return text
     from cryptography.fernet import Fernet
 
-    token = Fernet(_derive_fernet_key(get_machine_id())).encrypt(text.encode("utf-8"))
+    token = Fernet(_derive_fernet_key(get_machine_id(), 200_000)).encrypt(text.encode("utf-8"))
     return SECRET_PREFIX + token.decode("ascii")
 
 
@@ -60,15 +60,20 @@ def decrypt_secret(
     from cryptography.fernet import Fernet, InvalidToken
 
     blob = value[len(SECRET_PREFIX) :]
-    try:
-        plain = Fernet(_derive_fernet_key(get_machine_id())).decrypt(blob.encode("ascii"))
-        return plain.decode("utf-8")
-    except InvalidToken:
-        logger.warning("Encrypted secret could not be decrypted (wrong machine or tampered data)")
-        return ""
-    except (ValueError, OSError) as exc:
-        logger.warning("Encrypted secret decode failed: %s", exc)
-        return ""
+    mid = get_machine_id()
+    for iters in (200_000, 100_000):
+        try:
+            plain = Fernet(_derive_fernet_key(mid, iters)).decrypt(blob.encode("ascii"))
+            return plain.decode("utf-8")
+        except InvalidToken:
+            if iters == 100_000:
+                logger.warning("Encrypted secret could not be decrypted (wrong machine or tampered data)")
+                return ""
+            continue
+        except (ValueError, OSError) as exc:
+            logger.warning("Encrypted secret decode failed: %s", exc)
+            return ""
+    return ""
 
 
 def read_plaintext_for_migration(value: str | None) -> str:

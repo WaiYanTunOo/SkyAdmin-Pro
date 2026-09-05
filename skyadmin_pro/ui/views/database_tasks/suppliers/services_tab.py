@@ -104,7 +104,7 @@ class SupplierServicesTab:
     def _refresh_supplier_services(self) -> None:
         supplier_id = self._selected_supplier_id()
         if supplier_id is None:
-            self.supplier_svc_tree.set_rows([])
+            self.supplier_svc_tree.set_rows([], empty_message="Select a supplier in the Directory tab first.")
             return
         services = self.app.db.list_supplier_services(supplier_id)
         self.supplier_svc_tree.set_rows(
@@ -118,6 +118,7 @@ class SupplierServicesTab:
                 for s in services
             ],
             iids=[str(s["id"]) for s in services],
+            empty_message="No services for this supplier yet.",
         )
 
     def _add_supplier_service(self) -> None:

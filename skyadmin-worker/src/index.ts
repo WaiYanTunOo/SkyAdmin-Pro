@@ -82,6 +82,7 @@ app.use("/api/revoke", authMiddleware);
 app.use("/api/unrevoke", authMiddleware);
 app.use("/api/ban", authMiddleware);
 app.use("/api/unban", authMiddleware);
+app.use("/api/bans", authMiddleware);
 app.use("/api/used", authMiddleware);
 app.use("/api/revoke-pc", authMiddleware);
 app.use("/api/records", authMiddleware);

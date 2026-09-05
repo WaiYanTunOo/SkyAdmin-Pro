@@ -142,7 +142,7 @@ class TaxIdsTabMixin:
         self._client_cred_rows = {}
         self._set_cred_password_display()
         if client_id is None:
-            self.client_cred_tree.set_rows([])
+            self.client_cred_tree.set_rows([], empty_message="Select a client to view portal credentials.")
             return
         rows = self.app.db.list_client_credentials(client_id=client_id)
         tree_rows = []
@@ -158,7 +158,9 @@ class TaxIdsTabMixin:
                     row.get("portal_url") or "",
                 )
             )
-        self.client_cred_tree.set_rows(tree_rows, iids=iids)
+        self.client_cred_tree.set_rows(
+            tree_rows, iids=iids, empty_message="No portal credentials saved for this client."
+        )
         if iids:
             self.client_cred_tree.tree.selection_set(iids[0])
             self.client_cred_tree.tree.focus(iids[0])
@@ -272,4 +274,4 @@ class TaxIdsTabMixin:
             self.feedback.error(f"Could not save tax IDs: {exc}")
             return
         self.feedback.success("Tax IDs & service info saved.")
-        self.refresh()
+        self._refresh_tax_ids_mutation()

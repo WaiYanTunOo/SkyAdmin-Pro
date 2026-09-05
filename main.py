@@ -284,6 +284,9 @@ def bootstrap() -> MainWindow:
     theme = db.get_setting(SETTING_COLOR_THEME, DEFAULT_COLOR_THEME)
     import customtkinter as ctk
 
+    from skyadmin_pro.ui.display import apply_high_dpi_scaling
+
+    apply_high_dpi_scaling()
     ctk.set_appearance_mode(appearance or DEFAULT_APPEARANCE_MODE)
     ctk.set_default_color_theme(theme or DEFAULT_COLOR_THEME)
 

@@ -121,13 +121,13 @@ class ServicePipelinePanel(ctk.CTkFrame):
             )
             iids.append(str(item["id"]))
             tags.append([tag] if tag else [])
-        self.pipe_tree.set_rows(rows, iids=iids, tags=tags)
+        self.pipe_tree.set_rows(rows, iids=iids, tags=tags, empty_message="No pipeline items yet.")
         summary = self.app.db.pipeline_summary()
         self.summary.configure(text=f"{summary['total']} engagement(s) tracked — {summary['completed']} completed.")
 
     def _refresh_tasks_panel(self) -> None:
-        view = self.app._views.get("database_tasks")
-        if view is not None and hasattr(view, "tasks_panel"):
+        view = self.app.get_view("database_tasks")
+        if view is not None and getattr(view, "tasks_panel", None) is not None:
             view.tasks_panel.refresh()
 
     def _add_item(self) -> None:

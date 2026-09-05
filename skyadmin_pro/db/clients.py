@@ -282,7 +282,31 @@ class ClientsMixin:
         for row in rows:
             row["source"] = row["src"]
             row["id_key"] = f"{'doc' if row['src'] == 'doc' else 'pipe'}-{row['id']}"
+            row["amount"] = self._resolve_incentive_amount(row.get("service"), row.get("amount"))
         return rows
+
+    def _resolve_incentive_amount(self, service: str | None, doc_amount) -> str | int | None:
+        """Amount for incentive report — document value, else pricing matrix headcount/fee."""
+        if doc_amount not in (None, ""):
+            return doc_amount
+        service_name = (service or "").strip()
+        if not service_name:
+            return None
+        tiers = self.get_pricing_matrix(service_type=service_name)
+        if not tiers:
+            tiers = self._fetch_all(
+                """
+                SELECT * FROM pricing_matrix
+                WHERE lower(service_type) = lower(?)
+                ORDER BY monthly_fee ASC
+                LIMIT 1
+                """,
+                (service_name,),
+            )
+        if tiers:
+            tier = tiers[0]
+            return tier.get("headcount") or tier.get("monthly_fee")
+        return None
 
     def list_client_documents(self, client_id: int) -> list[dict]:
         clause, params = _in_clause("d.document_type", tuple(self.list_service_types()))
@@ -301,16 +325,6 @@ class ClientsMixin:
 
     def _now(self) -> str:
         return datetime.now().strftime("%Y-%m-%d %H:%M:%S")
-
-    def _fetch_all(self, sql: str, params: tuple = ()) -> list[dict]:
-        with self.connection() as conn:
-            rows = conn.execute(sql, params).fetchall()
-        return [dict(row) for row in rows]
-
-    def _fetch_one(self, sql: str, params: tuple = ()) -> dict | None:
-        with self.connection() as conn:
-            row = conn.execute(sql, params).fetchone()
-        return dict(row) if row is not None else None
 
     def list_clients(self) -> list[dict]:
         return self._fetch_all(
@@ -361,7 +375,7 @@ class ClientsMixin:
                     (fts_query,),
                 )
         except Exception:
-            pass
+            self._log.debug("FTS search failed, falling back to LIKE", exc_info=True)
         like = f"%{_escape_like(q)}%"
         return self._fetch_all(
             base_select
@@ -387,6 +401,7 @@ class ClientsMixin:
         vat_registration: str | None = None,
         business_address: str | None = None,
         business_objectives: str | None = None,
+        group_id: int | None = None,
     ) -> None:
         """Update a client. None keeps the current value; '' clears a text field."""
         if status is not None and status not in {"active", "inactive"}:
@@ -417,6 +432,7 @@ class ClientsMixin:
             "business_objectives": (
                 business_objectives if business_objectives is not None else current["business_objectives"]
             ),
+            "group_id": group_id if group_id is not None else current.get("group_id"),
         }
         with self.connection() as conn:
             try:
@@ -427,7 +443,8 @@ class ClientsMixin:
                         notes = ?, status = ?,
                         registration_number = ?, director = ?, contact_number = ?,
                         registered_capital = ?, vat_registration = ?,
-                        business_address = ?, business_objectives = ?, updated_at = ?
+                        business_address = ?, business_objectives = ?,
+                        group_id = ?, updated_at = ?
                     WHERE id = ?
                     """,
                     (
@@ -444,6 +461,7 @@ class ClientsMixin:
                         values["vat_registration"],
                         values["business_address"],
                         values["business_objectives"],
+                        values["group_id"],
                         self._now(),
                         client_id,
                     ),
@@ -458,3 +476,63 @@ class ClientsMixin:
                 (client_id,),
             )
             conn.execute("DELETE FROM clients WHERE id = ?", (client_id,))
+
+    def batch_delete_clients(self, client_ids: list[int]) -> int:
+        """Delete multiple clients and cascade-delete related tasks. Returns count deleted."""
+        if not client_ids:
+            return 0
+        placeholders = ",".join("?" for _ in client_ids)
+        with self.connection() as conn:
+            conn.execute(
+                f"DELETE FROM tasks WHERE pipeline_item_id IN (SELECT id FROM pipeline_items WHERE client_id IN ({placeholders}))",
+                client_ids,
+            )
+            cursor = conn.execute(
+                f"DELETE FROM clients WHERE id IN ({placeholders})",
+                client_ids,
+            )
+        return cursor.rowcount
+
+    def batch_update_client_status(self, client_ids: list[int], status: str) -> int:
+        """Update status for multiple clients. Returns count updated."""
+        if not client_ids:
+            return 0
+        placeholders = ",".join("?" for _ in client_ids)
+        with self.connection() as conn:
+            cursor = conn.execute(
+                f"UPDATE clients SET status = ?, updated_at = ? WHERE id IN ({placeholders})",
+                [status, self._now(), *client_ids],
+            )
+        return cursor.rowcount
+
+    # -- Client groups --------------------------------------------------
+
+    def list_client_groups(self) -> list[dict]:
+        with self.connection() as conn:
+            rows = conn.execute(
+                "SELECT id, name, color FROM client_groups ORDER BY name COLLATE NOCASE"
+            ).fetchall()
+        return [dict(r) for r in rows]
+
+    def add_client_group(self, name: str, color: str | None = None) -> int:
+        with self.connection() as conn:
+            cur = conn.execute(
+                "INSERT INTO client_groups (name, color) VALUES (?, ?)",
+                (name, color),
+            )
+        return cur.lastrowid
+
+    def update_client_group(self, group_id: int, name: str, color: str | None = None) -> int:
+        with self.connection() as conn:
+            cur = conn.execute(
+                "UPDATE client_groups SET name = ?, color = ? WHERE id = ?",
+                (name, color, group_id),
+            )
+        return cur.rowcount
+
+    def delete_client_group(self, group_id: int) -> int:
+        """Delete a group (clients in it become ungrouped)."""
+        with self.connection() as conn:
+            conn.execute("UPDATE clients SET group_id = NULL WHERE group_id = ?", (group_id,))
+            cur = conn.execute("DELETE FROM client_groups WHERE id = ?", (group_id,))
+        return cur.rowcount

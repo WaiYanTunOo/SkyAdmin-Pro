@@ -13,7 +13,11 @@ from skyadmin_pro.services.license_authoring import (
     build_control_envelope_v2,
     generate_ed25519_license,
     generate_ed25519_passcode,
+)
+from skyadmin_pro.services.license_authoring import (
     generate_license as legacy_hmac_license,
+)
+from skyadmin_pro.services.license_authoring import (
     generate_passcode as legacy_hmac_passcode,
 )
 from skyadmin_pro.services.license_crypto import license_payload_string
@@ -154,8 +158,7 @@ def test_burn_blocks_redemption(mid, fake_app_dir, monkeypatch):
     assert ok
 
     monkeypatch.setattr(
-        lic,
-        "_read_license_payload",
+        "skyadmin_pro.services.license.verify._read_license_payload",
         lambda: {"mid": mid, "exp": payload["exp"], "n": "other-nonce-xyz"},
     )
     ok, msg, _ = lic.check_activation_usable(key)
@@ -414,6 +417,10 @@ def test_daily_sync_status_shows_time_remaining(monkeypatch):
     """UI sync line shows remaining window, not last-check timestamp."""
     now = datetime.now()
     monkeypatch.setattr(lic, "_get_last_sync_time", lambda: now - timedelta(hours=2))
+    monkeypatch.setattr(
+        "skyadmin_pro.services.license.online._get_last_sync_time",
+        lambda: now - timedelta(hours=2),
+    )
     ok, msg = lic.get_daily_sync_status()
     assert ok
     assert "left" in msg
@@ -421,7 +428,10 @@ def test_daily_sync_status_shows_time_remaining(monkeypatch):
     assert "h" in msg
 
     monkeypatch.setattr(lic, "_get_last_sync_time", lambda: now - timedelta(hours=25))
+    monkeypatch.setattr(
+        "skyadmin_pro.services.license.online._get_last_sync_time",
+        lambda: now - timedelta(hours=25),
+    )
     ok, msg = lic.get_daily_sync_status()
     assert not ok
     assert "Overdue" in msg
-

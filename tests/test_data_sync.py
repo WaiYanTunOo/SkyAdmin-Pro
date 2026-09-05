@@ -3,8 +3,6 @@
 import json
 import uuid
 
-import pytest
-
 from skyadmin_pro.config import SETTING_DATA_SYNC_ENABLED, SETTING_SYNC_LAST_PULL
 from skyadmin_pro.services import data_sync as sync
 
@@ -156,7 +154,6 @@ def test_apply_remote_tombstone_marks_deleted(db):
     row = db._fetch_one("SELECT deleted_at FROM clients WHERE global_id = ?", (gid,))
     assert row["deleted_at"] == "2026-05-01 10:00:00"
 
-
     gid = uuid.uuid4().hex
     with db.connection() as conn:
         conn.execute(
@@ -186,9 +183,7 @@ def test_register_sync_device_persists_credentials(monkeypatch, fake_app_dir):
 
     class FakeResp:
         def read(self, n=-1):
-            return json.dumps(
-                {"ok": True, "machine_id": "ABCD1234EFGH5678", "sync_token": "tok123"}
-            ).encode()
+            return json.dumps({"ok": True, "machine_id": "ABCD1234EFGH5678", "sync_token": "tok123"}).encode()
 
         def __enter__(self):
             return self
@@ -203,6 +198,59 @@ def test_register_sync_device_persists_credentials(monkeypatch, fake_app_dir):
     assert ok
     creds = sync.load_sync_credentials()
     assert creds == ("ABCD1234EFGH5678", "tok123")
+
+
+def test_rotate_sync_credentials_after_license_change(monkeypatch, fake_app_dir):
+    import urllib.request
+
+    import skyadmin_pro.config as config
+    import skyadmin_pro.paths as paths_mod
+
+    monkeypatch.setattr(paths_mod, "app_data_dir", lambda: fake_app_dir)
+    monkeypatch.setattr(config, "API_BASE_URL", "https://worker.test")
+    sync.save_sync_credentials("ABCD1234EFGH5678", "old-token")
+    monkeypatch.setattr(sync, "_license_code", lambda: "fake-license")
+
+    class FakeResp:
+        def __init__(self, token: str):
+            self._token = token
+
+        def read(self, n=-1):
+            return json.dumps({"ok": True, "machine_id": "ABCD1234EFGH5678", "sync_token": self._token}).encode()
+
+        def __enter__(self):
+            return self
+
+        def __exit__(self, *a):
+            return False
+
+    tokens = iter(["new-token-1", "new-token-2"])
+
+    def fake_urlopen(req, timeout=0):
+        return FakeResp(next(tokens))
+
+    monkeypatch.setattr(urllib.request, "urlopen", fake_urlopen)
+
+    ok, msg = sync.rotate_sync_credentials_after_license_change()
+    assert ok, msg
+    assert sync.load_sync_credentials() == ("ABCD1234EFGH5678", "new-token-1")
+
+
+def test_rotate_sync_skips_when_no_credentials(monkeypatch, fake_app_dir):
+    import skyadmin_pro.paths as paths_mod
+
+    monkeypatch.setattr(paths_mod, "app_data_dir", lambda: fake_app_dir)
+    calls: list[str] = []
+
+    def fail_register(*_a, **_k):
+        calls.append("register")
+        return False, "should not run"
+
+    monkeypatch.setattr(sync, "register_sync_device", fail_register)
+    ok, msg = sync.rotate_sync_credentials_after_license_change()
+    assert ok
+    assert "No sync credentials" in msg
+    assert calls == []
 
 
 def test_sync_data_pull_push_updates_cursor(db, monkeypatch, fake_app_dir):
@@ -230,7 +278,9 @@ def test_sync_data_pull_push_updates_cursor(db, monkeypatch, fake_app_dir):
         if "/api/sync/pull" in req.full_url:
             body = json.dumps({"ok": True, "server_time": "2026-04-01T09:00:00Z", "changes": []}).encode()
         else:
-            body = json.dumps({"ok": True, "applied": 1, "conflicts": 0, "server_time": "2026-04-01T09:00:00Z"}).encode()
+            body = json.dumps(
+                {"ok": True, "applied": 1, "conflicts": 0, "server_time": "2026-04-01T09:00:00Z"}
+            ).encode()
 
         class R:
             def read(self, n=-1):

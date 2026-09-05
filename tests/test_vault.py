@@ -2,8 +2,6 @@
 
 from __future__ import annotations
 
-import pytest
-
 from skyadmin_pro.services.vault import decrypt_vault_secret, encrypt_vault_secret
 
 

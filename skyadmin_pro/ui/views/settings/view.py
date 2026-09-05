@@ -2,54 +2,39 @@
 
 from __future__ import annotations
 
-from pathlib import Path
-from tkinter import filedialog, messagebox
-
 import customtkinter as ctk
 
 from skyadmin_pro.config import (
-    CHECKLIST_TEMPLATES,
+    APP_TAGLINE,
     DEFAULT_COLOR_THEME,
     DEFAULT_PORTAL_URL,
     LEGAL_DISCLAIMER_SHORT,
     MOBILE_VIEWER_URL,
-    OWNER_EMAIL,
     PRICING_DEFAULT_SERVICE,
-    SERVICE_TYPES,
-    SETTING_APPEARANCE_MODE,
     SETTING_COLOR_THEME,
     SETTING_PORTAL_URL,
-    SETTING_WORKSPACE_CUSTOM,
-    SETTING_WORKSPACE_ROOT,
     TRANSACTION_RANGES,
-    pricing_uses_transaction_ranges,
 )
-from skyadmin_pro.paths import WorkspacePaths
-from skyadmin_pro.services.data_hygiene import run_data_hygiene
-from skyadmin_pro.services.file_ops import open_in_file_manager
-from skyadmin_pro.services.workflow import normalize_portal_url, repair_client_workspaces
 from skyadmin_pro.ui.theme import TEXT_MUTED
 from skyadmin_pro.ui.treeview import ThemedTreeview
 from skyadmin_pro.ui.views.base import BaseView
-from skyadmin_pro.ui.widgets import (
-    FeedbackLabel,
-    SectionCard,
-    bind_wrap_label,
-    labeled_entry,
-    make_modal,
-    option_menu_style_kwargs,
-    themed_entry,
-    themed_scrollable_frame,
-    card_style_kwargs,
-    themed_tabview,
-    themed_textbox,
-)
-
 from skyadmin_pro.ui.views.settings.backup_mixin import BackupMixin
 from skyadmin_pro.ui.views.settings.checklist_mixin import ChecklistMixin
 from skyadmin_pro.ui.views.settings.license_mixin import LicenseMixin
 from skyadmin_pro.ui.views.settings.pricing_mixin import PricingMixin
 from skyadmin_pro.ui.views.settings.workspace_mixin import WorkspaceMixin
+from skyadmin_pro.ui.widgets import (
+    FeedbackLabel,
+    SectionCard,
+    bind_wrap_label,
+    card_style_kwargs,
+    labeled_entry,
+    option_menu_style_kwargs,
+    themed_entry,
+    themed_scrollable_frame,
+    themed_tabview,
+    themed_textbox,
+)
 
 
 class SettingsView(BackupMixin, ChecklistMixin, LicenseMixin, PricingMixin, WorkspaceMixin, BaseView):
@@ -142,9 +127,7 @@ class SettingsView(BackupMixin, ChecklistMixin, LicenseMixin, PricingMixin, Work
         tag_row.grid_columnconfigure(0, weight=1)
         self.tagline_var = ctk.StringVar()
         themed_entry(tag_row, textvariable=self.tagline_var).grid(row=0, column=0, sticky="ew")
-        ctk.CTkButton(tag_row, text="Save", width=70, command=self._save_tagline).grid(
-            row=0, column=1, padx=(8, 0)
-        )
+        ctk.CTkButton(tag_row, text="Save", width=70, command=self._save_tagline).grid(row=0, column=1, padx=(8, 0))
 
         ctk.CTkLabel(body, text="Language", anchor="w").grid(row=3, column=0, sticky="w", pady=4)
         from skyadmin_pro.services.i18n import available_languages
@@ -259,6 +242,15 @@ class SettingsView(BackupMixin, ChecklistMixin, LicenseMixin, PricingMixin, Work
             command=self._open_sync_conflicts,
         )
         self.conflicts_btn.pack(side="left", padx=(0, 8))
+        self.audit_log_btn = ctk.CTkButton(
+            sync_btns,
+            text="Audit log",
+            width=90,
+            fg_color="transparent",
+            border_width=1,
+            command=self._open_audit_log,
+        )
+        self.audit_log_btn.pack(side="left", padx=(0, 8))
         self.check_updates_btn = ctk.CTkButton(
             sync_btns,
             text="Check updates",
@@ -496,6 +488,14 @@ class SettingsView(BackupMixin, ChecklistMixin, LicenseMixin, PricingMixin, Work
             border_width=1,
             command=self._import_directory_lists,
         ).grid(row=0, column=1, padx=(8, 0))
+        ctk.CTkButton(
+            dir_buttons,
+            text="Import clients CSV",
+            width=140,
+            fg_color="transparent",
+            border_width=1,
+            command=self._import_clients_csv,
+        ).grid(row=0, column=2, padx=(8, 0))
         row += 1
 
         checklists = SectionCard(
@@ -670,20 +670,45 @@ class SettingsView(BackupMixin, ChecklistMixin, LicenseMixin, PricingMixin, Work
         backup_body = backup.body
         backup_btns = ctk.CTkFrame(backup_body, fg_color="transparent")
         backup_btns.grid(row=0, column=0, sticky="w", pady=(0, 8))
-        ctk.CTkButton(backup_btns, text="Backup encrypted data…", width=200, command=self._backup_encrypted).pack(
-            side="left", padx=(0, 8)
+        self.backup_action_btn = ctk.CTkButton(
+            backup_btns, text="Backup encrypted data…", width=200, command=self._backup_encrypted
         )
-        ctk.CTkButton(
+        self.backup_action_btn.pack(side="left", padx=(0, 8))
+        self.restore_backup_btn = ctk.CTkButton(
             backup_btns,
             text="Restore encrypted backup…",
             width=200,
             fg_color="transparent",
             border_width=1,
             command=self._restore_encrypted,
-        ).pack(side="left")
+        )
+        self.restore_backup_btn.pack(side="left")
         self.backup_banner = ctk.CTkLabel(backup_body, text="", anchor="w", justify="left")
         self.backup_banner.grid(row=1, column=0, sticky="ew")
         bind_wrap_label(self.backup_banner, backup_body, pad=24)
+
+        # Auto-backup toggle
+        auto_frame = ctk.CTkFrame(backup_body, fg_color="transparent")
+        auto_frame.grid(row=2, column=0, sticky="ew", pady=(8, 0))
+        from skyadmin_pro.services.auto_backup import (
+            SETTING_AUTO_BACKUP_ENABLED,
+            SETTING_AUTO_BACKUP_INTERVAL,
+        )
+        self._auto_backup_enabled_var = ctk.StringVar(
+            value="1" if self.app.db.get_setting(SETTING_AUTO_BACKUP_ENABLED) == "1" else "0"
+        )
+        self._auto_backup_interval_var = ctk.StringVar(
+            value=self.app.db.get_setting(SETTING_AUTO_BACKUP_INTERVAL) or "daily"
+        )
+        ctk.CTkSwitch(
+            auto_frame, text="Auto-backup", variable=self._auto_backup_enabled_var,
+            onvalue="1", offvalue="0", command=self._toggle_auto_backup,
+        ).pack(side="left", padx=(0, 12))
+        ctk.CTkOptionMenu(
+            auto_frame, variable=self._auto_backup_interval_var,
+            values=["daily", "weekly", "off"], width=100,
+            command=lambda _: self._toggle_auto_backup(),
+        ).pack(side="left")
 
     def on_show(self) -> None:
         current = ctk.get_appearance_mode()
@@ -696,7 +721,7 @@ class SettingsView(BackupMixin, ChecklistMixin, LicenseMixin, PricingMixin, Work
         self.workspace_var.set(str(self.app.paths.root))
         self.tagline_var.set(
             self.app.db.get_setting("app_tagline")
-            or __import__("skyadmin_pro.config", fromlist=["APP_TAGLINE"]).APP_TAGLINE
+            or APP_TAGLINE
         )
         saved_lang = (self.app.db.get_setting("ui_language") or "en").upper()
         try:
@@ -732,3 +757,7 @@ class SettingsView(BackupMixin, ChecklistMixin, LicenseMixin, PricingMixin, Work
             row=0, column=1, padx=(8, 0)
         )
         return value
+
+    def _open_audit_log(self) -> None:
+        from skyadmin_pro.ui.views.audit_log import AuditLogDialog
+        AuditLogDialog(self.app)

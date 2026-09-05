@@ -119,6 +119,86 @@ Quick spot-check if time is short:
 | Settings | theme switch, license row, sync buttons |
 | Document Hub | all 6 tabs |
 
+### 6.1 Dashboard performance (this release)
+
+Run on a **clean Windows PC** at **125%** and **150%** display scaling.
+
+| Step | Action | Pass? |
+|------|--------|-------|
+| F.1 | Open app → Dashboard loads; stat cards populate within ~1s | ☐ |
+| F.2 | Scroll Dashboard — expiry / overdue / pending trees scroll smoothly (no nested page scroll) | ☐ |
+| F.3 | **Dashboard → Settings → Dashboard** quickly — view returns instantly; stat cards still correct; no visible tree flicker | ☐ |
+| F.4 | **Dashboard → Database & Tasks → Tasks** — complete a task → **Dashboard** — pending count and Next actions update | ☐ |
+| F.5 | Open expiry date on Company Details **General** tab (bottom of form) — calendar fully visible, not clipped | ☐ |
+| F.6 | **Document Hub** — switch away and back — only active tab polls (no background churn in status bar) | ☐ |
+| F.7 | **Database & Tasks** — switch Clients / Suppliers / Tasks tabs — only active tab reloads | ☐ |
+
+**Fail cues:** tree rows flash/rebuild on every sidebar click; calendar clipped inside scroll area; all 8 DB tabs reload when switching one tab.
+
+### 6.2 Signed installer smoke (VM)
+
+Run on a **fresh Windows 10/11 VM** with no Python installed. Requires a configured code-signing cert (see `packaging/SIGNING.md`).
+
+**Build machine (with cert):**
+
+```powershell
+cd D:\StudioProjects\SkyAdmin-Pro-main
+$env:SKYADMIN_SIGN_PFX = "C:\certs\skyadmin.pfx"
+$env:SKYADMIN_SIGN_PASSWORD = "your-pfx-password"
+.\packaging\build-installer.cmd
+python scripts\release_check.py --skip-pytest --require-signature
+```
+
+**Pass:** `RELEASE OK` — checks **both** `dist\SkyAdminPro.exe` and `dist\SkyAdminPro-Setup-<version>.exe` when using `--require-signature`.
+
+```powershell
+Get-AuthenticodeSignature dist\SkyAdminPro.exe
+Get-AuthenticodeSignature dist\SkyAdminPro-Setup-0.3.1.exe
+```
+
+Both should show `Status: Valid`.
+
+Copy `dist\SkyAdminPro-Setup-<version>.exe` to the VM (USB or shared folder).
+
+| Step | Action | Pass? |
+|------|--------|-------|
+| G.1 | `Get-AuthenticodeSignature .\SkyAdminPro-Setup-*.exe` → **Valid** (publisher name matches cert) | ☐ |
+| G.2 | Double-click installer — **no** “Unknown publisher” block (EV cert) or only SmartScreen “Run anyway” once (OV cert) | ☐ |
+| G.3 | Install completes; Start Menu shortcut launches app | ☐ |
+| G.4 | No console window flash; activation dialog appears on first run | ☐ |
+| G.5 | Uninstall from Settings → Apps removes Program Files; `%USERPROFILE%\.skyadmin_pro` remains | ☐ |
+
+**Without a cert (dev only):** `release_check.py --require-signature` correctly **blocks** with `NotSigned` — expected until Phase 11.2 cert is configured in CI or locally.
+
+---
+
+## 9. Bucket A + B — Windows ship track
+
+One-page view of what blocks “perfect on Windows” vs polish already in code.
+
+### Bucket A — must pass before rollout
+
+| # | Item | Owner | Status |
+|---|------|-------|--------|
+| A.1 | Code-signed **exe + installer** (`SKYADMIN_SIGN_*` → `build-installer.cmd`) | You + cert | ☐ Needs cert |
+| A.2 | `python scripts\release_check.py --require-signature` → **RELEASE OK** | Dev PC | ☐ |
+| A.3 | Clean VM install smoke (§3 + §6.2 G.1–G.5) | VM | ☐ |
+| A.4 | Manual UI spot-check (§6.1 F.1–F.7) at 125%/150% DPI | Clean PC | ☐ |
+| A.5 | Monthly incentive export matches your Excel (`SkyAdmin_Export_YYYYMM01.xlsx`, Pipeline sheet) | You | ☐ Verify one real month |
+
+### Bucket B — polish (mostly done in code; verify, don’t rebuild)
+
+| # | Item | In app? | Verify |
+|---|------|---------|--------|
+| B.1 | Company Details lazy sub-tabs | ✅ | Open DB Tasks → Company Details → only first tab builds |
+| B.2 | Treeview incremental refresh (20+ rows) | ✅ | Large client list scrolls without full flash |
+| B.3 | Dashboard deferred trees + quick switch skip | ✅ | Dashboard ↔ Settings — no tree flicker |
+| B.4 | High-DPI bootstrap (`ui/display.py`) | ✅ | §6.1 F.5 date picker not clipped |
+| B.5 | DB migrations numbered (`db/migrations/`) | ✅ | Fresh install + upgrade from old DB |
+| B.6 | **`admin.ts` split** (Worker maintainability) | ✅ | See `docs/WORKER_ADMIN.md` |
+
+**Ship when:** A.1–A.5 checked. B.1–B.5 are regression checks during A.4.
+
 ---
 
 ## 7. iPhone / HTML generator (optional)

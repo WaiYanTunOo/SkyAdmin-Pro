@@ -1,5 +1,5 @@
 #!/usr/bin/env bash
-# Build SkyAdmin Pro .app bundle on macOS (unsigned — dev use).
+# Build SkyAdmin Pro .app bundle on macOS with optional notarization.
 set -euo pipefail
 
 ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
@@ -26,8 +26,30 @@ if [[ -d "$APP" ]]; then
     echo ""
     echo "Built: $APP"
     echo "Run:   open \"$APP\""
-    echo "Note: unsigned — right-click → Open on first launch."
 else
     echo "Build failed — dist/SkyAdminPro.app not found." >&2
     exit 1
+fi
+
+# ── Notarization (optional) ──────────────────────────────────────────────
+# Requires: APPLE_ID, APPLE_TEAM_ID, APPLE_APP_PASSWORD in environment
+# Sign first: codesign --force --deep --sign "Developer ID Application: ..." "$APP"
+# Then notarize:
+if [[ "${NOTARIZE:-0}" == "1" ]]; then
+    if [[ -z "${APPLE_ID:-}" || -z "${APPLE_TEAM_ID:-}" || -z "${APPLE_APP_PASSWORD:-}" ]]; then
+        echo "Set APPLE_ID, APPLE_TEAM_ID, APPLE_APP_PASSWORD to notarize." >&2
+        exit 1
+    fi
+    ZIP="$ROOT/dist/SkyAdminPro.zip"
+    ditto -c -k --keepParent "$APP" "$ZIP"
+    echo "Submitting for notarization..."
+    xcrun notarytool submit "$ZIP" \
+        --apple-id "$APPLE_ID" \
+        --team-id "$APPLE_TEAM_ID" \
+        --password "$APPLE_APP_PASSWORD" \
+        --wait
+    echo "Stapling notarization ticket..."
+    xcrun stapler staple "$APP"
+    rm -f "$ZIP"
+    echo "Notarized: $APP"
 fi

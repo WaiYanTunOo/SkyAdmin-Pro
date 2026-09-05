@@ -4,6 +4,7 @@ from __future__ import annotations
 
 from collections.abc import Callable
 from pathlib import Path
+from tkinter import TclError
 from typing import Any
 
 import customtkinter as ctk
@@ -42,7 +43,7 @@ def init_dnd(window: Any) -> bool:
 def parse_dropped_files(widget: Any, data: str) -> list[Path]:
     try:
         parts = widget.tk.splitlist(data)
-    except Exception:
+    except (TclError, TypeError):
         parts = data.split()
     paths: list[Path] = []
     for raw in parts:

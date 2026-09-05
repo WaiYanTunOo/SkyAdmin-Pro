@@ -8,27 +8,15 @@ from tkinter import filedialog, messagebox
 import customtkinter as ctk
 
 from skyadmin_pro.config import (
-    CHECKLIST_TEMPLATES,
-    DEFAULT_COLOR_THEME,
-    DEFAULT_PORTAL_URL,
-    MOBILE_VIEWER_URL,
-    OWNER_EMAIL,
-    PRICING_DEFAULT_SERVICE,
-    SERVICE_TYPES,
     SETTING_APPEARANCE_MODE,
     SETTING_COLOR_THEME,
-    SETTING_PORTAL_URL,
     SETTING_WORKSPACE_CUSTOM,
     SETTING_WORKSPACE_ROOT,
-    pricing_uses_transaction_ranges,
 )
 from skyadmin_pro.paths import WorkspacePaths
 from skyadmin_pro.services.data_hygiene import run_data_hygiene
 from skyadmin_pro.services.file_ops import open_in_file_manager
-from skyadmin_pro.services.workflow import normalize_portal_url, repair_client_workspaces
-from skyadmin_pro.ui.theme import TEXT_MUTED
-from skyadmin_pro.ui.treeview import ThemedTreeview
-from skyadmin_pro.ui.widgets import FeedbackLabel, bind_wrap_label, make_modal, themed_entry
+from skyadmin_pro.services.workflow import repair_client_workspaces
 
 
 class WorkspaceMixin:
@@ -166,6 +154,33 @@ class WorkspaceMixin:
             f"Imported {new_clients} client company name(s) and {new_depts} department(s) from existing data."
         )
 
+    def _import_clients_csv(self) -> None:
+        from tkinter import filedialog
+
+        from skyadmin_pro.services.importer import import_clients_from_csv
+
+        csv_path = filedialog.askopenfilename(
+            parent=self.winfo_toplevel(),
+            title="Import clients from CSV",
+            filetypes=[("CSV files", "*.csv"), ("All files", "*.*")],
+        )
+        if not csv_path:
+            return
+        try:
+            stats = import_clients_from_csv(self.app.db, Path(csv_path))
+        except Exception as exc:
+            self.feedback.error(f"Import failed: {exc}")
+            return
+        parts = []
+        if stats["imported"]:
+            parts.append(f"{stats['imported']} imported")
+        if stats["skipped"]:
+            parts.append(f"{stats['skipped']} skipped (duplicate)")
+        if stats["errors"]:
+            parts.append(f"{stats['errors']} errors")
+        self.feedback.success("Import complete: " + ", ".join(parts) if parts else "No rows processed.")
+        self._load_directory_lists()
+
     def _on_language_change(self, lang: str) -> None:
         from skyadmin_pro.services import i18n
 
@@ -182,4 +197,3 @@ class WorkspaceMixin:
         self.feedback.success("Tagline saved.")
         self.app.refresh_tagline(saved)
         self.app.set_status(f"Tagline: {saved}")
-

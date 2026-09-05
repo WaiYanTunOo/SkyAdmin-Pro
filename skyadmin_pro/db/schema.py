@@ -43,6 +43,7 @@ CREATE TABLE IF NOT EXISTS clients (
     csh_renewal_date      TEXT,
     shareholder_info      TEXT,
     global_id             TEXT UNIQUE,
+    group_id              INTEGER,
     deleted_at            TEXT,
     created_at            TEXT    NOT NULL DEFAULT (datetime('now', 'localtime')),
     updated_at            TEXT    NOT NULL DEFAULT (datetime('now', 'localtime'))
@@ -211,6 +212,11 @@ CREATE INDEX IF NOT EXISTS idx_pipeline_client ON pipeline_items(client_id);
 CREATE INDEX IF NOT EXISTS idx_courier_logs_client ON courier_logs(client_id);
 CREATE INDEX IF NOT EXISTS idx_supplier_payments_due ON supplier_payments(due_date);
 CREATE INDEX IF NOT EXISTS idx_supplier_payments_paid ON supplier_payments(paid);
+CREATE INDEX IF NOT EXISTS idx_supplier_payments_unpaid_due
+    ON supplier_payments(due_date, supplier_id)
+    WHERE paid = 0
+      AND due_date IS NOT NULL
+      AND trim(due_date) != '';
 CREATE INDEX IF NOT EXISTS idx_renewals_service ON service_renewals(service_id);
 CREATE INDEX IF NOT EXISTS idx_renewals_client ON service_renewals(client_id);
 
@@ -352,6 +358,16 @@ CREATE INDEX IF NOT EXISTS idx_tasks_category ON tasks(category);
 CREATE INDEX IF NOT EXISTS idx_documents_type ON documents(document_type);
 CREATE INDEX IF NOT EXISTS idx_documents_progress ON documents(progress);
 CREATE INDEX IF NOT EXISTS idx_documents_paid ON documents(paid);
+CREATE INDEX IF NOT EXISTS idx_documents_unpaid_overdue
+    ON documents(payment_date, document_type, client_id)
+    WHERE client_id IS NOT NULL
+      AND COALESCE(paid, 0) = 0
+      AND payment_date IS NOT NULL
+      AND trim(payment_date) != '';
+CREATE INDEX IF NOT EXISTS idx_documents_ongoing_service
+    ON documents(document_type, client_id)
+    WHERE client_id IS NOT NULL
+      AND progress = 'Ongoing';
 CREATE INDEX IF NOT EXISTS idx_pipeline_step ON pipeline_items(step);
 CREATE INDEX IF NOT EXISTS idx_pipeline_updated ON pipeline_items(updated_at);
 CREATE INDEX IF NOT EXISTS idx_supplier_services_type ON supplier_services(service_type);
@@ -372,4 +388,13 @@ CREATE TABLE IF NOT EXISTS sync_conflicts (
     logged_at           TEXT    NOT NULL DEFAULT (datetime('now', 'localtime'))
 );
 CREATE INDEX IF NOT EXISTS idx_sync_conflicts_logged ON sync_conflicts(logged_at);
+
+-- P2.5: client grouping
+CREATE TABLE IF NOT EXISTS client_groups (
+    id          INTEGER PRIMARY KEY AUTOINCREMENT,
+    name        TEXT    NOT NULL UNIQUE COLLATE NOCASE,
+    color       TEXT,
+    created_at  TEXT    NOT NULL DEFAULT (datetime('now', 'localtime'))
+);
+CREATE INDEX IF NOT EXISTS idx_clients_group ON clients(group_id);
 """

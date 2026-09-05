@@ -75,7 +75,7 @@ def _compute_seal_key() -> bytes:
 def seal_value(data: str) -> str:
     """Create an HMAC seal of a string value."""
     key = _compute_seal_key()
-    sig = hmac.new(key, data.encode(), hashlib.sha256).hexdigest()[:16]
+    sig = hmac.new(key, data.encode(), hashlib.sha256).hexdigest()
     return f"{data}|{sig}"
 
 
@@ -86,7 +86,7 @@ def verify_seal(sealed: str) -> str | None:
         return None
     data, sig = parts
     key = _compute_seal_key()
-    expected = hmac.new(key, data.encode(), hashlib.sha256).hexdigest()[:16]
+    expected = hmac.new(key, data.encode(), hashlib.sha256).hexdigest()
     if not hmac.compare_digest(expected, sig):
         return None
     return data

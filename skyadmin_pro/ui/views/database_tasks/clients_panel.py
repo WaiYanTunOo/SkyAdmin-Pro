@@ -17,7 +17,7 @@ from skyadmin_pro.services.workflow import create_client_workspace
 from skyadmin_pro.ui.combo_utils import fill_combo
 from skyadmin_pro.ui.theme import CARD_RADIUS, CARD_TITLE_SIZE
 from skyadmin_pro.ui.treeview import ThemedTreeview
-from skyadmin_pro.ui.widgets import DatePickerField, FeedbackLabel, make_modal, themed_entry, themed_scrollable_frame
+from skyadmin_pro.ui.widgets import DatePickerField, FeedbackLabel, make_modal, themed_entry
 
 
 class ClientsExpiryPanel(ctk.CTkFrame):
@@ -27,13 +27,10 @@ class ClientsExpiryPanel(ctk.CTkFrame):
         self.feedback = feedback
         self.grid_columnconfigure(0, weight=1)
         self.grid_rowconfigure(0, weight=1)
+        self.grid_rowconfigure(1, weight=0)
 
-        scroll = themed_scrollable_frame(self)
-        scroll.grid(row=0, column=0, sticky="nsew")
-        scroll.grid_columnconfigure(0, weight=1)
-
-        left = ctk.CTkFrame(scroll, corner_radius=CARD_RADIUS)
-        left.grid(row=0, column=0, sticky="ew", pady=(0, 10))
+        left = ctk.CTkFrame(self, corner_radius=CARD_RADIUS)
+        left.grid(row=0, column=0, sticky="nsew", pady=(0, 10))
         left.grid_columnconfigure(0, weight=1)
         title_row = ctk.CTkFrame(left, fg_color="transparent")
         title_row.grid(row=0, column=0, sticky="ew", padx=16, pady=(14, 8))
@@ -49,12 +46,18 @@ class ClientsExpiryPanel(ctk.CTkFrame):
             textvariable=self.search_var,
             placeholder_text="Search name / email",
         ).grid(row=0, column=1, sticky="ew", padx=(12, 8))
+        self._group_filter_var = ctk.StringVar(value="All")
+        self.group_filter_menu = ctk.CTkOptionMenu(
+            title_row, variable=self._group_filter_var,
+            values=["All"], width=120, command=lambda _: self._refresh_clients(),
+        )
+        self.group_filter_menu.grid(row=0, column=2, padx=(0, 8))
         ctk.CTkButton(
             title_row,
             text="Export to Excel",
             width=130,
             command=self._export_excel,
-        ).grid(row=0, column=2, sticky="e", padx=(8, 0))
+        ).grid(row=0, column=3, sticky="e", padx=(8, 0))
         self.client_tree = ThemedTreeview(
             left,
             columns=(
@@ -108,7 +111,31 @@ class ClientsExpiryPanel(ctk.CTkFrame):
             command=self._open_suppliers,
         ).pack(side="left", padx=(8, 0))
 
-        right = ctk.CTkFrame(scroll, corner_radius=CARD_RADIUS)
+        # Batch action row (visible when items are selected)
+        batch_row = ctk.CTkFrame(left, fg_color="transparent")
+        batch_row.grid(row=3, column=0, sticky="ew", padx=12, pady=(0, 4))
+        ctk.CTkLabel(
+            batch_row, text="Batch:",
+            font=ctk.CTkFont(size=11, weight="bold"),
+            text_color="#9ca3af",
+        ).pack(side="left", padx=(0, 6))
+        ctk.CTkButton(
+            batch_row, text="Delete selected", width=110,
+            fg_color="#dc2626", hover_color="#b91c1c",
+            command=self._batch_delete,
+        ).pack(side="left", padx=(0, 4))
+        ctk.CTkButton(
+            batch_row, text="Mark Active", width=95,
+            fg_color="transparent", border_width=1,
+            command=lambda: self._batch_set_status("Active"),
+        ).pack(side="left", padx=(0, 4))
+        ctk.CTkButton(
+            batch_row, text="Mark Inactive", width=95,
+            fg_color="transparent", border_width=1,
+            command=lambda: self._batch_set_status("Inactive"),
+        ).pack(side="left")
+
+        right = ctk.CTkFrame(self, corner_radius=CARD_RADIUS)
         right.grid(row=1, column=0, sticky="ew")
         right.grid_columnconfigure(0, weight=1)
         ctk.CTkLabel(
@@ -157,6 +184,16 @@ class ClientsExpiryPanel(ctk.CTkFrame):
     def refresh(self) -> None:
         self.client_tree.apply_theme()
         self.doc_tree.apply_theme()
+        # Refresh group filter options
+        groups = self.app.db.list_client_groups()
+        group_names = ["All"] + [g["name"] for g in groups]
+        self._group_map = {g["name"]: g["id"] for g in groups}
+        current = self._group_filter_var.get()
+        self.group_filter_menu.configure(values=group_names)
+        if current in group_names:
+            self._group_filter_var.set(current)
+        else:
+            self._group_filter_var.set("All")
         self._refresh_client_table()
         clients = self.app.db.list_clients()
         names = [item["name"] for item in clients]
@@ -179,7 +216,7 @@ class ClientsExpiryPanel(ctk.CTkFrame):
             )
             iids.append(str(item["id"]))
             tags.append((tag,) if left is not None else ())
-        self.doc_tree.set_rows(rows, iids=iids, tags=tags)
+        self.doc_tree.set_rows(rows, iids=iids, tags=tags, empty_message="No expiring documents match this filter.")
 
     def _debounced_search(self) -> None:
         # Wait for a pause in typing before hitting the database.
@@ -196,6 +233,12 @@ class ClientsExpiryPanel(ctk.CTkFrame):
 
     def _refresh_client_table(self) -> None:
         clients = self.app.db.search_clients(self.search_var.get())
+        # Apply group filter
+        group_filter = self._group_filter_var.get()
+        if group_filter != "All":
+            group_id = getattr(self, "_group_map", {}).get(group_filter)
+            if group_id is not None:
+                clients = [c for c in clients if c.get("group_id") == group_id]
         rows, iids, tags = [], [], []
         for item in clients:
             rows.append(
@@ -208,10 +251,10 @@ class ClientsExpiryPanel(ctk.CTkFrame):
             )
             iids.append(str(item["id"]))
             tags.append(("inactive",) if item.get("status") == "inactive" else ())
-        self.client_tree.set_rows(rows, iids=iids, tags=tags)
+        self.client_tree.set_rows(rows, iids=iids, tags=tags, empty_message="No clients match this search.")
 
     def _export_excel(self) -> None:
-        view = self.app._views.get("database_tasks")
+        view = self.app.get_view("database_tasks")
         if view is not None and hasattr(view, "_export_excel"):
             view._export_excel()
 
@@ -292,8 +335,8 @@ class ClientsExpiryPanel(ctk.CTkFrame):
             if client_id is None:
                 cid = self.app.db.get_or_create_client(name)
                 self.app.db.update_client(cid, contact_name=contact, email=email, status=status)
-                view = self.app._views.get("database_tasks")
-                if view is not None and hasattr(view, "tasks_panel"):
+                view = self.app.get_view("database_tasks")
+                if view is not None and getattr(view, "tasks_panel", None) is not None:
                     view.tasks_panel.refresh()
             else:
                 self.app.db.update_client(
@@ -345,6 +388,32 @@ class ClientsExpiryPanel(ctk.CTkFrame):
         self.feedback.success("Client deleted.")
         self.refresh()
 
+    def _batch_delete(self) -> None:
+        iids = self.client_tree.selected_iids()
+        if not iids:
+            self.feedback.error("Select one or more clients first.")
+            return
+        if not messagebox.askyesno(
+            "Batch delete",
+            f"Delete {len(iids)} selected client(s)? This cannot be undone.",
+            parent=self.winfo_toplevel(),
+        ):
+            return
+        ids = [int(iid) for iid in iids]
+        count = self.app.db.batch_delete_clients(ids)
+        self.feedback.success(f"Deleted {count} client(s).")
+        self.refresh()
+
+    def _batch_set_status(self, status: str) -> None:
+        iids = self.client_tree.selected_iids()
+        if not iids:
+            self.feedback.error("Select one or more clients first.")
+            return
+        ids = [int(iid) for iid in iids]
+        count = self.app.db.batch_update_client_status(ids, status)
+        self.feedback.success(f"Updated {count} client(s) to {status}.")
+        self.refresh()
+
     def _open_client_folder(self) -> None:
         name = self._selected_client_name()
         if not name:
@@ -373,7 +442,7 @@ class ClientsExpiryPanel(ctk.CTkFrame):
         if not name:
             self.feedback.error("Select a client row first.")
             return
-        view = self.app._views.get("database_tasks")
+        view = self.app.get_view("database_tasks")
         if view is not None and hasattr(view, "open_company_details"):
             view.open_company_details(name)
             self.feedback.info(f"Showing details for {name}")

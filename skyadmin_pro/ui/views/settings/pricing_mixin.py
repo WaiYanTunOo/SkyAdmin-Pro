@@ -2,33 +2,18 @@
 
 from __future__ import annotations
 
-from pathlib import Path
-from tkinter import filedialog, messagebox
+from tkinter import messagebox
 
 import customtkinter as ctk
 
 from skyadmin_pro.config import (
-    CHECKLIST_TEMPLATES,
-    DEFAULT_COLOR_THEME,
-    DEFAULT_PORTAL_URL,
-    MOBILE_VIEWER_URL,
-    OWNER_EMAIL,
     PRICING_DEFAULT_SERVICE,
-    SERVICE_TYPES,
-    SETTING_APPEARANCE_MODE,
-    SETTING_COLOR_THEME,
     SETTING_PORTAL_URL,
-    SETTING_WORKSPACE_CUSTOM,
-    SETTING_WORKSPACE_ROOT,
     pricing_uses_transaction_ranges,
 )
-from skyadmin_pro.paths import WorkspacePaths
-from skyadmin_pro.services.data_hygiene import run_data_hygiene
-from skyadmin_pro.services.file_ops import open_in_file_manager
-from skyadmin_pro.services.workflow import normalize_portal_url, repair_client_workspaces
+from skyadmin_pro.services.workflow import normalize_portal_url
 from skyadmin_pro.ui.theme import TEXT_MUTED
-from skyadmin_pro.ui.treeview import ThemedTreeview
-from skyadmin_pro.ui.widgets import FeedbackLabel, bind_wrap_label, make_modal, themed_entry
+from skyadmin_pro.ui.widgets import make_modal, themed_entry
 
 
 class PricingMixin:
@@ -82,7 +67,11 @@ class PricingMixin:
             )
             for row in rows
         ]
-        self.pricing_tree.set_rows(tree_rows, iids=[str(row["id"]) for row in rows])
+        self.pricing_tree.set_rows(
+            tree_rows,
+            iids=[str(row["id"]) for row in rows],
+            empty_message="No pricing tiers for this service yet.",
+        )
         if rows:
             first = str(rows[0]["id"])
             self.pricing_tree.tree.selection_set(first)
@@ -238,9 +227,9 @@ class PricingMixin:
 
         buttons = ctk.CTkFrame(body, fg_color="transparent")
         buttons.grid(row=2, column=0, sticky="e", pady=(16, 0))
-        ctk.CTkButton(buttons, text="Cancel", width=90, fg_color="transparent", border_width=1, command=top.destroy).grid(
-            row=0, column=0, padx=(0, 8)
-        )
+        ctk.CTkButton(
+            buttons, text="Cancel", width=90, fg_color="transparent", border_width=1, command=top.destroy
+        ).grid(row=0, column=0, padx=(0, 8))
 
         def save() -> None:
             charge_name = name_var.get().strip()
@@ -308,4 +297,3 @@ class PricingMixin:
         self.app.db.set_setting(SETTING_PORTAL_URL, url)
         self.portal_var.set(url)
         self.feedback.success("Portal URL saved.")
-

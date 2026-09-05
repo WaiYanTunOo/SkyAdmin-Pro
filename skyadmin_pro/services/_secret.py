@@ -39,8 +39,7 @@ def _derive_secret() -> bytes:
         expected_crc = 0x868E28D8
         actual_crc = _binascii.crc32(crc_data) & 0xFFFFFFFF
         if actual_crc != expected_crc:
-            _SECRET = b"\x00" * 32
-            return _SECRET
+            raise RuntimeError("Secret integrity check failed — refusing weak key")
 
         parts_a = []
         parts_b = []

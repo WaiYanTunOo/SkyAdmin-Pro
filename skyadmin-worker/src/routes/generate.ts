@@ -1,8 +1,10 @@
 /** POST /api/generate — Generate a signed license key + passcode. */
 
 import { Context } from "hono";
-import { Env } from "../db";
+import { Env, bumpVersion } from "../db";
 import { generateLicenseKey, generatePasscode } from "../signing";
+import { loadPricingPackages } from "./pricing";
+import { priceForDays } from "../packages";
 
 interface GenerateBody {
   mid?: string;
@@ -11,10 +13,22 @@ interface GenerateBody {
 }
 
 export async function generateHandler(c: Context<{ Bindings: Env }>) {
-  const body = await c.req.json<GenerateBody>();
+  let body: GenerateBody;
+  try {
+    body = await c.req.json<GenerateBody>();
+  } catch {
+    return c.json({ ok: false, error: "invalid json" }, 400);
+  }
   const mid = (body.mid || "").trim().toUpperCase();
   const days = "days" in body ? body.days : 30;
-  const price = body.price ?? 0;
+  // Ignore client-supplied price; server computes from pricing packages to prevent injection
+  let price = 0;
+  try {
+    const pkgs = await loadPricingPackages(c.env.DB);
+    price = priceForDays(pkgs, days as number | null);
+  } catch {
+    price = 0;
+  }
 
   // Validate machine ID
   if (!mid || !/^[0-9A-F]{16}$/.test(mid)) {
@@ -35,13 +49,17 @@ export async function generateHandler(c: Context<{ Bindings: Env }>) {
   const { key, iat, nonce, exp } = await generateLicenseKey(mid, days, ed25519Key);
   const passcode = await generatePasscode(mid, days, ed25519Key);
 
-  // Store in D1
-  await c.env.DB.prepare(
-    "INSERT INTO issued_licenses (machine_id, license_key, passcode, package_days, expires_at, nonce, issued_at, price_thb) VALUES (?, ?, ?, ?, ?, ?, ?, ?)"
-  ).bind(mid, key, passcode, days, exp, nonce, iat, price).run();
+  // Store in D1 — return error before returning the license if DB write fails
+  try {
+    await c.env.DB.prepare(
+      "INSERT INTO issued_licenses (machine_id, license_key, passcode, package_days, expires_at, nonce, issued_at, price_thb) VALUES (?, ?, ?, ?, ?, ?, ?, ?)"
+    ).bind(mid, key, passcode, days, exp, nonce, iat, price).run();
+  } catch (err) {
+    console.error("D1 insert failed during generate:", err);
+    return c.json({ ok: false, error: "Failed to record license." }, 500);
+  }
 
   // Bump control version
-  const { bumpVersion } = await import("../db");
   await bumpVersion(c.env.DB);
 
   return c.json({

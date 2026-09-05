@@ -2,7 +2,7 @@
 
 from __future__ import annotations
 
-from typing import Callable
+from collections.abc import Callable
 
 
 def debounced_after(widget, callback: Callable[[], None], delay_ms: int = 300) -> Callable[[], None]:

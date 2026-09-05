@@ -17,7 +17,13 @@ from skyadmin_pro.ui.widgets import make_modal
 
 class FilingTabMixin:
     def _build_filing_statuses(self, master) -> ctk.CTkFrame:
+        """Build filing form (status rows). History tree is a separate section."""
+        self._build_filing_statuses_form(master)
+        return master
+
+    def _build_filing_statuses_form(self, master) -> ctk.CTkFrame:
         frame = ctk.CTkFrame(master, corner_radius=CARD_RADIUS)
+        frame.grid(row=0, column=0, sticky="ew")
         frame.grid_columnconfigure(0, weight=1)
 
         # Title row
@@ -136,30 +142,31 @@ class FilingTabMixin:
             command=self._reset_all_filing_statuses,
         ).pack(side="left")
 
-        # Change history section
-        history_frame = ctk.CTkFrame(frame, fg_color="transparent")
-        history_frame.grid(row=len(TAX_FILING_FIELDS) + 3, column=0, sticky="ew", padx=16, pady=(0, 14))
-        history_frame.grid_columnconfigure(0, weight=1)
+        return frame
+
+    def _build_filing_history(self, master) -> ctk.CTkFrame:
+        frame = ctk.CTkFrame(master, corner_radius=CARD_RADIUS)
+        frame.grid_columnconfigure(0, weight=1)
+        frame.grid_rowconfigure(1, weight=1)
         ctk.CTkLabel(
-            history_frame,
+            frame,
             text="Recent Changes",
             font=ctk.CTkFont(size=13, weight="bold"),
-        ).grid(row=0, column=0, sticky="w", pady=(0, 4))
+        ).grid(row=0, column=0, sticky="w", padx=16, pady=(14, 4))
         self.filing_history_tree = ThemedTreeview(
-            history_frame,
+            frame,
             columns=(
                 ("date", "Date", 140),
                 ("field", "Filing", 130),
                 ("old", "From", 120),
                 ("new", "To", 120),
             ),
+            showheight=5,
         )
-        self.filing_history_tree.tree.configure(height=5)
-        self.filing_history_tree.grid(row=1, column=0, sticky="ew")
-
+        self.filing_history_tree.grid(row=1, column=0, sticky="nsew", padx=12, pady=(0, 14))
         return frame
 
-    def _persist_filing_field(self, field: str) -> None:
+    def _persist_filing_field(self, field: str, *, refresh: bool = True) -> None:
         client_id = self._selected_client_id()
         if client_id is None:
             return
@@ -179,30 +186,8 @@ class FilingTabMixin:
                 description=f"Status changed from {old.get(field, 'N/A')} to {new_val}.",
             )
         self.app.db.update_client_fields(client_id, **{field: new_val})
-        val = new_val if new_val in TAX_FILING_STATUSES else "Not Applicable"
-        self.filing_labels[field].configure(
-            text="\u2705"
-            if val == "Complete"
-            else "\U0001f7e1"
-            if val == "On-Going"
-            else "\u274c"
-            if val == "Pending"
-            else "\u2b1c"
-        )
-        last_changed = self.app.db.get_filing_last_changed(client_id)
-        self.filing_last_changed_label.configure(text=f"Last changed: {last_changed}" if last_changed else "")
-        history = self.app.db.get_filing_change_history(client_id, limit=20)
-        self.filing_history_tree.set_rows(
-            [
-                (
-                    row.get("changed_at") or "",
-                    TAX_FILING_LABELS.get(row.get("field") or "", row.get("field") or ""),
-                    row.get("old_value") or "",
-                    row.get("new_value") or "",
-                )
-                for row in history
-            ]
-        )
+        if refresh:
+            self._refresh_filing_mutation()
         self.feedback.success(f"{TAX_FILING_LABELS.get(field, field)} saved.")
 
     def _save_filing_statuses(self) -> None:
@@ -211,9 +196,9 @@ class FilingTabMixin:
             self.feedback.error("Select a company first.")
             return
         for field in TAX_FILING_FIELDS:
-            self._persist_filing_field(field)
+            self._persist_filing_field(field, refresh=False)
+        self._refresh_filing_mutation()
         self.feedback.success("All filing statuses saved.")
-        self.refresh()
 
     def _edit_filing_status(self, field: str) -> None:
         client_id = self._selected_client_id()
@@ -254,7 +239,7 @@ class FilingTabMixin:
                     )
             dialog.destroy()
             self.feedback.success(f"{label} updated to {new_val}.")
-            self.refresh()
+            self._refresh_filing_mutation()
 
         ctk.CTkButton(dialog, text="Save", width=100, command=_confirm).grid(
             row=1, column=0, columnspan=2, pady=(12, 16)
@@ -272,7 +257,7 @@ class FilingTabMixin:
         self.app.db.log_tax_change(client_id, field, old_val, "Not Applicable")
         self.app.db.update_client_fields(client_id, **{field: "Not Applicable"})
         self.feedback.success(f"{label} reset to N/A.")
-        self.refresh()
+        self._refresh_filing_mutation()
 
     def _reset_all_filing_statuses(self) -> None:
         client_id = self._selected_client_id()
@@ -290,4 +275,4 @@ class FilingTabMixin:
             self.feedback.success(f"{len(updates)} filing status(es) reset to N/A.")
         else:
             self.feedback.info("All filing statuses already N/A.")
-        self.refresh()
+        self._refresh_filing_mutation()

@@ -2,11 +2,15 @@
 
 from __future__ import annotations
 
+import getpass
 import json
 import logging
+import os
+import sys
 import urllib.error
 import urllib.parse
 import urllib.request
+from pathlib import Path
 from typing import TYPE_CHECKING, Any
 
 from skyadmin_pro.config import API_BASE_URL, SETTING_DATA_SYNC_ENABLED, SETTING_SYNC_LAST_PULL, SETTING_SYNC_LAST_PUSH
@@ -31,36 +35,105 @@ SYNC_EXCLUDED_COLUMNS: dict[str, frozenset[str]] = {
 }
 
 SYNC_ALLOWED_COLUMNS: dict[str, frozenset[str]] = {
-    "clients": frozenset({
-        "name", "company_name", "contact_name", "email", "status", "notes",
-        "registration_number", "director", "contact_number", "registered_capital",
-        "vat_registration", "business_address", "business_objectives", "tax_id",
-        "vat_registered", "vat_registered_date", "service_type", "num_transactions",
-        "service_fee", "payment_status", "sla", "headcount", "fs_status",
-        "pnd53_status", "pp30_status", "pnd51_status", "pnd50_status", "audit_status",
-        "vo_address", "vo_service_provider", "vo_renewal_date", "csh_service_provider",
-        "csh_renewal_date", "shareholder_info", "global_id", "created_at", "updated_at",
-        "deleted_at",
-    }),
-    "tasks": frozenset({
-        "title", "description", "status", "category", "due_date", "completed_at",
-        "pipeline_item_id", "pipeline_step", "source_document_id", "global_id",
-        "created_at", "updated_at", "deleted_at", FK_CLIENT_COLUMN,
-    }),
-    "office_contacts": frozenset({
-        "name", "role_title", "organization", "department", "phone", "email",
-        "line_id", "category", "notes", "is_favorite", "global_id", "created_at",
-        "updated_at", "deleted_at", FK_CLIENT_COLUMN,
-    }),
-    "notebook_entries": frozenset({
-        "entry_type", "title", "body", "entry_date", "author", "follow_up_date",
-        "is_pinned", "global_id", "created_at", "updated_at", "deleted_at",
-        FK_CLIENT_COLUMN,
-    }),
+    "clients": frozenset(
+        {
+            "name",
+            "company_name",
+            "contact_name",
+            "email",
+            "status",
+            "notes",
+            "registration_number",
+            "director",
+            "contact_number",
+            "registered_capital",
+            "vat_registration",
+            "business_address",
+            "business_objectives",
+            "tax_id",
+            "vat_registered",
+            "vat_registered_date",
+            "service_type",
+            "num_transactions",
+            "service_fee",
+            "payment_status",
+            "sla",
+            "headcount",
+            "fs_status",
+            "pnd53_status",
+            "pp30_status",
+            "pnd51_status",
+            "pnd50_status",
+            "audit_status",
+            "vo_address",
+            "vo_service_provider",
+            "vo_renewal_date",
+            "csh_service_provider",
+            "csh_renewal_date",
+            "shareholder_info",
+            "global_id",
+            "created_at",
+            "updated_at",
+            "deleted_at",
+        }
+    ),
+    "tasks": frozenset(
+        {
+            "title",
+            "description",
+            "status",
+            "category",
+            "due_date",
+            "completed_at",
+            "pipeline_item_id",
+            "pipeline_step",
+            "source_document_id",
+            "global_id",
+            "created_at",
+            "updated_at",
+            "deleted_at",
+            FK_CLIENT_COLUMN,
+        }
+    ),
+    "office_contacts": frozenset(
+        {
+            "name",
+            "role_title",
+            "organization",
+            "department",
+            "phone",
+            "email",
+            "line_id",
+            "category",
+            "notes",
+            "is_favorite",
+            "global_id",
+            "created_at",
+            "updated_at",
+            "deleted_at",
+            FK_CLIENT_COLUMN,
+        }
+    ),
+    "notebook_entries": frozenset(
+        {
+            "entry_type",
+            "title",
+            "body",
+            "entry_date",
+            "author",
+            "follow_up_date",
+            "is_pinned",
+            "global_id",
+            "created_at",
+            "updated_at",
+            "deleted_at",
+            FK_CLIENT_COLUMN,
+        }
+    ),
 }
 
 
-def _credentials_path():
+def _credentials_path() -> Path:
     from skyadmin_pro.paths import app_data_dir
 
     return app_data_dir() / "sync_device.json"
@@ -79,6 +152,7 @@ def load_sync_credentials() -> tuple[str, str] | None:
         if is_encrypted_secret(raw):
             plain = decrypt_secret(raw)
             if not plain:
+                logger.warning("sync_device.json decrypt failed (wrong machine?)", exc_info=False)
                 return None
             data = json.loads(plain)
         else:
@@ -93,8 +167,14 @@ def load_sync_credentials() -> tuple[str, str] | None:
         token = str(data.get("sync_token") or "").strip()
         if mid and token:
             return mid, token
-    except (OSError, ValueError, TypeError):
-        pass
+    except (OSError, ValueError, TypeError) as exc:
+        logger.warning("sync_device.json corrupt: %s", exc, exc_info=True)
+        try:
+            corrupt = path.with_suffix(".corrupt")
+            if not corrupt.exists():
+                path.rename(corrupt)
+        except OSError:
+            pass
     return None
 
 
@@ -108,6 +188,28 @@ def save_sync_credentials(machine_id: str, sync_token: str) -> None:
         ensure_ascii=False,
     )
     path.write_text(encrypt_secret(payload), encoding="utf-8")
+    try:
+        path.chmod(0o600)
+    except Exception:
+        pass
+    # Windows NTFS: chmod is no-op — restrict ACL to current user via icacls
+    if sys.platform == "win32":
+        try:
+            import subprocess
+
+            user = os.environ.get("USERNAME") or getpass.getuser()
+            resolved_path = str(path)
+            # Validate path is a real file/dir before calling icacls
+            if not os.path.exists(resolved_path):
+                return
+            # Remove inheritance and grant only current user full control
+            subprocess.run(
+                ["icacls", resolved_path, "/inheritance:r", "/grant:r", f"{user}:(F)"],
+                capture_output=True,
+                timeout=5,
+            )
+        except Exception:
+            pass
 
 
 def _license_code() -> str | None:
@@ -122,7 +224,10 @@ def _license_code() -> str | None:
 
 
 def register_sync_device(timeout: float = 10.0) -> tuple[bool, str]:
-    """Exchange the active license for a device-scoped sync token."""
+    """Exchange the active license for a device-scoped sync token.
+
+    Re-registering always rotates the token on the Worker (license renewal hygiene).
+    """
     from skyadmin_pro.config import API_BASE_URL as api_url_cfg
 
     api_url = (api_url_cfg or "").strip()
@@ -150,7 +255,7 @@ def register_sync_device(timeout: float = 10.0) -> tuple[bool, str]:
             body = exc.read().decode("utf-8", errors="replace")
             data = json.loads(body)
             return False, str(data.get("error") or f"HTTP {exc.code}")
-        except Exception:
+        except (json.JSONDecodeError, ValueError, UnicodeDecodeError):
             return False, f"Sync registration failed (HTTP {exc.code})."
     except Exception as exc:
         return False, f"Sync registration failed: {exc}"
@@ -164,6 +269,13 @@ def register_sync_device(timeout: float = 10.0) -> tuple[bool, str]:
         return False, "Server did not return a sync token."
     save_sync_credentials(mid, token)
     return True, "Sync credentials registered."
+
+
+def rotate_sync_credentials_after_license_change(timeout: float = 10.0) -> tuple[bool, str]:
+    """Rotate the device sync token after license renewal or replacement."""
+    if load_sync_credentials() is None:
+        return True, "No sync credentials to rotate."
+    return register_sync_device(timeout=timeout)
 
 
 def ensure_sync_credentials(timeout: float = 10.0) -> tuple[str, str] | None:
@@ -215,7 +327,7 @@ def _sync_request(
             parsed = json.loads(exc.read().decode("utf-8", errors="replace"))
             if isinstance(parsed, dict):
                 return False, str(parsed.get("error") or f"HTTP {exc.code}")
-        except Exception:
+        except (json.JSONDecodeError, ValueError, UnicodeDecodeError):
             pass
         return False, f"Sync HTTP {exc.code}"
     except Exception as exc:
@@ -245,13 +357,22 @@ def _parse_updated_at(value: str) -> float:
     text = str(value or "").strip()
     if not text:
         return 0.0
-    from datetime import datetime
+    from datetime import datetime, timezone
 
     normalized = text.replace(" ", "T")
-    if not normalized.endswith("Z") and "+" not in normalized:
-        normalized = f"{normalized}Z"
+    # Treat DB timestamps as UTC if no explicit zone (SQLite datetime('now') is UTC)
+    if not normalized.endswith("Z") and "+" not in normalized and normalized.count("-") <= 2:
+        # No timezone info — assume UTC
+        if "T" in normalized and normalized[-3] != ":" and normalized[-6] != "+" or "T" not in normalized:
+            normalized = f"{normalized}Z"
+    else:
+        if not normalized.endswith("Z") and "+" not in normalized:
+            normalized = f"{normalized}Z"
     try:
-        return datetime.fromisoformat(normalized.replace("Z", "+00:00")).timestamp()
+        dt = datetime.fromisoformat(normalized.replace("Z", "+00:00"))
+        if dt.tzinfo is None:
+            dt = dt.replace(tzinfo=timezone.utc)
+        return dt.astimezone(timezone.utc).timestamp()
     except ValueError:
         return 0.0
 
@@ -300,10 +421,18 @@ def log_sync_conflict(
         )
 
 
-def collect_local_changes(db: Database, *, since: str = "") -> list[dict[str, Any]]:
-    """Collect active rows and soft-delete tombstones for push."""
+def collect_local_changes(db: Database, *, since: str = "", limit: int = 500) -> list[dict[str, Any]]:
+    """Collect active rows and soft-delete tombstones for push (bounded)."""
     changes: list[dict[str, Any]] = []
     since = (since or "").strip()
+    # Batch client global_id lookup for tasks/office_contacts/notebook_entries
+    client_gid_map: dict[int, str | None] = {}
+    try:
+        for row in db._fetch_all("SELECT id, global_id FROM clients"):
+            client_gid_map[int(row["id"])] = str(row["global_id"]) if row.get("global_id") else None
+    except Exception:
+        logger.warning("Batch client GID lookup failed, using per-row fallback", exc_info=True)
+        client_gid_map = {}
     for table in SYNC_PUSH_ORDER:
         if since:
             rows = db._fetch_all(
@@ -311,20 +440,43 @@ def collect_local_changes(db: Database, *, since: str = "") -> list[dict[str, An
                 SELECT * FROM {table}
                 WHERE global_id IS NOT NULL AND TRIM(global_id) != ''
                   AND updated_at > ?
+                ORDER BY updated_at ASC LIMIT ?
                 """,
-                (since,),
+                (since, limit),
             )
         else:
             rows = db._fetch_all(
-                f"SELECT * FROM {table} WHERE global_id IS NOT NULL AND TRIM(global_id) != ''"
+                f"SELECT * FROM {table} WHERE global_id IS NOT NULL AND TRIM(global_id) != '' ORDER BY updated_at ASC LIMIT ?",
+                (limit,),
             )
         for row in rows:
             deleted_at = row.get("deleted_at")
+            if deleted_at:
+                row_payload = {"global_id": str(row["global_id"])}
+            else:
+                # Use batched client_gid_map to avoid per-row DB connection
+                payload = dict(row)
+                for col in SYNC_EXCLUDED_COLUMNS.get(table, frozenset()):
+                    payload.pop(col, None)
+                if table in ("tasks", "office_contacts", "notebook_entries"):
+                    cid = row.get("client_id")
+                    gid = client_gid_map.get(int(cid)) if cid is not None else None
+                    payload[FK_CLIENT_COLUMN] = gid
+                    payload.pop("client_id", None)
+                payload = {
+                    k: v
+                    for k, v in payload.items()
+                    if k in SYNC_ALLOWED_COLUMNS.get(table, frozenset())
+                    or k in ("global_id", "created_at", "updated_at", "deleted_at", FK_CLIENT_COLUMN)
+                }
+                payload["global_id"] = str(row.get("global_id") or "")
+                row_payload = _filter_sync_row(table, payload)
+                row_payload["global_id"] = str(row["global_id"])
             changes.append(
                 {
                     "table": table,
                     "global_id": str(row["global_id"]),
-                    "row": {"global_id": str(row["global_id"])} if deleted_at else _row_to_sync_payload(db, table, row),
+                    "row": row_payload,
                     "updated_at": str(row.get("updated_at") or row.get("created_at") or ""),
                     "deleted_at": deleted_at,
                 }
@@ -399,8 +551,16 @@ def _apply_remote_change(db: Database, change: dict[str, Any]) -> str:
 def apply_remote_changes(db: Database, changes: list[dict[str, Any]]) -> tuple[int, int]:
     applied = 0
     conflicts = 0
-    ordered = sorted(changes, key=lambda c: (SYNC_PUSH_ORDER.index(c["table"]) if c.get("table") in SYNC_PUSH_ORDER else 99))
-    for change in ordered:
+    # Apply deletes child-first (reverse order) to avoid FK orphan, inserts parent-first
+    deletes = [c for c in changes if c.get("deleted_at")]
+    upserts = [c for c in changes if not c.get("deleted_at")]
+    deletes_ordered = sorted(
+        deletes, key=lambda c: -(SYNC_PUSH_ORDER.index(c["table"]) if c.get("table") in SYNC_PUSH_ORDER else -99)
+    )
+    upserts_ordered = sorted(
+        upserts, key=lambda c: SYNC_PUSH_ORDER.index(c["table"]) if c.get("table") in SYNC_PUSH_ORDER else 99
+    )
+    for change in deletes_ordered + upserts_ordered:
         result = _apply_remote_change(db, change)
         if result == "applied":
             applied += 1
@@ -415,9 +575,7 @@ def ensure_sync_ids(db: Database) -> None:
 
     with db.connection() as conn:
         for table in SYNC_TABLES:
-            rows = conn.execute(
-                f"SELECT id FROM {table} WHERE global_id IS NULL OR TRIM(global_id) = ''"
-            ).fetchall()
+            rows = conn.execute(f"SELECT id FROM {table} WHERE global_id IS NULL OR TRIM(global_id) = ''").fetchall()
             for row in rows:
                 conn.execute(
                     f"UPDATE {table} SET global_id = ? WHERE id = ?",
@@ -438,7 +596,12 @@ def sync_data(db: Database, *, timeout: float = 25.0) -> tuple[bool, str]:
 
     machine_id, token = creds
     if machine_id != get_machine_id().strip().upper():
-        return False, "Sync credentials are for a different machine ID."
+        # Stale credentials — remove and prompt re-register
+        try:
+            _credentials_path().unlink(missing_ok=True)
+        except Exception:
+            pass
+        return False, "Sync credentials are for a different machine ID — please re-activate."
 
     ensure_sync_ids(db)
 
@@ -477,8 +640,8 @@ def sync_data(db: Database, *, timeout: float = 25.0) -> tuple[bool, str]:
     server_time = str(pull_data.get("server_time") or push_data.get("server_time") or "")
     if server_time:
         db.set_setting(SETTING_SYNC_LAST_PULL, server_time)
-        if int(push_data.get("applied") or 0) > 0 or not local_changes:
-            db.set_setting(SETTING_SYNC_LAST_PUSH, server_time)
+        # Always advance push cursor on successful push (avoid infinite re-push of rejected changes)
+        db.set_setting(SETTING_SYNC_LAST_PUSH, server_time)
 
     applied = int(push_data.get("applied") or 0)
     push_conflicts = int(push_data.get("conflicts") or 0)

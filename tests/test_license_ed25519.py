@@ -12,7 +12,6 @@ from skyadmin_pro.services.license_authoring import generate_license as legacy_g
 from skyadmin_pro.services.license_crypto import (
     license_payload_string,
     parse_control_envelope_v2,
-    verify_ed25519,
 )
 from skyadmin_pro.services.license_public import CONTROL_ENVELOPE_V2_PREFIX, LICENSE_SIGNATURE_ALGORITHM
 

@@ -8,7 +8,10 @@
     "typecheck": "tsc --noEmit",
     "test": "vitest run",
     "db:init": "wrangler d1 execute skyadmin-db --remote --file=schema.sql",
-    "db:init:local": "wrangler d1 execute skyadmin-db --local --file=schema.sql"
+    "db:init:local": "wrangler d1 execute skyadmin-db --local --file=schema.sql",
+    "db:migrate": "wrangler d1 migrations apply skyadmin-db --remote",
+    "db:migrate:local": "wrangler d1 migrations apply skyadmin-db --local",
+    "db:migrate:new": "echo \"Create migrations/NNNN_name.sql then run db:migrate\""
   },
   "dependencies": {
     "hono": "^4.13.5"

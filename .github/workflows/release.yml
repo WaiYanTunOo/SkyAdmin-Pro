@@ -6,15 +6,36 @@ on:
       - "v*"
   workflow_dispatch:
 
+permissions:
+  contents: write
+
+concurrency:
+  group: release-${{ github.ref }}
+  cancel-in-progress: false
+
 jobs:
   windows-release:
     runs-on: windows-latest
     steps:
       - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
 
       - uses: actions/setup-python@v5
         with:
           python-version: "3.12"
+
+      - name: Resolve version
+        id: version
+        shell: pwsh
+        run: |
+          if ($env:GITHUB_REF -match '^refs/tags/v(.+)$') {
+            $version = $matches[1]
+          } else {
+            $version = python -c "from skyadmin_pro.config import APP_VERSION; print(APP_VERSION)"
+          }
+          "version=$version" | Out-File -FilePath $env:GITHUB_OUTPUT -Append
+          Write-Host "Release version: $version"
 
       - name: Install dependencies
         run: |
@@ -31,16 +52,95 @@ jobs:
           python packaging\make_icon.py
           pyinstaller SkyAdminPro.spec --noconfirm --log-level WARN
 
+      - name: Sign portable exe
+        shell: pwsh
+        env:
+          WINDOWS_CERT_PFX: ${{ secrets.WINDOWS_CERT_PFX }}
+          WINDOWS_CERT_PASSWORD: ${{ secrets.WINDOWS_CERT_PASSWORD }}
+          SKYADMIN_SIGN_REQUIRED: ${{ secrets.WINDOWS_CERT_PFX != '' && '1' || '0' }}
+        run: |
+          pwsh -NoProfile -ExecutionPolicy Bypass -File packaging/sign-windows.ps1 -Paths dist/SkyAdminPro.exe
+
+      - name: Build Windows installer (Inno Setup)
+        shell: pwsh
+        run: |
+          choco install innosetup -y --no-progress
+          $iscc = "${env:ProgramFiles(x86)}\Inno Setup 6\ISCC.exe"
+          if (-not (Test-Path $iscc)) { $iscc = "${env:ProgramFiles}\Inno Setup 6\ISCC.exe" }
+          if (-not (Test-Path $iscc)) { $iscc = "$env:LOCALAPPDATA\Programs\Inno Setup 6\ISCC.exe" }
+          if (-not (Test-Path $iscc)) { throw "ISCC.exe not found after install" }
+          $ver = "${{ steps.version.outputs.version }}"
+          & $iscc "/DAppVersion=$ver" packaging/SkyAdminPro.iss
+          if ($LASTEXITCODE -ne 0) { throw "ISCC failed with exit $LASTEXITCODE" }
+          Get-ChildItem dist\SkyAdminPro-Setup-*.exe | Format-Table Name, Length
+
+      - name: Sign installer
+        shell: pwsh
+        env:
+          WINDOWS_CERT_PFX: ${{ secrets.WINDOWS_CERT_PFX }}
+          WINDOWS_CERT_PASSWORD: ${{ secrets.WINDOWS_CERT_PASSWORD }}
+          SKYADMIN_SIGN_REQUIRED: ${{ secrets.WINDOWS_CERT_PFX != '' && '1' || '0' }}
+        run: |
+          pwsh -NoProfile -ExecutionPolicy Bypass -File packaging/sign-windows.ps1 -Paths dist/SkyAdminPro-Setup-*.exe
+
       - name: Release check
-        run: python scripts\release_check.py --skip-pytest
+        shell: pwsh
+        run: |
+          if ($env:WINDOWS_CERT_PFX) {
+            python scripts\release_check.py --skip-pytest --require-signature
+          } else {
+            python scripts\release_check.py --skip-pytest
+          }
         env:
           SKYADMIN_SKIP_DAILY_CHECK: "1"
+          WINDOWS_CERT_PFX: ${{ secrets.WINDOWS_CERT_PFX }}
 
-      - name: Upload SkyAdminPro.exe
+      - name: Generate release notes
+        run: |
+          python scripts\generate_changelog.py --version ${{ steps.version.outputs.version }} --output dist\RELEASE_NOTES.md
+
+      - name: Create GitHub Release
+        if: startsWith(github.ref, 'refs/tags/')
+        uses: softprops/action-gh-release@v2
+        with:
+          tag_name: v${{ steps.version.outputs.version }}
+          name: SkyAdmin Pro ${{ steps.version.outputs.version }}
+          body_path: dist/RELEASE_NOTES.md
+          files: |
+            dist/SkyAdminPro.exe
+            dist/SkyAdminPro-Setup-*.exe
+            dist/RELEASE_NOTES.md
+          draft: false
+          prerelease: false
+
+      - name: Publish Worker update
+        if: startsWith(github.ref, 'refs/tags/')
+        env:
+          SKYADMIN_API_TOKEN: ${{ secrets.SKYADMIN_API_TOKEN }}
+          SKYADMIN_API_URL: ${{ secrets.SKYADMIN_API_URL }}
+        shell: pwsh
+        run: |
+          if (-not $env:SKYADMIN_API_TOKEN) {
+            Write-Host "SKIP  Worker publish - SKYADMIN_API_TOKEN not configured"
+            exit 0
+          }
+          $version = "${{ steps.version.outputs.version }}"
+          $url = "https://github.com/${{ github.repository }}/releases/download/v$version/SkyAdminPro.exe"
+          if ($env:SKYADMIN_API_URL) {
+            python scripts\publish_update.py --version $version --url $url --api-url $env:SKYADMIN_API_URL --token $env:SKYADMIN_API_TOKEN
+          } else {
+            python scripts\publish_update.py --version $version --url $url --token $env:SKYADMIN_API_TOKEN
+          }
+
+      - name: Upload artifacts
         uses: actions/upload-artifact@v4
         with:
-          name: SkyAdminPro-windows
-          path: dist/SkyAdminPro.exe
+          name: SkyAdminPro-windows-${{ steps.version.outputs.version }}
+          path: |
+            dist/SkyAdminPro.exe
+            dist/SkyAdminPro-Setup-*.exe
+            dist/RELEASE_NOTES.md
+            dist/SHA256SUMS
 
   worker:
     runs-on: ubuntu-latest

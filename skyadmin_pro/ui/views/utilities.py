@@ -5,7 +5,6 @@ from __future__ import annotations
 import json
 import math
 import re
-import threading
 import tkinter.font as _tkfont
 import uuid
 from datetime import date
@@ -785,36 +784,26 @@ class UtilitiesView(BaseView):
         self._busy = True
         self.translate_btn.configure(state="disabled", text="Translating…")
         self.translator_feedback.info("Translating…")
+        from skyadmin_pro.ui.async_ui import run_background
 
-        def worker() -> None:
-            error: str | None = None
-            result = ""
-            try:
-                result = translate_text(source_text, source, target)
-            except Exception as exc:
-                error = str(exc)
+        def work() -> str:
+            source, target = direction_codes(self.direction.get())
+            return translate_text(source_text, source, target)
 
-            def done() -> None:
-                if not self.winfo_exists():
-                    return
-                if error:
-                    self._translate_failed(error)
-                else:
-                    self._translate_ok(result)
+        def _translate_reset(self) -> None:
+            self._busy = False
+            self.translate_btn.configure(state="normal", text="Translate")
 
-            try:
-                self.after(0, done)
-            except Exception:
-                # Widget gone: nothing safe to update, but never leave the
-                # busy flag stuck for the next session.
-                self._busy = False
-                return
-
-        threading.Thread(target=worker, daemon=True).start()
+        run_background(
+            self,
+            work=work,
+            on_success=self._translate_ok,
+            on_error=self._translate_failed,
+            finally_fn=self._translate_reset,
+            feedback=self.translator_feedback,
+        )
 
     def _translate_ok(self, result: str) -> None:
-        self._busy = False
-        self.translate_btn.configure(state="normal", text="Translate")
         self._set_output(result)
         try:
             copy_to_clipboard(result, tk_window=self.app)
@@ -824,8 +813,6 @@ class UtilitiesView(BaseView):
         self.app.set_status("Translation ready.")
 
     def _translate_failed(self, message: str) -> None:
-        self._busy = False
-        self.translate_btn.configure(state="normal", text="Translate")
         self.translator_feedback.error(message)
 
     def _copy_output(self) -> None:

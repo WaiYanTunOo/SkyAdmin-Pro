@@ -1,19 +1,13 @@
-"""Hardware-bound license verification — Sky Creation Innovations.
-
-Offline verification with Ed25519-signed activation codes.
-Machine-bound, one-time-use with remote revocation support.
-"""
+"""License verification, control list sync, updates, and persistence."""
 
 from __future__ import annotations
 
 import base64
-import hashlib
 import json
 import logging
-import platform
 import sys
 import uuid
-from datetime import date, datetime, timedelta, timezone
+from datetime import date, datetime
 from pathlib import Path
 
 from skyadmin_pro.services.license_crypto import (
@@ -71,305 +65,15 @@ def generate_passcode(*_args: object, **_kwargs: object) -> str:
     )
 
 
-def _check_debugger() -> None:
-    """Detect common Python debuggers — exit if found.
-
-    Only checks OS-level debugger attachment (IsDebuggerPresent on Windows)
-    and known debug environment variables. Does NOT check sys.gettrace()
-    which can trigger false positives in packaged apps.
-    """
-    import os
-    import sys as _sys
-
-    # Check for common debugger environment variables
-    for var in ("PYDEVD", "PYCHARM_DEBUG", "PYDEV_DEBUG", "REMOTE_DEBUG"):
-        if os.environ.get(var):
-            _sys.exit(1)
-    # Check for attached debugger via Windows API (fast, non-blocking)
-    if _sys.platform == "win32":
-        try:
-            import ctypes as _ct
-
-            if _ct.windll.kernel32.IsDebuggerPresent():
-                _sys.exit(1)
-        except Exception:
-            pass
-
-
-# Run once at import time — fast, non-blocking
-_check_debugger()
-
-LICENSE_FILENAME = "license.key"
-HARDWARE_ID_FILENAME = "hardware.id"
-DAILY_SYNC_FILENAME = "last_online_check.txt"
-# Everyday online required - customer must be online at least once per 24h
-MAX_OFFLINE_SECONDS = 24 * 3600
-# Rate limit: max 5 failed activations per 60s
-_MAX_ATTEMPTS = 5
-_ATTEMPT_WINDOW = 60
-
-
-def _legacy_machine_id() -> str:
-    """Original formula (MAC+hostname) — kept only to preserve IDs that
-    customers already activated with, via the hardware.id freeze below."""
-    mac = uuid.getnode()
-    node = platform.node() or "unknown"
-    raw = f"{mac:012x}-{node}-{platform.system()}-{platform.machine()}"
-    return hashlib.sha256(raw.encode()).hexdigest()[:16].upper()
-
-
-def _windows_stable_id() -> str | None:
-    """HKLM\\...\\Cryptography\\MachineGuid — stable per Windows install,
-    unaffected by Wi-Fi/Ethernet/VPN switches. No admin rights needed."""
-    if sys.platform != "win32":
-        return None
-    try:
-        import winreg
-
-        key = winreg.OpenKey(winreg.HKEY_LOCAL_MACHINE, r"SOFTWARE\Microsoft\Cryptography")
-        value, _ = winreg.QueryValueEx(key, "MachineGuid")
-        winreg.CloseKey(key)
-        if value:
-            return hashlib.sha256(("SKY|" + value).encode()).hexdigest()[:16].upper()
-    except Exception:
-        pass
-    return None
-
-
-def get_machine_id() -> str:
-    """Stable hardware-bound ID.
-
-    Frozen once into ~/.skyadmin_pro/hardware.id (with a shadow copy in
-    backups\\) so network-adapter changes or accidental deletions can never
-    invalidate an activated license. New installs use the Windows
-    MachineGuid; machines that already had a license under the legacy MAC
-    formula keep that ID for continuity.
-    """
-    try:
-        from skyadmin_pro.paths import app_data_dir
-
-        base = app_data_dir()
-        id_file = base / HARDWARE_ID_FILENAME
-        if id_file.exists():
-            stored = id_file.read_text(encoding="utf-8").strip().upper()
-            if len(stored) == 16:
-                return stored
-        shadow = base / "backups" / (HARDWARE_ID_FILENAME + ".shadow")
-        if shadow.exists():
-            stored = shadow.read_text(encoding="utf-8").strip().upper()
-            if len(stored) == 16:
-                id_file.write_text(stored, encoding="utf-8")
-                return stored
-    except Exception:
-        id_file = None
-        shadow = None
-
-    has_existing_license = False
-    try:
-        from skyadmin_pro.paths import app_data_dir
-
-        has_existing_license = (Path(app_data_dir()) / LICENSE_FILENAME).exists()
-    except Exception:
-        pass
-
-    computed = _legacy_machine_id() if has_existing_license else (_windows_stable_id() or _legacy_machine_id())
-    try:
-        from skyadmin_pro.paths import app_data_dir
-
-        base = Path(app_data_dir())
-        (base / HARDWARE_ID_FILENAME).write_text(computed, encoding="utf-8")
-        shadow = base / "backups" / (HARDWARE_ID_FILENAME + ".shadow")
-        shadow.parent.mkdir(parents=True, exist_ok=True)
-        shadow.write_text(computed, encoding="utf-8")
-    except Exception:
-        pass
-    return computed
-
-
-def _last_sync_path() -> Path | None:
-    try:
-        from skyadmin_pro.paths import app_data_dir
-
-        return app_data_dir() / DAILY_SYNC_FILENAME
-    except Exception:
-        return None
-
-
-def requires_online_check() -> bool:
-    """True when API or Gist control URLs are configured (daily sync required)."""
-    from skyadmin_pro.config import API_BASE_URL, REVOCATION_URL
-
-    return bool((API_BASE_URL or REVOCATION_URL or "").strip())
-
-
-def _record_online_sync() -> None:
-    """Record successful online control-list sync - machine-bound seal + monotonic clock."""
-    try:
-        p = _last_sync_path()
-        if p is not None:
-            p.parent.mkdir(parents=True, exist_ok=True)
-            now_iso = datetime.now().isoformat()
-            mid = get_machine_id()
-            # Machine-bound seal prevents copying file to another PC
-            seal_data = f"{now_iso}|{mid}"
-            p.write_text(now_iso, encoding="utf-8")
-            try:
-                from skyadmin_pro.services._protect_core import seal_value
-
-                seal_p = p.parent / ".last_sync.seal"
-                seal_p.write_text(seal_value(seal_data), encoding="utf-8")
-            except Exception:
-                pass
-            # Also record monotonic last_seen for clock-tamper detection
-            try:
-                seen_p = p.parent / ".last_seen.txt"
-                seen_p.write_text(now_iso, encoding="utf-8")
-            except Exception:
-                pass
-    except Exception:
-        pass
-
-
-def _get_last_sync_time() -> datetime | None:
-    try:
-        p = _last_sync_path()
-        if p is None or not p.exists():
-            return None
-        txt = p.read_text(encoding="utf-8").strip()
-        # Verify machine-bound seal - if seal exists and mismatches, treat as tampered -> stale
-        try:
-            from skyadmin_pro.services._protect_core import verify_seal
-
-            seal_p = p.parent / ".last_sync.seal"
-            if seal_p.exists():
-                sealed = seal_p.read_text(encoding="utf-8").strip()
-                expected = f"{txt}|{get_machine_id()}"
-                if verify_seal(sealed) != expected:
-                    return None  # tampered or copied from another machine
-        except Exception:
-            pass
-        return datetime.fromisoformat(txt)
-    except Exception:
-        return None
-
-
-def _is_clock_tampered() -> bool:
-    """Detect if system clock was set back to bypass expiry."""
-    try:
-        p = _last_sync_path()
-        if p is None:
-            return False
-        seen_p = p.parent / ".last_seen.txt"
-        if not seen_p.exists():
-            return False
-        last_seen_str = seen_p.read_text(encoding="utf-8").strip()
-        last_seen = datetime.fromisoformat(last_seen_str)
-        # If now is >5 min before last_seen, clock went backwards
-        if (datetime.now() - last_seen).total_seconds() < -300:
-            return True
-    except Exception:
-        pass
-    return False
-
-
-def _attempt_path() -> Path | None:
-    try:
-        from skyadmin_pro.paths import app_data_dir
-
-        return app_data_dir() / ".attempts.txt"
-    except Exception:
-        return None
-
-
-def _is_rate_limited() -> bool:
-    try:
-        p = _attempt_path()
-        if p is None or not p.exists():
-            return False
-        now = datetime.now().timestamp()
-        lines = p.read_text(encoding="utf-8").splitlines()
-        recent = [float(x) for x in lines if x.strip()]
-        recent = [t for t in recent if now - t < _ATTEMPT_WINDOW]
-        return len(recent) >= _MAX_ATTEMPTS
-    except Exception:
-        return True
-
-
-def _record_attempt(success: bool) -> None:
-    try:
-        p = _attempt_path()
-        if p is None:
-            return
-        if success:
-            # clear on success
-            if p.exists():
-                p.unlink()
-            return
-        now = datetime.now().timestamp()
-        lines = []
-        if p.exists():
-            lines = [x for x in p.read_text(encoding="utf-8").splitlines() if x.strip()]
-        # keep only recent
-        recent = [float(x) for x in lines]
-        recent = [t for t in recent if now - t < _ATTEMPT_WINDOW]
-        recent.append(now)
-        p.parent.mkdir(parents=True, exist_ok=True)
-        p.write_text("\n".join(str(t) for t in recent) + "\n", encoding="utf-8")
-    except Exception:
-        pass
-
-
-def is_daily_sync_stale() -> bool:
-    """True if everyday online check has not been satisfied within 24h."""
-    import os as _os
-
-    # Allow tests to bypass daily check via env var without code change
-    if _os.environ.get("SKYADMIN_SKIP_DAILY_CHECK") == "1":
-        return False
-    if _os.environ.get("PYTEST_CURRENT_TEST"):
-        return False
-    from skyadmin_pro.config import API_BASE_URL, REVOCATION_URL
-
-    has_online = bool((API_BASE_URL or REVOCATION_URL or "").strip())
-    if not has_online:
-        return False  # offline mode - no daily requirement
-    if _is_clock_tampered():
-        return True  # clock went backwards -> force online re-check
-    last = _get_last_sync_time()
-    if last is None:
-        return True  # never synced - require online
-    return (datetime.now() - last).total_seconds() > MAX_OFFLINE_SECONDS
-
-
-def _format_sync_remaining(age_seconds: float) -> tuple[bool, str]:
-    """Return (is_ok, short_remaining_text) for daily online check window."""
-    if age_seconds > MAX_OFFLINE_SECONDS:
-        overdue = age_seconds - MAX_OFFLINE_SECONDS
-        hours = int(overdue // 3600)
-        if hours >= 24:
-            days = hours // 24
-            rem_h = hours % 24
-            return False, f"Overdue {days}d {rem_h}h — connect now"
-        return False, f"Overdue {hours}h — connect now"
-    remaining = MAX_OFFLINE_SECONDS - age_seconds
-    hours = int(remaining // 3600)
-    mins = int((remaining % 3600) // 60)
-    if hours >= 24:
-        days = hours // 24
-        rem_h = hours % 24
-        return True, f"{days}d {rem_h}h left"
-    if hours > 0:
-        return True, f"{hours}h {mins}m left"
-    return True, f"{mins}m left"
-
-
-def get_daily_sync_status() -> tuple[bool, str]:
-    """Return (is_ok, human_message) for UI — time remaining until next check."""
-    last = _get_last_sync_time()
-    if last is None:
-        return False, "Connect to internet"
-    age = (datetime.now() - last).total_seconds()
-    return _format_sync_remaining(age)
+from skyadmin_pro.services.license._constants import LICENSE_FILENAME
+from skyadmin_pro.services.license.machine import get_machine_id
+from skyadmin_pro.services.license.online import (
+    _is_rate_limited,
+    _record_attempt,
+    _record_online_sync,
+    get_daily_sync_status,
+    is_daily_sync_stale,
+)
 
 
 def _license_paths() -> list[Path]:
@@ -382,13 +86,13 @@ def _license_paths() -> list[Path]:
             p = exe_dir / LICENSE_FILENAME
             if p.exists():
                 paths.append(p)
-        except Exception:
+        except (OSError, ValueError):
             pass
     try:
         from skyadmin_pro.paths import app_data_dir
 
         paths.append(app_data_dir() / LICENSE_FILENAME)
-    except Exception:
+    except (ImportError, OSError):
         paths.append(Path.home() / ".skyadmin_pro" / LICENSE_FILENAME)
     return paths
 
@@ -516,7 +220,7 @@ def _read_license_payload() -> dict | None:
         b64 += "=" * (-len(b64) % 4)
         data = json.loads(base64.b64decode(b64).decode())
         return data if isinstance(data, dict) else None
-    except Exception:
+    except (ValueError, TypeError, json.JSONDecodeError):
         return None
 
 
@@ -551,7 +255,7 @@ def revoked_nonces() -> frozenset[str]:
         text = path.read_text(encoding="utf-8")
         tokens = [t.strip() for t in text.replace(",", "\n").splitlines()]
         return frozenset(filter(None, tokens))
-    except Exception:
+    except (OSError, ValueError):
         return frozenset()
 
 
@@ -565,7 +269,7 @@ def banned_machines() -> frozenset[str]:
             return frozenset()
         text = path.read_text(encoding="utf-8")
         return frozenset(t.strip().upper() for t in text.splitlines() if t.strip())
-    except Exception:
+    except (OSError, ValueError):
         return frozenset()
 
 
@@ -579,7 +283,7 @@ def revoked_passcodes() -> frozenset[str]:
             return frozenset()
         text = path.read_text(encoding="utf-8")
         return frozenset(t.strip() for t in text.splitlines() if t.strip())
-    except Exception:
+    except (OSError, ValueError):
         return frozenset()
 
 
@@ -602,7 +306,7 @@ def used_nonces() -> frozenset[str]:
         if not path.exists():
             return frozenset()
         return frozenset(t.strip() for t in path.read_text(encoding="utf-8").splitlines() if t.strip())
-    except Exception:
+    except (OSError, ValueError):
         return frozenset()
 
 
@@ -618,7 +322,7 @@ def mark_used(nonce: str) -> None:
         current = used_nonces() | {nonce.strip()}
         path.write_text("\n".join(sorted(current)) + "\n", encoding="utf-8")
     except Exception:
-        pass
+        logging.getLogger(__name__).warning("Failed to burn nonce %s", nonce, exc_info=True)
 
 
 def _saved_license_text() -> str | None:
@@ -629,7 +333,7 @@ def _saved_license_text() -> str | None:
         if path.exists():
             text = path.read_text(encoding="utf-8").strip()
             return text or None
-    except Exception:
+    except (OSError, ValueError):
         pass
     return None
 
@@ -704,7 +408,7 @@ def _payload_of(text: str) -> dict | None:
             data["n"] = nonce or str(data.get("n") or "")
             data["passcode"] = True
             return data
-        except Exception:
+        except (ValueError, TypeError, json.JSONDecodeError):
             return None
     if raw.isdigit() and len(raw) == 8:
         return None
@@ -713,7 +417,7 @@ def _payload_of(text: str) -> dict | None:
         b64 += "=" * (-len(b64) % 4)
         data = json.loads(base64.b64decode(b64).decode())
         return data if isinstance(data, dict) else None
-    except Exception:
+    except (ValueError, TypeError, json.JSONDecodeError):
         return None
 
 
@@ -756,7 +460,7 @@ def _control_paths() -> tuple[Path, Path, Path] | None:
 
         base = app_data_dir()
         return base / "revoked.txt", base / "banned.txt", base / "revoked_passcodes.txt"
-    except Exception:
+    except (ImportError, OSError):
         return None
 
 
@@ -977,7 +681,7 @@ def read_update_info() -> dict | None:
         return None
 
 
-def _version_tuple(version: str):
+def _version_tuple(version: str) -> tuple[int, int, int]:
     parts = []
     for chunk in str(version).split("."):
         digits = "".join(ch for ch in chunk if ch.isdigit())
@@ -1165,7 +869,7 @@ def _shadow_path() -> Path | None:
         from skyadmin_pro.paths import app_data_dir
 
         return app_data_dir() / "backups" / "license.key.shadow"
-    except Exception:
+    except (ImportError, OSError):
         return None
 
 
@@ -1185,7 +889,7 @@ def save_license_file(content: str) -> Path:
         seal_path = path.parent / ".license.seal"
         seal_path.write_text(seal_value(clean), encoding="utf-8")
     except Exception:
-        pass
+        logging.getLogger(__name__).warning("License seal write failed", exc_info=True)
     try:
         shadow = _shadow_path()
         if shadow is not None:
@@ -1193,6 +897,12 @@ def save_license_file(content: str) -> Path:
             shadow.write_text(clean, encoding="utf-8")
     except OSError:
         pass
+    try:
+        from skyadmin_pro.services.data_sync import rotate_sync_credentials_after_license_change
+
+        rotate_sync_credentials_after_license_change()
+    except Exception:
+        logging.getLogger(__name__).debug("Sync token rotation skipped after license save", exc_info=True)
     return path
 
 
@@ -1210,7 +920,7 @@ def _self_heal_license() -> Path | None:
             primary.write_text(shadow.read_text(encoding="utf-8"), encoding="utf-8")
             logging.getLogger(__name__).info("License file was missing — restored from shadow copy.")
             return primary
-    except Exception:
+    except (OSError, ValueError):
         return None
     return None
 

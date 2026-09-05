@@ -110,7 +110,7 @@ class GeneralTabMixin:
             self.feedback.error(f"Could not save company info: {exc}")
             return
         self.feedback.success("Company info saved.")
-        self.refresh()
+        self._refresh_general_mutation()
 
     def _build_services(self, master) -> ctk.CTkFrame:
         frame = ctk.CTkFrame(master, corner_radius=CARD_RADIUS)

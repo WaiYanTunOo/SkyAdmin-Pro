@@ -9,14 +9,22 @@ import customtkinter as ctk
 from skyadmin_pro.services.export import default_export_name, export_to_excel
 from skyadmin_pro.ui.views.base import BaseView
 from skyadmin_pro.ui.views.company_details import CompanyDetailsPanel
-from skyadmin_pro.ui.widgets import FeedbackLabel, MonthStatusPanel, themed_scrollable_frame, themed_tabview
-
 from skyadmin_pro.ui.views.database_tasks.clients_panel import ClientsExpiryPanel
 from skyadmin_pro.ui.views.database_tasks.courier_panel import CourierPanel
 from skyadmin_pro.ui.views.database_tasks.pipeline_panel import ServicePipelinePanel
 from skyadmin_pro.ui.views.database_tasks.renewal_panel import RenewalPanel
 from skyadmin_pro.ui.views.database_tasks.suppliers_panel import SuppliersPanel
 from skyadmin_pro.ui.views.database_tasks.task_panel import TaskPanel
+from skyadmin_pro.ui.widgets import FeedbackLabel, MonthStatusPanel, themed_tabview
+
+
+def service_menu_panel_key(tab_name: str) -> str | None:
+    """Map Database & Tasks tab to the panel that owns a service-type combo, if any."""
+    return {
+        "Clients & Expiry": "clients",
+        "Company Details": "company",
+        "Service Pipeline": "pipeline",
+    }.get(tab_name)
 
 
 class DatabaseTasksView(BaseView):
@@ -58,16 +66,9 @@ class DatabaseTasksView(BaseView):
             tab = self.tabs.tab(name)
             tab.grid_columnconfigure(0, weight=1)
             tab.grid_rowconfigure(0, weight=1)
-            tab.grid_propagate(False)
 
-        self.tasks_panel = TaskPanel(self.tabs.tab("Tasks"), self.app, self.feedback)
-        self.tasks_panel.grid(row=0, column=0, sticky="nsew", padx=8, pady=8)
-        self._lazy_panels["Tasks"] = self.tasks_panel
-
-        self.clients_panel = ClientsExpiryPanel(self.tabs.tab("Clients & Expiry"), self.app, self.feedback)
-        self.clients_panel.grid(row=0, column=0, sticky="nsew", padx=8, pady=8)
-        self._lazy_panels["Clients & Expiry"] = self.clients_panel
-
+        self.tasks_panel = None
+        self.clients_panel = None
         self.courier_panel = None
         self.month_panel = None
         self.renewals_panel = None
@@ -78,16 +79,22 @@ class DatabaseTasksView(BaseView):
     def _ensure_lazy_panel(self, name: str) -> None:
         if name in self._lazy_panels:
             return
-        if name == "Courier Tracker":
+        if name == "Tasks":
+            self.tasks_panel = TaskPanel(self.tabs.tab("Tasks"), self.app, self.feedback)
+            self.tasks_panel.grid(row=0, column=0, sticky="nsew", padx=8, pady=8)
+            self._lazy_panels[name] = self.tasks_panel
+        elif name == "Clients & Expiry":
+            self.clients_panel = ClientsExpiryPanel(self.tabs.tab("Clients & Expiry"), self.app, self.feedback)
+            self.clients_panel.grid(row=0, column=0, sticky="nsew", padx=8, pady=8)
+            self._lazy_panels[name] = self.clients_panel
+        elif name == "Courier Tracker":
             self.courier_panel = CourierPanel(self.tabs.tab("Courier Tracker"), self.app, self.feedback)
             self.courier_panel.grid(row=0, column=0, sticky="nsew", padx=8, pady=8)
             self._lazy_panels[name] = self.courier_panel
         elif name == "Monthly Tax Status":
-            month_scroll = themed_scrollable_frame(self.tabs.tab("Monthly Tax Status"))
-            month_scroll.grid(row=0, column=0, sticky="nsew", padx=8, pady=8)
-            month_scroll.grid_columnconfigure(0, weight=1)
+            # MonthStatusPanel is lightweight with its own tree scrollbar; outer scroll not needed
             self.month_panel = MonthStatusPanel(
-                month_scroll,
+                self.tabs.tab("Monthly Tax Status"),
                 self.app,
                 showheight=12,
                 title="Monthly tax status per client",
@@ -117,15 +124,21 @@ class DatabaseTasksView(BaseView):
         except Exception:
             current = ""
         self._ensure_lazy_panel(current)
-        self._refresh_active_tab(current)
+        self.refresh_active_tab(current)
 
-    def _refresh_active_tab(self, tab_name: str) -> None:
-        self._refresh_service_menus()
-        if tab_name == "Tasks":
+    def refresh_active_tab(self, tab_name: str | None = None) -> None:
+        """Reload data for the selected tab only (not all eight panels)."""
+        if tab_name is None:
+            try:
+                tab_name = self.tabs.get()
+            except Exception:
+                tab_name = "Tasks"
+        self._refresh_service_menus(tab_name)
+        if tab_name == "Tasks" and self.tasks_panel is not None:
             self.tasks_panel.refresh()
         elif tab_name == "Courier Tracker" and self.courier_panel is not None:
             self.courier_panel.refresh()
-        elif tab_name == "Clients & Expiry":
+        elif tab_name == "Clients & Expiry" and self.clients_panel is not None:
             self.clients_panel.refresh()
         elif tab_name == "Monthly Tax Status" and self.month_panel is not None:
             self.month_panel.refresh()
@@ -138,6 +151,9 @@ class DatabaseTasksView(BaseView):
         elif tab_name == "Suppliers & AP" and self.suppliers_panel is not None:
             self.suppliers_panel.refresh()
 
+    def _refresh_active_tab(self, tab_name: str) -> None:
+        self.refresh_active_tab(tab_name)
+
     def _require_company_panel(self) -> CompanyDetailsPanel:
         self._ensure_lazy_panel("Company Details")
         assert self.company_panel is not None
@@ -149,43 +165,45 @@ class DatabaseTasksView(BaseView):
         except Exception:
             current = "Tasks"
         self._ensure_lazy_panel(current)
-        self._refresh_active_tab(current)
+        self.refresh_active_tab(current)
 
     def open_company_details(self, client_name: str) -> None:
         self.tabs.set("Company Details")
         panel = self._require_company_panel()
         panel.select_client(client_name)
-        panel.refresh()
+        self.refresh_active_tab("Company Details")
 
     def open_company_tax_ids(self, client_name: str) -> None:
         self.tabs.set("Company Details")
         panel = self._require_company_panel()
         panel.select_client(client_name)
         panel.tabs.set("Tax IDs")
-        panel.refresh()
+        self.refresh_active_tab("Company Details")
 
     def open_accounting_setup(self) -> None:
         self.tabs.set("Company Details")
         panel = self._require_company_panel()
         panel.tabs.set("Accounting Setup")
-        panel.refresh_accounting_setup()
+        self.refresh_active_tab("Company Details")
 
     def open_vo_csh_setup(self) -> None:
         self.tabs.set("Company Details")
         panel = self._require_company_panel()
         panel.tabs.set("VO/CSH Setup")
-        panel.refresh_vo_csh_setup()
+        self.refresh_active_tab("Company Details")
 
     def open_company_vo_csh(self, client_name: str) -> None:
         self.tabs.set("Company Details")
         panel = self._require_company_panel()
         panel.select_client(client_name)
         panel.tabs.set("VO & CSH")
-        panel.refresh()
+        self.refresh_active_tab("Company Details")
 
     def open_task(self, task_id: int) -> None:
         self.tabs.set("Tasks")
-        self.tasks_panel.select_task(task_id)
+        self._ensure_lazy_panel("Tasks")
+        if self.tasks_panel is not None:
+            self.tasks_panel.select_task(task_id)
 
     def open_renewal(self, client_name: str) -> None:
         self._ensure_lazy_panel("Renewals")
@@ -201,49 +219,84 @@ class DatabaseTasksView(BaseView):
             self.pipeline_panel.refresh()
 
     def refresh_all(self) -> None:
-        if not hasattr(self, "tasks_panel"):
+        """Backward-compatible alias — refreshes only the active tab."""
+        if not hasattr(self, "tabs"):
             return
-        try:
-            current = self.tabs.get()
-        except Exception:
-            current = "Tasks"
-        self._ensure_lazy_panel(current)
-        self._refresh_active_tab(current)
+        self.refresh_active_tab()
 
-    def _refresh_service_menus(self) -> None:
+    def sync_service_menus(self) -> None:
+        """Update service-type combobox values on constructed panels without full tab refresh."""
         types = self.app.db.list_service_types()
-        if hasattr(self, "clients_panel") and self.clients_panel is not None:
+        if self.clients_panel is not None:
             combo = self.clients_panel.expiry_type
             combo.configure(values=types)
             if combo.get() not in types:
-                combo.set(types[0])
+                combo.set(types[0] if types else "")
         if self.company_panel is not None:
-            combo = self.company_panel.service_type
-            combo.configure(values=types)
-            if combo.get() not in types:
-                combo.set(types[0])
+            combo = getattr(self.company_panel, "service_type", None)
+            if combo is not None:
+                combo.configure(values=types)
+                if combo.get() not in types:
+                    combo.set(types[0] if types else "")
         if self.pipeline_panel is not None:
             combo = self.pipeline_panel.pipe_service
             combo.configure(values=types)
             if combo.get() not in types:
-                combo.set(types[0])
+                combo.set(types[0] if types else "")
+
+    def _refresh_service_menus(self, tab_name: str) -> None:
+        panel_key = service_menu_panel_key(tab_name)
+        if panel_key is None:
+            return
+        types = self.app.db.list_service_types()
+        if panel_key == "clients" and self.clients_panel is not None:
+            combo = self.clients_panel.expiry_type
+            combo.configure(values=types)
+            if combo.get() not in types:
+                combo.set(types[0] if types else "")
+        elif panel_key == "company" and self.company_panel is not None:
+            combo = getattr(self.company_panel, "service_type", None)
+            if combo is not None:
+                combo.configure(values=types)
+                if combo.get() not in types:
+                    combo.set(types[0] if types else "")
+        elif panel_key == "pipeline" and self.pipeline_panel is not None:
+            combo = self.pipeline_panel.pipe_service
+            combo.configure(values=types)
+            if combo.get() not in types:
+                combo.set(types[0] if types else "")
 
     def _export_excel(self) -> None:
-        target = filedialog.asksaveasfilename(
-            parent=self.winfo_toplevel(),
-            title="Export database to Excel",
-            defaultextension=".xlsx",
-            initialfile=default_export_name(),
-            initialdir=str(self.app.paths.root),
-            filetypes=[("Excel workbook", "*.xlsx")],
-        )
-        if not target:
-            return
-        try:
-            path = export_to_excel(self.app.db, target)
-        except Exception as exc:
-            self.feedback.error(f"Export failed: {exc}")
-            messagebox.showerror("Export failed", str(exc), parent=self.winfo_toplevel())
-            return
-        self.feedback.success(f"Exported to {path.name}")
-        self.app.set_status(f"Exported database to {path}")
+        from skyadmin_pro.ui.views.export_filter_dialog import ExportFilterDialog
+
+        def _do_export(*, date_from=None, date_to=None, status=None):
+            target = filedialog.asksaveasfilename(
+                parent=self.winfo_toplevel(),
+                title="Export database to Excel",
+                defaultextension=".xlsx",
+                initialfile=default_export_name(),
+                initialdir=str(self.app.paths.root),
+                filetypes=[("Excel workbook", "*.xlsx")],
+            )
+            if not target:
+                return
+            try:
+                path = export_to_excel(
+                    self.app.db, target,
+                    date_from=date_from, date_to=date_to, status=status,
+                )
+            except Exception as exc:
+                self.feedback.error(f"Export failed: {exc}")
+                messagebox.showerror("Export failed", str(exc), parent=self.winfo_toplevel())
+                return
+            self.feedback.success(f"Exported to {path.name}")
+            self.app.set_status(f"Exported database to {path}")
+
+        ExportFilterDialog(self.winfo_toplevel(), on_export=_do_export)
+
+    def _on_shortcut_export(self) -> None:
+        self._export_excel()
+
+    def _on_shortcut_new(self) -> None:
+        if hasattr(self, "clients_panel"):
+            self.clients_panel._add_client()

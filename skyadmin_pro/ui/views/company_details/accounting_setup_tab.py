@@ -52,6 +52,8 @@ class AccountingSetupTabMixin:
             ),
             on_double_click=self._open_selected_accounting_tax_ids,
             showheight=10,
+            tree_sticky="nsew",
+            tree_row_weight=1,
         )
         panel.configure_data(
             list_rows=lambda: list_accounting_setup_rows(self.app.db),
@@ -75,6 +77,8 @@ class AccountingSetupTabMixin:
         )
 
     def refresh_accounting_setup(self) -> None:
+        if hasattr(self, "_ensure_lazy_tab"):
+            self._ensure_lazy_tab("Accounting Setup")
         if hasattr(self, "_accounting_setup_panel"):
             self._accounting_setup_panel.refresh()
 
@@ -117,7 +121,11 @@ class AccountingSetupTabMixin:
         self.feedback.success(f"Service type set to {suggested}.")
         self.refresh_accounting_setup()
         if self._selected_client_id() == int(row["id"]):
-            self.refresh()
+            tab = self._current_subtab()
+            if tab == "Tax IDs":
+                self._refresh_tax_ids_mutation()
+            elif tab == "General":
+                self._refresh_general_mutation()
 
     def _infer_all_service_types(self) -> None:
         pending = sum(
@@ -137,7 +145,6 @@ class AccountingSetupTabMixin:
         updated = infer_service_types(self.app.db, only_missing=True)
         self.feedback.success(f"Inferred service type for {updated} client(s).")
         self.refresh_accounting_setup()
-        self.refresh()
 
     def _apply_selected_pricing_tier(self) -> None:
         row = self._selected_accounting_setup_row()
@@ -155,6 +162,8 @@ class AccountingSetupTabMixin:
             self.feedback.success("Pricing tier applied from matrix.")
             self.refresh_accounting_setup()
             if self._selected_client_id() == client_id:
-                self.refresh()
+                tab = self._current_subtab()
+                if tab == "Tax IDs":
+                    self._refresh_tax_ids_mutation()
         else:
             self.feedback.error("No matching pricing tier — check Settings → Pricing matrix.")

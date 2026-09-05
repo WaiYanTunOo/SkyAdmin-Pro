@@ -23,6 +23,7 @@ from skyadmin_pro.services.workflow import (
     create_client_workspace,
     format_eod_report,
 )
+from skyadmin_pro.ui.canvas_scroll import CanvasScrollFrame
 from skyadmin_pro.ui.theme import (
     CANVAS_BG,
     CANVAS_TEXT,
@@ -32,7 +33,7 @@ from skyadmin_pro.ui.theme import (
 )
 from skyadmin_pro.ui.treeview import ThemedTreeview
 from skyadmin_pro.ui.views.base import BaseView
-from skyadmin_pro.ui.widgets import FeedbackLabel, MonthStatusPanel, themed_entry, themed_scrollable_frame
+from skyadmin_pro.ui.widgets import FeedbackLabel, MonthStatusPanel, themed_entry
 
 
 def _days_since(start: str | None, today: str) -> str:
@@ -46,19 +47,76 @@ def _days_since(start: str | None, today: str) -> str:
     return f"{delta} day(s)" if delta >= 0 else "—"
 
 
+def snap_fingerprint(snap: dict) -> tuple:
+    """Stable signature for dashboard snapshot data — skip tree rebuild when unchanged."""
+
+    def row_ids(items: list[dict], key: str = "id") -> tuple[str, ...]:
+        return tuple(sorted(str(item[key]) for item in items if item.get(key) is not None))
+
+    counts = snap["counts"]
+    clients = snap.get("accounting_clients") or []
+    client_sig = tuple(
+        sorted(
+            (
+                c.get("id"),
+                c.get("fs_status"),
+                c.get("pnd53_status"),
+                c.get("pp30_status"),
+                c.get("pnd51_status"),
+                c.get("pnd50_status"),
+                c.get("audit_status"),
+                c.get("payment_status"),
+                c.get("service_fee"),
+            )
+            for c in clients
+        )
+    )
+    return (
+        tuple(sorted(counts.items())),
+        snap.get("pending_filings"),
+        snap.get("revenue"),
+        snap.get("vo_csh_expiring"),
+        row_ids(snap["expiring"]),
+        row_ids(snap["supplier_expiring"]),
+        row_ids(snap["overdue"]),
+        row_ids(snap["supplier_due"]),
+        row_ids(snap["pending"]),
+        row_ids(snap["ongoing"]),
+        row_ids(snap.get("renewal_due") or []),
+        client_sig,
+    )
+
+
 class DashboardView(BaseView):
     title = "Dashboard"
     subtitle = "Live overview of pending work and document expiry alerts."
 
     def build(self) -> None:
-        self.body.grid_rowconfigure(0, weight=1)
-        self._scroll = themed_scrollable_frame(self.body)
-        self._scroll.grid(row=0, column=0, sticky="nsew")
-        self._scroll.grid_columnconfigure(0, weight=1)
-        self._scroll.grid_rowconfigure(5, weight=1)
+        self.body.grid_rowconfigure(0, weight=0)
+        self.body.grid_rowconfigure(1, weight=1)
+        self._tree_refresh_after: str | None = None
+        self._detail_trees_after: str | None = None
+        self._timeline_after: str | None = None
+        self._visible = False
+        self._trees_ready = False
+        self._snap_fingerprint: tuple | None = None
+        self._detail_built = False
+
+        self._header = ctk.CTkFrame(self.body, fg_color="transparent")
+        self._header.grid(row=0, column=0, sticky="ew")
+        self._header.grid_columnconfigure(0, weight=1)
+
+        self._detail_scroll = CanvasScrollFrame(self.body)
+        self._detail_scroll.grid(row=1, column=0, sticky="nsew")
+        self._detail_scroll.content.grid_columnconfigure(0, weight=1)
+
+        self._detail = ctk.CTkFrame(self._detail_scroll.content, fg_color="transparent")
+        self._detail.grid(row=0, column=0, sticky="nsew")
+        self._detail.grid_columnconfigure(0, weight=1)
+        self._detail.grid_rowconfigure(1, weight=1)
 
         # -- Row 1: core operational cards --
-        self._row1 = ctk.CTkFrame(self._scroll, fg_color="transparent")
+        self._row1 = ctk.CTkFrame(self._header, fg_color="transparent")
         self._row1.grid(row=0, column=0, sticky="ew", pady=(0, 8))
         for i in range(5):
             self._row1.grid_columnconfigure(i, weight=1)
@@ -70,7 +128,7 @@ class DashboardView(BaseView):
         self.card_clients = self._stat_card(self._row1, 4, "Clients", "0")
 
         # -- Row 2: financial / accounting cards --
-        self._row2 = ctk.CTkFrame(self._scroll, fg_color="transparent")
+        self._row2 = ctk.CTkFrame(self._header, fg_color="transparent")
         self._row2.grid(row=1, column=0, sticky="ew", pady=(0, 12))
         for i in range(5):
             self._row2.grid_columnconfigure(i, weight=1)
@@ -82,7 +140,7 @@ class DashboardView(BaseView):
         self.card_vo_csh = self._stat_card(self._row2, 4, "VO/CSH expiring", "0")
 
         # -- Row 1.5: expiry timeline chart --
-        timeline_card = ctk.CTkFrame(self._scroll, corner_radius=12)
+        timeline_card = ctk.CTkFrame(self._header, corner_radius=12)
         timeline_card.grid(row=2, column=0, sticky="ew", pady=(0, 12))
         timeline_card.grid_columnconfigure(0, weight=1)
         ctk.CTkLabel(
@@ -98,8 +156,19 @@ class DashboardView(BaseView):
             highlightthickness=0,
         )
         self.timeline_canvas.grid(row=1, column=0, sticky="ew", padx=16, pady=(0, 14))
+        self._timeline_resize_after: str | None = None
 
-        workflow = ctk.CTkFrame(self._scroll, corner_radius=12)
+        def _on_timeline_resize(_event=None) -> None:
+            if self._timeline_resize_after:
+                try:
+                    self.after_cancel(self._timeline_resize_after)
+                except Exception:
+                    pass
+            self._timeline_resize_after = self.after(150, lambda: self._draw_timeline() if self._visible else None)
+
+        self.timeline_canvas.bind("<Configure>", _on_timeline_resize)
+
+        workflow = ctk.CTkFrame(self._header, corner_radius=12)
         workflow.grid(row=3, column=0, sticky="ew", pady=(0, 12))
         workflow.grid_columnconfigure(1, weight=1)
 
@@ -154,7 +223,7 @@ class DashboardView(BaseView):
         self.workflow_feedback = FeedbackLabel(workflow)
         self.workflow_feedback.grid(row=2, column=0, columnspan=3, sticky="ew", padx=16, pady=(0, 12))
 
-        next_card = ctk.CTkFrame(self._scroll, corner_radius=12)
+        next_card = ctk.CTkFrame(self._header, corner_radius=12)
         next_card.grid(row=4, column=0, sticky="ew", pady=(0, 12))
         next_card.grid_columnconfigure(0, weight=1)
         next_card.grid_rowconfigure(1, weight=1)
@@ -184,13 +253,19 @@ class DashboardView(BaseView):
         self.next_tree.tree.configure(height=10)
         self.next_tree.grid(row=2, column=0, sticky="nsew", padx=12, pady=(0, 12))
 
-        self.month_panel = MonthStatusPanel(
-            self._scroll, self.app, showheight=6, title="Client month closes — tax status"
-        )
-        self.month_panel.grid(row=5, column=0, sticky="ew", pady=(0, 12))
+    def _build_detail_trees(self) -> None:
+        """Build heavyweight detail tree widgets — deferred until first on_show()."""
+        if self._detail_built:
+            return
+        self._detail_built = True
 
-        split = ctk.CTkFrame(self._scroll, fg_color="transparent")
-        split.grid(row=6, column=0, sticky="nsew")
+        self.month_panel = MonthStatusPanel(
+            self._detail, self.app, showheight=6, title="Client month closes — tax status"
+        )
+        self.month_panel.grid(row=0, column=0, sticky="ew", pady=(0, 12))
+
+        split = ctk.CTkFrame(self._detail, fg_color="transparent")
+        split.grid(row=1, column=0, sticky="nsew")
         split.grid_columnconfigure(0, weight=3)
         split.grid_columnconfigure(1, weight=2)
         split.grid_rowconfigure(0, weight=1)
@@ -254,8 +329,8 @@ class DashboardView(BaseView):
         )
         self.pending_tree.grid(row=1, column=0, sticky="nsew", padx=12, pady=(0, 12))
 
-        ongoing = ctk.CTkFrame(self._scroll, corner_radius=12)
-        ongoing.grid(row=7, column=0, sticky="ew", pady=(0, 12))
+        ongoing = ctk.CTkFrame(self._detail, corner_radius=12)
+        ongoing.grid(row=2, column=0, sticky="ew", pady=(0, 12))
         ongoing.grid_columnconfigure(0, weight=1)
         ongoing_header = ctk.CTkFrame(ongoing, fg_color="transparent")
         ongoing_header.grid(row=0, column=0, sticky="ew", padx=16, pady=(14, 8))
@@ -285,8 +360,8 @@ class DashboardView(BaseView):
         self.ongoing_tree.tree.configure(height=4)
         self.ongoing_tree.grid(row=1, column=0, sticky="ew", padx=16, pady=(0, 12))
 
-        overdue = ctk.CTkFrame(self._scroll, corner_radius=12)
-        overdue.grid(row=8, column=0, sticky="ew", pady=(0, 12))
+        overdue = ctk.CTkFrame(self._detail, corner_radius=12)
+        overdue.grid(row=3, column=0, sticky="ew", pady=(0, 12))
         overdue.grid_columnconfigure(0, weight=1)
         ctk.CTkLabel(
             overdue,
@@ -327,8 +402,8 @@ class DashboardView(BaseView):
             text_color=TEXT_MUTED,
         ).pack(side="right")
 
-        supplier_due = ctk.CTkFrame(self._scroll, corner_radius=12)
-        supplier_due.grid(row=9, column=0, sticky="ew", pady=(0, 12))
+        supplier_due = ctk.CTkFrame(self._detail, corner_radius=12)
+        supplier_due.grid(row=4, column=0, sticky="ew", pady=(0, 12))
         supplier_due.grid_columnconfigure(0, weight=1)
         ctk.CTkLabel(
             supplier_due,
@@ -363,8 +438,8 @@ class DashboardView(BaseView):
             text_color=TEXT_MUTED,
         ).pack(side="right")
 
-        report_card = ctk.CTkFrame(self._scroll, corner_radius=12)
-        report_card.grid(row=10, column=0, sticky="ew", pady=(0, 12))
+        report_card = ctk.CTkFrame(self._detail, corner_radius=12)
+        report_card.grid(row=5, column=0, sticky="ew", pady=(0, 12))
         report_card.grid_columnconfigure(0, weight=1)
         report_card.grid_rowconfigure(1, weight=1)
         report_header = ctk.CTkFrame(report_card, fg_color="transparent")
@@ -405,11 +480,11 @@ class DashboardView(BaseView):
         self.report_tree = ThemedTreeview(
             report_card,
             columns=(
+                ("no", "No.", 50),
+                ("date", "Date", 110),
                 ("client", "Client", 200),
-                ("type", "Service", 240),
+                ("service", "Service", 240),
                 ("amount", "Amount", 110),
-                ("service_date", "Start date", 120),
-                ("source", "Source", 90),
             ),
         )
         self.report_tree.tree.configure(height=6)
@@ -422,8 +497,8 @@ class DashboardView(BaseView):
         )
         self.report_hint.grid(row=2, column=0, sticky="w", padx=16, pady=(0, 12))
 
-        tax_overview = ctk.CTkFrame(self._scroll, corner_radius=12)
-        tax_overview.grid(row=11, column=0, sticky="ew", pady=(0, 12))
+        tax_overview = ctk.CTkFrame(self._detail, corner_radius=12)
+        tax_overview.grid(row=6, column=0, sticky="ew", pady=(0, 12))
         tax_overview.grid_columnconfigure(0, weight=1)
         tax_overview.grid_rowconfigure(1, weight=1)
         tax_header = ctk.CTkFrame(tax_overview, fg_color="transparent")
@@ -502,7 +577,7 @@ class DashboardView(BaseView):
         value_label.grid(row=1, column=0, sticky="sw", padx=16, pady=(6, 16))
         return value_label
 
-    def _draw_timeline(self) -> None:
+    def _draw_timeline(self, snap: dict | None = None) -> None:
         """Draw a bar-per-day expiry timeline for the next 45 days."""
         canvas = self.timeline_canvas
         canvas.delete("all")
@@ -518,8 +593,12 @@ class DashboardView(BaseView):
             width = max(canvas.winfo_width(), 600)
         height = int(canvas.cget("height"))
 
-        expiring = self.app.db.list_expiring_documents()
-        supplier_expiring = self.app.db.list_expiring_supplier_services()
+        if snap is not None:
+            expiring = snap.get("expiring", [])
+            supplier_expiring = snap.get("supplier_expiring", [])
+        else:
+            expiring = self.app.db.list_expiring_documents()
+            supplier_expiring = self.app.db.list_expiring_supplier_services()
         # Bucket by days-left
         buckets = {}
         for item in expiring:
@@ -580,17 +659,51 @@ class DashboardView(BaseView):
             lx += 45
 
     def on_show(self) -> None:
+        self._visible = True
+        self._build_detail_trees()
         self.refresh()
 
-    def refresh(self) -> None:
-        if getattr(self, "_tree_refresh_after", None):
-            try:
-                self.after_cancel(self._tree_refresh_after)
-            except Exception:
-                pass
-            self._tree_refresh_after = None
+    def on_hide(self) -> None:
+        self._visible = False
+        had_pending = bool(self._tree_refresh_after or self._detail_trees_after or self._timeline_after)
+        self._cancel_deferred_refresh()
+        if had_pending:
+            self._trees_ready = False
+
+    def mark_stale(self) -> None:
+        """Force a full tree rebuild on the next refresh (e.g. after edits elsewhere)."""
+        self._trees_ready = False
+        self._snap_fingerprint = None
+
+    def _cancel_deferred_refresh(self) -> None:
+        for attr in ("_tree_refresh_after", "_detail_trees_after", "_timeline_after"):
+            after_id = getattr(self, attr, None)
+            if after_id is not None:
+                try:
+                    self.after_cancel(after_id)
+                except Exception:
+                    pass
+                setattr(self, attr, None)
+
+    def refresh(self, *, force: bool = False) -> None:
+        self._cancel_deferred_refresh()
 
         snap = self.app.db.dashboard_snapshot()
+        fingerprint = snap_fingerprint(snap)
+        self._apply_stat_cards(snap)
+        if self._detail_built:
+            self.month_panel.refresh()
+
+        if not force and self._trees_ready and fingerprint == self._snap_fingerprint:
+            return
+
+        self._snap_fingerprint = fingerprint
+        self._trees_ready = False
+        if self._detail_built:
+            self._refresh_report()
+        self._tree_refresh_after = self.after(100, lambda s=snap: self._refresh_priority_trees(s))
+
+    def _apply_stat_cards(self, snap: dict) -> None:
         counts = snap["counts"]
         pending_filings = snap["pending_filings"]
         revenue = snap["revenue"]
@@ -606,8 +719,6 @@ class DashboardView(BaseView):
         self.card_pending_filings.configure(text=str(pending_filings))
         self.card_revenue.configure(text=f"{revenue:,}")
         self.card_vo_csh.configure(text=str(vo_csh_expiring))
-
-        self._refresh_report()
 
         if counts["expiring"]:
             self.card_expiring.configure(text_color=("#b45309", "#fbbf24"))
@@ -634,23 +745,36 @@ class DashboardView(BaseView):
         else:
             self.card_vo_csh.configure(text_color=("gray10", "gray90"))
 
-        self._tree_refresh_after = self.after(100, lambda s=snap: self._refresh_trees_from_snap(s))
-
-    def _refresh_trees_from_snap(self, snap: dict) -> None:
+    def _refresh_priority_trees(self, snap: dict) -> None:
         self._tree_refresh_after = None
-        if not self.winfo_exists():
+        if not self._visible or not self.winfo_exists():
             return
 
-        self.month_panel.refresh()
         self._refresh_tax_overview(snap.get("accounting_clients"))
-        self.timeline_canvas.after(50, self._draw_timeline)
+        self.next_tree.apply_theme()
+        self._refresh_next_actions(
+            snap["overdue"],
+            snap["supplier_due"],
+            snap["expiring"],
+            snap["supplier_expiring"],
+            snap["pending"],
+            snap["ongoing"],
+            snap["renewal_due"],
+        )
+        if not self._visible:
+            return
+        self._detail_trees_after = self.after(80, lambda s=snap: self._refresh_detail_trees(s))
+
+    def _refresh_detail_trees(self, snap: dict) -> None:
+        self._detail_trees_after = None
+        if not self._visible or not self.winfo_exists():
+            return
 
         self.expiry_tree.apply_theme()
         self.pending_tree.apply_theme()
         self.overdue_tree.apply_theme()
         self.supplier_due_tree.apply_theme()
         self.ongoing_tree.apply_theme()
-        self.next_tree.apply_theme()
 
         expiring = snap["expiring"]
         supplier_expiring = snap["supplier_expiring"]
@@ -658,9 +782,6 @@ class DashboardView(BaseView):
         supplier_due = snap["supplier_due"]
         pending = snap["pending"]
         ongoing = snap["ongoing"]
-        renewal_due = snap["renewal_due"]
-        self._refresh_next_actions(overdue, supplier_due, expiring, supplier_expiring, pending, ongoing, renewal_due)
-
         rows = []
         tags = []
         iids = []
@@ -788,6 +909,17 @@ class DashboardView(BaseView):
                 iids=["empty"],
                 tags=[("inactive",)],
             )
+
+        if not self._visible:
+            return
+        self._timeline_after = self.after(120, lambda s=snap: self._draw_timeline_deferred(s))
+
+    def _draw_timeline_deferred(self, snap: dict) -> None:
+        self._timeline_after = None
+        if not self._visible or not self.winfo_exists():
+            return
+        self._draw_timeline(snap)
+        self._trees_ready = True
 
     def _refresh_next_actions(
         self,
@@ -955,6 +1087,7 @@ class DashboardView(BaseView):
             [entry[2] for entry in actions],
             iids=[entry[3] for entry in actions],
             tags=[[entry[1]] for entry in actions],
+            empty_message="Nothing urgent — you're caught up.",
         )
 
     def _next_selected(self, iid: str | None) -> None:
@@ -964,7 +1097,7 @@ class DashboardView(BaseView):
         if not target:
             return
         kind, value = target
-        tasks_view = self.app._views.get(NAV_DATABASE_TASKS)
+        tasks_view = self.app.get_view(NAV_DATABASE_TASKS)
         if tasks_view is None:
             return
         self.app.show_view(NAV_DATABASE_TASKS)
@@ -983,7 +1116,7 @@ class DashboardView(BaseView):
         values = self.ongoing_tree.tree.item(iid, "values")
         if not values or values[0] in ("", "—"):
             return
-        tasks_view = self.app._views.get(NAV_DATABASE_TASKS)
+        tasks_view = self.app.get_view(NAV_DATABASE_TASKS)
         if tasks_view is None:
             return
         self.app.show_view(NAV_DATABASE_TASKS)
@@ -1027,7 +1160,7 @@ class DashboardView(BaseView):
             return
         self.app.db.set_document_paid(document_id, True)
         self.workflow_feedback.success("Marked as paid.")
-        self.refresh()
+        self.refresh(force=True)
 
     def _mark_supplier_due_paid(self) -> None:
         iid = self.supplier_due_tree.selected_iid()
@@ -1036,7 +1169,7 @@ class DashboardView(BaseView):
             return
         self.app.db.set_supplier_payment_paid(int(iid), True)
         self.workflow_feedback.success("Supplier payment marked as paid.")
-        self.refresh()
+        self.refresh(force=True)
 
     def _open_folder(self, folder) -> None:
         try:
@@ -1076,7 +1209,7 @@ class DashboardView(BaseView):
         self.onboard_var.set("")
         self.workflow_feedback.success(f"Workspace ready: {folder.name}/01_Company_Setup, 02_Accounting, 03_Visa")
         self.app.set_status(f"Created client workspace at {folder}")
-        self.refresh()
+        self.refresh(force=True)
         try:
             open_in_file_manager(folder)
         except Exception as exc:
@@ -1093,15 +1226,16 @@ class DashboardView(BaseView):
         self.report_tree.set_rows(
             [
                 (
+                    str(index),
+                    (row.get("service_date") or "")[:10] or "—",
                     row.get("client_name") or "—",
                     row.get("service") or "—",
-                    row.get("amount") or "—",
-                    (row.get("service_date") or "")[:10],
-                    "Pipeline" if row.get("source") == "pipe" else "Document",
+                    row.get("amount") if row.get("amount") not in (None, "") else "—",
                 )
-                for row in rows
+                for index, row in enumerate(rows, start=1)
             ],
             iids=[row["id_key"] for row in rows],
+            empty_message="No new services signed up for this month.",
         )
 
     def _export_report(self) -> None:
@@ -1112,8 +1246,7 @@ class DashboardView(BaseView):
             return
         from skyadmin_pro.services.export import export_monthly_report
 
-        label = self._report_month_var.get().replace(" ", "_")
-        default_name = f"monthly_report_{label}.xlsx"
+        default_name = f"SkyAdmin_Export_{year}{month:02d}01.xlsx"
         path = filedialog.asksaveasfilename(
             parent=self.winfo_toplevel(),
             defaultextension=".xlsx",
@@ -1163,7 +1296,7 @@ class DashboardView(BaseView):
             f"{result['fields_updated']} filing(s) moved to On-Going."
         )
         self.workflow_feedback.success(msg)
-        self.refresh()
+        self.refresh(force=True)
 
     def _refresh_tax_overview(self, clients=None) -> None:
         self.tax_overview_tree.apply_theme()

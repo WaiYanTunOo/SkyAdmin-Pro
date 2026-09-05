@@ -15,34 +15,50 @@ export async function recordsHandler(c: Context<{ Bindings: Env }>) {
   ).first<{ total: number }>();
   const total = countResult?.total || 0;
 
-  // Get paginated results
+  // Get paginated results with revoked/used status via LEFT JOINs
+  // (avoids loading entire revocations + used_nonces tables into memory)
   const { results } = await c.env.DB.prepare(
-    "SELECT id, machine_id, license_key, passcode, package_days, expires_at, nonce, issued_at, price_thb FROM issued_licenses ORDER BY id DESC LIMIT ? OFFSET ?"
-  ).bind(limit, offset).all();
+    `SELECT l.id, l.machine_id, l.license_key, l.passcode, l.package_days,
+            l.expires_at, l.nonce, l.issued_at, l.price_thb,
+            (r.target IS NOT NULL OR r2.target IS NOT NULL) AS revoked,
+            u.nonce IS NOT NULL AS used
+     FROM issued_licenses l
+     LEFT JOIN revocations r ON r.target = l.nonce
+     LEFT JOIN revocations r2 ON r2.target = l.machine_id
+     LEFT JOIN used_nonces u ON u.nonce = l.nonce
+     ORDER BY l.id DESC
+     LIMIT ? OFFSET ?`
+  ).bind(limit, offset).all<{
+    id: number;
+    machine_id: string;
+    license_key: string;
+    passcode: string;
+    package_days: number | null;
+    expires_at: string | null;
+    nonce: string;
+    issued_at: string;
+    price_thb: number;
+    revoked: number;
+    used: number;
+  }>();
 
-  // Enrich with revoked/used status
-  const revSet = new Set(
-    (await c.env.DB.prepare("SELECT target FROM revocations").all<{ target: string }>()).results?.map(r => r.target) || []
-  );
-  const usedSet = new Set(
-    (await c.env.DB.prepare("SELECT nonce FROM used_nonces").all<{ nonce: string }>()).results?.map(r => r.nonce) || []
-  );
-
-  const enriched = (results || []).map((r: Record<string, unknown>) => {
+  const enriched = (results || []).map((r) => {
+    const isRevoked = Boolean(r.revoked);
+    const isUsed = Boolean(r.used);
     const expiry = describeLicenseExpiry(
       (r.expires_at as string | null | undefined) ?? null,
-      { revoked: revSet.has(String(r.nonce || "")), used: usedSet.has(String(r.nonce || "")) },
+      { revoked: isRevoked, used: isUsed },
     );
     return {
       ...r,
-      revoked: revSet.has(String(r.nonce || "")),
-      used: usedSet.has(String(r.nonce || "")),
+      revoked: isRevoked,
+      used: isUsed,
       expires_label: expiry.expires_label,
       time_left: expiry.time_left,
       is_expired: expiry.is_expired,
       expiry_state: expiry.state,
       expiring_soon:
-        !revSet.has(String(r.nonce || "")) &&
+        !isRevoked &&
         !expiry.is_expired &&
         expiry.ms_remaining !== null &&
         expiry.ms_remaining > 0 &&
@@ -50,20 +66,31 @@ export async function recordsHandler(c: Context<{ Bindings: Env }>) {
     };
   });
 
+  // Machine summary — scan recent rows for machine aggregation
+  const summaryLimit = Math.min(5000, Math.max(100, parseInt(c.req.query("summary_limit") || "2000", 10)));
   const allRows = await c.env.DB.prepare(
-    "SELECT machine_id, expires_at, issued_at, package_days, nonce FROM issued_licenses ORDER BY id DESC",
-  ).all<{
+    `SELECT l.machine_id, l.expires_at, l.issued_at, l.package_days, l.nonce,
+            (r.target IS NOT NULL OR r2.target IS NOT NULL) AS revoked,
+            u.nonce IS NOT NULL AS used
+     FROM issued_licenses l
+     LEFT JOIN revocations r ON r.target = l.nonce
+     LEFT JOIN revocations r2 ON r2.target = l.machine_id
+     LEFT JOIN used_nonces u ON u.nonce = l.nonce
+     ORDER BY l.id DESC LIMIT ?`,
+  ).bind(summaryLimit).all<{
     machine_id: string;
     expires_at: string | null;
     issued_at: string;
     package_days: number | null;
     nonce: string;
+    revoked: number;
+    used: number;
   }>();
 
   const allEnriched = (allRows.results || []).map((r) => ({
     ...r,
-    revoked: revSet.has(r.nonce),
-    used: usedSet.has(r.nonce),
+    revoked: Boolean(r.revoked),
+    used: Boolean(r.used),
   }));
 
   return c.json({

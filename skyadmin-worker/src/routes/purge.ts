@@ -7,9 +7,14 @@ interface PurgeBody {
   older_than_days?: number;
 }
 
-/** Licenses safe to remove: expired 30d+, revoked 30d+, or unused pending 30d+. */
+/** Licenses safe to remove: expired 30d+, revoked 30d+, or unused pending 30d+ (unlimited kept). */
 export async function purgeLicensesHandler(c: Context<{ Bindings: Env }>) {
-  const body = await c.req.json<PurgeBody>().catch(() => ({} as PurgeBody));
+  let body: PurgeBody = {};
+  try {
+    body = await c.req.json<PurgeBody>();
+  } catch {
+    body = {};
+  }
   const olderThanDays = Math.max(1, Math.min(365, body.older_than_days ?? 30));
   const cutoff = `-${olderThanDays} days`;
 
@@ -19,11 +24,11 @@ export async function purgeLicensesHandler(c: Context<{ Bindings: Env }>) {
      FROM issued_licenses il
      LEFT JOIN revocations r ON r.target = il.nonce
      LEFT JOIN used_nonces u ON u.nonce = il.nonce
-     WHERE (
-       (il.expires_at IS NOT NULL AND il.expires_at < datetime('now', ?))
-       OR (r.target IS NOT NULL AND il.issued_at < datetime('now', ?))
-       OR (u.nonce IS NULL AND il.issued_at < datetime('now', ?))
-     )
+      WHERE (
+        (il.expires_at IS NOT NULL AND il.expires_at < datetime('now', ?))
+        OR (r.target IS NOT NULL AND il.issued_at < datetime('now', ?))
+        OR (u.nonce IS NULL AND il.package_days IS NOT NULL AND il.issued_at < datetime('now', ?))
+      )
      AND NOT (
        u.nonce IS NOT NULL
        AND r.target IS NULL
@@ -49,13 +54,14 @@ export async function purgeLicensesHandler(c: Context<{ Bindings: Env }>) {
   }
 
   let archived = 0;
+  const stmts: D1PreparedStatement[] = [];
   for (const row of rows) {
-    await c.env.DB.prepare(
-      `INSERT INTO archived_licenses
-         (machine_id, license_key, passcode, package_days, expires_at, nonce, issued_at, price_thb)
-       VALUES (?, ?, ?, ?, ?, ?, ?, ?)`,
-    )
-      .bind(
+    stmts.push(
+      c.env.DB.prepare(
+        `INSERT INTO archived_licenses
+          (machine_id, license_key, passcode, package_days, expires_at, nonce, issued_at, price_thb)
+        VALUES (?, ?, ?, ?, ?, ?, ?, ?)`,
+      ).bind(
         row.machine_id,
         row.license_key,
         row.passcode,
@@ -64,16 +70,15 @@ export async function purgeLicensesHandler(c: Context<{ Bindings: Env }>) {
         row.nonce,
         row.issued_at,
         row.price_thb,
-      )
-      .run();
+      ),
+    );
     archived += 1;
   }
 
   const ids = rows.map((r) => r.id);
   const placeholders = ids.map(() => "?").join(",");
-  await c.env.DB.prepare(`DELETE FROM issued_licenses WHERE id IN (${placeholders})`)
-    .bind(...ids)
-    .run();
+  stmts.push(c.env.DB.prepare(`DELETE FROM issued_licenses WHERE id IN (${placeholders})`).bind(...ids));
+  await c.env.DB.batch(stmts);
 
   const { bumpVersion } = await import("../db");
   await bumpVersion(c.env.DB);

@@ -158,7 +158,7 @@ class TaskPanel(ctk.CTkFrame):
             )
             iids.append(str(task["id"]))
             tags.append(("completed",) if task.get("status") == TASK_STATUS_COMPLETED else ())
-        self.tree.set_rows(rows, iids=iids, tags=tags)
+        self.tree.set_rows(rows, iids=iids, tags=tags, empty_message="No tasks in this view.")
 
     def _on_select(self, iid: str | None) -> None:
         if iid is None:
@@ -258,6 +258,7 @@ class TaskPanel(ctk.CTkFrame):
             except Exception:
                 pass
         self.app.set_status("Tasks saved.")
+        self.app.invalidate_dashboard()
 
     def _complete(self) -> None:
         if self._editing_id is None:
@@ -267,6 +268,7 @@ class TaskPanel(ctk.CTkFrame):
         self.feedback.success("Marked as completed.")
         self.refresh()
         self.status_label.configure(text="Status: completed")
+        self.app.invalidate_dashboard()
 
     def _reopen(self) -> None:
         if self._editing_id is None:
@@ -276,6 +278,7 @@ class TaskPanel(ctk.CTkFrame):
         self.feedback.success("Task reopened.")
         self.refresh()
         self.status_label.configure(text="Status: pending")
+        self.app.invalidate_dashboard()
 
     def _delete(self) -> None:
         if self._editing_id is None:
@@ -291,3 +294,4 @@ class TaskPanel(ctk.CTkFrame):
         self.feedback.success("Task deleted.")
         self._new()
         self.refresh()
+        self.app.invalidate_dashboard()

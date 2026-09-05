@@ -111,4 +111,4 @@ class VoCshTabMixin:
             self.feedback.error(f"Could not save VO & CSH: {exc}")
             return
         self.feedback.success("VO & CSH info saved.")
-        self.refresh()
+        self._refresh_vo_csh_mutation()

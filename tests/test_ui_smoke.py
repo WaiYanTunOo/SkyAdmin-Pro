@@ -82,6 +82,9 @@ def test_document_hub_lazy_tabs(app):
     app.update()
     view = app._views["document_hub"]
     assert view.title == "Document Hub"
+    assert view.renamer is not None
+    assert view.converter is None
+    assert view.merger is None
     for tab in (
         "Smart Renamer",
         "Image to PDF",
@@ -91,8 +94,11 @@ def test_document_hub_lazy_tabs(app):
         "Financial Docs",
     ):
         view.tabs.set(tab)
+        view._on_tab_changed()
         app.update()
         assert view.tabs.get() == tab
+    assert view.converter is not None
+    assert view.merger is not None
 
 
 def test_settings_workspace_field(app):

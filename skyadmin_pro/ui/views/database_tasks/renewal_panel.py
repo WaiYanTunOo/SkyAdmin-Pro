@@ -12,7 +12,7 @@ from skyadmin_pro.services.tracking import (
 )
 from skyadmin_pro.ui.combo_utils import fill_combo
 from skyadmin_pro.ui.theme import CARD_RADIUS, CARD_TITLE_SIZE, TEXT_MUTED
-from skyadmin_pro.ui.widgets import FeedbackLabel, bind_wrap_label, combo_style_kwargs, themed_scrollable_frame
+from skyadmin_pro.ui.widgets import FeedbackLabel, combo_style_kwargs, themed_scrollable_frame
 
 
 class RenewalPanel(ctk.CTkFrame):
@@ -35,13 +35,9 @@ class RenewalPanel(ctk.CTkFrame):
         selector.grid(row=0, column=0, sticky="ew", pady=(0, 8))
         selector.grid_columnconfigure(1, weight=1)
         ctk.CTkLabel(selector, text="Company / Client:", anchor="w").grid(row=0, column=0, sticky="w", padx=(0, 10))
-        self.company_box = ctk.CTkComboBox(
-            selector, values=[""], command=self._on_company, **combo_style_kwargs()
-        )
+        self.company_box = ctk.CTkComboBox(selector, values=[""], command=self._on_company, **combo_style_kwargs())
         self.company_box.grid(row=0, column=1, sticky="ew")
-        ctk.CTkLabel(selector, text="Service:", anchor="w").grid(
-            row=1, column=0, sticky="w", padx=(0, 10), pady=(8, 0)
-        )
+        ctk.CTkLabel(selector, text="Service:", anchor="w").grid(row=1, column=0, sticky="w", padx=(0, 10), pady=(8, 0))
         self.service_box = ctk.CTkComboBox(
             selector,
             values=[""],

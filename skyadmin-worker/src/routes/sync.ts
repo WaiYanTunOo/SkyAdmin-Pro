@@ -6,6 +6,14 @@ import { parseActivationClaim } from "../verification";
 import { checkActivationEligibility } from "../sync_eligibility";
 import { newSyncToken, syncAuthMiddleware } from "../sync_auth";
 import {
+  MAX_PUSH_CHANGES,
+  fetchExistingUpdatedAt,
+  partitionPushChanges,
+  preparePushChanges,
+  writePushBatch,
+  type PushChange,
+} from "../sync_push";
+import {
   SYNC_EXCLUDED_COLUMNS,
   SYNC_SCHEMA_VERSION,
   SYNC_TABLES,
@@ -13,24 +21,59 @@ import {
 } from "../sync_schema";
 
 async function upsertSyncDevice(db: D1Database, machineId: string): Promise<string> {
+  const token = newSyncToken();
+  const expiry = new Date(Date.now() + 30 * 86400 * 1000).toISOString().slice(0, 19);
   const existing = await db
     .prepare("SELECT token FROM sync_devices WHERE machine_id = ?")
     .bind(machineId)
     .first<{ token: string }>();
   if (existing?.token) {
-    return existing.token;
+    await db
+      .prepare(
+        "UPDATE sync_devices SET token = ?, last_seen_at = datetime('now'), expires_at = ? WHERE machine_id = ?",
+      )
+      .bind(token, expiry, machineId)
+      .run();
+    return token;
   }
-  const token = newSyncToken();
   await db
-    .prepare("INSERT INTO sync_devices (machine_id, token) VALUES (?, ?)")
-    .bind(machineId, token)
+    .prepare("INSERT INTO sync_devices (machine_id, token, expires_at) VALUES (?, ?, ?)")
+    .bind(machineId, token, expiry)
     .run();
   return token;
 }
 
+const REGISTER_WINDOW_SECONDS = 60;
+const REGISTER_MAX_PER_WINDOW = 10;
+
+async function isRegisterRateLimited(db: D1Database, ip: string): Promise<boolean> {
+  const key = `register:${ip}`;
+  const row = await db
+    .prepare(
+      `INSERT INTO rate_limits (key, window_start, count) VALUES (?, datetime('now'), 1)
+       ON CONFLICT(key) DO UPDATE SET
+         count = CASE WHEN window_start < datetime('now', '-${REGISTER_WINDOW_SECONDS} seconds') THEN 1 ELSE count + 1 END,
+         window_start = CASE WHEN window_start < datetime('now', '-${REGISTER_WINDOW_SECONDS} seconds') THEN datetime('now') ELSE window_start END
+       RETURNING count`
+    )
+    .bind(key)
+    .first<{ count: number }>();
+  const count = row?.count ?? 1;
+  return count > REGISTER_MAX_PER_WINDOW;
+}
+
 /** POST /api/sync/register — prove valid license, receive device sync token. */
 export async function syncRegisterHandler(c: Context<{ Bindings: Env }>) {
-  const body = await c.req.json<{ code?: string }>();
+  const ip = c.req.header("cf-connecting-ip") || "unknown";
+  if (await isRegisterRateLimited(c.env.DB, ip)) {
+    return c.json({ ok: false, error: "Too many registration attempts — try again shortly." }, 429);
+  }
+  let body: { code?: string };
+  try {
+    body = await c.req.json<{ code?: string }>();
+  } catch {
+    return c.json({ ok: false, error: "invalid json" }, 400);
+  }
   const code = (body.code || "").trim();
   if (!code) {
     return c.json({ ok: false, error: "code required" }, 400);
@@ -68,11 +111,12 @@ export async function syncSchemaHandler(c: Context<{ Bindings: Env }>) {
   });
 }
 
-/** GET /api/sync/pull?since=ISO&tables=a,b */
+/** GET /api/sync/pull?since=ISO&tables=a,b&limit=N */
 export async function syncPullHandler(c: Context<{ Bindings: Env }>) {
   const machineId = (c.req.header("X-Machine-Id") || "").trim().toUpperCase();
   const since = (c.req.query("since") || "").trim();
   const tablesParam = (c.req.query("tables") || "").trim();
+  const limit = Math.min(500, Math.max(1, parseInt(c.req.query("limit") || "500", 10)));
   const tables = tablesParam
     ? tablesParam.split(",").map((t) => t.trim()).filter(isSyncTable)
     : [...SYNC_TABLES];
@@ -84,13 +128,13 @@ export async function syncPullHandler(c: Context<{ Bindings: Env }>) {
   const placeholders = tables.map(() => "?").join(", ");
   const sql = since
     ? `SELECT table_name, global_id, row_json, updated_at, deleted_at
-       FROM sync_rows
-       WHERE machine_id = ? AND table_name IN (${placeholders}) AND updated_at > ?
-       ORDER BY updated_at ASC`
+        FROM sync_rows
+        WHERE machine_id = ? AND table_name IN (${placeholders}) AND updated_at > ?
+        ORDER BY updated_at ASC LIMIT ${limit}`
     : `SELECT table_name, global_id, row_json, updated_at, deleted_at
-       FROM sync_rows
-       WHERE machine_id = ? AND table_name IN (${placeholders})
-       ORDER BY updated_at ASC`;
+        FROM sync_rows
+        WHERE machine_id = ? AND table_name IN (${placeholders})
+        ORDER BY updated_at ASC LIMIT ${limit}`;
 
   const binds = since ? [machineId, ...tables, since] : [machineId, ...tables];
   const { results } = await c.env.DB.prepare(sql).bind(...binds).all<{
@@ -123,21 +167,15 @@ export async function syncPullHandler(c: Context<{ Bindings: Env }>) {
   });
 }
 
-type PushChange = {
-  table?: string;
-  global_id?: string;
-  row?: Record<string, unknown>;
-  updated_at?: string;
-  deleted_at?: string | null;
-};
-
-const MAX_PUSH_CHANGES = 500;
-const MAX_ROW_JSON_BYTES = 64 * 1024;
-
 /** POST /api/sync/push */
 export async function syncPushHandler(c: Context<{ Bindings: Env }>) {
   const machineId = (c.req.header("X-Machine-Id") || "").trim().toUpperCase();
-  const body = await c.req.json<{ changes?: PushChange[] }>();
+  let body: { changes?: PushChange[] };
+  try {
+    body = await c.req.json<{ changes?: PushChange[] }>();
+  } catch {
+    return c.json({ ok: false, error: "invalid json" }, 400);
+  }
   const changes = body.changes || [];
   if (!Array.isArray(changes) || !changes.length) {
     return c.json({ ok: false, error: "changes array required" }, 400);
@@ -146,75 +184,16 @@ export async function syncPushHandler(c: Context<{ Bindings: Env }>) {
     return c.json({ ok: false, error: `Too many changes (max ${MAX_PUSH_CHANGES})` }, 413);
   }
 
-  let applied = 0;
-  let skipped = 0;
-  let conflicts = 0;
-
-  for (const change of changes) {
-    const table = (change.table || "").trim();
-    const globalId = (change.global_id || "").trim();
-    const updatedAt = (change.updated_at || "").trim();
-    if (!isSyncTable(table) || !globalId || !updatedAt) {
-      skipped += 1;
-      continue;
-    }
-
-    const row = { ...(change.row || {}) };
-    for (const col of SYNC_EXCLUDED_COLUMNS[table]) {
-      delete row[col];
-    }
-
-    const rowJson = JSON.stringify(row);
-    if (rowJson.length > MAX_ROW_JSON_BYTES) {
-      skipped += 1;
-      continue;
-    }
-
-    const existing = await c.env.DB.prepare(
-      `SELECT updated_at FROM sync_rows
-       WHERE machine_id = ? AND table_name = ? AND global_id = ?`,
-    )
-      .bind(machineId, table, globalId)
-      .first<{ updated_at: string }>();
-
-    if (existing && existing.updated_at >= updatedAt) {
-      skipped += 1;
-      conflicts += 1;
-      await c.env.DB.prepare(
-        `INSERT INTO sync_conflicts
-           (machine_id, table_name, global_id, direction, kept_updated_at, rejected_updated_at)
-         VALUES (?, ?, ?, 'push', ?, ?)`,
-      )
-        .bind(machineId, table, globalId, existing.updated_at, updatedAt)
-        .run();
-      continue;
-    }
-
-    await c.env.DB.prepare(
-      `INSERT INTO sync_rows (machine_id, table_name, global_id, row_json, updated_at, deleted_at)
-       VALUES (?, ?, ?, ?, ?, ?)
-       ON CONFLICT(machine_id, table_name, global_id) DO UPDATE SET
-         row_json = excluded.row_json,
-         updated_at = excluded.updated_at,
-         deleted_at = excluded.deleted_at`,
-    )
-      .bind(
-        machineId,
-        table,
-        globalId,
-        rowJson,
-        updatedAt,
-        change.deleted_at || null,
-      )
-      .run();
-    applied += 1;
-  }
+  const { prepared, skipped: invalidSkipped } = preparePushChanges(changes);
+  const existing = await fetchExistingUpdatedAt(c.env.DB, machineId, prepared);
+  const partition = partitionPushChanges(prepared, existing);
+  await writePushBatch(c.env.DB, machineId, partition, existing);
 
   return c.json({
     ok: true,
-    applied,
-    skipped,
-    conflicts,
+    applied: partition.apply.length,
+    skipped: invalidSkipped + partition.skipped,
+    conflicts: partition.conflicts.length,
     server_time: new Date().toISOString(),
   });
 }

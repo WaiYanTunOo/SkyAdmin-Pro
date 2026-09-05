@@ -39,6 +39,12 @@ jobs:
         env:
           SKYADMIN_SKIP_DAILY_CHECK: "1"
 
+      - name: Audit Python dependencies
+        run: pip-audit --strict
+
+      - name: Security scan with bandit
+        run: bandit -r skyadmin_pro/ -c pyproject.toml --severity-level medium
+
   worker:
     runs-on: ubuntu-latest
     defaults:
@@ -64,3 +70,12 @@ jobs:
 
       - name: Test worker
         run: npm test
+
+      - name: Security scan with semgrep
+        uses: returntocorp/semgrep-action@v1
+        with:
+          config: p/typescript
+          generatingCode: false
+
+      - name: Audit Worker dependencies
+        run: npm audit --audit-level=moderate

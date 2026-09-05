@@ -1,11 +1,15 @@
 /** Authentication middleware — Bearer API token only (no session cookies on /api/*). */
 
 import { Context, Next } from "hono";
+import { timingSafeEqual } from "./timing_safe";
 
 export async function authMiddleware(c: Context, next: Next) {
   const header = c.req.header("Authorization") || "";
   const token = header.startsWith("Bearer ") ? header.slice(7) : "";
-  if (token && token === c.env.API_TOKEN) {
+  const expected = (c.env.API_TOKEN || "").trim();
+  // Constant-time compare to avoid timing oracle
+  const ok = token.length > 0 && expected.length > 0 && timingSafeEqual(token, expected);
+  if (ok) {
     await next();
     return;
   }

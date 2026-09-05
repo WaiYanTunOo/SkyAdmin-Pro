@@ -43,3 +43,13 @@ if (Test-Path $Setup) {
 } else {
     throw "Installer not found: $Setup"
 }
+
+Write-Host ""
+Write-Host "Code signing (optional)..."
+$PortableExe = Join-Path $Root "dist\SkyAdminPro.exe"
+$signArgs = @("-Paths", @($PortableExe, $Setup))
+if ($env:SKYADMIN_SIGN_REQUIRED -eq "1") {
+    $signArgs += "-Required"
+}
+& powershell -NoProfile -ExecutionPolicy Bypass -File (Join-Path $PSScriptRoot "sign-windows.ps1") @signArgs
+if ($LASTEXITCODE -ne 0) { throw "sign-windows.ps1 failed" }

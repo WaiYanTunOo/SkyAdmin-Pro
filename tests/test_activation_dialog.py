@@ -11,7 +11,8 @@ from skyadmin_pro.ui.activation import ActivationDialog
 def test_activation_dialog_accepts_generated_key(monkeypatch):
     """Local verify + save path should succeed without blocking on UI thread."""
     mid = "ABCD1234EFGH5678"
-    monkeypatch.setattr("skyadmin_pro.services.license.get_machine_id", lambda: mid)
+    monkeypatch.setattr("skyadmin_pro.services.license.machine.get_machine_id", lambda: mid)
+    monkeypatch.setattr("skyadmin_pro.services.license.verify.get_machine_id", lambda: mid)
     monkeypatch.setattr("skyadmin_pro.services.license.requires_online_check", lambda: False)
 
     saved: list[str] = []

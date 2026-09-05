@@ -37,7 +37,11 @@ Pre-ship gate:
 
 ```powershell
 python scripts\release_check.py
+# When signing is configured:
+python scripts\release_check.py --require-signature
 ```
+
+See `packaging/SIGNING.md` for Authenticode certificate setup.
 
 ## Linux (Ubuntu / Debian)
 
@@ -74,11 +78,27 @@ Notes:
 
 ## Publish an app update (all platforms)
 
-After uploading a new build to a public URL:
+After a tagged release (recommended):
+
+```bash
+# CI does this automatically on git tag v* when SKYADMIN_API_TOKEN is set.
+# Manual one-shot after a local build:
+python scripts/publish_release.py --version 0.3.1 --exe dist/SkyAdminPro.exe --github
+```
+
+Or publish only the Worker LATEST line (URL must already be public):
 
 ```bash
 # Bearer token = Worker API_TOKEN
-python scripts/publish_update.py --version 0.3.1 --url https://your-cdn/SkyAdminPro.exe
+python scripts/publish_update.py --version 0.3.1 --url https://github.com/WaiYanTunOo/SkyAdmin-Pro/releases/download/v0.3.1/SkyAdminPro.exe
+```
+
+Update `CHANGELOG.md` before tagging:
+
+```bash
+python scripts/generate_changelog.py --version 0.3.2 --write
+git add CHANGELOG.md && git commit -m "Changelog for 0.3.2"
+git tag v0.3.2 && git push origin v0.3.2
 ```
 
 Or use **Admin → App update** on the Worker admin page.
@@ -94,7 +114,11 @@ Desktop apps pick up `LATEST version url` on the next **Sync Now** or daily cont
 | `packaging/SkyAdminPro-macos.spec` | macOS `.app` bundle spec |
 | `packaging/build.ps1` | Windows build + tests |
 | `packaging/build-installer.ps1` | Windows Inno Setup installer |
+| `packaging/sign-windows.ps1` | Authenticode signing (optional) |
 | `packaging/SkyAdminPro.iss` | Inno Setup script |
 | `packaging/build-linux.sh` | Linux build + tests |
 | `packaging/build-macos.sh` | macOS build + tests |
 | `scripts/release_check.py` | Automated pre-release gate |
+| `scripts/generate_changelog.py` | Release notes from git history |
+| `scripts/publish_release.py` | Local publish orchestrator |
+| `scripts/publish_update.py` | Worker LATEST update line |

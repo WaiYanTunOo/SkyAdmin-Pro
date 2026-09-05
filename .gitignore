@@ -41,3 +41,12 @@ desktop.ini
 .idea/
 .vscode/
 *.swp
+.cursor/
+
+# Backup files
+*.bak
+*.bak.*
+
+# One-time scripts and samples
+scripts/split_*.py
+control_sample*.txt

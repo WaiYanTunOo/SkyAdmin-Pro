@@ -171,8 +171,30 @@ def test_phase4_company_details_vo_fields(app):
     view._ensure_lazy_panel("Company Details")
     app.update()
     panel = view.company_panel
+    panel.tabs.set("VO & CSH")
+    app.update()
+    panel._ensure_lazy_tab("VO & CSH")
     assert hasattr(panel, "vo_address_var")
     assert hasattr(panel, "shareholder_var")
+
+
+def test_phase4_company_details_lazy_subtabs(app):
+    app.show_view("database_tasks")
+    app.update()
+    view = app._views["database_tasks"]
+    view.tabs.set("Company Details")
+    app.update()
+    view._ensure_lazy_panel("Company Details")
+    app.update()
+    panel = view.company_panel
+    panel.refresh()
+    app.update()
+    assert "Financial Docs" not in panel._lazy_tabs
+    panel.tabs.set("Financial Docs")
+    panel.refresh()
+    app.update()
+    assert "Financial Docs" in panel._lazy_tabs
+    assert hasattr(panel, "fin_doc_tree")
 
 
 def test_phase5_activation_dialog_offscreen(monkeypatch, fake_app_dir):
@@ -187,7 +209,8 @@ def test_phase5_activation_dialog_offscreen(monkeypatch, fake_app_dir):
     mid = "ABCD1234EFGH5678"
     saved: list[str] = []
 
-    monkeypatch.setattr("skyadmin_pro.services.license.get_machine_id", lambda: mid)
+    monkeypatch.setattr("skyadmin_pro.services.license.machine.get_machine_id", lambda: mid)
+    monkeypatch.setattr("skyadmin_pro.services.license.verify.get_machine_id", lambda: mid)
     monkeypatch.setattr("skyadmin_pro.services.license.requires_online_check", lambda: False)
     monkeypatch.setattr(
         "skyadmin_pro.services.license.save_license_file",

@@ -50,8 +50,9 @@ export async function controlHandler(c: Context<{ Bindings: Env }>) {
   return new Response(envelope, {
     headers: {
       "Content-Type": "text/plain; charset=utf-8",
-      "Cache-Control": "public, max-age=300", // 5-minute edge cache
+      "Cache-Control": "private, max-age=60, must-revalidate",
       "X-Control-Version": version,
+      "X-Content-Type-Options": "nosniff",
     },
   });
 }

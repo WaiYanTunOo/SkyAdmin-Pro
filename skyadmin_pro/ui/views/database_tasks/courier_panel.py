@@ -12,9 +12,8 @@ from skyadmin_pro.services.file_ops import parse_flexible_date
 from skyadmin_pro.ui.combo_utils import fill_combo
 from skyadmin_pro.ui.theme import CARD_RADIUS, CARD_TITLE_SIZE, FORM_ROW_GAP, FORM_SIDEBAR_MIN_WIDTH
 from skyadmin_pro.ui.treeview import ThemedTreeview
-from skyadmin_pro.ui.widgets import FeedbackLabel, FormField, themed_scrollable_frame
-
 from skyadmin_pro.ui.views.database_tasks.constants import NONE_TASK
+from skyadmin_pro.ui.widgets import FeedbackLabel, FormField, themed_scrollable_frame
 
 FORM_PADX = 16
 
@@ -76,7 +75,9 @@ class CourierPanel(ctk.CTkFrame):
         self.tracking_field.grid(row=row, column=0, sticky="ew", padx=FORM_PADX, pady=(FORM_ROW_GAP, 0))
         row += 1
 
-        self.driver_field = FormField(form, label="Driver (Grab / Lalamove)", kind="combo", values=list(COURIER_DRIVERS))
+        self.driver_field = FormField(
+            form, label="Driver (Grab / Lalamove)", kind="combo", values=list(COURIER_DRIVERS)
+        )
         self.driver_field.set("Grab")
         self.driver_field.grid(row=row, column=0, sticky="ew", padx=FORM_PADX, pady=(FORM_ROW_GAP, 0))
         self.driver_box = self.driver_field.widget

@@ -44,6 +44,8 @@ class VoCshSetupTabMixin:
             ),
             on_double_click=self._open_selected_vo_csh_tab,
             showheight=10,
+            tree_sticky="nsew",
+            tree_row_weight=1,
         )
         panel.configure_data(
             list_rows=lambda: list_vo_csh_setup_rows(self.app.db),
@@ -66,6 +68,8 @@ class VoCshSetupTabMixin:
         )
 
     def refresh_vo_csh_setup(self) -> None:
+        if hasattr(self, "_ensure_lazy_tab"):
+            self._ensure_lazy_tab("VO/CSH Setup")
         if hasattr(self, "_vo_csh_setup_panel"):
             self._vo_csh_setup_panel.refresh()
 
@@ -98,7 +102,8 @@ class VoCshSetupTabMixin:
             return
         self.feedback.success(f"Inferred {result['vo']} VO and {result['csh']} CSH renewal date(s).")
         self.refresh_vo_csh_setup()
-        self.refresh()
+        if self._selected_client_id() == int(row["id"]) and self._current_subtab() == "VO & CSH":
+            self._refresh_vo_csh_mutation()
 
     def _infer_all_vo_csh_dates(self) -> None:
         pending = sum(
@@ -117,4 +122,3 @@ class VoCshSetupTabMixin:
         total = int(result["vo"]) + int(result["csh"])
         self.feedback.success(f"Inferred {result['vo']} VO and {result['csh']} CSH renewal date(s) ({total} total).")
         self.refresh_vo_csh_setup()
-        self.refresh()

@@ -38,6 +38,7 @@ a = Analysis(
         "deep_translator",
         "pyperclip",
         "tkinterdnd2",
+        "pypdf",
     ],
     hookspath=[],
     hooksconfig={},

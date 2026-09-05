@@ -7,6 +7,7 @@ with a signed code from the phone generator → paste → activated instantly.
 
 from __future__ import annotations
 
+import logging
 from urllib.parse import quote
 from webbrowser import open as _open_url
 
@@ -23,10 +24,7 @@ from skyadmin_pro.config import (
 from skyadmin_pro.services.license import (
     activation_request_message,
     check_activation_usable,
-    fetch_revocations,
     get_machine_id,
-    mark_used,
-    save_license_file,
 )  # noqa: F401 (fetch_revocations used inside _activate worker)
 from skyadmin_pro.ui.theme import (
     CARD_RADIUS,
@@ -36,7 +34,7 @@ from skyadmin_pro.ui.theme import (
     HEADER_TITLE_SIZE,
     TEXT_MUTED,
 )
-from skyadmin_pro.ui.widgets import bind_wrap_label, make_modal, themed_entry, themed_scrollable_frame, themed_textbox
+from skyadmin_pro.ui.widgets import bind_wrap_label, themed_entry, themed_scrollable_frame, themed_textbox
 
 
 def open_whatsapp_chat(message: str = "") -> None:
@@ -265,9 +263,7 @@ class ActivationDialog(ctk.CTkToplevel):
         over = ctk.CTkFrame(card, corner_radius=10, fg_color=("gray90", "gray20"))
         over.grid(row=rows_used + 1, column=0, columnspan=2, sticky="ew", padx=8, pady=(4, 12))
         over.grid_columnconfigure(1, weight=1)
-        ctk.CTkLabel(over, text=self._over_year_text, anchor="w").grid(
-            row=0, column=0, sticky="w", padx=12, pady=10
-        )
+        ctk.CTkLabel(over, text=self._over_year_text, anchor="w").grid(row=0, column=0, sticky="w", padx=12, pady=10)
         ctk.CTkButton(
             over,
             text="WhatsApp us",
@@ -384,12 +380,12 @@ class ActivationDialog(ctk.CTkToplevel):
                 return
 
             from skyadmin_pro.services.license import (
+                _is_repair_activation,
                 fetch_revocations,
                 mark_used,
                 report_activation_claim,
                 requires_online_check,
                 save_license_file,
-                _is_repair_activation,
             )
 
             needs_online = requires_online_check()
@@ -413,7 +409,7 @@ class ActivationDialog(ctk.CTkToplevel):
                     try:
                         self._on_activated()
                     except Exception:
-                        pass
+                        logging.getLogger(__name__).warning("Activation callback failed", exc_info=True)
 
             if not needs_online:
                 _finish(True, msg, nonce, None)
@@ -429,9 +425,7 @@ class ActivationDialog(ctk.CTkToplevel):
                 try:
                     net_ok, net_msg = fetch_revocations()
                     if not net_ok:
-                        result_msg = (
-                            "Internet connection is required to activate. Please connect and try again."
-                        )
+                        result_msg = "Internet connection is required to activate. Please connect and try again."
                     else:
                         ok2, msg2, n2 = check_activation_usable(content)
                         if not ok2:

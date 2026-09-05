@@ -13,10 +13,10 @@ from datetime import datetime, timedelta, timezone
 from cryptography.hazmat.primitives import serialization
 from cryptography.hazmat.primitives.asymmetric.ed25519 import Ed25519PrivateKey
 
+from skyadmin_pro.services._secret import _derive_secret
 from skyadmin_pro.services.license import get_machine_id
 from skyadmin_pro.services.license_crypto import license_payload_string, passcode_payload_string
 from skyadmin_pro.services.license_public import LICENSE_SIGNATURE_ALGORITHM, PASSCODE_PREFIX
-from skyadmin_pro.services._secret import _derive_secret
 
 _DEV_PRIVATE_KEY_B64 = (
     "LS0tLS1CRUdJTiBQUklWQVRFIEtFWS0tLS0tCk1DNENBUUF3QlFZREsyVndCQ0lFSUxVUFV2UlpLendzR1Mv"

@@ -4,8 +4,8 @@ import pytest
 
 from skyadmin_pro.database import Database
 from skyadmin_pro.services.export import (
-    FORBIDDEN_EXPORT_COLUMNS,
     _ALL_EXPORT_COLUMN_MAPS,
+    FORBIDDEN_EXPORT_COLUMNS,
     export_to_excel,
 )
 
@@ -56,17 +56,13 @@ def test_export_excludes_credential_and_ird_secrets(db, tmp_path, fake_app_dir, 
         if sheet.max_row < 1:
             continue
         headers = [str(cell.value or "").strip().lower() for cell in sheet[1]]
-        assert not forbidden_headers.intersection(headers), (
-            f"Forbidden header in sheet {sheet.title!r}: {headers}"
-        )
+        assert not forbidden_headers.intersection(headers), f"Forbidden header in sheet {sheet.title!r}: {headers}"
         for row in sheet.iter_rows(min_row=2, values_only=True):
             for value in row:
                 text = str(value or "").strip()
                 if not text:
                     continue
-                assert text not in secret_values, (
-                    f"Secret value leaked in sheet {sheet.title!r}: {text!r}"
-                )
+                assert text not in secret_values, f"Secret value leaked in sheet {sheet.title!r}: {text!r}"
 
 
 def test_monthly_report_export_excludes_secrets(db, tmp_path, fake_app_dir, monkeypatch):
@@ -91,9 +87,10 @@ def test_monthly_report_export_excludes_secrets(db, tmp_path, fake_app_dir, monk
     import openpyxl
 
     wb = openpyxl.load_workbook(dest)
-    sheet = wb.active
+    sheet = wb["Pipeline"]
     flat = {str(value) for row in sheet.iter_rows(values_only=True) for value in row if value is not None}
     assert "monthly-report-leak" not in flat
-    headers = [str(cell.value or "").strip().lower() for cell in sheet[1]]
-    assert "ird_password" not in headers
-    assert "password" not in headers
+    headers = [str(cell.value or "").strip() for cell in sheet[1]]
+    assert headers == ["No.", "Date", "Client", "Service", "Amount"]
+    assert "ird_password" not in {h.lower() for h in headers}
+    assert "password" not in {h.lower() for h in headers}

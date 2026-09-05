@@ -133,11 +133,7 @@ def main() -> None:
     tree = ast.parse(text)
     cls = next(n for n in tree.body if isinstance(n, ast.ClassDef) and n.name == "SettingsView")
     lines = text.splitlines(keepends=True)
-    spans = {
-        n.name: (n.lineno - 1, n.end_lineno)
-        for n in cls.body
-        if isinstance(n, ast.FunctionDef)
-    }
+    spans = {n.name: (n.lineno - 1, n.end_lineno) for n in cls.body if isinstance(n, ast.FunctionDef)}
 
     OUT.mkdir(exist_ok=True)
     for fname, names in GROUPS.items():
@@ -159,7 +155,7 @@ def main() -> None:
         "from skyadmin_pro.ui.views.settings.workspace_mixin import WorkspaceMixin\n\n",
         "class SettingsView(BackupMixin, ChecklistMixin, LicenseMixin, PricingMixin, WorkspaceMixin, BaseView):\n",
         '    title = "Settings"\n',
-        "    subtitle = \"Appearance, portal URL, workspace folders, and local database location.\"\n\n",
+        '    subtitle = "Appearance, portal URL, workspace folders, and local database location."\n\n',
     ]
     for name in ("build", "on_show", "_path_row"):
         s, e = spans[name]

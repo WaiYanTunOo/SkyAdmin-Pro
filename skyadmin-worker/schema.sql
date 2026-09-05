@@ -97,7 +97,8 @@ CREATE TABLE IF NOT EXISTS sync_devices (
     machine_id TEXT NOT NULL PRIMARY KEY,
     token TEXT NOT NULL UNIQUE,
     created_at TEXT NOT NULL DEFAULT (datetime('now')),
-    last_seen_at TEXT
+    last_seen_at TEXT,
+    expires_at TEXT NOT NULL DEFAULT (datetime('now', '+30 days'))
 );
 
 CREATE TABLE IF NOT EXISTS sync_rows (

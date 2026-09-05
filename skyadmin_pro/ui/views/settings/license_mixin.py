@@ -3,32 +3,17 @@
 from __future__ import annotations
 
 from pathlib import Path
-from tkinter import filedialog, messagebox
+from tkinter import messagebox
 
 import customtkinter as ctk
 
 from skyadmin_pro.config import (
-    CHECKLIST_TEMPLATES,
-    DEFAULT_COLOR_THEME,
-    DEFAULT_PORTAL_URL,
     MOBILE_VIEWER_URL,
     OWNER_EMAIL,
-    PRICING_DEFAULT_SERVICE,
-    SERVICE_TYPES,
-    SETTING_APPEARANCE_MODE,
-    SETTING_COLOR_THEME,
-    SETTING_PORTAL_URL,
-    SETTING_WORKSPACE_CUSTOM,
-    SETTING_WORKSPACE_ROOT,
-    pricing_uses_transaction_ranges,
 )
-from skyadmin_pro.paths import WorkspacePaths
-from skyadmin_pro.services.data_hygiene import run_data_hygiene
-from skyadmin_pro.services.file_ops import open_in_file_manager
-from skyadmin_pro.services.workflow import normalize_portal_url, repair_client_workspaces
 from skyadmin_pro.ui.theme import TEXT_MUTED
 from skyadmin_pro.ui.treeview import ThemedTreeview
-from skyadmin_pro.ui.widgets import FeedbackLabel, bind_wrap_label, make_modal, themed_entry
+from skyadmin_pro.ui.widgets import make_modal
 
 
 class LicenseMixin:
@@ -115,118 +100,126 @@ class LicenseMixin:
         )
 
     def _activate_with_passcode(self) -> None:
-        import threading
-
         from skyadmin_pro.services.license import (
+            _is_repair_activation,
             check_activation_usable,
             fetch_revocations,
             mark_used,
             report_activation_claim,
             requires_online_check,
             save_license_file,
-            _is_repair_activation,
         )
+        from skyadmin_pro.ui.async_ui import run_background
 
         code = " ".join(self.passcode_var.get().split())
         if not code:
             self.feedback.error("Enter a passcode first.")
             return
 
-        self.feedback.info("Verifying passcode…")
         self.configure(cursor="watch")
         self.update_idletasks()
 
-        def worker():
-            try:
-                ok, msg, nonce = check_activation_usable(code)
-                if not ok:
-                    self._after(lambda: self._activation_fail(msg))
-                    return
-                if requires_online_check():
-                    net_ok, net_msg = fetch_revocations(timeout=6)
-                    if not net_ok:
-                        self._after(
-                            lambda: self._activation_fail("Internet required to activate - " + net_msg.splitlines()[0])
-                        )
-                        return
-                    ok2, msg2, nonce2 = check_activation_usable(code)
-                    if not ok2:
-                        self._after(lambda: self._activation_fail(msg2))
-                        return
-                    claim_ok, claim_msg, license_key = report_activation_claim(
-                        code,
-                        allow_already_claimed=_is_repair_activation(code),
-                    )
-                    if not claim_ok:
-                        self._after(lambda: self._activation_fail(claim_msg))
-                        return
-                    ok, msg, nonce = ok2, msg2, nonce2
-                to_save = (license_key or "").strip() or code
-                save_license_file(to_save)
-                if nonce:
-                    mark_used(nonce)
-                self._after(lambda: self._activation_ok(msg, "passcode"))
-            except Exception as exc:
-                self._after(lambda: self._activation_fail(str(exc)))
+        def work() -> tuple[bool, str]:
+            ok, msg, nonce = check_activation_usable(code)
+            if not ok:
+                return False, msg
+            license_key: str | None = None
+            if requires_online_check():
+                net_ok, net_msg = fetch_revocations(timeout=6)
+                if not net_ok:
+                    return False, "Internet required to activate - " + net_msg.splitlines()[0]
+                ok2, msg2, nonce2 = check_activation_usable(code)
+                if not ok2:
+                    return False, msg2
+                claim_ok, claim_msg, license_key = report_activation_claim(
+                    code,
+                    allow_already_claimed=_is_repair_activation(code),
+                )
+                if not claim_ok:
+                    return False, claim_msg
+                ok, msg, nonce = ok2, msg2, nonce2
+            to_save = (license_key or "").strip() or code
+            save_license_file(to_save)
+            if nonce:
+                mark_used(nonce)
+            return True, msg
 
-        threading.Thread(target=worker, daemon=True).start()
+        def on_success(result: tuple[bool, str]) -> None:
+            ok, msg = result
+            if ok:
+                self._activation_ok(msg, "passcode")
+            else:
+                self._activation_fail(msg)
+
+        run_background(
+            self,
+            work=work,
+            on_success=on_success,
+            on_error=self._activation_fail,
+            finally_fn=lambda: self.configure(cursor=""),
+            feedback=self.feedback,
+        )
 
     def _activate_with_key(self) -> None:
-        import threading
-
         from skyadmin_pro.services.license import (
+            _is_repair_activation,
             check_activation_usable,
             fetch_revocations,
             mark_used,
             report_activation_claim,
             requires_online_check,
             save_license_file,
-            _is_repair_activation,
         )
+        from skyadmin_pro.ui.async_ui import run_background
 
         content = self.key_paste_var.get().strip()
         if not content:
             self.feedback.error("Paste a license key first.")
             return
 
-        self.feedback.info("Verifying license key…")
         self.configure(cursor="watch")
         self.update_idletasks()
 
-        def worker():
-            try:
-                ok, msg, nonce = check_activation_usable(content)
-                if not ok:
-                    self._after(lambda: self._activation_fail(msg))
-                    return
-                if requires_online_check():
-                    net_ok, net_msg = fetch_revocations(timeout=6)
-                    if not net_ok:
-                        self._after(
-                            lambda: self._activation_fail("Internet required to activate - " + net_msg.splitlines()[0])
-                        )
-                        return
-                    ok2, msg2, nonce2 = check_activation_usable(content)
-                    if not ok2:
-                        self._after(lambda: self._activation_fail(msg2))
-                        return
-                    claim_ok, claim_msg, license_key = report_activation_claim(
-                        content,
-                        allow_already_claimed=_is_repair_activation(content),
-                    )
-                    if not claim_ok:
-                        self._after(lambda: self._activation_fail(claim_msg))
-                        return
-                    ok, msg, nonce = ok2, msg2, nonce2
-                to_save = (license_key or "").strip() or content
-                save_license_file(to_save)
-                if nonce:
-                    mark_used(nonce)
-                self._after(lambda: self._activation_ok(msg, "key"))
-            except Exception as exc:
-                self._after(lambda: self._activation_fail(str(exc)))
+        def work() -> tuple[bool, str]:
+            ok, msg, nonce = check_activation_usable(content)
+            if not ok:
+                return False, msg
+            license_key: str | None = None
+            if requires_online_check():
+                net_ok, net_msg = fetch_revocations(timeout=6)
+                if not net_ok:
+                    return False, "Internet required to activate - " + net_msg.splitlines()[0]
+                ok2, msg2, nonce2 = check_activation_usable(content)
+                if not ok2:
+                    return False, msg2
+                claim_ok, claim_msg, license_key = report_activation_claim(
+                    content,
+                    allow_already_claimed=_is_repair_activation(content),
+                )
+                if not claim_ok:
+                    return False, claim_msg
+                ok, msg, nonce = ok2, msg2, nonce2
+            to_save = (license_key or "").strip() or content
+            save_license_file(to_save)
+            if nonce:
+                mark_used(nonce)
+            return True, msg
 
-        threading.Thread(target=worker, daemon=True).start()
+        def on_success(result: tuple[bool, str]) -> None:
+            ok, msg = result
+            if ok:
+                self._activation_ok(msg, "key")
+            else:
+                self._activation_fail(msg)
+
+        run_background(
+            self,
+            work=work,
+            on_success=on_success,
+            on_error=self._activation_fail,
+            finally_fn=lambda: self.configure(cursor=""),
+            feedback=self.feedback,
+        )
 
     def _activate_pasted(self) -> None:
         """Activate from the single paste field (license key or SKYPASS1 passcode)."""
@@ -254,15 +247,36 @@ class LicenseMixin:
         self.app.refresh_sidebar_status()
 
     def _after(self, fn) -> None:
-        def wrapped() -> None:
-            if not self.winfo_exists():
-                return
-            fn()
+        from skyadmin_pro.ui.async_ui import run_on_main
 
-        try:
-            self.after(0, wrapped)
-        except Exception:
-            pass
+        run_on_main(self, fn, feedback=self.feedback)
+
+    def _begin_license_background(self, action: str, status: str) -> None:
+        """Disable sync/update controls while a background license task runs."""
+        self._license_bg_action = action
+        self.configure(cursor="watch")
+        self.feedback.info(status)
+        sync_btn = getattr(self, "sync_now_btn", None)
+        upd_btn = getattr(self, "check_updates_btn", None)
+        if sync_btn is not None:
+            sync_btn.configure(
+                state="disabled",
+                text="Syncing…" if action == "sync" else sync_btn.cget("text"),
+            )
+        if upd_btn is not None:
+            upd_btn.configure(
+                state="disabled",
+                text="Checking…" if action == "updates" else upd_btn.cget("text"),
+            )
+
+    def _end_license_background(self) -> None:
+        self.configure(cursor="")
+        sync_btn = getattr(self, "sync_now_btn", None)
+        upd_btn = getattr(self, "check_updates_btn", None)
+        if sync_btn is not None:
+            sync_btn.configure(state="normal", text="Sync now")
+        if upd_btn is not None:
+            upd_btn.configure(state="normal", text="Check updates")
 
     def _format_data_sync_status(self) -> str:
         from skyadmin_pro.config import SETTING_SYNC_LAST_PULL
@@ -309,9 +323,7 @@ class LicenseMixin:
         try:
             ok = self.app.db.quick_check()
         except Exception:
-            banner.configure(
-                text="⚠ Database integrity check could not run — contact support if data looks wrong."
-            )
+            banner.configure(text="⚠ Database integrity check could not run — contact support if data looks wrong.")
             banner.grid()
             return
         if ok:
@@ -377,42 +389,38 @@ class LicenseMixin:
                 pass
 
     def _check_for_updates(self) -> None:
-        import threading
-
         from skyadmin_pro.services.license import check_for_updates
+        from skyadmin_pro.ui.async_ui import run_background
 
-        self.feedback.info("Checking for updates…")
+        self._begin_license_background("updates", "Checking for updates…")
         self.daily_sync_label.configure(text="Checking for updates…", text_color=TEXT_MUTED)
-        btn = getattr(self, "check_updates_btn", None)
-        if btn is not None:
-            btn.configure(state="disabled")
-        self.configure(cursor="watch")
 
-        def worker() -> None:
+        def work() -> tuple[bool, str, dict | None]:
             try:
-                ok, msg, info = check_for_updates(timeout=8)
+                return check_for_updates(timeout=8)
             except Exception as exc:
-                ok, msg, info = False, str(exc), None
+                return False, str(exc), None
 
-            def done() -> None:
-                if not self.winfo_exists():
-                    return
-                self.configure(cursor="")
-                if btn is not None:
-                    btn.configure(state="normal")
-                self._refresh_license_label()
-                self._refresh_update_banner()
-                if info:
-                    ver = info.get("version", "?")
-                    self.feedback.success(f"Update available: v{ver}")
-                elif ok:
-                    self.feedback.info("You are on the latest published version.")
-                else:
-                    self.feedback.error(msg.splitlines()[0])
+        def on_success(result: tuple[bool, str, dict | None]) -> None:
+            ok, msg, info = result
+            self._refresh_license_label()
+            self._refresh_update_banner()
+            if info:
+                ver = info.get("version", "?")
+                self.feedback.success(f"Update available: v{ver}")
+            elif ok:
+                self.feedback.info("You are on the latest published version.")
+            else:
+                self.feedback.error(msg.splitlines()[0])
 
-            self._after(done)
-
-        threading.Thread(target=worker, daemon=True).start()
+        run_background(
+            self,
+            work=work,
+            on_success=on_success,
+            on_error=lambda err: self.feedback.error(err.splitlines()[0]),
+            finally_fn=self._end_license_background,
+            feedback=self.feedback,
+        )
 
     def _open_sync_conflicts(self) -> None:
         total = self.app.db.count_sync_conflicts()
@@ -488,8 +496,7 @@ class LicenseMixin:
         def _clear() -> None:
             if not messagebox.askyesno(
                 "Clear conflict log",
-                f"Remove all {total} logged conflict(s)?\n\n"
-                "This only clears the audit log — your data is unchanged.",
+                f"Remove all {total} logged conflict(s)?\n\nThis only clears the audit log — your data is unchanged.",
                 parent=top,
             ):
                 return
@@ -498,9 +505,7 @@ class LicenseMixin:
             self._refresh_license_label()
             top.destroy()
 
-        ctk.CTkButton(actions, text="Clear log", width=100, fg_color="#b45309", command=_clear).pack(
-            side="left"
-        )
+        ctk.CTkButton(actions, text="Clear log", width=100, fg_color="#b45309", command=_clear).pack(side="left")
         ctk.CTkButton(actions, text="Close", width=90, command=top.destroy).pack(side="right")
 
     def _on_data_sync_toggle(self) -> None:
@@ -515,54 +520,48 @@ class LicenseMixin:
             self.feedback.info("Cloud data sync disabled — use encrypted backup for a second PC.")
 
     def _sync_now(self) -> None:
-        import threading
-
         from skyadmin_pro.services.data_sync import sync_data
         from skyadmin_pro.services.license import fetch_revocations
+        from skyadmin_pro.ui.async_ui import run_background
 
-        self.feedback.info("Syncing license + data…")
+        self._begin_license_background("sync", "Syncing license + data…")
         self.daily_sync_label.configure(text="Syncing…", text_color=TEXT_MUTED)
         self.data_sync_label.configure(text="")
-        sync_btn = getattr(self, "sync_now_btn", None)
-        if sync_btn is not None:
-            sync_btn.configure(state="disabled")
-        self.configure(cursor="watch")
 
-        def worker():
+        def work() -> tuple[bool, str]:
+            lic_ok, lic_msg = fetch_revocations(timeout=6)
+            data_ok, data_msg = sync_data(self.app.db, timeout=25)
+            ok = lic_ok and data_ok
+            if lic_ok and data_ok:
+                msg = f"{lic_msg.splitlines()[0]} · {data_msg}"
+            elif not lic_ok:
+                msg = lic_msg
+            else:
+                msg = data_msg
+            return ok, msg
+
+        def on_success(result: tuple[bool, str]) -> None:
+            ok, msg = result
+            if ok:
+                self.feedback.success(msg.splitlines()[0])
+            else:
+                self.feedback.error(msg.splitlines()[0])
+            self._refresh_license_label()
+            self._refresh_update_banner()
             try:
-                lic_ok, lic_msg = fetch_revocations(timeout=6)
-                data_ok, data_msg = sync_data(self.app.db, timeout=25)
-                ok = lic_ok and data_ok
-                if lic_ok and data_ok:
-                    msg = f"{lic_msg.splitlines()[0]} · {data_msg}"
-                elif not lic_ok:
-                    msg = lic_msg
-                else:
-                    msg = data_msg
-            except Exception as exc:
-                ok, msg = False, str(exc)
+                self.app.refresh_sidebar_status()
+                self.app.set_status(msg.splitlines()[0])
+            except Exception:
+                pass
 
-            def done():
-                if not self.winfo_exists():
-                    return
-                self.configure(cursor="")
-                if sync_btn is not None:
-                    sync_btn.configure(state="normal")
-                if ok:
-                    self.feedback.success(msg.splitlines()[0])
-                else:
-                    self.feedback.error(msg.splitlines()[0])
-                self._refresh_license_label()
-                self._refresh_update_banner()
-                try:
-                    self.app.refresh_sidebar_status()
-                    self.app.set_status(msg.splitlines()[0])
-                except Exception:
-                    pass
-
-            self._after(done)
-
-        threading.Thread(target=worker, daemon=True).start()
+        run_background(
+            self,
+            work=work,
+            on_success=on_success,
+            on_error=lambda err: self.feedback.error(err.splitlines()[0]),
+            finally_fn=self._end_license_background,
+            feedback=self.feedback,
+        )
 
     def _show_license(self) -> None:
         # Read from the app itself (embedded) so it always works in the
@@ -592,4 +591,3 @@ class LicenseMixin:
         box.insert("1.0", text)
         box.configure(state="disabled")
         ctk.CTkButton(top, text="Close", width=110, command=top.destroy).grid(row=1, column=0, pady=(0, 16))
-

@@ -13,6 +13,10 @@ import tempfile
 import zipfile
 from dataclasses import dataclass
 from pathlib import Path
+from typing import TYPE_CHECKING
+
+if TYPE_CHECKING:
+    from cryptography.fernet import Fernet
 
 from skyadmin_pro.paths import remove_sqlite_sidecars
 from skyadmin_pro.services._secret import _derive_secret
@@ -50,20 +54,29 @@ def format_byte_size(num_bytes: int) -> str:
     return f"{size:.1f} GB"
 
 
-def _derive_fernet_key(machine_id: str) -> bytes:
+def _derive_fernet_key(machine_id: str, iterations: int = 200_000) -> bytes:
     """Return a 32-byte urlsafe base64 Fernet key bound to *machine_id*."""
-    raw = hashlib.pbkdf2_hmac(
-        "sha256", _derive_secret(), machine_id.encode(), 100_000, dklen=32
-    )
+    raw = hashlib.pbkdf2_hmac("sha256", _derive_secret(), machine_id.encode(), iterations, dklen=32)
     return base64.urlsafe_b64encode(raw)
 
 
-def _derive_backup_key() -> bytes:
+def _derive_backup_key(iterations: int = 200_000) -> bytes:
     """Return the universal Fernet key used for encrypted ``.skybackup`` archives."""
-    raw = hashlib.pbkdf2_hmac(
-        "sha256", _derive_secret(), b"SkyAdminBackupSalt2026", 100_000, dklen=32
-    )
+    raw = hashlib.pbkdf2_hmac("sha256", _derive_secret(), b"SkyAdminBackupSalt2026", iterations, dklen=32)
     return base64.urlsafe_b64encode(raw)
+
+
+def _fernet_for_machine(machine_id: str, try_legacy: bool = True) -> Fernet:
+    """Get Fernet for machine, trying current then legacy iteration count."""
+    from cryptography.fernet import Fernet
+
+    # Current 200k
+    try:
+        return Fernet(_derive_fernet_key(machine_id, 200_000))
+    except ValueError:
+        if try_legacy:
+            return Fernet(_derive_fernet_key(machine_id, 100_000))
+        raise
 
 
 def _resolve_member_under(base: Path, relative_name: str) -> Path:
@@ -88,9 +101,7 @@ def _resolve_member_under(base: Path, relative_name: str) -> Path:
     root = base.resolve()
     target = (root / clean).resolve()
     if not target.is_relative_to(root):
-        raise ValueError(
-            f"Archive member escapes destination directory: {relative_name!r}"
-        )
+        raise ValueError(f"Archive member escapes destination directory: {relative_name!r}")
     return target
 
 
@@ -113,7 +124,7 @@ def encrypt_file(path: Path, machine_id: str) -> bool:
 
         from cryptography.fernet import Fernet
 
-        fernet = Fernet(_derive_fernet_key(machine_id))
+        fernet = Fernet(_derive_fernet_key(machine_id, 200_000))
         data = path.read_bytes()
         encrypted = MAGIC + fernet.encrypt(data)
         path = Path(path)
@@ -151,9 +162,19 @@ def decrypt_file(path: Path, machine_id: str) -> bool:
 
         from cryptography.fernet import Fernet, InvalidToken
 
-        fernet = Fernet(_derive_fernet_key(machine_id))
-        blob = path.read_bytes()
-        data = fernet.decrypt(blob[len(MAGIC) :])
+        blob = path.read_bytes()[len(MAGIC) :]
+        # Try current then legacy KDF
+        for iters in (200_000, 100_000):
+            try:
+                fernet = Fernet(_derive_fernet_key(machine_id, iters))
+                data = fernet.decrypt(blob)
+                break
+            except InvalidToken:
+                if iters == 100_000:
+                    raise
+                continue
+        else:
+            return False
         path = Path(path)
         tmp_fd, tmp_name = tempfile.mkstemp(
             dir=path.parent,
@@ -184,11 +205,18 @@ def _decrypt_backup_zip(archive: Path) -> Path:
     if not is_encrypted(archive):
         raise ValueError("Not a valid SkyAdmin encrypted backup (missing header).")
 
-    fernet = Fernet(_derive_backup_key())
-    try:
-        data = fernet.decrypt(archive.read_bytes()[len(MAGIC) :])
-    except InvalidToken as exc:
-        raise ValueError("Encrypted backup could not be decrypted.") from exc
+    blob = archive.read_bytes()[len(MAGIC) :]
+    for iters in (200_000, 100_000):
+        try:
+            fernet = Fernet(_derive_backup_key(iters))
+            data = fernet.decrypt(blob)
+            break
+        except InvalidToken:
+            if iters == 100_000:
+                raise ValueError("Encrypted backup could not be decrypted.") from InvalidToken()
+            continue
+    else:
+        raise ValueError("Encrypted backup could not be decrypted.")
 
     tmp = tempfile.NamedTemporaryFile(delete=False, suffix=".zip")
     tmp_path = Path(tmp.name)
@@ -240,7 +268,7 @@ def create_encrypted_backup(workspace_root: Path, db_file: Path, dest: Path) -> 
 
     dest = Path(dest)
     dest.parent.mkdir(parents=True, exist_ok=True)
-    fernet = Fernet(_derive_backup_key())
+    fernet = Fernet(_derive_backup_key(200_000))
 
     with tempfile.NamedTemporaryFile(delete=False, suffix=".zip") as tmp:
         tmp_path = Path(tmp.name)
@@ -275,9 +303,7 @@ def restore_encrypted_backup(archive: Path, workspace_root: Path, db_file: Path)
         with zipfile.ZipFile(tmp_path, "r") as archive_zip:
             names = archive_zip.namelist()
             if "skyadmin_pro.db" not in names:
-                raise ValueError(
-                    "Backup archive is missing skyadmin_pro.db — restore aborted."
-                )
+                raise ValueError("Backup archive is missing skyadmin_pro.db — restore aborted.")
 
             ws = Path(workspace_root)
             ws.mkdir(parents=True, exist_ok=True)

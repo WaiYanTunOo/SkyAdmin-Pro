@@ -28,6 +28,12 @@ FORBIDDEN_EXE_STRINGS = (
 )
 
 
+def default_installer_path() -> Path:
+    from skyadmin_pro.config import APP_VERSION
+
+    return ROOT / "dist" / f"SkyAdminPro-Setup-{APP_VERSION}.exe"
+
+
 def _ok(msg: str) -> None:
     print(f"  OK  {msg}")
 
@@ -135,9 +141,47 @@ def check_embedded_public_key() -> list[str]:
     return errors
 
 
+def check_authenticode_signature(exe: Path, *, required: bool) -> list[str]:
+    errors: list[str] = []
+    if sys.platform != "win32":
+        if required:
+            errors.append(_fail("Authenticode signature required but release check is not running on Windows"))
+        else:
+            print("  WARN  Skipping Authenticode check (not on Windows)")
+        return errors
+
+    ps = f"$s = Get-AuthenticodeSignature -FilePath '{exe}'; Write-Output $s.Status"
+    try:
+        result = subprocess.run(
+            ["powershell", "-NoProfile", "-Command", ps],
+            cwd=ROOT,
+            capture_output=True,
+            text=True,
+            timeout=30,
+            check=False,
+        )
+    except (OSError, subprocess.TimeoutExpired) as exc:
+        errors.append(_fail(f"Authenticode check failed: {exc}"))
+        return errors
+
+    status = (result.stdout or "").strip()
+    if status == "Valid":
+        _ok(f"Authenticode signature valid ({exe.name})")
+        return errors
+
+    if required:
+        detail = status or (result.stderr or "unknown").strip() or "unsigned"
+        errors.append(_fail(f"Authenticode signature required but status is {detail}"))
+    else:
+        print(f"  WARN  {exe.name} is not Authenticode-signed (expected until Phase 11.2 cert is configured)")
+    return errors
+
+
 def check_version_alignment() -> list[str]:
     errors: list[str] = []
     try:
+        import re
+
         import tomllib
 
         from skyadmin_pro.config import APP_VERSION
@@ -151,9 +195,78 @@ def check_version_alignment() -> list[str]:
             errors.append(_fail(f"Version mismatch: pyproject.toml={py_ver} config.APP_VERSION={APP_VERSION}"))
         else:
             _ok(f"Version aligned at {APP_VERSION}")
+
+        # Check ISS version — supports both hardcoded and injected (via /DAppVersion)
+        iss = ROOT / "packaging" / "SkyAdminPro.iss"
+        if iss.is_file():
+            iss_text = iss.read_text(encoding="utf-8")
+            m = re.search(r'#define\s+AppVersion\s+"([^"]+)"', iss_text)
+            iss_ver = m.group(1) if m else ""
+            if "#error" in iss_text and "AppVersion not defined" in iss_text:
+                _ok(
+                    "ISS defers version to build (injected via /DAppVersion) — check passes if build-installer passes APP_VERSION"
+                )
+                # Still ensure no hardcoded stale fallback remains
+                if iss_ver:
+                    _ok(f"ISS hardcoded fallback {iss_ver} ignored (injected path)")
+            elif iss_ver and iss_ver != APP_VERSION:
+                errors.append(
+                    _fail(f"Version mismatch: SkyAdminPro.iss AppVersion={iss_ver} APP_VERSION={APP_VERSION}")
+                )
+            elif iss_ver:
+                _ok(f"ISS version aligned at {iss_ver}")
+
+        # Check macOS spec version
+        macos_spec = ROOT / "packaging" / "SkyAdminPro-macos.spec"
+        if macos_spec.is_file():
+            spec_text = macos_spec.read_text(encoding="utf-8")
+            m2 = re.search(r'"CFBundleShortVersionString"\s*:\s*"([^"]+)"', spec_text)
+            mac_ver = m2.group(1) if m2 else ""
+            if mac_ver and mac_ver != APP_VERSION:
+                errors.append(
+                    _fail(
+                        f"Version mismatch: SkyAdminPro-macos.spec CFBundleShortVersionString={mac_ver} APP_VERSION={APP_VERSION}"
+                    )
+                )
+            elif mac_ver:
+                _ok(f"macOS spec version aligned at {mac_ver}")
     except Exception as exc:
         errors.append(_fail(f"Version check failed: {exc}"))
     return errors
+
+
+def check_installer(installer: Path) -> list[str]:
+    errors: list[str] = []
+    if not installer.is_file():
+        _ok(f"Installer not found (optional): {installer.name}")
+        return errors
+    size = installer.stat().st_size
+    if size < 5 * 1024 * 1024:
+        errors.append(_fail(f"Installer too small ({size:,} bytes)"))
+    else:
+        _ok(f"Installer size {size / (1024 * 1024):.1f} MB ({installer.name})")
+    return errors
+
+
+def write_hash_manifest() -> None:
+    import hashlib
+
+    dist = ROOT / "dist"
+    if not dist.is_dir():
+        return
+    hashes = []
+    for name in (
+        "SkyAdminPro.exe",
+        f"SkyAdminPro-Setup-{__import__('skyadmin_pro.config', fromlist=['APP_VERSION']).APP_VERSION}.exe",
+    ):
+        p = dist / name
+        if p.is_file():
+            h = hashlib.sha256(p.read_bytes()).hexdigest()
+            hashes.append(f"{h}  {name}")
+    if hashes:
+        out = dist / "SHA256SUMS"
+        out.write_text("\n".join(hashes) + "\n", encoding="utf-8")
+        _ok(f"Wrote {out.name} ({len(hashes)} entries)")
 
 
 def run_pytest() -> list[str]:
@@ -183,10 +296,21 @@ def run_pytest() -> list[str]:
 def main() -> int:
     parser = argparse.ArgumentParser(description="SkyAdmin Pro pre-release checks")
     parser.add_argument("--exe", type=Path, default=DEFAULT_EXE, help="Path to SkyAdminPro.exe")
+    parser.add_argument(
+        "--installer",
+        type=Path,
+        default=None,
+        help="Path to SkyAdminPro-Setup-<version>.exe (default: dist/SkyAdminPro-Setup-<APP_VERSION>.exe)",
+    )
     parser.add_argument("--linux-binary", type=Path, default=None, help="Optional Linux dist/SkyAdminPro path")
     parser.add_argument("--api-url", default="", help="Worker base URL (default: from config.API_BASE_URL)")
     parser.add_argument("--skip-pytest", action="store_true", help="Skip pytest release/walkthrough suite")
     parser.add_argument("--skip-worker", action="store_true", help="Skip Worker HTTP checks")
+    parser.add_argument(
+        "--require-signature",
+        action="store_true",
+        help="Fail when dist exe is not Authenticode-signed (Windows only)",
+    )
     args = parser.parse_args()
 
     print("SkyAdmin Pro — release checks\n")
@@ -195,6 +319,17 @@ def main() -> int:
     failures.extend(check_version_alignment())
     failures.extend(check_embedded_public_key())
     failures.extend(check_exe(args.exe.resolve()))
+    # Installer check (warn if missing, fail only with --require-signature handled below)
+    installer_path = (args.installer or default_installer_path()).resolve()
+    if not args.require_signature:
+        check_installer(installer_path)
+    if args.require_signature:
+        failures.extend(check_authenticode_signature(args.exe.resolve(), required=True))
+        installer = installer_path
+        if installer.exists():
+            failures.extend(check_authenticode_signature(installer, required=True))
+        else:
+            failures.append(_fail(f"Installer not found for signature check: {installer}"))
     if args.linux_binary:
         failures.extend(check_linux_binary(args.linux_binary.resolve()))
 
@@ -217,6 +352,12 @@ def main() -> int:
 
     if not args.skip_pytest:
         failures.extend(run_pytest())
+
+    # Write SHA256 manifest for artifacts (informational, never blocks)
+    try:
+        write_hash_manifest()
+    except Exception as exc:
+        print(f"  WARN  Could not write SHA256SUMS: {exc}")
 
     print()
     if failures:

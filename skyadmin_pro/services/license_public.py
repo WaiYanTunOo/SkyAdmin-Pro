@@ -16,6 +16,5 @@ ED25519_PUBLIC_KEY_HEX = "b9bc4ee341f806f7cdfe698c048fc4b212e8b5ef6ebffcb63bc4d5
 ED25519_PUBLIC_KEY = bytes.fromhex(ED25519_PUBLIC_KEY_HEX)
 
 LEGACY_FORMAT_SUNSET_MESSAGE = (
-    "This activation code uses a retired format. "
-    "Request a new license or passcode from Sky Creation Innovations."
+    "This activation code uses a retired format. Request a new license or passcode from Sky Creation Innovations."
 )

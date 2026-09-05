@@ -1,73 +1,17 @@
-/** Admin page — hidden generator UI served at a secret path. */
+/** Admin HTML pages (login + dashboard shell). */
 
-import { Context } from "hono";
-import { getCookie, setCookie } from "hono/cookie";
-import { Env } from "../db";
-import { adminSessionSalt } from "../env_secrets";
-import { hmacSign } from "../signing";
-import {
-  isBlockedAttemptCount,
-  loginBlockCutoffIso,
-  readAttemptCount,
-} from "../admin_security";
+export const ADMIN_CSP = [
+  "default-src 'none'",
+  "script-src 'self'",
+  "style-src 'unsafe-inline'",
+  "img-src 'self' data:",
+  "connect-src 'self'",
+  "form-action 'self'",
+  "base-uri 'none'",
+  "frame-ancestors 'none'",
+].join("; ");
 
-const SESSION_TTL = 86400 * 7; // 7 days
-const CSRF_TTL = 3600; // 1 hour
-
-function sessionKey(secret: string): string {
-  return "skyadm_" + secret.slice(0, 8);
-}
-
-function csrfKey(secret: string): string {
-  return "csrf_" + secret.slice(0, 8);
-}
-
-async function generateCsrfToken(adminPass: string, adminPath: string): Promise<string> {
-  const ts = Math.floor(Date.now() / 1000).toString();
-  const sig = await hmacSign(adminPass, adminPath + ":csrf:" + ts);
-  return ts + "." + sig;
-}
-
-async function validateCsrfToken(token: string, adminPass: string, adminPath: string): Promise<boolean> {
-  const parts = token.split(".");
-  if (parts.length !== 2) return false;
-  const [ts, sig] = parts;
-  const tsNum = parseInt(ts, 10);
-  if (isNaN(tsNum)) return false;
-  const now = Math.floor(Date.now() / 1000);
-  if (now - tsNum > CSRF_TTL) return false;
-  const expected = await hmacSign(adminPass, adminPath + ":csrf:" + ts);
-  return sig === expected;
-}
-
-async function isValidSession(c: Context<{ Bindings: Env }>): Promise<boolean> {
-  const cookieName = sessionKey(adminSessionSalt(c.env));
-  const token = getCookie(c, cookieName);
-  if (!token) return false;
-  const expected = await hmacSign(c.env.ADMIN_PASS, c.env.ADMIN_PATH + ":session");
-  return token === expected;
-}
-
-async function isIpBlocked(c: Context<{ Bindings: Env }>, ip: string): Promise<boolean> {
-  const cutoff = loginBlockCutoffIso();
-  const row = await c.env.DB.prepare(
-    "SELECT COUNT(*) as cnt FROM login_attempts WHERE ip = ? AND attempted_at > ?"
-  ).bind(ip, cutoff).first<{ cnt: number }>();
-  return isBlockedAttemptCount(readAttemptCount(row));
-}
-
-async function recordLoginAttempt(c: Context<{ Bindings: Env }>, ip: string): Promise<void> {
-  await c.env.DB.prepare(
-    "INSERT INTO login_attempts (ip) VALUES (?)"
-  ).bind(ip).run();
-  // Cleanup old entries (older than 1 hour)
-  const cutoff = new Date(Date.now() - 3600 * 1000).toISOString();
-  await c.env.DB.prepare(
-    "DELETE FROM login_attempts WHERE attempted_at < ?"
-  ).bind(cutoff).run();
-}
-
-function loginPage(adminPath: string, error?: string): string {
+export function loginPage(adminPath: string, error?: string): string {
   const loginUrl = adminPath + "/login";
   return `<!DOCTYPE html>
 <html lang="en"><head><meta charset="UTF-8"><meta name="viewport" content="width=device-width,initial-scale=1">
@@ -89,11 +33,12 @@ button:active{background:#1d4ed8}
 <input name="password" type="password" placeholder="Password" autofocus>
 <button type="submit">Enter</button>
 </form>
-${error ? '<div class="err">' + error + '</div>' : ''}
+ ${error ? '<div class="err">' + error.replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;') + '</div>' : ''}
 </div></body></html>`;
 }
 
-const ADMIN_HTML_BUILDER = (adminPath: string, apiToken: string) => `<!DOCTYPE html>
+export function buildAdminPage(adminPath: string, apiToken: string): string {
+  return `<!DOCTYPE html>
 <html lang="en"><head><meta charset="UTF-8"><meta name="viewport" content="width=device-width,initial-scale=1">
 <title>SkyAdmin Pro</title>
 <link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 32 32'%3E%3Crect width='32' height='32' rx='6' fill='%232563eb'/%3E%3Ctext x='16' y='21' text-anchor='middle' font-size='14' fill='white' font-family='sans-serif'%3ES%3C/text%3E%3C/svg%3E">
@@ -753,73 +698,4 @@ loadPricing().then(function(){
   loadRecords();loadBans();checkSigningKey();
 });
 </script></body></html>`;
-
-export async function adminHandler(c: Context<{ Bindings: Env }>): Promise<Response> {
-  const url = new URL(c.req.url);
-  const path = url.pathname;
-  const adminPath = "/" + c.env.ADMIN_PATH;
-  const ip = c.req.header("cf-connecting-ip") || "unknown";
-
-  // Login POST — form-encoded password
-  if (path.endsWith("/login") && c.req.method === "POST") {
-    // Check if IP is blocked
-    if (await isIpBlocked(c, ip)) {
-      return c.html(loginPage(adminPath, "Too many attempts. Try again later."), 429);
-    }
-
-    try {
-      const body = await c.req.parseBody();
-      const pw = typeof body.password === "string" ? body.password : "";
-
-      // Validate CSRF token
-      const csrfToken = typeof body.csrf_token === "string" ? body.csrf_token : "";
-      if (!csrfToken || !(await validateCsrfToken(csrfToken, c.env.ADMIN_PASS, c.env.ADMIN_PATH))) {
-        return c.html(loginPage(adminPath, "Invalid form. Please try again."), 403);
-      }
-
-      if (pw === c.env.ADMIN_PASS) {
-        // Clear failed attempts on success
-        await c.env.DB.prepare("DELETE FROM login_attempts WHERE ip = ?").bind(ip).run();
-
-        const cookieName = sessionKey(adminSessionSalt(c.env));
-        const token = await hmacSign(c.env.ADMIN_PASS, c.env.ADMIN_PATH + ":session");
-        return new Response(null, {
-          status: 303,
-          headers: {
-            Location: adminPath + "/",
-            "Set-Cookie": `${cookieName}=${token}; Max-Age=${SESSION_TTL}; Path=/; HttpOnly; Secure; SameSite=Lax`,
-          },
-        });
-      }
-
-      // Record failed attempt
-      await recordLoginAttempt(c, ip);
-    } catch {}
-    return c.html(loginPage(adminPath, "Wrong password"), 401);
-  }
-
-  // Logout POST
-  if (path.endsWith("/logout") && c.req.method === "POST") {
-    const cookieName = sessionKey(adminSessionSalt(c.env));
-    return new Response(null, {
-      status: 303,
-      headers: {
-        Location: adminPath + "/",
-        "Set-Cookie": `${cookieName}=; Max-Age=0; Path=/`,
-      },
-    });
-  }
-
-  // Check session
-  if (!(await isValidSession(c))) {
-    // Generate CSRF token for login page
-    const csrfToken = await generateCsrfToken(c.env.ADMIN_PASS, c.env.ADMIN_PATH);
-    const page = loginPage(adminPath).replace(
-      '<input type="hidden" name="csrf_token" value="">',
-      `<input type="hidden" name="csrf_token" value="${csrfToken}">`
-    );
-    return c.html(page);
-  }
-
-  return c.html(ADMIN_HTML_BUILDER(adminPath, c.env.API_TOKEN));
 }

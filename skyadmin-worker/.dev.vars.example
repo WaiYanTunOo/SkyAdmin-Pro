@@ -1,4 +1,9 @@
 # Copy to .dev.vars (never commit) for local wrangler dev.
+#
+# ⚠️  WARNING: This file contains TEST-ONLY credentials for local development.
+#     NEVER use these values in production. The Ed25519 private key below is a
+#     dummy key that does NOT correspond to any real license signing key.
+#
 # Admin session cookie salt (legacy name LICENSE_SECRET; prefer ADMIN_SESSION_SECRET).
 LICENSE_SECRET=replace-with-random-admin-session-salt
 # ADMIN_SESSION_SECRET=optional-preferred-name-for-cookie-salt
@@ -7,5 +12,6 @@ ADMIN_PATH=replace-with-random-admin-path
 ADMIN_PASS=replace-with-strong-admin-password
 
 # Ed25519 PKCS#8 PEM (standard base64) — must match skyadmin_pro/services/license_public.py
+# TEST-ONLY: This is a dummy key generated for local development.
 # Generate with: python -c "from cryptography.hazmat.primitives.asymmetric.ed25519 import Ed25519PrivateKey; ..."
 LICENSE_ED25519_PRIVATE_KEY_B64=LS0tLS1CRUdJTiBQUklWQVRFIEtFWS0tLS0tCk1DNENBUUF3QlFZREsyVndCQ0lFSUxVUFV2UlpLendzR1MvU0l6N0VIK2hiamd6VjFzT1I3ZFdGbmh5SWkxdlgKLS0tLS1FTkQgUFJJVkFURSBLRVktLS0tLQo=

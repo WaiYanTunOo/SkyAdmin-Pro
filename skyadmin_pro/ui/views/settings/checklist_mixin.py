@@ -2,33 +2,15 @@
 
 from __future__ import annotations
 
-from pathlib import Path
-from tkinter import filedialog, messagebox
+from tkinter import messagebox
 
 import customtkinter as ctk
 
 from skyadmin_pro.config import (
     CHECKLIST_TEMPLATES,
-    DEFAULT_COLOR_THEME,
-    DEFAULT_PORTAL_URL,
-    MOBILE_VIEWER_URL,
-    OWNER_EMAIL,
-    PRICING_DEFAULT_SERVICE,
     SERVICE_TYPES,
-    SETTING_APPEARANCE_MODE,
-    SETTING_COLOR_THEME,
-    SETTING_PORTAL_URL,
-    SETTING_WORKSPACE_CUSTOM,
-    SETTING_WORKSPACE_ROOT,
-    pricing_uses_transaction_ranges,
 )
-from skyadmin_pro.paths import WorkspacePaths
-from skyadmin_pro.services.data_hygiene import run_data_hygiene
-from skyadmin_pro.services.file_ops import open_in_file_manager
-from skyadmin_pro.services.workflow import normalize_portal_url, repair_client_workspaces
-from skyadmin_pro.ui.theme import TEXT_MUTED
-from skyadmin_pro.ui.treeview import ThemedTreeview
-from skyadmin_pro.ui.widgets import FeedbackLabel, bind_wrap_label, make_modal, themed_entry
+from skyadmin_pro.ui.widgets import themed_entry
 
 
 class ChecklistMixin:
@@ -177,8 +159,7 @@ class ChecklistMixin:
         self.app.set_status("Services list reset to defaults.")
 
     def _refresh_service_menus(self) -> None:
-        view = self.app._views.get("database_tasks")
+        view = self.app.get_view("database_tasks")
         if view is None:
             return
-        view.refresh_all()
-
+        view.sync_service_menus()

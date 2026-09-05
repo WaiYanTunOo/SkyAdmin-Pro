@@ -4,6 +4,16 @@ import { Context } from "hono";
 
 const VIEWER_TABLES = "clients,tasks,office_contacts,notebook_entries";
 
+export const VIEWER_CSP = [
+  "default-src 'none'",
+  "style-src 'unsafe-inline'",
+  "img-src 'self' data:",
+  "connect-src 'self'",
+  "manifest-src 'self'",
+  "worker-src 'self'",
+  "frame-ancestors 'none'",
+].join("; ");
+
 export function viewerManifestHandler(_c: Context) {
   const body = JSON.stringify({
     name: "SkyAdmin Viewer",
@@ -308,6 +318,7 @@ if(loadCreds()){showApp();syncNow()}else{showActivate()}
     headers: {
       "Content-Type": "text/html; charset=utf-8",
       "Cache-Control": "public, max-age=300",
+      "Content-Security-Policy": VIEWER_CSP,
     },
   });
 }

@@ -19,6 +19,12 @@ if ($LASTEXITCODE -ne 0) { throw "PyInstaller failed with exit code $LASTEXITCOD
 $Exe = Join-Path $Root "dist\SkyAdminPro.exe"
 Write-Host ""
 Write-Host "Built: $Exe ($([math]::Round((Get-Item $Exe).Length / 1MB, 1)) MB)"
+
+Write-Host ""
+Write-Host "Code signing (optional)..."
+& powershell -NoProfile -ExecutionPolicy Bypass -File (Join-Path $PSScriptRoot "sign-windows.ps1") -Paths $Exe
+if ($LASTEXITCODE -ne 0) { throw "sign-windows.ps1 failed" }
+
 Write-Host ""
 Write-Host "Running release checks..."
 & $Py scripts\release_check.py --skip-pytest
