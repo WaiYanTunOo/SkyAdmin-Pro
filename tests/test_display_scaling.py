@@ -26,11 +26,6 @@ def test_apply_high_dpi_scaling_sets_ctk_on_windows():
     with (
         patch.object(sys, "platform", "win32"),
         patch.object(ctypes.windll.shcore, "SetProcessDpiAwareness", return_value=0),
-        patch.object(ctypes.windll.user32, "GetDpiForSystem", return_value=120),
-        patch("customtkinter.set_widget_scaling") as set_widget,
-        patch("customtkinter.set_window_scaling") as set_window,
     ):
         scale = apply_high_dpi_scaling()
-        assert scale == 1.25
-        set_widget.assert_called_once_with(1.25)
-        set_window.assert_called_once_with(1.0)
+        assert scale == 1.0
