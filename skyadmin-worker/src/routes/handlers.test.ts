@@ -163,3 +163,24 @@ describe("records", () => {
     expect(res.status).toBe(401);
   });
 });
+
+describe("admin-write rate limiting", () => {
+  it("rejects revoke when over limit", async () => {
+    const db = {
+      prepare: (sql: string) => ({
+        bind: () => ({
+          first: async () => {
+            if (sql.includes("rate_limits")) return { count: 31 };
+            return null;
+          },
+          run: async () => ({ success: true }),
+        }),
+      }),
+    } as unknown as D1Database;
+    const res = await app.request("http://localhost/api/revoke", {
+      method: "POST", headers: { "Content-Type": "application/json", ...AUTH },
+      body: JSON.stringify({ nonce: "test-nonce-rl" }),
+    }, mockEnv({ DB: db }));
+    expect(res.status).toBe(429);
+  });
+});

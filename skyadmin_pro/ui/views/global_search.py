@@ -7,7 +7,6 @@ import customtkinter as ctk
 from skyadmin_pro.ui.theme import (
     CONTENT_PAD,
     TEXT_MUTED,
-    WRAP_CARD,
 )
 from skyadmin_pro.ui.widgets import FeedbackLabel, themed_entry
 
@@ -62,7 +61,7 @@ class GlobalSearchDialog(ctk.CTkToplevel):
 
         # ── Results ───────────────────────────────────────────────────
         self._results_frame = ctk.CTkScrollableFrame(
-            self, fg_color=WRAP_CARD, corner_radius=8
+            self, corner_radius=8
         )
         self._results_frame.grid(row=2, column=0, sticky="nsew", padx=CONTENT_PAD, pady=(0, 8))
         self._results_frame.grid_columnconfigure(0, weight=1)
@@ -72,6 +71,15 @@ class GlobalSearchDialog(ctk.CTkToplevel):
 
         self._search_after = None
         self._last_query = ""
+
+    def destroy(self) -> None:
+        try:
+            if self._search_after is not None:
+                self.after_cancel(self._search_after)
+        except Exception:
+            pass
+        self._search_after = None
+        super().destroy()
 
     def _schedule_search(self) -> None:
         if self._search_after is not None:

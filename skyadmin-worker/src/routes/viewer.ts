@@ -1,6 +1,7 @@
 /** P4.1 — read-only mobile/PWA viewer (office_contacts + notebook_entries). */
 
 import { Context } from "hono";
+import { randomCspNonce, withScriptNonce } from "../csp";
 
 const VIEWER_TABLES = "clients,tasks,office_contacts,notebook_entries";
 
@@ -53,6 +54,7 @@ self.addEventListener("fetch",e=>{const u=new URL(e.request.url);if(u.pathname.s
 }
 
 export function viewerHandler(_c: Context) {
+  const nonce = randomCspNonce();
   const html = `<!DOCTYPE html>
 <html lang="en">
 <head>
@@ -134,7 +136,7 @@ main{padding:12px 16px 24px;padding-bottom:max(24px,env(safe-area-inset-bottom))
   </main>
 </div>
 
-<script>
+<script nonce="${nonce}">
 const STORAGE_KEY="skyadmin_viewer_creds";
 const VIEWER_TABLES=${JSON.stringify(VIEWER_TABLES)};
 const NOTE_TYPES={daily_report:"Daily report",weekly_report:"Weekly report",customer_instruction:"Customer instruction",senior_note:"Senior note",general:"General"};
@@ -318,7 +320,7 @@ if(loadCreds()){showApp();syncNow()}else{showActivate()}
     headers: {
       "Content-Type": "text/html; charset=utf-8",
       "Cache-Control": "public, max-age=300",
-      "Content-Security-Policy": VIEWER_CSP,
+      "Content-Security-Policy": withScriptNonce(VIEWER_CSP, nonce),
     },
   });
 }

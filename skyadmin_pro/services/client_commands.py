@@ -11,7 +11,7 @@ from __future__ import annotations
 
 from typing import TYPE_CHECKING, Any
 
-from skyadmin_pro.services.undo_manager import Command
+from skyadmin_pro.services.undo_manager import Command, UndoConflictError
 
 if TYPE_CHECKING:
     from skyadmin_pro.database import Database
@@ -60,12 +60,17 @@ class AddClientCommand(Command):
 
     label = "add client"
 
-    def __init__(self, db: Database, *, name: str, contact: str, email: str, status: str) -> None:
+    def __init__(
+        self, db: Database, *, name: str, contact: str, email: str, status: str,
+        group_id: int | None = None, clear_group: bool = False,
+    ) -> None:
         self._db = db
         self._name = name
         self._contact = contact
         self._email = email
         self._status = status
+        self._group_id = group_id
+        self._clear_group = clear_group
         self._client_id: int | None = None
         self._existed_before: dict | None = None
 
@@ -75,19 +80,22 @@ class AddClientCommand(Command):
             self._existed_before = self._db.get_client(existing)
         self._client_id = self._db.get_or_create_client(self._name)
         self._db.update_client(
-            self._client_id, contact_name=self._contact, email=self._email, status=self._status
+            self._client_id, contact_name=self._contact, email=self._email, status=self._status,
+            group_id=self._group_id, clear_group=self._clear_group,
         )
         return self._client_id
 
-    def undo(self) -> None:
+    def undo(self, *, force: bool = False) -> None:
         assert self._client_id is not None
         if self._existed_before is None:
             self._db.delete_client(self._client_id)
         else:
             before = self._existed_before
-            self._db.update_client(
-                self._client_id, **{k: before.get(k) for k in EDIT_FIELDS if k in before}
-            )
+            fields = {k: before.get(k) for k in EDIT_FIELDS if k in before}
+            if fields.get("group_id") is None:
+                fields.pop("group_id", None)
+                fields["clear_group"] = True
+            self._db.update_client(self._client_id, **fields)
 
 
 class EditClientCommand(Command):
@@ -105,12 +113,16 @@ class EditClientCommand(Command):
         self._before = self._db.get_client(self._client_id)
         self._db.update_client(self._client_id, **self._fields)
 
-    def undo(self) -> None:
+    def undo(self, *, force: bool = False) -> None:
         assert self._before is not None
         before = self._before
-        self._db.update_client(
-            self._client_id, **{k: before.get(k) for k in EDIT_FIELDS if k in before}
-        )
+        fields = {k: before.get(k) for k in EDIT_FIELDS if k in before}
+        if fields.get("group_id") is None:
+            # Snapshot had no group: None means "keep" to update_client,
+            # so request an explicit clear instead.
+            fields.pop("group_id", None)
+            fields["clear_group"] = True
+        self._db.update_client(self._client_id, **fields)
 
 
 class SetStatusCommand(Command):
@@ -131,7 +143,7 @@ class SetStatusCommand(Command):
                 self._before[cid] = row.get("status", "active")
         return self._db.batch_update_client_status(self._ids, self._status)
 
-    def undo(self) -> None:
+    def undo(self, *, force: bool = False) -> None:
         for cid, status in self._before.items():
             self._db.update_client(cid, status=status)
 
@@ -147,12 +159,25 @@ class DeleteClientsCommand(Command):
         self._client_rows: list[dict] = []
         # table -> list of full row dicts (with rowid) referencing our clients
         self._dependents: dict[str, list[dict]] = {}
+        # client_id -> RAW (still encrypted) ird_password; get_client() decrypts,
+        # so secrets are snapshotted separately to restore ciphertext exactly.
+        self._raw_secrets: dict[int, object] = {}
 
     def do(self) -> int:
         db = self._db
         self._client_rows = [r for cid in self._ids if (r := db.get_client(cid)) is not None]
         self._dependents = {}
+        self._raw_secrets = {}
         with db.connection() as conn:
+            for cid in self._ids:
+                try:
+                    secret = conn.execute(
+                        "SELECT ird_password FROM clients WHERE id = ?", (cid,)
+                    ).fetchone()
+                except Exception:
+                    continue
+                if secret is not None:
+                    self._raw_secrets[cid] = secret["ird_password"]
             for table in _linked_tables(db):
                 if table == "clients":
                     continue
@@ -167,16 +192,52 @@ class DeleteClientsCommand(Command):
                 self._dependents[table] = [dict(r) for r in rows]
         return db.batch_delete_clients(self._ids)
 
-    def undo(self) -> None:
+    def check_conflicts(self) -> list[str]:
+        """Names/sync keys reused since the delete — overwriting needs confirm."""
+        found: list[str] = []
         db = self._db
+        with db.connection() as conn:
+            for row in self._client_rows:
+                try:
+                    hit = conn.execute(
+                        "SELECT id FROM clients WHERE name = ? COLLATE NOCASE", (row["name"],)
+                    ).fetchone()
+                except Exception:
+                    continue
+                if hit is not None and int(hit["id"]) != int(row["id"]):
+                    found.append(f"Client name reused: {row['name']}")
+                sync_key = row.get("global_id")
+                if sync_key:
+                    try:
+                        hit = conn.execute(
+                            "SELECT id FROM clients WHERE global_id = ?", (sync_key,)
+                        ).fetchone()
+                    except Exception:
+                        continue
+                    if hit is not None and int(hit["id"]) != int(row["id"]):
+                        found.append(f"Sync key reused for: {row['name']}")
+        return found
+
+    def undo(self, *, force: bool = False) -> None:
+        conflicts = self.check_conflicts()
+        if conflicts and not force:
+            raise UndoConflictError(conflicts)
+        db = self._db
+        verb = "INSERT OR REPLACE" if force else "INSERT"
         with db.connection() as conn:
             for row in self._client_rows:
                 cols = [c for c in row.keys() if c != "id"]
                 conn.execute(
-                    f'INSERT OR REPLACE INTO clients (id, {", ".join(cols)}) '
+                    f'{verb} INTO clients (id, {", ".join(cols)}) '
                     f'VALUES (?, {", ".join("?" for _ in cols)})',
                     (row["id"], *[row[c] for c in cols]),
                 )
+                # Restore ciphertext exactly — get_client() snapshots decrypt.
+                if row["id"] in self._raw_secrets:
+                    conn.execute(
+                        "UPDATE clients SET ird_password = ? WHERE id = ?",
+                        (self._raw_secrets[row["id"]], row["id"]),
+                    )
             for table, rows in self._dependents.items():
                 for saved in rows:
                     rowid = saved.pop("_rowid")

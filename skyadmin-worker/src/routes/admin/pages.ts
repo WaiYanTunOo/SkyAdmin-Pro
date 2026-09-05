@@ -37,7 +37,7 @@ button:active{background:#1d4ed8}
 </div></body></html>`;
 }
 
-export function buildAdminPage(adminPath: string): string {
+export function buildAdminPage(adminPath: string, csrfToken: string, scriptNonce: string): string {
   return `<!DOCTYPE html>
 <html lang="en"><head><meta charset="UTF-8"><meta name="viewport" content="width=device-width,initial-scale=1">
 <title>SkyAdmin Pro</title>
@@ -91,6 +91,7 @@ button.sm{width:auto;padding:7px 12px;font-size:12px;border-radius:8px;margin-to
 <div class="topbar">
   <div id="status" class="status"></div>
   <form class="logout-form" method="POST" action="${adminPath}/logout">
+    <input type="hidden" name="csrf_token" value="${csrfToken}">
     <button class="logout" type="submit">Logout</button>
   </form>
 </div>
@@ -184,7 +185,8 @@ button.sm{width:auto;padding:7px 12px;font-size:12px;border-radius:8px;margin-to
 </div>
 <div id="purgeResult" class="hint"></div>
 
-<script>
+<script nonce="${scriptNonce}">
+var CSRF_TOKEN=${JSON.stringify(csrfToken)};
 var _recs=[];
 var _machines=[];
 var _bans=[];
@@ -200,8 +202,9 @@ function showStatus(m){
 
 function api(method,path,body){
   // Session-cookie auth (HttpOnly, SameSite=Lax): the browser sends it
-  // automatically same-origin. The master API_TOKEN never touches the DOM.
-  var init={method:method,headers:{'Content-Type':'application/json'},credentials:'same-origin'};
+  // automatically same-origin. POSTs additionally carry the short-lived
+  // X-CSRF-Token the server requires (see authMiddleware).
+  var init={method:method,headers:{'Content-Type':'application/json','X-CSRF-Token':CSRF_TOKEN},credentials:'same-origin'};
   if(body)init.body=JSON.stringify(body);
   return fetch(path,init).then(function(r){
     if(!r.ok)return r.json().then(function(d){throw new Error(d.error||'API error '+r.status);});

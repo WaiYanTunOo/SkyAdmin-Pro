@@ -4,6 +4,7 @@ import { describe, expect, it } from "vitest";
 import app from "../index";
 import type { Env } from "../db";
 import { hmacSign } from "../signing";
+import { sessionMessage } from "./admin/session";
 
 const ADMIN = "admin-test";
 const PASS = "secret-password";
@@ -133,7 +134,8 @@ describe("admin login POST", () => {
 describe("admin session gate", () => {
   it("grants access with valid session cookie", async () => {
     const salt = "test-license-secret";
-    const sessionToken = await hmacSign(PASS, ADMIN + ":session");
+    // Stub DB has no epoch row → epoch "0".
+    const sessionToken = await hmacSign(PASS, sessionMessage(ADMIN, "0"));
     const cookieName = "skyadm_" + salt.slice(0, 8);
 
     const res = await app.request(
@@ -169,15 +171,34 @@ describe("admin session gate", () => {
 
 describe("admin logout", () => {
   it("clears session cookie", async () => {
+    const env = mockEnv();
+    const page = await app.request(adminUrl("/"), {}, env);
+    const html = await page.text();
+    const csrfMatch = html.match(/name="csrf_token" value="([^"]+)"/);
+    const csrfToken = csrfMatch![1];
+
     const res = await app.request(
       adminUrl("/logout"),
-      { method: "POST" },
-      mockEnv(),
+      {
+        method: "POST",
+        headers: { "Content-Type": "application/x-www-form-urlencoded" },
+        body: `csrf_token=${csrfToken}`,
+      },
+      env,
     );
     expect(res.status).toBe(303);
     expect(res.headers.get("Location")).toBe(`/${ADMIN}/`);
     const setCookie = res.headers.get("Set-Cookie") || "";
     expect(setCookie).toContain("Max-Age=0");
+  });
+
+  it("rejects logout without CSRF token", async () => {
+    const res = await app.request(
+      adminUrl("/logout"),
+      { method: "POST" },
+      mockEnv(),
+    );
+    expect(res.status).toBe(403);
   });
 });
 
@@ -234,7 +255,7 @@ describe("CSP on all admin HTML responses", () => {
 
   it("CSP header on admin dashboard (authenticated)", async () => {
     const salt = "test-license-secret";
-    const sessionToken = await hmacSign(PASS, ADMIN + ":session");
+    const sessionToken = await hmacSign(PASS, sessionMessage(ADMIN, "0"));
     const cookieName = "skyadm_" + salt.slice(0, 8);
 
     const res = await app.request(
@@ -247,5 +268,27 @@ describe("CSP on all admin HTML responses", () => {
       mockEnv(),
     );
     expect(res.headers.get("Content-Security-Policy")).toContain("default-src 'none'");
+  });
+
+  it("dashboard allows its inline script via per-response CSP nonce", async () => {
+    const salt = "test-license-secret";
+    const sessionToken = await hmacSign(PASS, sessionMessage(ADMIN, "0"));
+    const cookieName = "skyadm_" + salt.slice(0, 8);
+
+    const res = await app.request(
+      adminUrl("/"),
+      {
+        headers: {
+          Cookie: `${cookieName}=${sessionToken}`,
+        },
+      },
+      mockEnv(),
+    );
+    expect(res.status).toBe(200);
+    const html = await res.text();
+    const match = html.match(/<script nonce="([^"]+)">/);
+    expect(match).not.toBeNull();
+    const csp = res.headers.get("Content-Security-Policy") || "";
+    expect(csp).toContain(`script-src 'nonce-${match![1]}'`);
   });
 });

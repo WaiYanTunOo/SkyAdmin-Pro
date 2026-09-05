@@ -116,7 +116,9 @@ class MainWindow(dnd_base_class()):
         self.bind("<Control-D>", lambda _e: self._toggle_dark_light())
 
     def _toggle_dark_light(self) -> None:
-        """Toggle between Dark and Light mode (Ctrl+D)."""
+        """Toggle between Dark and Light mode (Ctrl+D, outside text inputs)."""
+        if self._focus_in_text_input():
+            return
         import customtkinter as _ctk
         from skyadmin_pro.config import SETTING_APPEARANCE_MODE
         current = _ctk.get_appearance_mode()
@@ -484,6 +486,14 @@ class MainWindow(dnd_base_class()):
                     on_hide()
                 except Exception:
                     pass
+        # Stop the auto-backup timer chain (process exit would reap it anyway).
+        scheduler = getattr(self, "_auto_backup", None)
+        stop = getattr(scheduler, "stop", None)
+        if callable(stop):
+            try:
+                stop()
+            except Exception:
+                pass
         for view in self._views.values():
             teardown = getattr(view, "on_hide", None)
             if callable(teardown):

@@ -58,6 +58,30 @@ class TestClientsMixin:
         db.delete_client(cid)
         assert db.get_client(cid) is None
 
+    def test_client_group_crud(self, db):
+        gid = db.add_client_group("VIP")
+        groups = db.list_client_groups()
+        assert [g["name"] for g in groups] == ["VIP"]
+        db.update_client_group(gid, "VIP Plus")
+        assert db.list_client_groups()[0]["name"] == "VIP Plus"
+        assert db.delete_client_group(gid) == 1
+        assert db.list_client_groups() == []
+
+    def test_client_group_assign_and_clear(self, db):
+        cid = db.get_or_create_client("Acme Corp")
+        gid = db.add_client_group("VIP")
+        db.update_client(cid, group_id=gid)
+        assert db.get_client(cid)["group_id"] == gid
+        db.update_client(cid, clear_group=True)
+        assert db.get_client(cid)["group_id"] is None
+
+    def test_delete_group_ungroups_members(self, db):
+        cid = db.get_or_create_client("Acme Corp")
+        gid = db.add_client_group("VIP")
+        db.update_client(cid, group_id=gid)
+        db.delete_client_group(gid)
+        assert db.get_client(cid)["group_id"] is None
+
     def test_record_document(self, db):
         cid = db.get_or_create_client("Acme Corp")
         doc_id = db.record_document(

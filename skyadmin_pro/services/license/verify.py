@@ -358,10 +358,14 @@ def report_activation_claim(
     license after claim, ``license_key_to_save`` is the full-period key.
     """
     from skyadmin_pro.config import API_BASE_URL
+    from skyadmin_pro.services.net import require_https_api_url
 
-    api_url = (API_BASE_URL or "").strip()
-    if not api_url:
+    if not (API_BASE_URL or "").strip():
         return True, "No API configured.", None
+    try:
+        api_url = require_https_api_url(API_BASE_URL or "")
+    except RuntimeError as exc:
+        return False, f"Claim refused: {exc}", None
 
     import urllib.request
 
@@ -504,6 +508,13 @@ def _fetch_control_from_api(api_url: str, timeout: float) -> tuple[bool, str | N
     """Fetch SKYCTRL2 text from the Cloudflare Worker API.
     Returns (ok, text_or_None). None means empty (no entries)."""
     import urllib.request
+
+    from skyadmin_pro.services.net import require_https_api_url
+
+    try:
+        api_url = require_https_api_url(api_url)
+    except RuntimeError as exc:
+        return False, f"API: {exc}"
 
     # Cache-buster to avoid stale CDN/edge cache
     ts = str(int(datetime.now().timestamp()))

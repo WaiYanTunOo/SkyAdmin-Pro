@@ -4,7 +4,7 @@ from __future__ import annotations
 
 import customtkinter as ctk
 
-from skyadmin_pro.ui.theme import CONTENT_PAD, CARD_RADIUS, TEXT_MUTED, WRAP_CARD
+from skyadmin_pro.ui.theme import CONTENT_PAD, CARD_RADIUS, TEXT_MUTED
 from skyadmin_pro.ui.treeview import ThemedTreeview
 from skyadmin_pro.ui.widgets import FeedbackLabel
 
@@ -81,34 +81,40 @@ class AuditLogDialog(ctk.CTkToplevel):
     def _load_log(self) -> None:
         # Toplevel dialogs sit outside the apply_form_theme walk — re-theme here.
         self.tree.apply_theme()
-        self.tree.clear()
         logs = self.app.db.list_audit_log(limit=500)
         filter_type = self._filter.get()
         if filter_type != "all":
             logs = [l for l in logs if l.get("log_type") == filter_type]
 
-        if not logs:
-            self.tree.set_empty_message("No audit log entries found.")
-            return
-
+        rows: list[tuple] = []
         for entry in logs:
             log_type = entry.get("log_type", "")
             if log_type == "tax_change":
-                display_type = "Tax Change"
-                client = entry.get("client_name", "")
-                field = entry.get("field", "")
-                old_val = entry.get("old_value", "")
-                new_val = entry.get("new_value", "")
+                rows.append((
+                    "Tax Change",
+                    entry.get("client_name", "") or "—",
+                    entry.get("field", "") or "—",
+                    entry.get("old_value", "") or "—",
+                    entry.get("new_value", "") or "—",
+                    entry.get("timestamp", "") or "—",
+                ))
             else:
-                display_type = "Sync Conflict"
-                client = entry.get("table_name", "")
-                field = entry.get("global_id", "")
-                old_val = entry.get("direction", "")
-                new_val = ""
-            self.tree.insert(
-                values=(display_type, client, field, old_val, new_val, entry.get("timestamp", "")),
-            )
-        self.feedback.set(f"{len(logs)} log entries loaded.", "info")
+                rows.append((
+                    "Sync Conflict",
+                    entry.get("table_name", "") or "—",
+                    entry.get("global_id", "") or "—",
+                    entry.get("direction", "") or "—",
+                    "—",
+                    entry.get("timestamp", "") or "—",
+                ))
+        # set_rows owns empty state + virtual rendering (500 rows → virtual).
+        self.tree.set_rows(
+            rows,
+            iids=[str(i) for i in range(len(rows))],
+            empty_message="No audit log entries found.",
+        )
+        if rows:
+            self.feedback.set(f"{len(rows)} log entries loaded.", "info")
 
     def _clear_logs(self) -> None:
         from tkinter import messagebox

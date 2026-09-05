@@ -2,7 +2,7 @@
 
 SkyAdmin Pro is designed so **one SQLite database** remains the source of truth on desktop today, while mobile and additional desktop OS targets can share the same data model later through the existing Cloudflare Worker API (`skyadmin-worker/`).
 
-## Current status (v0.3.1)
+## Current status (v0.3.2)
 
 | Platform | Status | Notes |
 |---|---|---|

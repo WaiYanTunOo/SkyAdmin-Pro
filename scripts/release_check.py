@@ -196,6 +196,18 @@ def check_version_alignment() -> list[str]:
         else:
             _ok(f"Version aligned at {APP_VERSION}")
 
+        # Check skyadmin_pro.__version__ alias (vestigial but must not drift)
+        pkg_init = ROOT / "skyadmin_pro" / "__init__.py"
+        if pkg_init.is_file():
+            m0 = re.search(r'__version__\s*=\s*"([^"]+)"', pkg_init.read_text(encoding="utf-8"))
+            pkg_ver = m0.group(1) if m0 else ""
+            if pkg_ver and pkg_ver != APP_VERSION:
+                errors.append(
+                    _fail(f"Version mismatch: skyadmin_pro/__init__.py __version__={pkg_ver} APP_VERSION={APP_VERSION}")
+                )
+            elif pkg_ver:
+                _ok(f"Package __version__ aligned at {pkg_ver}")
+
         # Check ISS version — supports both hardcoded and injected (via /DAppVersion)
         iss = ROOT / "packaging" / "SkyAdminPro.iss"
         if iss.is_file():

@@ -2,8 +2,11 @@
 
 import { Context } from "hono";
 import { Env, bumpVersion } from "../db";
+import { checkRateLimit } from "../rate_limit";
 
 export async function banHandler(c: Context<{ Bindings: Env }>) {
+  const limited = await checkRateLimit(c, "admin-write", { windowSeconds: 60, max: 30 });
+  if (limited) return limited;
   const { mid, reason } = await c.req.json<{ mid?: string; reason?: string }>();
   if (!mid?.trim()) return c.json({ ok: false, error: "mid required" }, 400);
 
@@ -16,6 +19,8 @@ export async function banHandler(c: Context<{ Bindings: Env }>) {
 }
 
 export async function unbanHandler(c: Context<{ Bindings: Env }>) {
+  const limited = await checkRateLimit(c, "admin-write", { windowSeconds: 60, max: 30 });
+  if (limited) return limited;
   const { mid } = await c.req.json<{ mid?: string }>();
   if (!mid?.trim()) return c.json({ ok: false, error: "mid required" }, 400);
 

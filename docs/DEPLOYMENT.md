@@ -22,7 +22,10 @@ Requires Inno Setup 6 (`winget install JRSoftware.InnoSetup`). Builds portable e
 
 ### Code Signing
 
-Signing is optional and handled by `packaging/sign-windows.ps1`. Set `SKYADMIN_SIGN_REQUIRED=1` to enforce signing during build.
+Local builds skip signing gracefully via `packaging/sign-windows.ps1`. Set `SKYADMIN_SIGN_REQUIRED=1`
+(or pass `-Required`) to enforce it. **`v*` releases always require a signature**: CI fails the
+tag pipeline when no certificate is configured — see `packaging/SIGNING.md` for cert options
+(PFX, store, Azure Trusted Signing).
 
 ## 2. Worker API — Cloudflare Worker
 
@@ -96,6 +99,7 @@ python -c "from cryptography.hazmat.primitives.asymmetric.ed25519 import Ed25519
 1. **D1 migration**: Run `npx wrangler d1 migrations apply skyadmin-db --remote` from `skyadmin-worker/` (versioned `migrations/`; legacy `schema.sql` replay only for archaeology).
 2. **Admin account**: Set `ADMIN_PASS` in environment variables. Access admin panel at `/{ADMIN_PATH}`.
 3. **Desktop DB**: SQLite schema auto-applies on first app launch via `skyadmin_pro/db/schema.py` + versioned `skyadmin_pro/db/migrations/`.
+4. **Support note — reinstalls**: activation codes burn strictly one-time (`used_nonces`). A wiped/reinstalled PC cannot re-register with its old code — issue a fresh code from the admin panel (Generate). Sync tokens additionally expire after 30 days idle and rotate on re-register.
 
 ## 5. Updates
 

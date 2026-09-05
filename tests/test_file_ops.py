@@ -155,3 +155,34 @@ class TestUniquePath:
         result = unique_path(p)
         assert result != p
         assert not result.exists()  # unique_path returns a non-existing path
+
+
+class TestOpenInFileManagerGuard:
+    def test_missing_path_rejected(self, tmp_path: Path):
+        import pytest
+
+        from skyadmin_pro.services.file_ops import open_in_file_manager
+
+        with pytest.raises(RuntimeError, match="does not exist"):
+            open_in_file_manager(tmp_path / "nope.pdf")
+
+    def test_executable_suffix_rejected(self, tmp_path: Path):
+        import pytest
+
+        from skyadmin_pro.services.file_ops import open_in_file_manager
+
+        for name in ("evil.exe", "run.bat", "click.lnk", "macro.hta", "script.js"):
+            target = tmp_path / name
+            target.write_bytes(b"x")
+            with pytest.raises(RuntimeError, match="executable file type"):
+                open_in_file_manager(target)
+
+    def test_case_insensitive_suffix(self, tmp_path: Path):
+        import pytest
+
+        from skyadmin_pro.services.file_ops import open_in_file_manager
+
+        target = tmp_path / "EVIL.EXE"
+        target.write_bytes(b"x")
+        with pytest.raises(RuntimeError, match="executable file type"):
+            open_in_file_manager(target)

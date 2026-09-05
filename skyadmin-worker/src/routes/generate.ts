@@ -2,6 +2,7 @@
 
 import { Context } from "hono";
 import { Env, bumpVersion } from "../db";
+import { checkRateLimit } from "../rate_limit";
 import { generateLicenseKey, generatePasscode } from "../signing";
 import { loadPricingPackages } from "./pricing";
 import { priceForDays } from "../packages";
@@ -13,6 +14,9 @@ interface GenerateBody {
 }
 
 export async function generateHandler(c: Context<{ Bindings: Env }>) {
+  // Ed25519 signing is CPU-expensive — strict per-IP budget.
+  const limited = await checkRateLimit(c, "generate", { windowSeconds: 60, max: 10 });
+  if (limited) return limited;
   let body: GenerateBody;
   try {
     body = await c.req.json<GenerateBody>();

@@ -2,8 +2,11 @@
 
 import { Context } from "hono";
 import { Env, bumpVersion } from "../db";
+import { checkRateLimit } from "../rate_limit";
 
 export async function usedHandler(c: Context<{ Bindings: Env }>) {
+  const limited = await checkRateLimit(c, "admin-write", { windowSeconds: 60, max: 30 });
+  if (limited) return limited;
   const { nonce } = await c.req.json<{ nonce?: string }>();
   if (!nonce?.trim()) return c.json({ ok: false, error: "nonce required" }, 400);
 
@@ -16,6 +19,8 @@ export async function usedHandler(c: Context<{ Bindings: Env }>) {
 }
 
 export async function revokePcHandler(c: Context<{ Bindings: Env }>) {
+  const limited = await checkRateLimit(c, "admin-write", { windowSeconds: 60, max: 30 });
+  if (limited) return limited;
   const { passcode } = await c.req.json<{ passcode?: string }>();
   if (!passcode?.trim()) return c.json({ ok: false, error: "passcode required" }, 400);
 

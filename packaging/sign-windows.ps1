@@ -3,7 +3,7 @@
 #
 # Usage:
 #   .\packaging\sign-windows.ps1 -Paths dist\SkyAdminPro.exe
-#   .\packaging\sign-windows.ps1 -Paths dist\SkyAdminPro.exe, dist\SkyAdminPro-Setup-0.3.1.exe -Required
+#   .\packaging\sign-windows.ps1 -Paths dist\SkyAdminPro.exe, dist\SkyAdminPro-Setup-0.3.2.exe -Required
 #
 # Certificate sources (first match wins):
 #   1. -PfxPath / -Password parameters

@@ -686,7 +686,7 @@ class DashboardView(BaseView):
         self._snap_fingerprint = None
 
     def _cancel_deferred_refresh(self) -> None:
-        for attr in ("_tree_refresh_after", "_detail_trees_after", "_timeline_after"):
+        for attr in ("_tree_refresh_after", "_detail_trees_after", "_timeline_after", "_timeline_resize_after"):
             after_id = getattr(self, attr, None)
             if after_id is not None:
                 try:

@@ -2,17 +2,21 @@
 
 import { Context } from "hono";
 import { Env } from "../../db";
+import { randomCspNonce, withScriptNonce } from "../../csp";
 import { adminSessionSalt } from "../../env_secrets";
 import { hmacSign } from "../../signing";
 import { timingSafeEqual } from "../../timing_safe";
 import { buildAdminPage, loginPage, ADMIN_CSP } from "./pages";
 import {
   SESSION_TTL,
+  bumpSessionEpoch,
   generateCsrfToken,
+  getSessionEpoch,
   isIpBlocked,
   isValidSession,
   recordLoginAttempt,
   sessionKey,
+  sessionMessage,
   validateCsrfToken,
 } from "./session";
 
@@ -36,7 +40,8 @@ export async function adminHandler(c: Context<{ Bindings: Env }>): Promise<Respo
 
       // Validate CSRF token
       const csrfToken = typeof body.csrf_token === "string" ? body.csrf_token : "";
-      if (!csrfToken || !(await validateCsrfToken(csrfToken, c.env.ADMIN_PASS, c.env.ADMIN_PATH))) {
+      const epoch = await getSessionEpoch(c.env.DB);
+      if (!csrfToken || !(await validateCsrfToken(csrfToken, c.env.ADMIN_PASS, c.env.ADMIN_PATH, epoch))) {
         c.header("Content-Security-Policy", ADMIN_CSP);
         return c.html(loginPage(adminPath, "Invalid form. Please try again."), 403);
       }
@@ -51,7 +56,7 @@ export async function adminHandler(c: Context<{ Bindings: Env }>): Promise<Respo
           return c.html(loginPage(adminPath, "Server misconfigured: session secret missing"), 500);
         }
         const cookieName = sessionKey(salt);
-        const token = await hmacSign(c.env.ADMIN_PASS, c.env.ADMIN_PATH + ":session");
+        const token = await hmacSign(c.env.ADMIN_PASS, sessionMessage(c.env.ADMIN_PATH, epoch));
         return new Response(null, {
           status: 303,
           headers: {
@@ -68,8 +73,21 @@ export async function adminHandler(c: Context<{ Bindings: Env }>): Promise<Respo
     return c.html(loginPage(adminPath, "Wrong password"), 401);
   }
 
-  // Logout POST
+  // Logout POST — CSRF-protected; revokes ALL sessions via epoch bump.
   if (path.endsWith("/logout") && c.req.method === "POST") {
+    try {
+      const body = await c.req.parseBody();
+      const csrfToken = typeof body.csrf_token === "string" ? body.csrf_token : "";
+      const epoch = await getSessionEpoch(c.env.DB);
+      if (!csrfToken || !(await validateCsrfToken(csrfToken, c.env.ADMIN_PASS, c.env.ADMIN_PATH, epoch))) {
+        c.header("Content-Security-Policy", ADMIN_CSP);
+        return c.html(loginPage(adminPath, "Invalid form. Please try again."), 403);
+      }
+    } catch {
+      c.header("Content-Security-Policy", ADMIN_CSP);
+      return c.html(loginPage(adminPath, "Invalid form. Please try again."), 403);
+    }
+    await bumpSessionEpoch(c.env.DB);
     const cookieName = sessionKey(adminSessionSalt(c.env));
     return new Response(null, {
       status: 303,
@@ -83,7 +101,8 @@ export async function adminHandler(c: Context<{ Bindings: Env }>): Promise<Respo
   // Check session
   if (!(await isValidSession(c))) {
     // Generate CSRF token for login page
-    const csrfToken = await generateCsrfToken(c.env.ADMIN_PASS, c.env.ADMIN_PATH);
+    const epoch = await getSessionEpoch(c.env.DB);
+    const csrfToken = await generateCsrfToken(c.env.ADMIN_PASS, c.env.ADMIN_PATH, epoch);
     const page = loginPage(adminPath).replace(
       '<input type="hidden" name="csrf_token" value="">',
       `<input type="hidden" name="csrf_token" value="${csrfToken}">`
@@ -92,6 +111,12 @@ export async function adminHandler(c: Context<{ Bindings: Env }>): Promise<Respo
     return c.html(page);
   }
 
-  c.header("Content-Security-Policy", ADMIN_CSP);
-  return c.html(buildAdminPage(adminPath));
+  // Authenticated dashboard — embed a short-lived CSRF token for API POSTs
+  // (master API_TOKEN never touches the DOM; see auth.ts session fallback).
+  // Inline dashboard JS runs under a per-response CSP nonce.
+  const epoch = await getSessionEpoch(c.env.DB);
+  const dashboardCsrf = await generateCsrfToken(c.env.ADMIN_PASS, c.env.ADMIN_PATH, epoch);
+  const nonce = randomCspNonce();
+  c.header("Content-Security-Policy", withScriptNonce(ADMIN_CSP, nonce));
+  return c.html(buildAdminPage(adminPath, dashboardCsrf, nonce));
 }

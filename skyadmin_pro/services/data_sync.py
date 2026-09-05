@@ -228,11 +228,12 @@ def register_sync_device(timeout: float = 10.0) -> tuple[bool, str]:
 
     Re-registering always rotates the token on the Worker (license renewal hygiene).
     """
-    from skyadmin_pro.config import API_BASE_URL as api_url_cfg
+    from skyadmin_pro.services.net import require_https_api_url
 
-    api_url = (api_url_cfg or "").strip()
-    if not api_url:
-        return False, "Data sync requires API_BASE_URL in this build."
+    try:
+        api_url = require_https_api_url(API_BASE_URL or "")
+    except RuntimeError:
+        return False, "Data sync requires a secure (https) API_BASE_URL in this build."
 
     code = _license_code()
     if not code:
@@ -298,9 +299,12 @@ def _sync_request(
     query: str = "",
     timeout: float = 20.0,
 ) -> tuple[bool, dict | str]:
-    api_url = (API_BASE_URL or "").strip()
-    if not api_url:
-        return False, "API_BASE_URL not configured."
+    from skyadmin_pro.services.net import require_https_api_url
+
+    try:
+        api_url = require_https_api_url(API_BASE_URL or "")
+    except RuntimeError:
+        return False, "API_BASE_URL must use https:// (refusing insecure sync)."
 
     url = api_url.rstrip("/") + path
     if query:

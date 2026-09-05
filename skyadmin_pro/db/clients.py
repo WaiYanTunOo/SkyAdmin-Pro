@@ -402,6 +402,7 @@ class ClientsMixin:
         business_address: str | None = None,
         business_objectives: str | None = None,
         group_id: int | None = None,
+        clear_group: bool = False,
     ) -> None:
         """Update a client. None keeps the current value; '' clears a text field."""
         if status is not None and status not in {"active", "inactive"}:
@@ -432,7 +433,11 @@ class ClientsMixin:
             "business_objectives": (
                 business_objectives if business_objectives is not None else current["business_objectives"]
             ),
-            "group_id": group_id if group_id is not None else current.get("group_id"),
+            "group_id": (
+                None
+                if clear_group
+                else (group_id if group_id is not None else current.get("group_id"))
+            ),
         }
         with self.connection() as conn:
             try:

@@ -83,14 +83,14 @@ After a tagged release (recommended):
 ```bash
 # CI does this automatically on git tag v* when SKYADMIN_API_TOKEN is set.
 # Manual one-shot after a local build:
-python scripts/publish_release.py --version 0.3.1 --exe dist/SkyAdminPro.exe --github
+python scripts/publish_release.py --version 0.3.2 --exe dist/SkyAdminPro.exe --github
 ```
 
 Or publish only the Worker LATEST line (URL must already be public):
 
 ```bash
 # Bearer token = Worker API_TOKEN
-python scripts/publish_update.py --version 0.3.1 --url https://github.com/WaiYanTunOo/SkyAdmin-Pro/releases/download/v0.3.1/SkyAdminPro.exe
+python scripts/publish_update.py --version 0.3.2 --url https://github.com/WaiYanTunOo/SkyAdmin-Pro/releases/download/v0.3.2/SkyAdminPro.exe
 ```
 
 Update `CHANGELOG.md` before tagging:

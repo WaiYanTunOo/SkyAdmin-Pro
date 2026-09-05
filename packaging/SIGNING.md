@@ -41,7 +41,7 @@ $env:SKYADMIN_SIGN_PASSWORD = "your-pfx-password"
 
 .\packaging\build-installer.cmd
 # Or sign an existing build:
-.\packaging\sign-windows.ps1 -Paths dist\SkyAdminPro.exe, dist\SkyAdminPro-Setup-0.3.1.exe
+.\packaging\sign-windows.ps1 -Paths dist\SkyAdminPro.exe, dist\SkyAdminPro-Setup-0.3.2.exe
 ```
 
 ### Local signing (certificate store / USB token)

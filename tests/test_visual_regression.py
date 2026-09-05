@@ -128,3 +128,39 @@ def test_keyboard_shortcuts_bound(app):
     assert app.bind("<Control-z>") is not None
     assert app.bind("<Control-s>") in (None, "")
     assert app.bind("<Control-b>") in (None, "")
+
+
+def test_shortcut_dispatch_reaches_clients_panel(app, monkeypatch):
+    """Ctrl+Z / Ctrl+N forward to the clients panel (no AttributeError)."""
+    app.show_view("database_tasks")
+    app.update()
+    view = app.get_view("database_tasks")
+    assert view is not None
+    view._ensure_lazy_panel("Clients & Expiry")
+    panel = view.clients_panel
+    assert panel is not None
+
+    undo_calls: list[str] = []
+    new_calls: list[str] = []
+    monkeypatch.setattr(panel, "_undo_last", lambda: undo_calls.append("undo"))
+    monkeypatch.setattr(panel, "_open_client_dialog", lambda: new_calls.append("new"))
+
+    view._on_shortcut_undo()
+    view._on_shortcut_new()
+    assert undo_calls == ["undo"]
+    assert new_calls == ["new"]
+
+
+def test_audit_log_dialog_loads_without_crash(app):
+    """AuditLogDialog renders via set_rows (empty state or data rows)."""
+    from skyadmin_pro.ui.views.audit_log import AuditLogDialog
+
+    dlg = AuditLogDialog(app)
+    app.update()
+    try:
+        assert dlg.tree.tree.get_children(), "expected empty-message row or data"
+    finally:
+        try:
+            dlg.destroy()
+        except Exception:
+            pass

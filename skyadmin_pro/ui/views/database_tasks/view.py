@@ -371,6 +371,10 @@ class DatabaseTasksView(BaseView):
                 except Exception:
                     continue
                 fields = [id_map[c] for c in visible if c in id_map]
+                if sheet == "Supplier Services" and fields and "supplier_name" not in fields:
+                    # Tree is single-supplier context (no supplier column shown),
+                    # but the sheet needs attribution — data always carries it.
+                    fields = ["supplier_name", *fields]
                 if fields:
                     result[sheet] = fields
         return result
@@ -379,5 +383,11 @@ class DatabaseTasksView(BaseView):
         self._export_excel()
 
     def _on_shortcut_new(self) -> None:
-        if hasattr(self, "clients_panel"):
-            self.clients_panel._add_client()
+        self._ensure_lazy_panel(TAB_CLIENTS)
+        if self.clients_panel is not None:
+            self.clients_panel._open_client_dialog()
+
+    def _on_shortcut_undo(self) -> None:
+        self._ensure_lazy_panel(TAB_CLIENTS)
+        if self.clients_panel is not None:
+            self.clients_panel._undo_last()

@@ -6,8 +6,8 @@ from datetime import date
 
 import customtkinter as ctk
 
-from skyadmin_pro.ui.theme import CONTENT_PAD, WRAP_CARD
-from skyadmin_pro.ui.widgets import FeedbackLabel, themed_entry
+from skyadmin_pro.ui.theme import CONTENT_PAD, TEXT_MUTED
+from skyadmin_pro.ui.widgets import FeedbackLabel, make_modal, themed_entry
 
 
 class ExportFilterDialog(ctk.CTkToplevel):
@@ -18,10 +18,10 @@ class ExportFilterDialog(ctk.CTkToplevel):
         self.app = app
         self.on_export = on_export
         self.title("Export Filters")
-        self.geometry("420x440")
+        self.geometry("420x520")
         self.resizable(False, False)
         self.transient(app)
-        self.grab_set()
+        make_modal(self)
 
         self.grid_columnconfigure(0, weight=1)
 
@@ -32,7 +32,7 @@ class ExportFilterDialog(ctk.CTkToplevel):
         ).grid(row=0, column=0, padx=CONTENT_PAD, pady=(CONTENT_PAD, 12), sticky="w")
 
         # ── Date range ────────────────────────────────────────────────
-        date_frame = ctk.CTkFrame(self, fg_color=WRAP_CARD, corner_radius=8)
+        date_frame = ctk.CTkFrame(self, corner_radius=8)
         date_frame.grid(row=1, column=0, sticky="ew", padx=CONTENT_PAD, pady=(0, 8))
         date_frame.grid_columnconfigure(1, weight=1)
 
@@ -57,7 +57,7 @@ class ExportFilterDialog(ctk.CTkToplevel):
         )
 
         # ── Status filter ─────────────────────────────────────────────
-        status_frame = ctk.CTkFrame(self, fg_color=WRAP_CARD, corner_radius=8)
+        status_frame = ctk.CTkFrame(self, corner_radius=8)
         status_frame.grid(row=2, column=0, sticky="ew", padx=CONTENT_PAD, pady=(0, 8))
         status_frame.grid_columnconfigure(1, weight=1)
 
@@ -78,7 +78,7 @@ class ExportFilterDialog(ctk.CTkToplevel):
         status_menu.grid(row=1, column=1, padx=12, pady=4, sticky="ew")
 
         # ── Columns ─────────────────────────────────────────────────────
-        columns_frame = ctk.CTkFrame(self, fg_color=WRAP_CARD, corner_radius=8)
+        columns_frame = ctk.CTkFrame(self, corner_radius=8)
         columns_frame.grid(row=3, column=0, sticky="ew", padx=CONTENT_PAD, pady=(0, 8))
         self.visible_only_var = ctk.BooleanVar(value=False)
         ctk.CTkCheckBox(
@@ -90,7 +90,7 @@ class ExportFilterDialog(ctk.CTkToplevel):
             columns_frame,
             text="Off = every sheet exports all columns (auditable). "
             "On = sheets follow hidden columns in Database & Tasks tables.",
-            font=ctk.CTkFont(size=10), text_color="gray",
+            font=ctk.CTkFont(size=10), text_color=TEXT_MUTED,
             wraplength=360, justify="left",
         ).grid(row=1, column=0, padx=12, pady=(0, 8), sticky="w")
 

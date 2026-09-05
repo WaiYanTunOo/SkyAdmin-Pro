@@ -79,6 +79,14 @@ class ClientsExpiryPanel(ctk.CTkFrame):
         ctk.CTkButton(actions, text="Add / Edit client", width=125, command=self._open_client_dialog).pack(side="left")
         ctk.CTkButton(
             actions,
+            text="Groups…",
+            width=85,
+            fg_color="transparent",
+            border_width=1,
+            command=self._manage_groups,
+        ).pack(side="left", padx=(8, 0))
+        ctk.CTkButton(
+            actions,
             text="View company details",
             width=155,
             fg_color="transparent",
@@ -278,15 +286,119 @@ class ClientsExpiryPanel(ctk.CTkFrame):
         iid = self.client_tree.selected_iid()
         return int(iid) if iid is not None else None
 
+    def _manage_groups(self) -> None:
+        from skyadmin_pro.ui.widgets import make_modal, themed_entry
+
+        top = ctk.CTkToplevel(self.winfo_toplevel())
+        top.title("Manage client groups")
+        top.resizable(False, False)
+        top.geometry("380x360")
+        make_modal(top)
+        body = ctk.CTkFrame(top, corner_radius=CARD_RADIUS)
+        body.grid(row=0, column=0, padx=16, pady=16, sticky="nsew")
+        body.grid_columnconfigure(0, weight=1)
+        top.grid_columnconfigure(0, weight=1)
+        top.grid_rowconfigure(0, weight=1)
+
+        ctk.CTkLabel(body, text="Groups", anchor="w").grid(row=0, column=0, sticky="w", pady=(0, 6))
+        group_var = ctk.StringVar(value="")
+        group_menu = ctk.CTkOptionMenu(body, variable=group_var, values=[""], width=280)
+        group_menu.grid(row=1, column=0, sticky="ew", pady=(0, 6))
+        name_var = ctk.StringVar(value="")
+        themed_entry(body, textvariable=name_var, placeholder_text="Group name").grid(
+            row=2, column=0, sticky="ew", pady=(0, 6)
+        )
+        msg = ctk.CTkLabel(body, text="", anchor="w")
+        msg.grid(row=3, column=0, sticky="ew", pady=(0, 6))
+
+        def id_map() -> dict[str, int]:
+            return {g["name"]: g["id"] for g in self.app.db.list_client_groups()}
+
+        def refresh_menu(select: str = "") -> None:
+            names = [""] + [g["name"] for g in self.app.db.list_client_groups()]
+            group_menu.configure(values=names)
+            group_var.set(select if select in names else "")
+
+        def note(text: str) -> None:
+            msg.configure(text=text)
+
+        def add_group() -> None:
+            name = name_var.get().strip()
+            if not name:
+                note("Enter a group name.")
+                return
+            try:
+                self.app.db.add_client_group(name)
+            except Exception as exc:
+                note(str(exc))
+                return
+            name_var.set("")
+            refresh_menu(name)
+            note(f"Added: {name}")
+            self.refresh()
+
+        def rename_group() -> None:
+            old = group_var.get().strip()
+            new = name_var.get().strip()
+            if not old or not new:
+                note("Select a group and enter the new name.")
+                return
+            try:
+                self.app.db.update_client_group(id_map()[old], new)
+            except Exception as exc:
+                note(str(exc))
+                return
+            name_var.set("")
+            refresh_menu(new)
+            note(f"Renamed to: {new}")
+            self.refresh()
+
+        def delete_group() -> None:
+            from tkinter import messagebox
+
+            old = group_var.get().strip()
+            if not old:
+                note("Select a group first.")
+                return
+            if not messagebox.askyesno(
+                "Delete group",
+                f"Delete group '{old}'? Its clients become ungrouped (not deleted).",
+                parent=top,
+            ):
+                return
+            try:
+                self.app.db.delete_client_group(id_map()[old])
+            except Exception as exc:
+                note(str(exc))
+                return
+            refresh_menu("")
+            note(f"Deleted: {old}")
+            self.refresh()
+
+        btns = ctk.CTkFrame(body, fg_color="transparent")
+        btns.grid(row=4, column=0, sticky="ew", pady=(6, 0))
+        ctk.CTkButton(btns, text="Add", width=80, command=add_group).pack(side="left")
+        ctk.CTkButton(
+            btns, text="Rename", width=80, fg_color="transparent", border_width=1,
+            command=rename_group,
+        ).pack(side="left", padx=(8, 0))
+        ctk.CTkButton(
+            btns, text="Delete", width=80, fg_color="transparent", border_width=1,
+            command=delete_group,
+        ).pack(side="left", padx=(8, 0))
+        ctk.CTkButton(btns, text="Close", width=80, command=top.destroy).pack(side="right")
+
+        refresh_menu()
+
     def _open_client_dialog(self) -> None:
         client_id = self._selected_client_id()
         current = self.app.db.get_client(client_id) if client_id is not None else None
         top = ctk.CTkToplevel(self.winfo_toplevel())
         top.title("Edit client" if current else "Add client")
         top.resizable(False, False)
-        top.geometry("460x340")
+        top.geometry("460x380")
         top.update_idletasks()
-        width, height = 460, 340
+        width, height = 460, 380
         x = (self.winfo_rootx() + self.winfo_width() // 2) - width // 2
         y = (self.winfo_rooty() + self.winfo_height() // 2) - height // 2
         top.geometry(f"{width}x{height}+{x}+{y}")
@@ -317,14 +429,25 @@ class ClientsExpiryPanel(ctk.CTkFrame):
         ctk.CTkLabel(body, text="Status", anchor="w").grid(row=3, column=0, sticky="w", padx=(0, 10), pady=6)
         status_menu = ctk.CTkOptionMenu(body, values=["Active", "Inactive"], variable=status_var)
         status_menu.grid(row=3, column=1, sticky="ew", pady=6)
+        ctk.CTkLabel(body, text="Group", anchor="w").grid(row=4, column=0, sticky="w", padx=(0, 10), pady=6)
+        groups = self.app.db.list_client_groups()
+        group_names = ["(No group)"] + [g["name"] for g in groups]
+        current_gid = (current or {}).get("group_id")
+        current_gname = next((g["name"] for g in groups if g["id"] == current_gid), "(No group)")
+        group_var = ctk.StringVar(value=current_gname if current_gname in group_names else "(No group)")
+        group_menu = ctk.CTkOptionMenu(body, values=group_names, variable=group_var)
+        group_menu.grid(row=4, column=1, sticky="ew", pady=6)
 
         buttons = ctk.CTkFrame(body, fg_color="transparent")
-        buttons.grid(row=4, column=0, columnspan=2, sticky="e", pady=(12, 0))
+        buttons.grid(row=5, column=0, columnspan=2, sticky="e", pady=(12, 0))
         ctk.CTkButton(
             buttons,
             text="Save",
             width=100,
-            command=lambda: self._save_client_dialog(top, client_id, name_var, contact_var, email_var, status_var),
+            command=lambda: self._save_client_dialog(
+                top, client_id, name_var, contact_var, email_var, status_var,
+                group_var, {g["name"]: g["id"] for g in groups},
+            ),
         ).pack(side="right")
         ctk.CTkButton(
             buttons,
@@ -335,7 +458,8 @@ class ClientsExpiryPanel(ctk.CTkFrame):
             command=top.destroy,
         ).pack(side="right", padx=(0, 8))
 
-    def _save_client_dialog(self, top, client_id: int | None, name_var, contact_var, email_var, status_var) -> None:
+    def _save_client_dialog(self, top, client_id: int | None, name_var, contact_var, email_var,
+                            status_var, group_var=None, group_map: dict | None = None) -> None:
         name = name_var.get().strip()
         if not name:
             self.feedback.error("Enter a company name.")
@@ -343,13 +467,17 @@ class ClientsExpiryPanel(ctk.CTkFrame):
         contact = contact_var.get().strip()
         email = email_var.get().strip()
         status = "active" if status_var.get() == "Active" else "inactive"
+        group_name = (group_var.get() if group_var is not None else "(No group)").strip()
+        group_id = (group_map or {}).get(group_name)
+        clear_group = group_id is None
         try:
             from skyadmin_pro.services.client_commands import AddClientCommand, EditClientCommand
 
             if client_id is None:
                 self._undo.execute(
                     AddClientCommand(
-                        self.app.db, name=name, contact=contact, email=email, status=status
+                        self.app.db, name=name, contact=contact, email=email, status=status,
+                        group_id=group_id, clear_group=clear_group,
                     )
                 )
                 view = self.app.get_view("database_tasks")
@@ -360,6 +488,7 @@ class ClientsExpiryPanel(ctk.CTkFrame):
                     EditClientCommand(
                         self.app.db, client_id,
                         name=name, contact_name=contact, email=email, status=status,
+                        group_id=group_id, clear_group=clear_group,
                     )
                 )
         except ValueError as exc:
@@ -373,8 +502,22 @@ class ClientsExpiryPanel(ctk.CTkFrame):
         if not self._undo.can_undo():
             self.feedback.info("Nothing to undo.")
             return
+        conflicts = self._undo.preview_conflicts()
+        force = False
+        if conflicts:
+            from tkinter import messagebox
+
+            if not messagebox.askyesno(
+                "Undo will overwrite",
+                "Undoing would overwrite rows created after the delete:\n\n"
+                + "\n".join(f"• {c}" for c in conflicts)
+                + "\n\nOverwrite them?",
+                parent=self.winfo_toplevel(),
+            ):
+                return
+            force = True
         try:
-            label = self._undo.undo()
+            label = self._undo.undo(force=force)
         except Exception as exc:
             self.feedback.error(str(exc))
             return

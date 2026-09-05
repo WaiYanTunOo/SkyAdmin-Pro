@@ -1,5 +1,8 @@
 /** Shared D1-backed rate limiter — atomic upsert, window-based. */
 
+import { Context } from "hono";
+import { Env } from "./db";
+
 const DEFAULT_WINDOW_SECONDS = 60;
 const DEFAULT_MAX = 20;
 
@@ -45,4 +48,20 @@ export async function purgeStaleRateLimits(db: D1Database): Promise<void> {
   await db
     .prepare("DELETE FROM rate_limits WHERE window_start < datetime('now', '-1 hour')")
     .run();
+}
+
+/**
+ * Per-IP guard for mutating routes. Returns a 429 response when over limit,
+ * or null when the request may proceed.
+ */
+export async function checkRateLimit(
+  c: Context<{ Bindings: Env }>,
+  name: string,
+  opts: RateLimitOpts = {},
+): Promise<Response | null> {
+  const ip = c.req.header("cf-connecting-ip") || "unknown";
+  if (await isRateLimited(c.env.DB, `${name}:${ip}`, opts)) {
+    return c.json({ ok: false, error: "Too many requests — try again shortly." }, 429);
+  }
+  return null;
 }

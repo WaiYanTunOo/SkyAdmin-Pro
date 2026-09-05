@@ -12,6 +12,7 @@ from skyadmin_pro.db.migrations import (
     m007_client_credentials_login_id,
     m008_perf_query_indexes,
     m009_client_groups,
+    m010_fts_rebuild,
 )
 from skyadmin_pro.db.migrations.runner import register_migrations, run_pending_migrations
 
@@ -38,6 +39,7 @@ register_migrations(
         ),
         (m008_perf_query_indexes.VERSION, m008_perf_query_indexes.NAME, m008_perf_query_indexes.upgrade),
         (m009_client_groups.VERSION, m009_client_groups.NAME, m009_client_groups.upgrade),
+        (m010_fts_rebuild.VERSION, m010_fts_rebuild.NAME, m010_fts_rebuild.upgrade),
     ]
 )
 

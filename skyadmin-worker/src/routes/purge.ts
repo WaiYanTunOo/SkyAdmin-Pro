@@ -2,6 +2,7 @@
 
 import { Context } from "hono";
 import { Env } from "../db";
+import { checkRateLimit } from "../rate_limit";
 
 interface PurgeBody {
   older_than_days?: number;
@@ -9,6 +10,9 @@ interface PurgeBody {
 
 /** Licenses safe to remove: expired 30d+, revoked 30d+, or unused pending 30d+ (unlimited kept). */
 export async function purgeLicensesHandler(c: Context<{ Bindings: Env }>) {
+  // Full-table scan + archive — strict per-IP budget.
+  const limited = await checkRateLimit(c, "purge", { windowSeconds: 60, max: 5 });
+  if (limited) return limited;
   let body: PurgeBody = {};
   try {
     body = await c.req.json<PurgeBody>();

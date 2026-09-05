@@ -16,8 +16,17 @@ class Command:
     def do(self):
         raise NotImplementedError
 
-    def undo(self) -> None:
+    def undo(self, *, force: bool = False) -> None:
+        """Revert. force=True permits overwriting conflicting rows (after user confirm)."""
         raise NotImplementedError
+
+
+class UndoConflictError(Exception):
+    """Undo would overwrite rows created after the delete. Carries descriptions."""
+
+    def __init__(self, conflicts: list[str]) -> None:
+        super().__init__("Undo conflicts with existing rows: " + "; ".join(conflicts))
+        self.conflicts = list(conflicts)
 
 
 class UndoManager:
@@ -41,14 +50,28 @@ class UndoManager:
     def undo_label(self) -> str:
         return self._pending.label if self._pending is not None else ""
 
-    def undo(self) -> str:
-        """Revert the armed command. Returns its label. Raises if nothing armed."""
+    def undo(self, *, force: bool = False) -> str:
+        """Revert the armed command. Returns its label. Raises if nothing armed.
+
+        A failed undo (e.g. UndoConflictError) keeps the arm so the user can
+        confirm and retry with force=True.
+        """
         cmd = self._pending
         if cmd is None:
             raise RuntimeError("Nothing to undo.")
+        cmd.undo(force=force)
         self._pending = None
-        cmd.undo()
         return cmd.label
+
+    def preview_conflicts(self) -> list[str]:
+        """Human-readable overwrite conflicts, [] when undo is clean."""
+        check = getattr(self._pending, "check_conflicts", None)
+        if not callable(check):
+            return []
+        try:
+            return list(check())
+        except Exception:
+            return []
 
     def clear(self) -> None:
         self._pending = None

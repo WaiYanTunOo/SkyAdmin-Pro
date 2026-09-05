@@ -104,7 +104,14 @@ function createMockDb() {
     };
   }
 
-  return { store, db: { prepare } as unknown as D1Database, getLastNonce: () => lastInsertedNonce };
+  return {
+    store,
+    db: {
+      prepare,
+      batch: async () => [{ success: true }],
+    } as unknown as D1Database,
+    getLastNonce: () => lastInsertedNonce,
+  };
 }
 
 function mockEnv(db: D1Database): Env {

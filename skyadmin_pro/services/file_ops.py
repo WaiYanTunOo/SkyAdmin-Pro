@@ -194,10 +194,26 @@ def copy_file(source: Path, dest_dir: Path, new_name: str | None = None) -> Path
     return target
 
 
+#: Executable/handler-dispatched suffixes never opened via the OS shell.
+#: A DB-stored file_path pointing at one of these could otherwise execute
+#: code on click (os.startfile/xdg-open dispatch by association).
+_BLOCKED_OPEN_SUFFIXES = frozenset(
+    {
+        ".exe", ".bat", ".cmd", ".com", ".msi", ".ps1", ".vbs", ".vbe",
+        ".js", ".jse", ".wsf", ".wsh", ".hta", ".lnk", ".scr", ".pif",
+        ".jar", ".msc", ".reg", ".cpl", ".gadget", ".inf",
+    }
+)
+
+
 def open_in_file_manager(path: Path) -> None:
     resolved = path.resolve()
     if not resolved.exists():
         raise RuntimeError(f"Path does not exist: {resolved}")
+    if resolved.is_file() and resolved.suffix.lower() in _BLOCKED_OPEN_SUFFIXES:
+        raise RuntimeError(f"Refusing to open executable file type: {resolved.suffix}")
+    if not resolved.is_file() and not resolved.is_dir():
+        raise RuntimeError(f"Not a file or folder: {resolved}")
     logger.info("Opening in file manager: %s", resolved)
     try:
         if sys.platform == "win32":

@@ -4,6 +4,7 @@ import { describe, expect, it } from "vitest";
 import app from "./index";
 import type { Env } from "./db";
 import { hmacSign } from "./signing";
+import { generateCsrfToken, sessionMessage } from "./routes/admin/session";
 
 const ADMIN = "admin-test";
 const PASS = "admin-pass";
@@ -20,7 +21,8 @@ function mockEnv(): Env {
 }
 
 async function sessionCookie(): Promise<string> {
-  const token = await hmacSign(PASS, ADMIN + ":session");
+  // Stub DB has no epoch row → epoch "0".
+  const token = await hmacSign(PASS, sessionMessage(ADMIN, "0"));
   return `skyadm_${SALT.slice(0, 8)}=${token}`;
 }
 
@@ -121,5 +123,53 @@ describe("authMiddleware", () => {
     const html = await res.text();
     expect(html).not.toContain("test-api-token");
     expect(html).not.toContain("API_TOKEN=");
+  });
+
+  it("rejects session-authed POST without CSRF token", async () => {
+    const res = await app.request(
+      "http://localhost/api/pricing",
+      {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+          Cookie: await sessionCookie(),
+        },
+        body: JSON.stringify({ packages: [] }),
+      },
+      mockEnv(),
+    );
+    expect(res.status).toBe(403);
+    const body = await res.json();
+    expect(body.error).toContain("CSRF");
+  });
+
+  it("accepts session-authed POST with valid CSRF token", async () => {
+    const db = {
+      prepare: () => ({
+        bind: () => ({
+          first: async <T>(): Promise<T | null> => null,
+          run: async () => ({ success: true }),
+        }),
+      }),
+    } as unknown as D1Database;
+
+    const csrf = await generateCsrfToken(PASS, ADMIN, "0");
+    const res = await app.request(
+      "http://localhost/api/pricing",
+      {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+          Cookie: await sessionCookie(),
+          "X-CSRF-Token": csrf,
+        },
+        body: JSON.stringify({
+          packages: [{ label: "Week", days: 7, price_thb: 100 }],
+          over_year_text: "",
+        }),
+      },
+      { ...mockEnv(), DB: db },
+    );
+    expect(res.status).toBe(200);
   });
 });

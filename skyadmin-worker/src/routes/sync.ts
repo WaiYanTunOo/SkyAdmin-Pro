@@ -2,7 +2,7 @@
 
 import { Context } from "hono";
 import { Env } from "../db";
-import { purgeStaleRateLimits } from "../rate_limit";
+import { checkRateLimit, purgeStaleRateLimits } from "../rate_limit";
 import { parseActivationClaim } from "../verification";
 import { checkActivationEligibility } from "../sync_eligibility";
 import { newSyncToken, syncAuthMiddleware } from "../sync_auth";
@@ -90,6 +90,19 @@ export async function syncRegisterHandler(c: Context<{ Bindings: Env }>) {
     return c.json({ ok: false, error: eligible.error }, 403);
   }
 
+  // Strict one-time burn: a claimed (burned) code can never mint a new sync
+  // token, even for the same machine. Reinstalls need a fresh code — see
+  // DEPLOYMENT.md support flow. Prevents stolen codes from impersonating
+  // the victim device via pull/push.
+  const burned = await c.env.DB.prepare(
+    "SELECT nonce FROM used_nonces WHERE nonce = ?",
+  )
+    .bind(claim.nonce)
+    .first<{ nonce: string }>();
+  if (burned) {
+    return c.json({ ok: false, error: "Activation code already used. Request a fresh code." }, 403);
+  }
+
   const token = await upsertSyncDevice(c.env.DB, claim.mid);
   // Periodic cleanup of stale rate_limits entries (mirrors claim path).
   await purgeStaleRateLimits(c.env.DB);
@@ -174,6 +187,8 @@ export async function syncPullHandler(c: Context<{ Bindings: Env }>) {
 /** POST /api/sync/push */
 export async function syncPushHandler(c: Context<{ Bindings: Env }>) {
   const machineId = (c.req.header("X-Machine-Id") || "").trim().toUpperCase();
+  const limited = await checkRateLimit(c, "push", { windowSeconds: 60, max: 30 });
+  if (limited) return limited;
   let body: { changes?: PushChange[] };
   try {
     body = await c.req.json<{ changes?: PushChange[] }>();

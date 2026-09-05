@@ -48,6 +48,7 @@ describe("claim rate limiting", () => {
           run: async () => ({ success: true }),
         }),
       }),
+      batch: async () => [{ success: true }],
     } as unknown as D1Database;
 
     const env = mockEnv({ DB: db });

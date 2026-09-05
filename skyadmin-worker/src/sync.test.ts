@@ -16,6 +16,7 @@ function mockEnv(overrides: Partial<Env> & { dbState?: Record<string, unknown> }
     bans: new Set<string>(),
     revocations: new Set<string>(),
     revoked_passcodes: new Set<string>(),
+    used_nonces: new Set<string>(),
     sync_devices: new Map<string, string>(),
     ...(overrides.dbState || {}),
   };
@@ -33,6 +34,10 @@ function mockEnv(overrides: Partial<Env> & { dbState?: Record<string, unknown> }
           }
           if (sqlLower.includes("from revoked_passcodes")) {
             return null;
+          }
+          if (sqlLower.includes("from used_nonces")) {
+            const nonces = state.used_nonces as Set<string>;
+            return nonces.has(String(args[0])) ? { nonce: String(args[0]) } : null;
           }
           if (sqlLower.includes("from sync_devices")) {
             const token = state.sync_devices.get(String(args[0]));
@@ -126,25 +131,19 @@ describe("POST /api/sync/register", () => {
     expect(res.status).toBe(403);
   });
 
-  it("rotates sync token on repeat register", async () => {
+  it("rejects re-register with a burned code (strict one-time burn)", async () => {
 
     const pass = await generatePasscode(MID, 7, DEV_ED25519_KEY_B64);
-    const env = mockEnv();
-    const first = await app.request("http://localhost/api/sync/register", {
+    const claim = await (await import("./verification")).parseActivationClaim(pass);
+    const env = mockEnv({ dbState: { used_nonces: new Set([claim!.nonce]) } });
+    const res = await app.request("http://localhost/api/sync/register", {
       method: "POST",
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify({ code: pass }),
     }, env);
-    const firstBody = await first.json();
-    const second = await app.request("http://localhost/api/sync/register", {
-      method: "POST",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ code: pass }),
-    }, env);
-    const secondBody = await second.json();
-    expect(firstBody.sync_token).toBeTruthy();
-    expect(secondBody.sync_token).toBeTruthy();
-    expect(secondBody.sync_token).not.toBe(firstBody.sync_token);
+    expect(res.status).toBe(403);
+    const body = await res.json();
+    expect(body.error).toMatch(/already used/i);
   });
 
   it("purges stale rate_limits on successful register", async () => {

@@ -114,11 +114,12 @@ class FilingTabMixin:
 
             del_btn = ctk.CTkButton(
                 frame,
-                text="\u2716",
+                text="✖",
                 width=28,
                 height=28,
                 font=ctk.CTkFont(size=12),
                 fg_color=("gray70", "gray30"),
+                text_color=("#1f2937", "white"),
                 hover_color=("#dc2626", "#b91c1c"),
                 command=lambda f=field: self._reset_filing_status(f),
             )

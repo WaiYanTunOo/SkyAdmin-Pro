@@ -104,6 +104,13 @@ Schema defined in `skyadmin_pro/db/schema.py`.
 | `settings` | Key-value app settings. |
 | `snippet_versions` | Versioned snippet snapshots. |
 
+**Known `settings` keys:** `window_geometry`, `sidebar_collapsed`, `app_tagline`,
+`color_theme`, `appearance_mode`, `ui_language`, `workspace_root`, `workspace_custom`,
+`portal_url`, `sync_last_pull_at`, `sync_last_push_at`, `data_sync_enabled`,
+`auto_backup_enabled`, `auto_backup_interval` (daily/weekly/off), `auto_backup_last_run`,
+`last_encrypted_backup`, `service_types`, `organization_list`, `department_list`,
+`snippet_overrides`, `table_columns_v1` (per-table hidden columns JSON).
+
 ### Sync
 
 | Table | Purpose |

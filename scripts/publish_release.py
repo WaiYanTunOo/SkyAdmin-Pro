@@ -5,9 +5,9 @@ Runs release_check, writes release notes, optionally creates a GitHub Release
 and publishes the Worker LATEST update line.
 
 Usage:
-  python scripts/publish_release.py --version 0.3.1 --exe dist/SkyAdminPro.exe
-  python scripts/publish_release.py --version 0.3.1 --exe dist/SkyAdminPro.exe --github
-  python scripts/publish_release.py --version 0.3.1 --url https://github.com/org/repo/releases/download/v0.3.1/SkyAdminPro.exe
+  python scripts/publish_release.py --version 0.3.2 --exe dist/SkyAdminPro.exe
+  python scripts/publish_release.py --version 0.3.2 --exe dist/SkyAdminPro.exe --github
+  python scripts/publish_release.py --version 0.3.2 --url https://github.com/org/repo/releases/download/v0.3.2/SkyAdminPro.exe
 """
 
 from __future__ import annotations
@@ -32,7 +32,7 @@ def _run(cmd: list[str], *, env: dict[str, str] | None = None) -> None:
 
 def main() -> int:
     parser = argparse.ArgumentParser(description="Publish a SkyAdmin Pro release")
-    parser.add_argument("--version", required=True, help="Release version, e.g. 0.3.1")
+    parser.add_argument("--version", required=True, help="Release version, e.g. 0.3.2")
     parser.add_argument("--exe", type=Path, default=ROOT / "dist" / "SkyAdminPro.exe")
     parser.add_argument("--notes", type=Path, default=ROOT / "dist" / "RELEASE_NOTES.md")
     parser.add_argument("--url", default="", help="Public download URL for publish_update.py")

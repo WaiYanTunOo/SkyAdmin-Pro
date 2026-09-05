@@ -139,6 +139,18 @@ class SettingsView(BackupMixin, ChecklistMixin, LicenseMixin, PricingMixin, Work
             width=120,
         )
         self.lang_menu.grid(row=3, column=1, sticky="w", pady=4)
+
+        from skyadmin_pro.ui.theme import TEXT_MUTED
+
+        ctk.CTkLabel(
+            body,
+            text="Shortcuts (outside text fields):  Ctrl+F search   ·   Ctrl+E export   ·   "
+            "Ctrl+N new client   ·   Ctrl+Z undo   ·   Ctrl+D theme",
+            font=ctk.CTkFont(size=11),
+            text_color=TEXT_MUTED,
+            anchor="w",
+            justify="left",
+        ).grid(row=4, column=0, columnspan=2, sticky="ew", pady=(8, 0))
         row += 1
 
         portal = SectionCard(

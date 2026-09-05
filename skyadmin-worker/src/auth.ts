@@ -8,7 +8,7 @@
  */
 
 import { Context, Next } from "hono";
-import { isValidSession } from "./routes/admin/session";
+import { getSessionEpoch, isValidSession, validateCsrfToken } from "./routes/admin/session";
 import { timingSafeEqual } from "./timing_safe";
 
 export async function authMiddleware(c: Context, next: Next) {
@@ -23,7 +23,17 @@ export async function authMiddleware(c: Context, next: Next) {
   }
 
   // Fall back to the admin session cookie (same-origin dashboard fetches).
+  // Reads stay cookie-only; state-changing requests must also present the
+  // short-lived X-CSRF-Token rendered into the dashboard page.
   if (await isValidSession(c)) {
+    const method = c.req.method.toUpperCase();
+    if (method !== "GET" && method !== "HEAD" && method !== "OPTIONS") {
+      const csrf = c.req.header("X-CSRF-Token") || "";
+      const epoch = await getSessionEpoch(c.env.DB);
+      if (!csrf || !(await validateCsrfToken(csrf, c.env.ADMIN_PASS, c.env.ADMIN_PATH, epoch))) {
+        return c.json({ ok: false, error: "CSRF validation failed." }, 403);
+      }
+    }
     await next();
     return;
   }

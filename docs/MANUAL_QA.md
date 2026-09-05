@@ -49,7 +49,7 @@ Open your admin URL (`https://<worker>/<ADMIN_PATH>`).
 Optional CLI publish (point URL at your hosted **installer** or exe):
 
 ```bash
-python scripts/publish_update.py --version 0.3.1 --url https://your-cdn/SkyAdminPro-Setup-0.3.1.exe --token YOUR_API_TOKEN
+python scripts/publish_update.py --version 0.3.2 --url https://your-cdn/SkyAdminPro-Setup-0.3.2.exe --token YOUR_API_TOKEN
 ```
 
 ---
@@ -153,7 +153,7 @@ python scripts\release_check.py --skip-pytest --require-signature
 
 ```powershell
 Get-AuthenticodeSignature dist\SkyAdminPro.exe
-Get-AuthenticodeSignature dist\SkyAdminPro-Setup-0.3.1.exe
+Get-AuthenticodeSignature dist\SkyAdminPro-Setup-0.3.2.exe
 ```
 
 Both should show `Status: Valid`.
@@ -185,7 +185,7 @@ One-page view of what blocks “perfect on Windows” vs polish already in code.
 | A.3 | Clean VM install smoke (§3 + §6.2 G.1–G.5) | VM | ☐ |
 | A.4 | Manual UI spot-check (§6.1 F.1–F.7) at 125%/150% DPI | Clean PC | ☐ |
 | A.5 | Monthly incentive export matches your Excel (`SkyAdmin_Export_YYYYMM01.xlsx`, Pipeline sheet) | You | ☐ Verify one real month |
-| A.6 | Status PDF export (Dashboard → Export PDF) opens in Reader; sections present; no secret columns | Clean PC | ☐ |
+| A.6 | Status PDF export (Dashboard → Export PDF) opens in Reader; sections present; no secret columns | Clean PC | ☐ (English-only: non-Latin names render as `?` — Thai fonts are a later phase) |
 
 ### Bucket B — polish (mostly done in code; verify, don’t rebuild)
 

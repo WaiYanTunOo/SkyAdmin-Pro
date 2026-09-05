@@ -25,4 +25,14 @@ describe("viewer routes", () => {
     expect(sw.status).toBe(200);
     expect(await sw.text()).toContain("skyadmin-viewer-v2");
   });
+
+  it("allows its inline script via per-response CSP nonce", async () => {
+    const res = await app.request("http://localhost/viewer");
+    expect(res.status).toBe(200);
+    const html = await res.text();
+    const match = html.match(/<script nonce="([^"]+)">/);
+    expect(match).not.toBeNull();
+    const csp = res.headers.get("Content-Security-Policy") || "";
+    expect(csp).toContain(`script-src 'nonce-${match![1]}'`);
+  });
 });

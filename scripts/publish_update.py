@@ -2,8 +2,8 @@
 """Publish a desktop app update on the Worker (LATEST line on control list).
 
 Usage:
-  python scripts/publish_update.py --version 0.3.1 --url https://cdn.example/SkyAdminPro.exe
-  python scripts/publish_update.py --version 0.3.1 --url https://cdn.example/SkyAdminPro.exe --api-url https://worker.example --token YOUR_API_TOKEN
+  python scripts/publish_update.py --version 0.3.2 --url https://cdn.example/SkyAdminPro.exe
+  python scripts/publish_update.py --version 0.3.2 --url https://cdn.example/SkyAdminPro.exe --api-url https://worker.example --token YOUR_API_TOKEN
 """
 
 from __future__ import annotations
@@ -23,7 +23,7 @@ if str(ROOT) not in sys.path:
 
 def main() -> int:
     parser = argparse.ArgumentParser(description="Publish SkyAdmin Pro app update on Worker")
-    parser.add_argument("--version", required=True, help="Semantic version, e.g. 0.3.1")
+    parser.add_argument("--version", required=True, help="Semantic version, e.g. 0.3.2")
     parser.add_argument("--url", default="", help="Public download URL for the new build")
     parser.add_argument("--api-url", default="", help="Worker base URL (default: config.API_BASE_URL)")
     parser.add_argument("--token", default="", help="Worker API_TOKEN (or set SKYADMIN_API_TOKEN)")

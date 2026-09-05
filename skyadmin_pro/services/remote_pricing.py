@@ -10,8 +10,11 @@ from skyadmin_pro.config import API_BASE_URL, PRICING_OVER_YEAR_TEXT, PRICING_TI
 
 def fetch_pricing_tiers(timeout: float = 4.0) -> tuple[tuple[tuple[str, int, int], ...], str]:
     """Return ``(tiers, over_year_text)`` — falls back to embedded defaults on error."""
-    api_url = (API_BASE_URL or "").strip()
-    if not api_url:
+    from skyadmin_pro.services.net import require_https_api_url
+
+    try:
+        api_url = require_https_api_url(API_BASE_URL or "")
+    except RuntimeError:
         return PRICING_TIERS, PRICING_OVER_YEAR_TEXT
 
     url = api_url.rstrip("/") + "/api/pricing"
@@ -55,9 +58,11 @@ def fetch_pricing_tiers(timeout: float = 4.0) -> tuple[tuple[tuple[str, int, int
 def fetch_signing_key_status(timeout: float = 4.0) -> tuple[bool, str]:
     """Check whether the Worker's signing key matches this desktop build."""
     from skyadmin_pro.services.license_public import ED25519_PUBLIC_KEY_HEX
+    from skyadmin_pro.services.net import require_https_api_url
 
-    api_url = (API_BASE_URL or "").strip()
-    if not api_url:
+    try:
+        api_url = require_https_api_url(API_BASE_URL or "")
+    except RuntimeError:
         return True, ""
 
     url = api_url.rstrip("/") + "/api/signing/public-key"

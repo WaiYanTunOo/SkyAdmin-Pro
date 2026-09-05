@@ -27,7 +27,7 @@ Manual QA after UI/theme changes. Test at **1100×700** (minimum) and **1920×10
 
 - [ ] Settings → Sync Now shows status without crushing button
 - [ ] Settings shows last data sync time and conflict count (when applicable)
-- [ ] Settings → **Conflicts** opens audit log when sync conflicts exist; **Clear log** works
+- [ ] Settings → **Conflicts** opens the sync-conflicts dialog when conflicts exist; **Audit log** opens the unified viewer (All/Tax/Sync filter); **Clear log** works
 - [ ] Settings → **Mobile viewer** opens `/viewer` PWA (when API configured)
 - [ ] Activation dialog — email + code box contrast
 

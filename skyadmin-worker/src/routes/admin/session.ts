@@ -14,6 +14,41 @@ import {
 export const SESSION_TTL = 86400 * 7; // 7 days
 const CSRF_TTL = 3600; // 1 hour
 
+/**
+ * Server-side session epoch. Bumped on logout so every outstanding session
+ * token and CSRF token dies immediately (single-owner admin: acceptable).
+ * Stored in control_meta; missing key means epoch "0".
+ */
+export async function getSessionEpoch(db: D1Database): Promise<string> {
+  try {
+    const row = await db
+      .prepare("SELECT value FROM control_meta WHERE key = ?")
+      .bind("admin_session_epoch")
+      .first<{ value: string | number }>();
+    const v = String(row?.value ?? "0").trim();
+    return /^\d+$/.test(v) ? v : "0";
+  } catch {
+    return "0";
+  }
+}
+
+export async function bumpSessionEpoch(db: D1Database): Promise<void> {
+  try {
+    await db
+      .prepare(
+        "INSERT INTO control_meta (key, value) VALUES ('admin_session_epoch', '1') " +
+          "ON CONFLICT(key) DO UPDATE SET value = CAST(value AS INTEGER) + 1",
+      )
+      .run();
+  } catch {
+    // Best effort — logout still clears the client cookie below.
+  }
+}
+
+export function sessionMessage(adminPath: string, epoch: string): string {
+  return `${adminPath}:session:${epoch}`;
+}
+
 export function sessionKey(secret: string): string {
   return "skyadm_" + secret.slice(0, 8);
 }
@@ -22,13 +57,13 @@ function csrfKey(secret: string): string {
   return "csrf_" + secret.slice(0, 8);
 }
 
-export async function generateCsrfToken(adminPass: string, adminPath: string): Promise<string> {
+export async function generateCsrfToken(adminPass: string, adminPath: string, epoch: string): Promise<string> {
   const ts = Math.floor(Date.now() / 1000).toString();
-  const sig = await hmacSign(adminPass, adminPath + ":csrf:" + ts);
+  const sig = await hmacSign(adminPass, adminPath + ":csrf:" + ts + ":" + epoch);
   return ts + "." + sig;
 }
 
-export async function validateCsrfToken(token: string, adminPass: string, adminPath: string): Promise<boolean> {
+export async function validateCsrfToken(token: string, adminPass: string, adminPath: string, epoch: string): Promise<boolean> {
   const parts = token.split(".");
   if (parts.length !== 2) return false;
   const [ts, sig] = parts;
@@ -37,7 +72,7 @@ export async function validateCsrfToken(token: string, adminPass: string, adminP
   const now = Math.floor(Date.now() / 1000);
   if (now - tsNum > CSRF_TTL) return false;
   if (tsNum > now + 300) return false;
-  const expected = await hmacSign(adminPass, adminPath + ":csrf:" + ts);
+  const expected = await hmacSign(adminPass, adminPath + ":csrf:" + ts + ":" + epoch);
   return timingSafeEqual(sig, expected);
 }
 
@@ -47,7 +82,8 @@ export async function isValidSession(c: Context<{ Bindings: Env }>): Promise<boo
   const cookieName = sessionKey(salt);
   const token = getCookie(c, cookieName);
   if (!token) return false;
-  const expected = await hmacSign(c.env.ADMIN_PASS, c.env.ADMIN_PATH + ":session");
+  const epoch = await getSessionEpoch(c.env.DB);
+  const expected = await hmacSign(c.env.ADMIN_PASS, sessionMessage(c.env.ADMIN_PATH, epoch));
   return timingSafeEqual(token, expected);
 }
 

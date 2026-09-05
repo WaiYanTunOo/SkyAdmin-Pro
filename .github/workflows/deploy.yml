@@ -39,7 +39,7 @@ jobs:
           npm test
 
       - name: Apply database migrations
-        run: npx wrangler d1 execute skyadmin-db --remote --file=schema.sql
+        run: npx wrangler d1 migrations apply skyadmin-db --remote
 
       - name: Deploy worker to Cloudflare
         run: npx wrangler deploy

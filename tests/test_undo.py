@@ -10,7 +10,7 @@ from skyadmin_pro.services.client_commands import (
     EditClientCommand,
     SetStatusCommand,
 )
-from skyadmin_pro.services.undo_manager import Command, UndoManager
+from skyadmin_pro.services.undo_manager import Command, UndoConflictError, UndoManager
 
 
 class _Noop(Command):
@@ -24,7 +24,7 @@ class _Noop(Command):
         self.done += 1
         return "did"
 
-    def undo(self) -> None:
+    def undo(self, *, force: bool = False) -> None:
         self.undone += 1
 
 
@@ -92,6 +92,20 @@ class TestEditClientCommand:
         assert restored["email"] == "o@x.io"
         assert restored["status"] == "active"
 
+    def test_group_assign_and_clear_round_trip(self, db):
+        cid = db.get_or_create_client("Grouped Co")
+        gid = db.add_client_group("VIP")
+        mgr = UndoManager()
+        mgr.execute(EditClientCommand(db, cid, group_id=gid))
+        assert db.get_client(cid)["group_id"] == gid
+        mgr.undo()
+        assert db.get_client(cid)["group_id"] is None
+        mgr.execute(EditClientCommand(db, cid, group_id=gid, clear_group=False))
+        mgr.execute(EditClientCommand(db, cid, clear_group=True))
+        assert db.get_client(cid)["group_id"] is None
+        mgr.undo()
+        assert db.get_client(cid)["group_id"] == gid
+
 
 class TestSetStatusCommand:
     def test_batch_then_undo_restores_each(self, db):
@@ -136,3 +150,27 @@ class TestDeleteClientsCommand:
         fresh = db.get_or_create_client("Fresh Co")
         assert fresh != cid
         assert db.get_client(cid)["name"] == "Collision Co"
+
+    def test_conflict_raises_until_forced(self, db):
+        cid = db.get_or_create_client("Reused Co")
+        mgr = UndoManager()
+        mgr.execute(DeleteClientsCommand(db, [cid]))
+        # Name reused after delete → clean undo must refuse but stay armed.
+        db.get_or_create_client("Reused Co")
+        with pytest.raises(UndoConflictError):
+            mgr.undo()
+        assert mgr.can_undo()
+        # Forced undo overwrites the squatter.
+        mgr.undo(force=True)
+        assert db.get_client(cid)["name"] == "Reused Co"
+
+    def test_ird_password_restored_as_ciphertext(self, db):
+        cid = db.get_or_create_client("Secret Co")
+        with db.connection() as conn:
+            conn.execute("UPDATE clients SET ird_password = ? WHERE id = ?", ("ENC$blob", cid))
+        mgr = UndoManager()
+        mgr.execute(DeleteClientsCommand(db, [cid]))
+        mgr.undo()
+        with db.connection() as conn:
+            raw = conn.execute("SELECT ird_password FROM clients WHERE id = ?", (cid,)).fetchone()
+        assert raw["ird_password"] == "ENC$blob"

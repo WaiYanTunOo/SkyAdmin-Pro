@@ -152,3 +152,47 @@ def test_perf_indexes_exist(populated_tax_db):
     assert "idx_documents_unpaid_overdue" in names
     assert "idx_documents_ongoing_service" in names
     assert "idx_supplier_payments_unpaid_due" in names
+
+
+@pytest.fixture
+def large_tax_db(tmp_path) -> Database:
+    """5000 clients + 5000 documents — large-client headroom guard."""
+    db = Database(tmp_path / "perf_large.db")
+    with db.connection() as conn:
+        conn.executemany(
+            "INSERT INTO clients (name, contact_name, email, status) VALUES (?, ?, ?, ?)",
+            [(f"Big Client {i:05d}", f"Contact {i}", f"b{i}@example.com", "active") for i in range(5000)],
+        )
+    service_type = SERVICE_TYPES[0]
+    overdue = (date.today() - timedelta(days=7)).isoformat()
+    current = date.today().isoformat()
+    with db.connection() as conn:
+        conn.executemany(
+            "INSERT INTO documents (client_id, document_type, payment_date, paid, progress) VALUES (?, ?, ?, ?, ?)",
+            [
+                (i + 1, service_type, overdue if i % 3 == 0 else current, 0, "Ongoing")
+                for i in range(5000)
+            ],
+        )
+    return db
+
+
+def test_large_client_headroom(large_tax_db, query_stats):
+    stats, attach = query_stats
+    attach(large_tax_db)
+
+    start = time.perf_counter()
+    snap = large_tax_db.dashboard_snapshot()
+    snapshot_elapsed = time.perf_counter() - start
+    assert snap["counts"]["clients"] == 5000
+    assert stats["connections"] == 1
+    assert snapshot_elapsed < 1.5
+
+    start = time.perf_counter()
+    rows = large_tax_db.search_clients("Big Client 01")
+    assert len(rows) >= 100
+    assert time.perf_counter() - start < 1.0
+
+    start = time.perf_counter()
+    assert len(large_tax_db.list_clients()) == 5000
+    assert time.perf_counter() - start < 1.0

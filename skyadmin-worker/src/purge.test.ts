@@ -28,6 +28,7 @@ describe("purgeLicensesHandler", () => {
     const prepare = vi.fn(() => ({
       bind: () => ({
         all: async () => ({ results: [] }),
+        first: async () => ({ count: 1 }),
       }),
     }));
     const db = { prepare } as unknown as D1Database;

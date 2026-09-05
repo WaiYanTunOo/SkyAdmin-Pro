@@ -15,9 +15,9 @@ def db_path(tmp_path):
 def test_fresh_database_records_all_migrations(db_path):
     db = Database(db_path)
     rows = db._fetch_all("SELECT version, name FROM schema_migrations ORDER BY version")
-    assert [int(row["version"]) for row in rows] == [1, 2, 3, 4, 5, 6, 7, 8, 9]
+    assert [int(row["version"]) for row in rows] == [1, 2, 3, 4, 5, 6, 7, 8, 9, 10]
     assert rows[0]["name"] == "legacy_schema"
-    assert rows[-1]["name"] == "client_groups"
+    assert rows[-1]["name"] == "fts_rebuild"
     # m009 owns the group index (kept out of SCHEMA_SQL replay) — fresh DBs get it via migration.
     idx = db._fetch_all("SELECT name FROM sqlite_master WHERE type = 'index' AND name = 'idx_clients_group'")
     assert len(idx) == 1
@@ -27,7 +27,7 @@ def test_migrations_are_idempotent_on_reopen(db_path):
     Database(db_path)
     db = Database(db_path)
     count = db._fetch_one("SELECT COUNT(*) AS n FROM schema_migrations")["n"]
-    assert count == 9
+    assert count == 10
 
 
 def test_new_migration_file_pattern(db_path):
@@ -88,3 +88,42 @@ def test_fresh_db_search_uses_fts_match(db_path):
     hits = db._fetch_all("SELECT rowid AS id FROM clients_fts WHERE clients_fts MATCH 'probe*'")
     assert [int(r["id"]) for r in hits] == [client_id]
     assert db.search_clients("probe")[0]["id"] == client_id
+
+
+def test_m010_heals_stale_fts(db_path):
+    """A clients_fts missing rows (dead triggers era) is rebuilt by m010."""
+    db = Database(db_path)
+    cid = db.get_or_create_client("Stale FTS Co")
+    with db.connection() as conn:
+        conn.execute("DELETE FROM clients_fts WHERE rowid = ?", (cid,))
+    assert db._fetch_all("SELECT rowid AS id FROM clients_fts WHERE clients_fts MATCH 'stale*'") == []
+    with db.connection() as conn:
+        conn.execute("DELETE FROM schema_migrations WHERE version = 10")
+    Database(db_path)  # reopen triggers pending m010
+    hits = db._fetch_all("SELECT rowid AS id FROM clients_fts WHERE clients_fts MATCH 'stale*'")
+    assert [int(r["id"]) for r in hits] == [cid]
+
+
+def test_migrate_legacy_vault_twice_is_idempotent(db_path):
+    """Re-running the vault migration never duplicates credentials."""
+    db = Database(db_path)
+    cid = db.get_or_create_client("Vault Co")
+    with db.connection() as conn:
+        conn.execute(
+            """
+            CREATE TABLE vault_entries (
+                client_id INTEGER, category TEXT, title TEXT, username TEXT,
+                secret_value TEXT, url TEXT, notes TEXT, is_favorite INTEGER,
+                contact_id INTEGER
+            )
+            """
+        )
+        conn.execute(
+            "INSERT INTO vault_entries (client_id, category, username, secret_value) VALUES (?, 'DBD', 'u', 's')",
+            (cid,),
+        )
+    db._migrate_legacy_vault()
+    db._migrate_legacy_vault()
+    rows = db._fetch_all("SELECT * FROM client_credentials WHERE client_id = ?", (cid,))
+    assert len(rows) == 1
+    assert db._fetch_all("SELECT * FROM vault_entries") == []
