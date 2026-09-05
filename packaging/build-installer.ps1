@@ -47,7 +47,11 @@ if (Test-Path $Setup) {
 Write-Host ""
 Write-Host "Code signing (optional)..."
 $PortableExe = Join-Path $Root "dist\SkyAdminPro.exe"
-$signArgs = @("-Paths", @($PortableExe, $Setup))
+# NOTE: pass both paths as ONE comma-separated value. sign-windows.ps1 splits
+# -Paths on commas; a nested array would not survive the powershell.exe
+# boundary as two values — the second path would positionally bind to -PfxPath
+# and signtool would try to load it as a certificate.
+$signArgs = @("-Paths", ($PortableExe + "," + $Setup))
 if ($env:SKYADMIN_SIGN_REQUIRED -eq "1") {
     $signArgs += "-Required"
 }
