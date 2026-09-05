@@ -8,6 +8,7 @@ import customtkinter as ctk
 
 from skyadmin_pro.config import CLIENT_CREDENTIAL_TYPES, OFFICE_SYSTEM_TYPES
 from skyadmin_pro.services.workflow import copy_to_clipboard
+from skyadmin_pro.ui.canvas_scroll import CanvasScrollFrame
 from skyadmin_pro.ui.debounce import debounced_after
 from skyadmin_pro.ui.theme import CARD_TITLE_SIZE
 from skyadmin_pro.ui.treeview import ThemedTreeview
@@ -28,9 +29,14 @@ class VaultTabMixin:
 
     def _build_client_credentials_tab(self, parent: ctk.CTkFrame) -> None:
         parent.grid_columnconfigure(0, weight=1)
-        parent.grid_rowconfigure(1, weight=1)
+        parent.grid_rowconfigure(0, weight=1)
+        scroll = CanvasScrollFrame(parent)
+        scroll.grid(row=0, column=0, sticky="nsew")
+        scroll.content.grid_columnconfigure(0, weight=1)
+        self._client_cred_scroll = scroll
+        body = scroll.content
 
-        toolbar = ctk.CTkFrame(parent, fg_color="transparent")
+        toolbar = ctk.CTkFrame(body, fg_color="transparent")
         toolbar.grid(row=0, column=0, sticky="ew", pady=(4, 8))
         toolbar.grid_columnconfigure(0, weight=1)
         self.client_cred_search_var = ctk.StringVar()
@@ -48,7 +54,7 @@ class VaultTabMixin:
         ctk.CTkButton(toolbar, text="New", width=70, command=self._new_client_credential).grid(row=0, column=2)
 
         self.client_cred_tree = ThemedTreeview(
-            parent,
+            body,
             columns=(
                 ("client", "Client", 160),
                 ("type", "Type", 80),
@@ -60,7 +66,7 @@ class VaultTabMixin:
         )
         self.client_cred_tree.grid(row=1, column=0, sticky="nsew")
 
-        form = ctk.CTkFrame(parent, corner_radius=12)
+        form = ctk.CTkFrame(body, corner_radius=12)
         form.grid(row=2, column=0, sticky="ew", pady=(8, 4))
         form.grid_columnconfigure(1, weight=1)
         form.grid_columnconfigure(3, weight=1)
@@ -124,9 +130,14 @@ class VaultTabMixin:
 
     def _build_office_credentials_tab(self, parent: ctk.CTkFrame) -> None:
         parent.grid_columnconfigure(0, weight=1)
-        parent.grid_rowconfigure(1, weight=1)
+        parent.grid_rowconfigure(0, weight=1)
+        scroll = CanvasScrollFrame(parent)
+        scroll.grid(row=0, column=0, sticky="nsew")
+        scroll.content.grid_columnconfigure(0, weight=1)
+        self._office_cred_scroll = scroll
+        body = scroll.content
 
-        toolbar = ctk.CTkFrame(parent, fg_color="transparent")
+        toolbar = ctk.CTkFrame(body, fg_color="transparent")
         toolbar.grid(row=0, column=0, sticky="ew", pady=(4, 8))
         toolbar.grid_columnconfigure(0, weight=1)
         self.office_cred_search_var = ctk.StringVar()
@@ -144,7 +155,7 @@ class VaultTabMixin:
         ctk.CTkButton(toolbar, text="New", width=70, command=self._new_office_credential).grid(row=0, column=2)
 
         self.office_cred_tree = ThemedTreeview(
-            parent,
+            body,
             columns=(
                 ("label", "Account", 180),
                 ("login", "Username / email", 180),
@@ -156,7 +167,7 @@ class VaultTabMixin:
         )
         self.office_cred_tree.grid(row=1, column=0, sticky="nsew")
 
-        form = ctk.CTkFrame(parent, corner_radius=12)
+        form = ctk.CTkFrame(body, corner_radius=12)
         form.grid(row=2, column=0, sticky="ew", pady=(8, 4))
         form.grid_columnconfigure(1, weight=1)
         form.grid_columnconfigure(3, weight=1)
@@ -241,6 +252,8 @@ class VaultTabMixin:
             iids=[str(r["id"]) for r in rows],
             empty_message="No client portal logins match this filter.",
         )
+        if hasattr(self, "_client_cred_scroll"):
+            self._client_cred_scroll._on_content_configure()
 
     def _on_client_cred_select(self, iid: str | None) -> None:
         if not iid:
@@ -341,6 +354,8 @@ class VaultTabMixin:
             iids=[str(r["id"]) for r in rows],
             empty_message="No office accounts match this filter.",
         )
+        if hasattr(self, "_office_cred_scroll"):
+            self._office_cred_scroll._on_content_configure()
 
     def _on_office_cred_select(self, iid: str | None) -> None:
         if not iid:

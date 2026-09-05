@@ -10,5 +10,18 @@
       "database_id": "2ae5a00e-0312-4a36-9da9-265956915296",
       "migrations_dir": "migrations"
     }
-  ]
+  ],
+  "env": {
+    "staging": {
+      "name": "skyadmin-worker-staging",
+      "d1_databases": [
+        {
+          "binding": "DB",
+          "database_name": "skyadmin-db-staging",
+          "database_id": "REPLACE_WITH_STAGING_DB_ID",
+          "migrations_dir": "migrations"
+        }
+      ]
+    }
+  }
 }

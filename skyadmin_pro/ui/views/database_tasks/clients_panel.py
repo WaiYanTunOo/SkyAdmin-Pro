@@ -14,6 +14,7 @@ from skyadmin_pro.services.tracking import (
     expiry_label,
 )
 from skyadmin_pro.services.workflow import create_client_workspace
+from skyadmin_pro.ui.canvas_scroll import CanvasScrollFrame
 from skyadmin_pro.ui.combo_utils import fill_combo
 from skyadmin_pro.ui.theme import CARD_RADIUS, CARD_TITLE_SIZE, TEXT_MUTED
 from skyadmin_pro.ui.treeview import ThemedTreeview
@@ -35,9 +36,12 @@ class ClientsExpiryPanel(ctk.CTkFrame):
         self._undo = UndoManager()
         self.grid_columnconfigure(0, weight=1)
         self.grid_rowconfigure(0, weight=1)
-        self.grid_rowconfigure(1, weight=0)
 
-        left = ctk.CTkFrame(self, corner_radius=CARD_RADIUS)
+        self._scroll = CanvasScrollFrame(self)
+        self._scroll.grid(row=0, column=0, sticky="nsew")
+        self._scroll.content.grid_columnconfigure(0, weight=1)
+
+        left = ctk.CTkFrame(self._scroll.content, corner_radius=CARD_RADIUS)
         left.grid(row=0, column=0, sticky="nsew", pady=(0, 10))
         left.grid_columnconfigure(0, weight=1)
         title_row = ctk.CTkFrame(left, fg_color="transparent")
@@ -202,7 +206,7 @@ class ClientsExpiryPanel(ctk.CTkFrame):
             command=self._undo_last,
         ).pack(side="left")
 
-        right = ctk.CTkFrame(self, corner_radius=CARD_RADIUS)
+        right = ctk.CTkFrame(self._scroll.content, corner_radius=CARD_RADIUS)
         right.grid(row=1, column=0, sticky="ew")
         right.grid_columnconfigure(0, weight=1)
         ctk.CTkLabel(
@@ -310,6 +314,7 @@ class ClientsExpiryPanel(ctk.CTkFrame):
             self.doc_tree.set_rows(
                 rows, iids=iids, tags=tags, empty_message="No expiring documents match this filter."
             )
+            self._scroll._on_content_configure()
             self.feedback.clear()
 
         def on_error(msg: str) -> None:
@@ -415,6 +420,7 @@ class ClientsExpiryPanel(ctk.CTkFrame):
                 tags.append(("inactive",) if item.get("status") == "inactive" else ())
             self.client_tree.set_rows(rows, iids=iids, tags=tags, empty_message="No clients match this search.")
             self._update_client_pager(len(shown))
+            self._scroll._on_content_configure()
 
         def on_error(msg: str) -> None:
             if seq != self._table_seq or not self.winfo_exists():

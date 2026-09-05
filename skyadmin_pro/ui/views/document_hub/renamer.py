@@ -15,6 +15,7 @@ from skyadmin_pro.config import (
     FOLDER_READY,
 )
 from skyadmin_pro.services import file_ops
+from skyadmin_pro.ui.canvas_scroll import CanvasScrollFrame
 from skyadmin_pro.ui.theme import CARD_TITLE_SIZE, WRAP_CARD
 from skyadmin_pro.ui.views.document_hub.helpers import launch_portal, open_folder
 from skyadmin_pro.ui.widgets import DatePickerField, FeedbackLabel, SelectableFileList, themed_entry
@@ -65,12 +66,18 @@ class SmartRenamerPanel(ctk.CTkFrame):
         right = ctk.CTkFrame(self, corner_radius=12)
         right.grid(row=1, column=1, sticky="nsew", padx=(8, 0))
         right.grid_columnconfigure(0, weight=1)
+        right.grid_rowconfigure(0, weight=1)
 
-        ctk.CTkLabel(right, text="Client name", anchor="w").grid(row=0, column=0, sticky="w", padx=16, pady=(16, 4))
+        self._rename_scroll = CanvasScrollFrame(right)
+        self._rename_scroll.grid(row=0, column=0, sticky="nsew")
+        self._rename_scroll.content.grid_columnconfigure(0, weight=1)
+        body = self._rename_scroll.content
+
+        ctk.CTkLabel(body, text="Client name", anchor="w").grid(row=0, column=0, sticky="w", padx=16, pady=(16, 4))
         self.client_var = ctk.StringVar()
         self._preview_after: str | None = None
         self.client_box = ctk.CTkComboBox(
-            right,
+            body,
             variable=self.client_var,
             values=[""],
             command=lambda _: self._schedule_preview(),
@@ -78,16 +85,16 @@ class SmartRenamerPanel(ctk.CTkFrame):
         self.client_box.grid(row=1, column=0, sticky="ew", padx=16)
         self.client_var.trace_add("write", lambda *_: self._schedule_preview())
 
-        ctk.CTkLabel(right, text="Document type", anchor="w").grid(row=2, column=0, sticky="w", padx=16, pady=(14, 4))
+        ctk.CTkLabel(body, text="Document type", anchor="w").grid(row=2, column=0, sticky="w", padx=16, pady=(14, 4))
         self.type_menu = ctk.CTkOptionMenu(
-            right,
+            body,
             values=list(DOCUMENT_TYPES),
             command=self._on_type_change,
         )
         self.type_menu.grid(row=3, column=0, sticky="ew", padx=16)
         self.type_menu.set(DOCUMENT_TYPES[0])
 
-        self.invoice_wrap = ctk.CTkFrame(right, fg_color="transparent")
+        self.invoice_wrap = ctk.CTkFrame(body, fg_color="transparent")
         self.invoice_wrap.grid(row=4, column=0, sticky="ew", padx=16, pady=(14, 0))
         self.invoice_wrap.grid_columnconfigure(0, weight=1)
         self.invoice_sop = ctk.CTkCheckBox(
@@ -97,7 +104,7 @@ class SmartRenamerPanel(ctk.CTkFrame):
         )
         self.invoice_sop.grid(row=0, column=0, sticky="w")
 
-        self.expiry_wrap = ctk.CTkFrame(right, fg_color="transparent")
+        self.expiry_wrap = ctk.CTkFrame(body, fg_color="transparent")
         self.expiry_wrap.grid(row=5, column=0, sticky="ew", padx=16, pady=(14, 0))
         self.expiry_wrap.grid_columnconfigure(0, weight=1)
         ctk.CTkLabel(self.expiry_wrap, text="Expiry date", anchor="w").grid(row=0, column=0, sticky="w")
@@ -105,7 +112,7 @@ class SmartRenamerPanel(ctk.CTkFrame):
         DatePickerField(self.expiry_wrap, var=self.expiry_var).grid(row=1, column=0, sticky="ew", pady=(4, 0))
         self.expiry_var.trace_add("write", lambda *_: self._schedule_preview())
 
-        self.amount_wrap = ctk.CTkFrame(right, fg_color="transparent")
+        self.amount_wrap = ctk.CTkFrame(body, fg_color="transparent")
         self.amount_wrap.grid(row=6, column=0, sticky="ew", padx=16, pady=(14, 0))
         self.amount_wrap.grid_columnconfigure(0, weight=1)
         ctk.CTkLabel(self.amount_wrap, text="Amount", anchor="w").grid(row=0, column=0, sticky="w")
@@ -122,9 +129,9 @@ class SmartRenamerPanel(ctk.CTkFrame):
         amount_entry.grid(row=1, column=0, sticky="ew", pady=(4, 0))
         self.amount_var.trace_add("write", lambda *_: self._schedule_preview())
 
-        ctk.CTkLabel(right, text="New filename", anchor="w").grid(row=7, column=0, sticky="w", padx=16, pady=(16, 4))
+        ctk.CTkLabel(body, text="New filename", anchor="w").grid(row=7, column=0, sticky="w", padx=16, pady=(16, 4))
         self.preview = ctk.CTkLabel(
-            right,
+            body,
             text="Select a file to preview the name.",
             anchor="w",
             wraplength=WRAP_CARD,
@@ -136,7 +143,7 @@ class SmartRenamerPanel(ctk.CTkFrame):
 
         self._busy = False
         self._rename_btn = ctk.CTkButton(
-            right,
+            body,
             text=f"Rename & move to {FOLDER_READY}",
             height=40,
             command=self._rename_and_move,
@@ -144,7 +151,7 @@ class SmartRenamerPanel(ctk.CTkFrame):
         self._rename_btn.grid(row=9, column=0, sticky="ew", padx=16, pady=(18, 6))
 
         self.portal_button = ctk.CTkButton(
-            right,
+            body,
             text="Open portal & copy path",
             height=36,
             fg_color="transparent",
@@ -154,7 +161,7 @@ class SmartRenamerPanel(ctk.CTkFrame):
         )
         self.portal_button.grid(row=10, column=0, sticky="ew", padx=16, pady=(0, 8))
 
-        self.feedback = FeedbackLabel(right)
+        self.feedback = FeedbackLabel(body)
         self.feedback.grid(row=11, column=0, sticky="ew", padx=16, pady=(0, 16))
 
         self._last_ready: Path | None = None
@@ -188,6 +195,8 @@ class SmartRenamerPanel(ctk.CTkFrame):
         else:
             self.amount_wrap.grid_remove()
         self._update_preview()
+        if hasattr(self, "_rename_scroll"):
+            self._rename_scroll._on_content_configure()
 
     def _invoice_name(self, client: str, suffix: str) -> str | None:
         client_id = self.app.db.client_id_by_name(client) or 0

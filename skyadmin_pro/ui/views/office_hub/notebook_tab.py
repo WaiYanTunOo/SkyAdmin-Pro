@@ -8,6 +8,7 @@ from tkinter import messagebox
 import customtkinter as ctk
 
 from skyadmin_pro.config import NOTEBOOK_ENTRY_TYPES
+from skyadmin_pro.ui.canvas_scroll import CanvasScrollFrame
 from skyadmin_pro.ui.debounce import debounced_after
 from skyadmin_pro.ui.theme import CARD_TITLE_SIZE
 from skyadmin_pro.ui.treeview import ThemedTreeview
@@ -17,9 +18,14 @@ from skyadmin_pro.ui.widgets import themed_entry
 class NotebookTabMixin:
     def _build_notebook_tab(self, parent: ctk.CTkFrame) -> None:
         parent.grid_columnconfigure(0, weight=1)
-        parent.grid_rowconfigure(1, weight=1)
+        parent.grid_rowconfigure(0, weight=1)
+        scroll = CanvasScrollFrame(parent)
+        scroll.grid(row=0, column=0, sticky="nsew")
+        scroll.content.grid_columnconfigure(0, weight=1)
+        self._notebook_scroll = scroll
+        body = scroll.content
 
-        toolbar = ctk.CTkFrame(parent, fg_color="transparent")
+        toolbar = ctk.CTkFrame(body, fg_color="transparent")
         toolbar.grid(row=0, column=0, sticky="ew", pady=(8, 8))
         toolbar.grid_columnconfigure(0, weight=1)
         self.note_search_var = ctk.StringVar()
@@ -41,7 +47,7 @@ class NotebookTabMixin:
         ctk.CTkButton(toolbar, text="New note", width=100, command=self._new_note).grid(row=0, column=4)
 
         self.notes_tree = ThemedTreeview(
-            parent,
+            body,
             columns=(
                 ("date", "Date", 100),
                 ("type", "Type", 130),
@@ -54,7 +60,7 @@ class NotebookTabMixin:
         )
         self.notes_tree.grid(row=1, column=0, sticky="nsew")
 
-        form = ctk.CTkFrame(parent, corner_radius=12)
+        form = ctk.CTkFrame(body, corner_radius=12)
         form.grid(row=2, column=0, sticky="ew", pady=(10, 8))
         form.grid_columnconfigure(1, weight=1)
         form.grid_columnconfigure(3, weight=1)
@@ -128,6 +134,8 @@ class NotebookTabMixin:
             iids=[str(r["id"]) for r in rows],
             empty_message="No notebook entries match this filter.",
         )
+        if hasattr(self, "_notebook_scroll"):
+            self._notebook_scroll._on_content_configure()
 
     def _filter_notes_today(self) -> None:
         today = date.today().isoformat()

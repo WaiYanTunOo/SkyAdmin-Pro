@@ -49,7 +49,7 @@ class RenewalPanel(ctk.CTkFrame):
         self.service_box.grid(row=1, column=1, sticky="ew", pady=(8, 0))
 
         card = ctk.CTkFrame(self, corner_radius=CARD_RADIUS)
-        card.grid(row=1, column=0, sticky="ew", pady=(0, 8))
+        card.grid(row=1, column=0, sticky="nsew", pady=(0, 8))
         card.grid_columnconfigure(0, weight=1)
         header = ctk.CTkFrame(card, fg_color="transparent")
         header.grid(row=0, column=0, sticky="ew", padx=16, pady=(12, 4))

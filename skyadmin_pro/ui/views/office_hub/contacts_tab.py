@@ -8,6 +8,7 @@ import customtkinter as ctk
 
 from skyadmin_pro.config import CONTACT_CATEGORIES
 from skyadmin_pro.services.workflow import copy_to_clipboard
+from skyadmin_pro.ui.canvas_scroll import CanvasScrollFrame
 from skyadmin_pro.ui.debounce import debounced_after
 from skyadmin_pro.ui.theme import CARD_TITLE_SIZE
 from skyadmin_pro.ui.treeview import ThemedTreeview
@@ -17,9 +18,14 @@ from skyadmin_pro.ui.widgets import themed_entry
 class ContactsTabMixin:
     def _build_contacts_tab(self, parent: ctk.CTkFrame) -> None:
         parent.grid_columnconfigure(0, weight=1)
-        parent.grid_rowconfigure(1, weight=1)
+        parent.grid_rowconfigure(0, weight=1)
+        scroll = CanvasScrollFrame(parent)
+        scroll.grid(row=0, column=0, sticky="nsew")
+        scroll.content.grid_columnconfigure(0, weight=1)
+        self._contacts_scroll = scroll
+        body = scroll.content
 
-        toolbar = ctk.CTkFrame(parent, fg_color="transparent")
+        toolbar = ctk.CTkFrame(body, fg_color="transparent")
         toolbar.grid(row=0, column=0, sticky="ew", pady=(8, 8))
         toolbar.grid_columnconfigure(1, weight=1)
         self.contact_search_var = ctk.StringVar()
@@ -34,7 +40,7 @@ class ContactsTabMixin:
         ctk.CTkButton(toolbar, text="New contact", width=110, command=self._new_contact).grid(row=0, column=3)
 
         self.contacts_tree = ThemedTreeview(
-            parent,
+            body,
             columns=(
                 ("name", "Name", 180),
                 ("organization", "Company", 160),
@@ -47,7 +53,7 @@ class ContactsTabMixin:
         )
         self.contacts_tree.grid(row=1, column=0, sticky="nsew")
 
-        form = ctk.CTkFrame(parent, corner_radius=12)
+        form = ctk.CTkFrame(body, corner_radius=12)
         form.grid(row=2, column=0, sticky="ew", pady=(10, 8))
         form.grid_columnconfigure(1, weight=1)
         form.grid_columnconfigure(3, weight=1)
@@ -141,6 +147,8 @@ class ContactsTabMixin:
             iids=[str(r["id"]) for r in rows],
             empty_message="No contacts match this search.",
         )
+        if getattr(self, "_contacts_scroll", None):
+            self._contacts_scroll._on_content_configure()
 
     def _on_contact_select(self, iid: str | None) -> None:
         if not iid:

@@ -97,6 +97,7 @@ def configure_shared_tree_style(
         background=scrollbar,
         troughcolor=trough,
         borderwidth=0,
+        arrowsize=14,
         arrowcolor=foreground,
     )
     style.configure(
@@ -104,15 +105,18 @@ def configure_shared_tree_style(
         background=scrollbar,
         troughcolor=trough,
         borderwidth=0,
+        arrowsize=14,
         arrowcolor=foreground,
     )
     style.map(
         "Sky.Vertical.TScrollbar",
-        background=[("active", scrollbar), ("!active", scrollbar)],
+        background=[("active", selected), ("!active", scrollbar)],
+        arrowcolor=[("active", "#ffffff"), ("!active", foreground)],
     )
     style.map(
         "Sky.Horizontal.TScrollbar",
-        background=[("active", scrollbar), ("!active", scrollbar)],
+        background=[("active", selected), ("!active", scrollbar)],
+        arrowcolor=[("active", "#ffffff"), ("!active", foreground)],
     )
     _SHARED_STYLE_KEY = key
     return True
@@ -149,7 +153,9 @@ class ThemedTreeview(ctk.CTkFrame):
         self._virtual_tags: list[tuple[str, ...]] | None = None
 
         self.grid_columnconfigure(0, weight=1)
+        self.grid_columnconfigure(1, weight=0)
         self.grid_rowconfigure(0, weight=1)
+        self.grid_rowconfigure(1, weight=0)
 
         mode = selectmode if selectmode in {"browse", "extended", "none"} else "browse"
         self.tree = ttk.Treeview(
@@ -174,18 +180,29 @@ class ThemedTreeview(ctk.CTkFrame):
         self.tree.bind("<Shift-MouseWheel>", self._on_shift_mousewheel)
         self.tree.bind("<Button-4>", lambda _e: self._scroll_vertical(-1))
         self.tree.bind("<Button-5>", lambda _e: self._scroll_vertical(1))
+        self.tree.bind("<Shift-Button-4>", lambda _e: self.tree.xview_scroll(-1, "units"))
+        self.tree.bind("<Shift-Button-5>", lambda _e: self.tree.xview_scroll(1, "units"))
 
         self._sort_col: str | None = None
         self._sort_reverse = False
-        for column_id, heading, width in columns:
-            # All columns stretch + resizable like Excel — user can drag header edge to resize
+        num_cols = len(columns)
+        for i, (column_id, heading, width) in enumerate(columns):
+            # Only the last column stretches to fill extra width; preceding columns
+            # keep their readable width so horizontal scrolling activates when needed.
+            is_last = (i == num_cols - 1)
             self.tree.heading(
                 column_id,
                 text=heading,
                 anchor="w",
                 command=lambda c=column_id: self._sort_by(c, False),
             )
-            self.tree.column(column_id, width=width, minwidth=80, stretch=True, anchor="w")
+            self.tree.column(
+                column_id,
+                width=width,
+                minwidth=max(60, min(width, 90)),
+                stretch=is_last,
+                anchor="w",
+            )
 
         self.tree.bind("<<TreeviewSelect>>", self._handle_select)
         if on_double_click:
@@ -425,6 +442,13 @@ class ThemedTreeview(ctk.CTkFrame):
         self._virtual_tags = None
 
     def _visible_row_count(self) -> int:
+        try:
+            h = self.tree.winfo_height()
+            if h > 40:
+                row_h = TABLE_ROW_HEIGHT or 28
+                return max(1, h // row_h + 1)
+        except Exception:
+            pass
         return max(1, int(self.tree.cget("height")))
 
     def _set_rows_virtual(
@@ -564,7 +588,7 @@ class ThemedTreeview(ctk.CTkFrame):
 
     def _scroll_vertical(self, delta: int) -> str:
         if self._virtual_active:
-            self._virtual_scroll_by_units(-delta, "units")
+            self._virtual_scroll_by_units(delta, "units")
         else:
             self.tree.yview_scroll(delta, "units")
         return "break"

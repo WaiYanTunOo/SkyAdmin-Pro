@@ -56,6 +56,7 @@ class SettingsView(BackupMixin, ChecklistMixin, LicenseMixin, PricingMixin, Work
         self._pricing_rows: dict[str, dict] = {}
         self._selected_pricing_id: int | None = None
         self._lazy_tabs: set[str] = set()
+        self._tab_scrolls: dict = {}
 
         for name in ("General", "License", "Business", "Data & backup"):
             self.tabs.add(name)
@@ -106,7 +107,13 @@ class SettingsView(BackupMixin, ChecklistMixin, LicenseMixin, PricingMixin, Work
         scroll.grid(row=0, column=0, sticky="nsew", padx=0, pady=0)
         scroll.content.grid_columnconfigure(0, weight=1)
         scroll.content.grid_rowconfigure(0, weight=1)
+        self._tab_scrolls[tab] = scroll
         return scroll.content
+
+    def _reconfigure_tab_scroll(self, tab) -> None:
+        scroll = self._tab_scrolls.get(tab)
+        if scroll and hasattr(scroll, "_on_content_configure"):
+            scroll._on_content_configure()
 
     def _build_general_tab(self, tab) -> None:
         scroll = self._scroll_tab(tab)

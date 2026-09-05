@@ -25,7 +25,10 @@ def test_treeview_virtual_mode_present():
 @pytest.fixture
 def tree_widget():
     ctk.set_appearance_mode("dark")
-    root = ctk.CTk()
+    try:
+        root = ctk.CTk()
+    except Exception:
+        pytest.skip("Tk unavailable in this process")
     root.withdraw()
     tree = ThemedTreeview(
         root,
@@ -33,7 +36,10 @@ def tree_widget():
         showheight=5,
     )
     yield tree
-    root.destroy()
+    try:
+        root.destroy()
+    except Exception:
+        pass
 
 
 def test_set_rows_incremental_updates_without_full_rebuild(tree_widget):

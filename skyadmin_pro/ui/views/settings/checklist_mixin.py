@@ -30,6 +30,7 @@ class ChecklistMixin:
         self._checklist_rows.clear()
         for entry in self.app.db.get_checklist_template_items(name):
             self._add_checklist_row(str(entry.get("item") or ""), str(entry.get("due_days") or 0))
+        self._reconfigure_tab_scroll(self.tabs.tab("Business"))
 
     def _add_checklist_row(self, item: str, days: str) -> None:
         row = ctk.CTkFrame(self.checklist_scroll, fg_color="transparent")
@@ -54,6 +55,7 @@ class ChecklistMixin:
             if current is frame:
                 self._checklist_rows.pop(index)
                 frame.destroy()
+                self._reconfigure_tab_scroll(self.tabs.tab("Business"))
                 return
 
     def _add_checklist_item(self) -> None:
@@ -70,6 +72,7 @@ class ChecklistMixin:
         self._add_checklist_row(item, str(days))
         self._new_item_var.set("")
         self._new_days_var.set("")
+        self._reconfigure_tab_scroll(self.tabs.tab("Business"))
 
     def _save_checklist(self) -> None:
         name = self.checklist_menu.get().strip()
@@ -95,6 +98,7 @@ class ChecklistMixin:
         self._reload_checklists(keep=name)
         self.feedback.success(f"Checklist “{name}” saved.")
         self.app.set_status(f"Renewal checklist “{name}” updated.")
+        self._reconfigure_tab_scroll(self.tabs.tab("Business"))
 
     def _add_checklist_list(self) -> None:
         name = self._new_list_var.get().strip()

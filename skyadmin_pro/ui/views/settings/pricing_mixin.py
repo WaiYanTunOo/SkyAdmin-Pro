@@ -187,6 +187,7 @@ class PricingMixin:
         self.feedback.success(f"Pricing saved for {service_type}.")
         self._refresh_pricing_matrix()
         self.app.set_status(f"Pricing updated: {service_type} / {transaction_range}")
+        self._reconfigure_tab_scroll(self.tabs.tab("Business"))
 
     def _add_pricing_charge_line(self) -> None:
         service_type = self.pricing_service_menu.get().strip() or PRICING_DEFAULT_SERVICE
@@ -258,6 +259,7 @@ class PricingMixin:
             self.pricing_tree.tree.selection_set(str(tier_id))
             self.pricing_tree.tree.focus(str(tier_id))
             self._on_pricing_row_select(str(tier_id))
+            self._reconfigure_tab_scroll(self.tabs.tab("Business"))
 
         save_btn = ctk.CTkButton(buttons, text="Add", width=90, command=save)
         save_btn.grid(row=0, column=1)
@@ -287,6 +289,7 @@ class PricingMixin:
         self._selected_pricing_id = None
         self.feedback.success(f"Deleted charge line: {charge_name}")
         self._refresh_pricing_matrix()
+        self._reconfigure_tab_scroll(self.tabs.tab("Business"))
 
     def _save_portal(self) -> None:
         try:

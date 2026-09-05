@@ -110,6 +110,9 @@ class DashboardView(BaseView):
         self._header = ctk.CTkFrame(self.body, fg_color="transparent")
         self._header.grid(row=0, column=0, sticky="ew")
         self._header.grid_columnconfigure(0, weight=1)
+        self._header.bind("<MouseWheel>", lambda e: self._detail_scroll._on_mousewheel(e))
+        self._header.bind("<Button-4>", lambda e: self._detail_scroll._on_mousewheel_linux(e))
+        self._header.bind("<Button-5>", lambda e: self._detail_scroll._on_mousewheel_linux(e))
 
         self._detail_scroll = CanvasScrollFrame(self.body)
         self._detail_scroll.grid(row=1, column=0, sticky="nsew")
@@ -150,8 +153,8 @@ class DashboardView(BaseView):
             return
         self._header_extras_built = True
 
-        timeline_card = ctk.CTkFrame(self._header, corner_radius=12)
-        timeline_card.grid(row=2, column=0, sticky="ew", pady=(0, 12))
+        timeline_card = ctk.CTkFrame(self._detail, corner_radius=12)
+        timeline_card.grid(row=0, column=0, sticky="ew", pady=(0, 12))
         timeline_card.grid_columnconfigure(0, weight=1)
         ctk.CTkLabel(
             timeline_card,
@@ -178,8 +181,8 @@ class DashboardView(BaseView):
 
         self.timeline_canvas.bind("<Configure>", _on_timeline_resize)
 
-        workflow = ctk.CTkFrame(self._header, corner_radius=12)
-        workflow.grid(row=3, column=0, sticky="ew", pady=(0, 12))
+        workflow = ctk.CTkFrame(self._detail, corner_radius=12)
+        workflow.grid(row=1, column=0, sticky="ew", pady=(0, 12))
         workflow.grid_columnconfigure(1, weight=1)
 
         self.onboard_var = ctk.StringVar()
@@ -234,8 +237,8 @@ class DashboardView(BaseView):
         self.workflow_feedback = FeedbackLabel(workflow)
         self.workflow_feedback.grid(row=2, column=0, columnspan=3, sticky="ew", padx=16, pady=(0, 12))
 
-        next_card = ctk.CTkFrame(self._header, corner_radius=12)
-        next_card.grid(row=4, column=0, sticky="ew", pady=(0, 12))
+        next_card = ctk.CTkFrame(self._detail, corner_radius=12)
+        next_card.grid(row=2, column=0, sticky="ew", pady=(0, 12))
         next_card.grid_columnconfigure(0, weight=1)
         next_card.grid_rowconfigure(1, weight=1)
 
@@ -263,6 +266,7 @@ class DashboardView(BaseView):
         )
         self.next_tree.tree.configure(height=10)
         self.next_tree.grid(row=2, column=0, sticky="nsew", padx=12, pady=(0, 12))
+        self._detail_scroll._on_content_configure()
 
     def _build_detail_trees(self) -> None:
         """Build all detail trees synchronously (tests / force refresh)."""
@@ -314,10 +318,10 @@ class DashboardView(BaseView):
         self.month_panel = MonthStatusPanel(
             self._detail, self.app, showheight=6, title="Client month closes — tax status"
         )
-        self.month_panel.grid(row=0, column=0, sticky="ew", pady=(0, 12))
+        self.month_panel.grid(row=3, column=0, sticky="ew", pady=(0, 12))
 
         split = ctk.CTkFrame(self._detail, fg_color="transparent")
-        split.grid(row=1, column=0, sticky="nsew")
+        split.grid(row=4, column=0, sticky="nsew", pady=(0, 12))
         split.grid_columnconfigure(0, weight=3)
         split.grid_columnconfigure(1, weight=2)
         split.grid_rowconfigure(0, weight=1)
@@ -380,6 +384,7 @@ class DashboardView(BaseView):
             ),
         )
         self.pending_tree.grid(row=1, column=0, sticky="nsew", padx=12, pady=(0, 12))
+        self._detail_scroll._on_content_configure()
 
     def _build_detail_trees_secondary(self) -> None:
         """Mid-weight payment / service trees."""
@@ -390,7 +395,7 @@ class DashboardView(BaseView):
         self._detail_stage = 2
 
         ongoing = ctk.CTkFrame(self._detail, corner_radius=12)
-        ongoing.grid(row=2, column=0, sticky="ew", pady=(0, 12))
+        ongoing.grid(row=5, column=0, sticky="ew", pady=(0, 12))
         ongoing.grid_columnconfigure(0, weight=1)
         ongoing_header = ctk.CTkFrame(ongoing, fg_color="transparent")
         ongoing_header.grid(row=0, column=0, sticky="ew", padx=16, pady=(14, 8))
@@ -421,7 +426,7 @@ class DashboardView(BaseView):
         self.ongoing_tree.grid(row=1, column=0, sticky="ew", padx=16, pady=(0, 12))
 
         overdue = ctk.CTkFrame(self._detail, corner_radius=12)
-        overdue.grid(row=3, column=0, sticky="ew", pady=(0, 12))
+        overdue.grid(row=6, column=0, sticky="ew", pady=(0, 12))
         overdue.grid_columnconfigure(0, weight=1)
         ctk.CTkLabel(
             overdue,
@@ -463,7 +468,7 @@ class DashboardView(BaseView):
         ).pack(side="right")
 
         supplier_due = ctk.CTkFrame(self._detail, corner_radius=12)
-        supplier_due.grid(row=4, column=0, sticky="ew", pady=(0, 12))
+        supplier_due.grid(row=7, column=0, sticky="ew", pady=(0, 12))
         supplier_due.grid_columnconfigure(0, weight=1)
         ctk.CTkLabel(
             supplier_due,
@@ -497,6 +502,7 @@ class DashboardView(BaseView):
             text="Select a row, then mark it paid.",
             text_color=TEXT_MUTED,
         ).pack(side="right")
+        self._detail_scroll._on_content_configure()
 
     def _build_detail_trees_heavy(self) -> None:
         """Heaviest trees: incentive report and tax overview."""
@@ -506,7 +512,7 @@ class DashboardView(BaseView):
             self._build_detail_trees_secondary()
 
         report_card = ctk.CTkFrame(self._detail, corner_radius=12)
-        report_card.grid(row=5, column=0, sticky="ew", pady=(0, 12))
+        report_card.grid(row=8, column=0, sticky="ew", pady=(0, 12))
         report_card.grid_columnconfigure(0, weight=1)
         report_card.grid_rowconfigure(1, weight=1)
         report_header = ctk.CTkFrame(report_card, fg_color="transparent")
@@ -565,7 +571,7 @@ class DashboardView(BaseView):
         self.report_hint.grid(row=2, column=0, sticky="w", padx=16, pady=(0, 12))
 
         tax_overview = ctk.CTkFrame(self._detail, corner_radius=12)
-        tax_overview.grid(row=6, column=0, sticky="ew", pady=(0, 12))
+        tax_overview.grid(row=9, column=0, sticky="ew", pady=(0, 12))
         tax_overview.grid_columnconfigure(0, weight=1)
         tax_overview.grid_rowconfigure(1, weight=1)
         tax_header = ctk.CTkFrame(tax_overview, fg_color="transparent")
@@ -624,6 +630,7 @@ class DashboardView(BaseView):
         self.tax_overview_tree.grid(row=1, column=0, sticky="nsew", padx=12, pady=(0, 12))
         self._detail_stage = 3
         self._detail_built = True
+        self._detail_scroll._on_content_configure()
 
     def _stat_card(self, master, column: int, label: str, value: str) -> ctk.CTkLabel:
         card = ctk.CTkFrame(master, corner_radius=14, height=110)
