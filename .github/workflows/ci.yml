@@ -45,6 +45,38 @@ jobs:
       - name: Security scan with bandit
         run: bandit -r skyadmin_pro/ -c pyproject.toml --severity-level medium
 
+  perf:
+    # Dedicated performance gate: budget tests block the build, and per-test
+    # timings upload as JUnit XML for run-over-run history (90-day retention).
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Setup Python 3.12
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+
+      - name: Install dependencies
+        run: |
+          python -m pip install --upgrade pip
+          pip install -r requirements.txt -r requirements-dev.txt
+
+      - name: Run performance budgets
+        run: pytest tests/test_performance_clients.py tests/test_performance_stress.py -q --tb=short --durations=15 --junitxml=perf-results.xml
+        env:
+          SKYADMIN_SKIP_DAILY_CHECK: "1"
+
+      - name: Upload perf timings
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: perf-timings-${{ github.sha }}
+          path: perf-results.xml
+          retention-days: 90
+
   worker:
     runs-on: ubuntu-latest
     defaults:
