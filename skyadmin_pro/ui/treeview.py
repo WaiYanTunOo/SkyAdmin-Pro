@@ -348,16 +348,28 @@ class ThemedTreeview(ctk.CTkFrame):
 
         self.configure(fg_color=background)
 
-        # Scale rowheight/font for Windows high-DPI (ctk scaling)
         try:
-            scale = float(self.tk.call("tk", "scaling"))
+            ui_zoom = ctk.ScalingTracker.get_widget_scaling(self)
         except Exception:
-            scale = 1.0
-        # Clamp scale to reasonable range (1.0-1.5)
-        scale = max(1.0, min(1.5, scale))
-        scaled_row = int(TABLE_ROW_HEIGHT * scale)
-        scaled_font = int(TABLE_FONT_SIZE * scale)
-        scaled_head = int(TABLE_HEADER_FONT_SIZE * scale)
+            ui_zoom = 1.0
+
+        ui_zoom = max(0.5, min(2.0, ui_zoom))
+
+        # Tk scaling represents OS DPI (pixels per point). 96 DPI = 1.3333 tk scaling.
+        # We divide by 1.3333 to get the true DPI multiplier (1.0 for 100%, 1.25 for 125%).
+        try:
+            dpi_multiplier = float(self.tk.call("tk", "scaling")) / (96.0 / 72.0)
+        except Exception:
+            dpi_multiplier = 1.0
+
+        # Row height is in pixels, so it needs BOTH OS DPI scaling and the user's custom UI zoom.
+        scaled_row = int(TABLE_ROW_HEIGHT * dpi_multiplier * ui_zoom)
+        
+        # Font sizes are in points (positive int). Tkinter inherently applies the OS DPI 
+        # multiplier to points. Thus, we ONLY apply the user's manual UI zoom here! 
+        # Multiplying by DPI here would cause squared double-scaling.
+        scaled_font = int(TABLE_FONT_SIZE * ui_zoom)
+        scaled_head = int(TABLE_HEADER_FONT_SIZE * ui_zoom)
 
         # Shared Sky.* styles are global — reconfigured only when mode/metrics/colors change.
         configure_shared_tree_style(
