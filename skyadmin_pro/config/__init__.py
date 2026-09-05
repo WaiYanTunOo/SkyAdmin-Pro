@@ -44,40 +44,13 @@ DEFAULT_COLOR_THEME = "blue"
 # ── Re-export everything from sub-modules ────────────────────────────────
 
 # nav
-from .nav import (  # noqa: E402
-    NAV_DASHBOARD,
-    NAV_DATABASE_TASKS,
-    NAV_DOCUMENT_HUB,
-    NAV_ITEMS,
-    NAV_OFFICE_HUB,
-    NAV_SETTINGS,
-    NAV_UTILITIES,
-)
-
-# workspace
-from .workspace import (  # noqa: E402
-    CLIENT_WORKSPACE_FOLDERS,
-    DEFAULT_PORTAL_URL,
-    FOLDER_ARCHIVE,
-    FOLDER_CLIENTS,
-    FOLDER_PORTAL_BACKUP,
-    FOLDER_READY,
-    FOLDER_STAGING,
-    FOLDER_SUPPLIERS,
-    SETTING_PORTAL_URL,
-)
-
-# office
-from .office import (  # noqa: E402
-    CLIENT_CREDENTIAL_TYPES,
-    CONTACT_CATEGORIES,
-    NOTEBOOK_ENTRY_TYPES,
-    OFFICE_SYSTEM_TYPES,
-    OWNER_BUSINESS_NAME,
-    OWNER_EMAIL,
-    OWNER_WHATSAPP_DISPLAY,
-    OWNER_WHATSAPP_NUMBER,
-    VAULT_CATEGORIES,
+# documents
+from .documents import (  # noqa: E402
+    FINANCIAL_DOC_CATEGORIES,
+    FINANCIAL_DOC_FOLDER_MAP,
+    FINANCIAL_DOC_SUBCATEGORIES,
+    IMAGE_SUFFIXES,
+    PDF_SUFFIX,
 )
 
 # licensing
@@ -93,6 +66,43 @@ from .licensing import (  # noqa: E402
     SETTING_DATA_SYNC_ENABLED,
     SETTING_SYNC_LAST_PULL,
     SETTING_SYNC_LAST_PUSH,
+)
+from .nav import (  # noqa: E402
+    NAV_DASHBOARD,
+    NAV_DATABASE_TASKS,
+    NAV_DOCUMENT_HUB,
+    NAV_ITEMS,
+    NAV_OFFICE_HUB,
+    NAV_SETTINGS,
+    NAV_UTILITIES,
+)
+
+# office
+from .office import (  # noqa: E402
+    CLIENT_CREDENTIAL_TYPES,
+    CONTACT_CATEGORIES,
+    NOTEBOOK_ENTRY_TYPES,
+    OFFICE_SYSTEM_TYPES,
+    OWNER_BUSINESS_NAME,
+    OWNER_EMAIL,
+    OWNER_WHATSAPP_DISPLAY,
+    OWNER_WHATSAPP_NUMBER,
+    VAULT_CATEGORIES,
+)
+
+# pricing
+from .pricing import (  # noqa: E402
+    ACCOUNTING_PRICING_SERVICES,
+    DEFAULT_FLAT_FEE_PRICING,
+    DEFAULT_PRICING_MATRIX,
+    DEFAULT_SERVICE_CHARGE_LINES,
+    FLAT_FEE_TRANSACTION_RANGE,
+    PAYMENT_STATUSES,
+    PRICING_DEFAULT_SERVICE,
+    TRANSACTION_RANGE_PRICING_SERVICES,
+    default_charge_lines_for,
+    is_transaction_volume_tier,
+    pricing_uses_transaction_ranges,
 )
 
 # services
@@ -124,21 +134,6 @@ from .services import (  # noqa: E402
     VO_DOCUMENT_TYPES,
 )
 
-# pricing
-from .pricing import (  # noqa: E402
-    ACCOUNTING_PRICING_SERVICES,
-    DEFAULT_FLAT_FEE_PRICING,
-    DEFAULT_PRICING_MATRIX,
-    DEFAULT_SERVICE_CHARGE_LINES,
-    FLAT_FEE_TRANSACTION_RANGE,
-    PAYMENT_STATUSES,
-    PRICING_DEFAULT_SERVICE,
-    TRANSACTION_RANGE_PRICING_SERVICES,
-    default_charge_lines_for,
-    is_transaction_volume_tier,
-    pricing_uses_transaction_ranges,
-)
-
 # tasks
 from .tasks import (  # noqa: E402
     COURIER_DRIVERS,
@@ -151,8 +146,8 @@ from .tasks import (  # noqa: E402
     PIPELINE_STEPS,
     PIPELINE_TASK_CATEGORIES,
     SERVICE_TASK_CATEGORY,
-    SETTING_APPEARANCE_MODE,
     SETTING_APP_TAGLINE,
+    SETTING_APPEARANCE_MODE,
     SETTING_COLOR_THEME,
     SETTING_DEPARTMENT_LIST,
     SETTING_LAST_ENCRYPTED_BACKUP,
@@ -170,13 +165,17 @@ from .tasks import (  # noqa: E402
     service_task_category,
 )
 
-# documents
-from .documents import (  # noqa: E402
-    FINANCIAL_DOC_CATEGORIES,
-    FINANCIAL_DOC_FOLDER_MAP,
-    FINANCIAL_DOC_SUBCATEGORIES,
-    IMAGE_SUFFIXES,
-    PDF_SUFFIX,
+# workspace
+from .workspace import (  # noqa: E402
+    CLIENT_WORKSPACE_FOLDERS,
+    DEFAULT_PORTAL_URL,
+    FOLDER_ARCHIVE,
+    FOLDER_CLIENTS,
+    FOLDER_PORTAL_BACKUP,
+    FOLDER_READY,
+    FOLDER_STAGING,
+    FOLDER_SUPPLIERS,
+    SETTING_PORTAL_URL,
 )
 
 # ── Checklist / renewal data (kept here because it spans domains) ──────

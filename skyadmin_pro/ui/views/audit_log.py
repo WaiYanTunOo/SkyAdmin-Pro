@@ -4,7 +4,7 @@ from __future__ import annotations
 
 import customtkinter as ctk
 
-from skyadmin_pro.ui.theme import CONTENT_PAD, CARD_RADIUS, TEXT_MUTED
+from skyadmin_pro.ui.theme import CONTENT_PAD
 from skyadmin_pro.ui.treeview import ThemedTreeview
 from skyadmin_pro.ui.widgets import FeedbackLabel
 

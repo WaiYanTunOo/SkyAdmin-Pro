@@ -364,9 +364,9 @@ class ThemedTreeview(ctk.CTkFrame):
 
         # Row height is in pixels, so it needs BOTH OS DPI scaling and the user's custom UI zoom.
         scaled_row = int(TABLE_ROW_HEIGHT * dpi_multiplier * ui_zoom)
-        
-        # Font sizes are in points (positive int). Tkinter inherently applies the OS DPI 
-        # multiplier to points. Thus, we ONLY apply the user's manual UI zoom here! 
+
+        # Font sizes are in points (positive int). Tkinter inherently applies the OS DPI
+        # multiplier to points. Thus, we ONLY apply the user's manual UI zoom here!
         # Multiplying by DPI here would cause squared double-scaling.
         scaled_font = int(TABLE_FONT_SIZE * ui_zoom)
         scaled_head = int(TABLE_HEADER_FONT_SIZE * ui_zoom)

@@ -2,10 +2,10 @@
 
 from __future__ import annotations
 
+import tkinter as tk
 from pathlib import Path
 
 import customtkinter as ctk
-import tkinter as tk
 
 from skyadmin_pro.ui.widgets import DatePickerField, calendar_popup_position
 

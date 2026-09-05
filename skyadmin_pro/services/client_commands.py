@@ -271,7 +271,7 @@ class DeleteClientsCommand(Command):
         verb = "INSERT OR REPLACE" if force else "INSERT"
         with db.connection() as conn:
             for row in self._client_rows:
-                cols = [c for c in row.keys() if c != "id"]
+                cols = [c for c in row if c != "id"]
                 conn.execute(
                     f'{verb} INTO clients (id, {", ".join(cols)}) '
                     f'VALUES (?, {", ".join("?" for _ in cols)})',

@@ -3,7 +3,6 @@
 from __future__ import annotations
 
 import logging
-import threading
 from datetime import date, datetime
 from pathlib import Path
 

@@ -218,10 +218,9 @@ def _decrypt_backup_zip(archive: Path) -> Path:
     else:
         raise ValueError("Encrypted backup could not be decrypted.")
 
-    tmp = tempfile.NamedTemporaryFile(delete=False, suffix=".zip")
-    tmp_path = Path(tmp.name)
-    tmp.write(data)
-    tmp.close()
+    with tempfile.NamedTemporaryFile(delete=False, suffix=".zip") as tmp:
+        tmp.write(data)
+        tmp_path = Path(tmp.name)
     return tmp_path
 
 

@@ -10,6 +10,15 @@ import uuid
 from datetime import date, datetime
 from pathlib import Path
 
+from skyadmin_pro.services.license._constants import LICENSE_FILENAME
+from skyadmin_pro.services.license.machine import get_machine_id
+from skyadmin_pro.services.license.online import (
+    _is_rate_limited,
+    _record_attempt,
+    _record_online_sync,
+    get_daily_sync_status,
+    is_daily_sync_stale,
+)
 from skyadmin_pro.services.license_crypto import (
     parse_control_envelope_v2,
     verify_ed25519_passcode_envelope,
@@ -64,16 +73,6 @@ def generate_passcode(*_args: object, **_kwargs: object) -> str:
         "Use POST /api/generate on the SkyAdmin Worker (owner tools), not the desktop app."
     )
 
-
-from skyadmin_pro.services.license._constants import LICENSE_FILENAME
-from skyadmin_pro.services.license.machine import get_machine_id
-from skyadmin_pro.services.license.online import (
-    _is_rate_limited,
-    _record_attempt,
-    _record_online_sync,
-    get_daily_sync_status,
-    is_daily_sync_stale,
-)
 
 
 def _license_paths() -> list[Path]:

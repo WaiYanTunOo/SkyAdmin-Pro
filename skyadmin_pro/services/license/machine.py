@@ -21,9 +21,9 @@ def _check_debugger() -> None:
     Emits a warning instead of sys.exit(1) so packaged apps don't crash
     unexpectedly. The actual license activation still proceeds.
     """
+    import logging as _logging
     import os
     import sys as _sys
-    import logging as _logging
 
     _log = _logging.getLogger(__name__)
 

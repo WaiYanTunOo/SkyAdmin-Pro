@@ -1,17 +1,17 @@
 """ThemedTreeview incremental and virtual row updates."""
 
+import importlib.util
 from pathlib import Path
 
 import customtkinter as ctk
-
-pytestmark = __import__("pytest").mark.skipif(
-    __import__("importlib").util.find_spec("customtkinter") is None,
-    reason="customtkinter not installed",
-)
-
 import pytest
 
 from skyadmin_pro.ui.treeview import _VIRTUAL_THRESHOLD, ThemedTreeview
+
+pytestmark = pytest.mark.skipif(
+    importlib.util.find_spec("customtkinter") is None,
+    reason="customtkinter not installed",
+)
 
 TREEVIEW_SRC = (Path(__file__).resolve().parents[1] / "skyadmin_pro" / "ui" / "treeview.py").read_text(encoding="utf-8")
 

@@ -3,7 +3,6 @@
 from __future__ import annotations
 
 import csv
-import tempfile
 from pathlib import Path
 
 from skyadmin_pro.services.importer import import_clients_from_csv

@@ -505,4 +505,4 @@ class TestCourierMixin:
         )
         db.delete_courier_log(log_id)
         logs = db.list_courier_logs()
-        assert all(l["id"] != log_id for l in logs)
+        assert all(log["id"] != log_id for log in logs)

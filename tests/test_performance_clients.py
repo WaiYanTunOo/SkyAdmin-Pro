@@ -132,13 +132,12 @@ def test_bundle_queries_nests_and_rolls_back(populated_db):
             assert db.client_id_by_name("Bundled Co") is not None
     assert db.client_id_by_name("Bundled Co") is not None
 
-    class _Boom(Exception):
+    class _BoomError(Exception):
         pass
 
-    with pytest.raises(_Boom):
-        with db.bundle_queries():
-            db.get_or_create_client("Rollback Co")
-            raise _Boom()
+    with pytest.raises(_BoomError), db.bundle_queries():
+        db.get_or_create_client("Rollback Co")
+        raise _BoomError()
     assert db.client_id_by_name("Rollback Co") is None
 
 

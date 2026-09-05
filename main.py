@@ -287,7 +287,7 @@ def bootstrap() -> MainWindow:
     from skyadmin_pro.ui.display import apply_high_dpi_scaling
 
     apply_high_dpi_scaling()
-    
+
     saved_zoom = db.get_setting("ui_zoom")
     if saved_zoom:
         try:

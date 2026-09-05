@@ -96,6 +96,7 @@ class SettingsView(BackupMixin, ChecklistMixin, LicenseMixin, PricingMixin, Work
             ctk.set_widget_scaling(scale)
             # Re-apply theme bounds safely if possible
             self.app.apply_app_theme()
+            self.app.set_status(f"UI Zoom set to {value}")
         except Exception:
             pass
 

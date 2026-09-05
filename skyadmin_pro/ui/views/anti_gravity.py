@@ -18,16 +18,13 @@ Requirements:
 
 from __future__ import annotations
 
-import math
 import os
-import random
 import sqlite3
 import sys
 import time
 from collections import OrderedDict
-from dataclasses import dataclass
 from pathlib import Path
-from typing import Any, Callable
+from typing import Any
 
 # ---------------------------------------------------------------------------
 # Qt6 Abstraction Layer: Supports both PySide6 and PyQt6 transparently
@@ -35,11 +32,8 @@ from typing import Any, Callable
 try:
     from PySide6.QtCore import (  # type: ignore[import-not-found]
         QAbstractTableModel,
-        QEvent,
-        QItemSelectionModel,
         QModelIndex,
         QObject,
-        QPoint,
         QRect,
         QRectF,
         QSize,
@@ -54,12 +48,9 @@ try:
         QBrush,
         QColor,
         QFont,
-        QFontDatabase,
-        QFontMetrics,
         QKeySequence,
         QLinearGradient,
         QPainter,
-        QPainterPath,
         QPen,
         QUndoCommand,
         QUndoStack,
@@ -83,7 +74,6 @@ try:
         QStyledItemDelegate,
         QStyleOptionViewItem,
         QTableView,
-        QToolBar,
         QVBoxLayout,
         QWidget,
     )
@@ -92,18 +82,19 @@ except ImportError:
     try:
         from PyQt6.QtCore import (  # type: ignore[import-not-found]
             QAbstractTableModel,
-            QEvent,
-            QItemSelectionModel,
             QModelIndex,
             QObject,
-            QPoint,
             QRect,
             QRectF,
             QSize,
             Qt,
             QThread,
             QTimer,
+        )
+        from PyQt6.QtCore import (
             pyqtSignal as Signal,
+        )
+        from PyQt6.QtCore import (
             pyqtSlot as Slot,
         )
         from PyQt6.QtGui import (  # type: ignore[import-not-found]
@@ -111,12 +102,9 @@ except ImportError:
             QBrush,
             QColor,
             QFont,
-            QFontDatabase,
-            QFontMetrics,
             QKeySequence,
             QLinearGradient,
             QPainter,
-            QPainterPath,
             QPen,
             QUndoCommand,
             QUndoStack,
@@ -140,7 +128,6 @@ except ImportError:
             QStyledItemDelegate,
             QStyleOptionViewItem,
             QTableView,
-            QToolBar,
             QVBoxLayout,
             QWidget,
         )
@@ -183,7 +170,7 @@ ROLE_RAW_VALUE = Qt.UserRole + 102
 # ---------------------------------------------------------------------------
 def ensure_mock_database(db_path: Path, target_rows: int = TOTAL_ROWS) -> Path:
     """Create and seed the 1M rows SQLite database if missing.
-    
+
     Thread-safety Note:
     Configured with WAL mode and synchronous=NORMAL for concurrent non-blocking
     reads and writes across multiple threads.
@@ -216,7 +203,7 @@ def ensure_mock_database(db_path: Path, target_rows: int = TOTAL_ROWS) -> Path:
         if existing < target_rows:
             print(f"[*] Seeding benchmark database with {target_rows:,} rows (currently {existing:,})...")
             start_time = time.time()
-            
+
             # Temporary turbo mode for initial batch generation
             conn.execute("PRAGMA synchronous=OFF")
             conn.execute("BEGIN TRANSACTION")
@@ -251,14 +238,14 @@ def ensure_mock_database(db_path: Path, target_rows: int = TOTAL_ROWS) -> Path:
                     ref = f"JE-2025-{row_id:07d}"
                     acc = accounts[row_id % len(accounts)]
                     memo = f"{memos[row_id % len(memos)]} (#{row_id})"
-                    
+
                     is_debit = (row_id % 2 == 0)
                     amt = round((row_id % 9500) * 1.45 + 25.50, 2)
                     debit = amt if is_debit else 0.0
                     credit = 0.0 if is_debit else amt
                     balance = round(150_000.00 + (row_id % 12000) * 8.75 - (row_id % 7000) * 11.20, 2)
                     status = statuses[row_id % len(statuses)]
-                    
+
                     batch_data.append((row_id, tx_date, ref, acc, memo, debit, credit, balance, status))
 
                 cur.executemany(
@@ -279,7 +266,7 @@ def ensure_mock_database(db_path: Path, target_rows: int = TOTAL_ROWS) -> Path:
 # ---------------------------------------------------------------------------
 class AsyncDbWorker(QObject):
     """Executes database queries completely off the GUI thread.
-    
+
     Thread-Safety Mechanism:
     - Lives in a dedicated QThread.
     - Maintains its own thread-local SQLite connection. SQLite connections MUST
@@ -374,7 +361,7 @@ class CellEditCommand(QUndoCommand):
 
     def __init__(
         self,
-        store: "LedgerDataStore",
+        store: LedgerDataStore,
         row: int,
         col: int,
         old_val: Any,
@@ -397,7 +384,7 @@ class CellEditCommand(QUndoCommand):
 
 class LedgerDataStore(QObject):
     """Central store implementing Unidirectional Data Flow (UDF).
-    
+
     Data Flow:
         User Edit -> QStyledItemDelegate
                   -> Store.requestCellEdit()
@@ -443,7 +430,7 @@ class LedgerDataStore(QObject):
 # ---------------------------------------------------------------------------
 class VirtualChunkTableModel(QAbstractTableModel):
     """Virtual TableModel supporting 1,000,000 rows with LRU chunk caching.
-    
+
     Lazy Loading Math:
     - Total Rows: N = 1,000,000.
     - Chunk Size: C = 100 rows.
@@ -462,11 +449,11 @@ class VirtualChunkTableModel(QAbstractTableModel):
         self._store = store
         self._total_rows = total_rows
         self._chunk_size = CHUNK_SIZE
-        
+
         # OrderedDict used as an LRU Cache: chunk_idx -> list of tuples
         self._cache: OrderedDict[int, list[tuple]] = OrderedDict()
         self._pending_chunks: set[int] = set()
-        
+
         # Connect store updates (Unidirectional Data Flow)
         self._store.cellCommitted.connect(self._on_store_cell_committed)
 
@@ -498,7 +485,7 @@ class VirtualChunkTableModel(QAbstractTableModel):
             # Cache hit: mark as recently used
             self._cache.move_to_end(chunk_idx)
             chunk_data = self._cache[chunk_idx]
-            
+
             if row_offset < len(chunk_data):
                 val = chunk_data[row_offset][col]
                 if role in (Qt.DisplayRole, Qt.EditRole, ROLE_RAW_VALUE):
@@ -544,11 +531,11 @@ class VirtualChunkTableModel(QAbstractTableModel):
     def setData(self, index: QModelIndex, value: Any, role: int = Qt.EditRole) -> bool:
         if not index.isValid() or role != Qt.EditRole:
             return False
-        
+
         row = index.row()
         col = index.column()
         old_val = self.data(index, ROLE_RAW_VALUE)
-        
+
         # Route edit through Unidirectional Data Store with undo support
         self._store.requestCellEdit(row, col, old_val, value)
         return True
@@ -605,7 +592,7 @@ class AccountingItemDelegate(QStyledItemDelegate):
     4. Generous padded cell layout.
     """
 
-    def __init__(self, table_view: "ExcelTableView", parent: QObject | None = None) -> None:
+    def __init__(self, table_view: ExcelTableView, parent: QObject | None = None) -> None:
         super().__init__(parent)
         self._table = table_view
         self._shimmer_phase = 0.0
@@ -666,10 +653,7 @@ class AccountingItemDelegate(QStyledItemDelegate):
                 text_color = QColor("#94a3b8")
             else:
                 display_text = f"${num:,.2f}"
-                if num < 0:
-                    text_color = QColor("#dc2626")  # Accounting Crimson Red
-                else:
-                    text_color = QColor("#0f172a")  # Slate-900
+                text_color = QColor("#dc2626") if num < 0 else QColor("#0f172a")
 
             painter.setPen(text_color)
             painter.drawText(content_rect, int(Qt.AlignRight | Qt.AlignVCenter), display_text)
@@ -725,9 +709,7 @@ class AccountingItemDelegate(QStyledItemDelegate):
             skeleton_rect.right(),
             0
         )
-        p1 = (self._shimmer_phase - 0.3) % 1.0
         p2 = self._shimmer_phase
-        p3 = (self._shimmer_phase + 0.3) % 1.0
 
         base_gray = QColor("#e2e8f0")
         highlight_gray = QColor("#f8fafc")

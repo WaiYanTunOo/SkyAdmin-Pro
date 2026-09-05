@@ -122,6 +122,7 @@ class MainWindow(dnd_base_class()):
         if self._focus_in_text_input():
             return
         import customtkinter as _ctk
+
         from skyadmin_pro.config import SETTING_APPEARANCE_MODE
         current = _ctk.get_appearance_mode()
         new_mode = "light" if current == "Dark" else "dark"

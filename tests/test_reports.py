@@ -5,7 +5,7 @@ from __future__ import annotations
 import pytest
 
 from skyadmin_pro.services.export import FORBIDDEN_EXPORT_COLUMNS
-from skyadmin_pro.services.pdf_render import render_report, sanitize_pdf_text
+from skyadmin_pro.services.pdf_render import sanitize_pdf_text
 from skyadmin_pro.services.reports import (
     REPORT_TABLE_ROW_CAP,
     _assert_no_forbidden,

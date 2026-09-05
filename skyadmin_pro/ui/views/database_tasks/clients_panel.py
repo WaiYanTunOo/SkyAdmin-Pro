@@ -90,6 +90,7 @@ class ClientsExpiryPanel(ctk.CTkFrame):
             selectmode="extended",
         )
         self.client_tree.grid(row=1, column=0, sticky="nsew", padx=12, pady=(0, 4))
+        self.client_tree.tree.bind("<<TreeviewSelect>>", self._on_client_tree_select, add="+")
         left.grid_rowconfigure(1, weight=1)
         client_pager = ctk.CTkFrame(left, fg_color="transparent")
         client_pager.grid(row=2, column=0, sticky="ew", padx=12, pady=(0, 4))
@@ -169,12 +170,13 @@ class ClientsExpiryPanel(ctk.CTkFrame):
             font=ctk.CTkFont(size=11, weight="bold"),
             text_color=TEXT_MUTED,
         ).pack(side="left", padx=(0, 6))
-        ctk.CTkLabel(
+        self._batch_selection_label = ctk.CTkLabel(
             batch_row,
-            text="Ctrl/Shift+click",
-            font=ctk.CTkFont(size=10),
+            text="0 selected",
+            font=ctk.CTkFont(size=10, weight="bold"),
             text_color=TEXT_MUTED,
-        ).pack(side="left", padx=(0, 8))
+        )
+        self._batch_selection_label.pack(side="left", padx=(0, 8))
         ctk.CTkButton(
             batch_row, text="Archive selected", width=120,
             fg_color="transparent", border_width=1,
@@ -732,6 +734,21 @@ class ClientsExpiryPanel(ctk.CTkFrame):
         self._undo.execute(DeleteClientsCommand(self.app.db, [int(iid)]))
         self.feedback.success("Client deleted. (Ctrl+Z to undo)")
         self.refresh()
+
+    def _on_client_tree_select(self, _event=None) -> None:
+        if not hasattr(self, "_batch_selection_label"):
+            return
+        count = len(self.client_tree.selected_iids())
+        if count > 0:
+            self._batch_selection_label.configure(
+                text=f"{count} selected",
+                text_color=("#0284c7", "#38bdf8"),
+            )
+        else:
+            self._batch_selection_label.configure(
+                text="0 selected",
+                text_color=TEXT_MUTED,
+            )
 
     def _batch_delete(self) -> None:
         iids = self.client_tree.selected_iids()
