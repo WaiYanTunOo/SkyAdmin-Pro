@@ -389,10 +389,11 @@ CREATE TABLE IF NOT EXISTS sync_conflicts (
 );
 CREATE INDEX IF NOT EXISTS idx_sync_conflicts_logged ON sync_conflicts(logged_at);
 
--- P2.5: client grouping (table only; the group_id column + index are owned
--- by migration m009 because _initialize replays this file BEFORE min_version=2
--- migrations run — creating the index here would crash legacy DBs that lack
--- the column: IF NOT EXISTS checks the index, not the column).
+-- Client grouping (table only; the group_id column + index are owned by
+-- migration m009 because _initialize replays this file BEFORE min_version=2
+-- migrations run). Sync columns (global_id / updated_at / deleted_at) are
+-- added by m011 — clients.group_id stays local; membership syncs via
+-- group_global_id on the wire.
 CREATE TABLE IF NOT EXISTS client_groups (
     id          INTEGER PRIMARY KEY AUTOINCREMENT,
     name        TEXT    NOT NULL UNIQUE COLLATE NOCASE,

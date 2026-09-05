@@ -81,15 +81,15 @@ class AuditLogDialog(ctk.CTkToplevel):
     def _load_log(self) -> None:
         # Toplevel dialogs sit outside the apply_form_theme walk — re-theme here.
         self.tree.apply_theme()
-        logs = self.app.db.list_audit_log(limit=500)
         filter_type = self._filter.get()
-        if filter_type != "all":
-            logs = [l for l in logs if l.get("log_type") == filter_type]
+        log_type = None if filter_type == "all" else filter_type
+        # Dedicated queries per filter so one type cannot crowd out the other.
+        logs = self.app.db.list_audit_log(limit=500, log_type=log_type)
 
         rows: list[tuple] = []
         for entry in logs:
-            log_type = entry.get("log_type", "")
-            if log_type == "tax_change":
+            entry_type = entry.get("log_type", "")
+            if entry_type == "tax_change":
                 rows.append((
                     "Tax Change",
                     entry.get("client_name", "") or "—",
@@ -105,7 +105,7 @@ class AuditLogDialog(ctk.CTkToplevel):
                     entry.get("global_id", "") or "—",
                     entry.get("direction", "") or "—",
                     "—",
-                    entry.get("timestamp", "") or "—",
+                    entry.get("timestamp", "") or entry.get("logged_at", "") or "—",
                 ))
         # set_rows owns empty state + virtual rendering (500 rows → virtual).
         self.tree.set_rows(

@@ -47,7 +47,7 @@ def decrypt_secret(
     * Corrupt or machine-mismatched ciphertext returns ``""``.
 
     Set ``allow_legacy_plaintext=True`` only in one-off migration code that
-    must read rows before ``_migrate_secret_fields`` has run.
+    must read rows before ``m003_secret_fields.upgrade`` has run.
     """
     if not value:
         return ""

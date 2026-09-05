@@ -13,7 +13,7 @@ Schema defined in `skyadmin_pro/db/schema.py`.
 | Table | Purpose |
 |-------|---------|
 | `clients` | Central entity — all other business tables link here. |
-| `client_groups` | Named client categories (migration m009). |
+| `client_groups` | Named client categories (m009). Sync columns via m011 (`global_id`, `updated_at`, `deleted_at`). Soft-delete; membership on clients remaps via `group_global_id`. |
 | `clients_fts` | FTS5 full-text index over client name/contact/email (Phase 10.1). |
 | `tasks` | Per-client tasks (pending/completed), linked to pipeline steps. |
 | `documents` | Client documents with expiry dates, payment tracking. |
@@ -21,7 +21,7 @@ Schema defined in `skyadmin_pro/db/schema.py`.
 
 **Key columns — `clients`:** `id`, `name` (UNIQUE), `global_id` (sync key), `group_id` FK→`client_groups` (m009), `status`, `service_type`, `payment_status`, `tax_id`, `deleted_at`, `created_at`, `updated_at`.
 
-**Key columns — `client_groups`:** `id`, `name` (UNIQUE, case-insensitive), `color`, `created_at`. Deleting a group NULLs members' `group_id` (no cascade).
+**Key columns — `client_groups`:** `id`, `name` (UNIQUE, case-insensitive), `color`, `global_id`, `created_at`, `updated_at`, `deleted_at`. Soft-delete clears members' `group_id`.
 
 **`clients_fts`:** virtual table `USING fts5(name, contact_name, email)` with `clients_fts_ai/ad/au` triggers. Lives in base `schema.py` so fresh installs search via MATCH immediately; legacy DBs are backfilled by migration m001. `search_clients()` falls back to LIKE if FTS is unavailable.
 

@@ -10,13 +10,16 @@ const ADMIN = "admin-test";
 const PASS = "secret-password";
 
 function mockEnv(overrides: Partial<Env> = {}): Env {
+  const result = {
+    first: async () => null,
+    run: async () => ({ success: true }),
+    all: async () => ({ results: [] }),
+  };
   return {
     DB: {
       prepare: () => ({
-        bind: () => ({
-          first: async () => null,
-          run: async () => ({ success: true }),
-        }),
+        ...result,
+        bind: () => result,
       }),
     } as unknown as D1Database,
     LICENSE_SECRET: "test-license-secret",

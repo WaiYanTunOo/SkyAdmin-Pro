@@ -29,8 +29,12 @@ npx wrangler d1 migrations apply skyadmin-db --local
 
 - Migrations are applied in filename order
 - Each migration is applied exactly once (tracked by D1 internally)
-- The `schema.sql` file is kept for reference / legacy `db:init` usage
-- For new databases, use `migrations apply` instead of `db:init`
+- **Setup path:** always use `npx wrangler d1 migrations apply` (or `npm run db:migrate`)
+- **Deprecated:** `schema.sql` via `wrangler d1 execute` / legacy `npm run db:init` — do not use for new or existing DBs
+- `schema.sql` remains the full desired **end-state reference** only (token_hash + expires_at + audit)
+- `0001_initial.sql` creates `sync_devices` with plaintext `token` (baseline)
 - `0002_sync_devices_expires_at.sql` ALTERs legacy `sync_devices` tables that
-  pre-date sync token TTL. Fresh installs get the column via 0002 (0001 creates
-  the table without it). `schema.sql` remains the full desired end-state.
+  pre-date sync token TTL
+- `0003_sync_tokens_hash.sql` rebuilds `sync_devices` with `token_hash` only
+  (existing devices must re-register — D1 SQL cannot hash plaintext tokens)
+- `0004_admin_audit_log.sql` adds `admin_audit_log`

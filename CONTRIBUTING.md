@@ -20,7 +20,7 @@ pip install -r requirements.txt -r requirements-dev.txt
 # Run the app
 python main.py
 
-# Worker dependencies (optional)
+# Worker dependencies
 cd skyadmin-worker && npm ci
 ```
 
@@ -35,27 +35,28 @@ cd skyadmin-worker && npm ci
 - **Target:** Python 3.10+ syntax
 
 Key rules:
-- No bare `except Exception: pass` — catch specific exceptions
-- Use `from __future__ import annotations` at top of every file
+
+- Prefer specific exceptions over broad `except Exception`
+- Use `from __future__ import annotations` at top of modules
 - Parameterized SQL only — never interpolate user input into queries
 - Atomic file writes (temp + rename pattern)
+- Fail closed for secrets/export/license verify (`secret_fields`, export redaction, Ed25519)
 
 ### TypeScript (Worker)
 
 - **Type checker:** `npx tsc --noEmit`
-- **Tests:** `npx vitest run`
+- **Tests:** `npm test` (Vitest)
 - **Strict mode** enabled
-- No dynamic `import()` in hot paths
+- Add Vitest coverage for route/behavior changes
+- D1 changes go in `skyadmin-worker/migrations/` — do **not** use `db:init` / `schema.sql` apply
 
 ## Testing
 
 ### Python
 
 ```bash
-pytest tests/ -v --tb=short
+pytest tests/ -q --tb=short
 ```
-
-Tests live in `tests/` and use pytest. Run before every commit.
 
 ### Worker
 
@@ -63,66 +64,66 @@ Tests live in `tests/` and use pytest. Run before every commit.
 cd skyadmin-worker && npm test
 ```
 
-Tests live in `skyadmin-worker/src/*.test.ts` and use Vitest.
-
 ### Full pre-ship check
 
 ```bash
 python scripts/release_check.py
+# Portable-only builds may use: --skip-installer --skip-pytest
 ```
 
-This runs lint, tests, type checks, and version consistency checks.
+Manual UI: `docs/UI_CHECKLIST.md`, `docs/MANUAL_QA.md`.
 
-## Architecture
+## Architecture (short)
 
 ```
 skyadmin_pro/
 ├── ui/                  # CustomTkinter views and widgets
-│   ├── views/           # 6 main views (dashboard, database_tasks, etc.)
-│   ├── widgets.py       # Shared components (DatePickerField, etc.)
-│   └── theme.py         # Colors, fonts, spacing
-├── services/            # Business logic (license, crypto, export, i18n)
-├── db/                  # 11 mixins → Database class (SQLite)
-│   ├── core.py          # Connection pooling, _fetch_all, _fetch_one
-│   ├── schema.py        # Table definitions
-│   └── migrations/      # Versioned DDL changes
-└── config.py            # Constants (service types, pricing, UI settings)
+│   ├── views/           # dashboard, database_tasks, company_details, settings, …
+│   ├── widgets.py       # DatePickerField, FormField, themed controls
+│   └── canvas_scroll.py # Form scroll (trees stay outside)
+├── services/            # license, data_sync, export, vault, i18n
+├── db/                  # Database mixins + versioned migrations/
+└── config/              # APP_VERSION, settings keys, pricing defaults
 
 skyadmin-worker/         # Cloudflare Worker (TypeScript + Hono)
-├── src/
-│   ├── routes/          # API endpoints
-│   ├── auth.ts          # Bearer token + session auth
-│   ├── signing.ts       # Ed25519 + HMAC
-│   └── cors.ts          # CORS middleware
-└── wrangler.toml
+├── src/routes/          # API + admin HTML
+├── migrations/          # D1 versioned SQL
+└── wrangler.jsonc
 ```
+
+See [docs/ARCHITECTURE.md](docs/ARCHITECTURE.md) for diagrams and data flow.
 
 ### Key patterns
 
-- **Database mixins:** Each domain (clients, tasks, tax, etc.) is a separate mixin class. The `Database` class composes all mixins via multiple inheritance.
-- **View lifecycle:** `BaseView.build()` creates widgets, `on_show()`/`on_hide()` handle tab switches.
-- **Lazy loading:** Views and detail trees are created on first access, not at startup.
-- **Connection pooling:** Single SQLite connection reused via `_get_pooled_conn()`.
+- **Database mixins:** Domain mixins compose into `Database`.
+- **View lifecycle:** `BaseView.build()` creates widgets; `on_show()` / `on_hide()` on tab switch.
+- **Lazy loading:** Company Details / Settings / Document Hub build heavy panels on first visit.
+- **Scroll:** One scroll surface per tab; trees outside `CanvasScrollFrame`.
+- **Connection pooling:** Thread-local pooled SQLite connections in `db/core.py`.
 
 ## Branch & Commit Conventions
 
-- Branch naming: `feature/description`, `fix/description`, `refactor/description`
-- Commit messages: imperative mood, <72 chars (`Add feature`, not `Added feature`)
+- Branch naming: `feature/…`, `fix/…`, `refactor/…`
+- Commit messages: imperative mood, ≤72 char subject
 - One logical change per commit
-- Run `ruff check .` and `pytest tests/ -q` before pushing
+- Run `ruff check .` and `pytest -q` (and Worker `npm test` if touching `skyadmin-worker/`) before push
 
 ## AI Agent Orchestration
 
 See [AGENTS.md](AGENTS.md) for the subagent roster and parallel workstream rules.
 
-Key rules:
-- Do not rewrite the desktop UI as Kotlin/Swift/mobile native
-- UI bugs are CustomTkinter layout/performance issues
-- Each subagent reads its listed project skills before editing
+- Do **not** rewrite the desktop UI as Kotlin/Swift/Qt/Electron unless explicitly requested after residual UX still fails
+- Do **not** re-implement landed S1 / P0–P3 items (timing-safe auth, sync TTL/hash, trees-out-of-scroll, release Worker gate, etc.)
 - Run `qa-verifier` after UI or API changes
 
 ## Security
 
 - Never commit secrets, keys, or `.dev.vars`
-- Use `timingSafeEqual` for all token/secret comparisons
-- Report vulnerabilities privately (see [SECURITY.md](SECURITY.md))
+- Use `timingSafeEqual` for secret/token comparisons
+- Report vulnerabilities privately — [SECURITY.md](SECURITY.md)
+
+## Deploy notes
+
+- Tag releases: `.github/workflows/release.yml` requires Worker Vitest + `SKYADMIN_API_TOKEN`
+- Main Worker deploys: `.github/workflows/deploy.yml` (concurrency group; migrations then deploy)
+- After D1 `0003_sync_tokens_hash`, devices must **re-register** for sync

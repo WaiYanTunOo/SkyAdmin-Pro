@@ -28,8 +28,9 @@ You should receive a response within 48 hours.
 - **Admin login**: Password-based with constant-time comparison (`timingSafeEqual`)
 - **Session tokens**: HMAC-signed, HttpOnly/Secure/SameSite=Lax cookies
 - **CSRF protection**: HMAC-based tokens with 1-hour TTL on login forms
-- **API tokens**: Bearer token authentication for all protected endpoints
-- **Rate limiting**: 5 login attempts per 15 minutes per IP; 20 claim attempts per minute per IP
+- **API tokens**: Bearer token **or** same-origin admin session cookie + CSRF for `/api/*`
+- **Rate limiting**: 5 login attempts per 15 minutes per IP; claim/register/control/sync pull+push limited per IP
+- **Admin audit log**: D1 `admin_audit_log` with 30-day purge on login/dashboard
 
 ### Cryptographic Operations
 
@@ -40,10 +41,11 @@ You should receive a response within 48 hours.
 
 ### Data Protection
 
-- **Sync token TTL**: Device sync tokens expire after 30 days, rotated on use
+- **Sync token TTL**: Device sync tokens expire after 30 days (fail-closed if TTL missing); stored as SHA-256 hashes
 - **Export redaction**: Sensitive columns excluded from Excel exports
 - **Secret fields**: `SECRET_FIELDS` list prevents accidental exposure
 - **Atomic writes**: Temp-file + rename pattern prevents corruption
+- **Client groups**: `client_groups` / `group_id` are local-only (not synced across devices)
 
 ### Transport Security
 
@@ -63,7 +65,7 @@ You should receive a response within 48 hours.
 - Desktop app uses SQLite (not encrypted at rest) — full-disk encryption recommended
 - Backup encryption uses a user-provided password (not key-derived from a KDF)
 - No multi-factor authentication on admin login
-- No audit logging of admin actions (planned)
+- Admin audit logging exists in D1; desktop audit UI is still limited
 
 ## Dependency Security
 

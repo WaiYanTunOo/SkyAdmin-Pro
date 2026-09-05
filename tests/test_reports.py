@@ -4,11 +4,14 @@ from __future__ import annotations
 
 import pytest
 
+from skyadmin_pro.services.export import FORBIDDEN_EXPORT_COLUMNS
 from skyadmin_pro.services.pdf_render import render_report, sanitize_pdf_text
 from skyadmin_pro.services.reports import (
     REPORT_TABLE_ROW_CAP,
     _assert_no_forbidden,
+    _project,
     build_status_report,
+    write_status_report_pdf,
 )
 
 
@@ -22,20 +25,25 @@ def _seed_clients(db, count: int) -> None:
 
 def test_model_has_all_sections(db):
     _seed_clients(db, 3)
+    cid = db.get_or_create_client("Tax Snapshot Co")
+    db.update_client_fields(cid, service_type="Accounting", fs_status="Pending", pnd53_status="Complete")
     model = build_status_report(db)
     assert model["title"].startswith("SkyAdmin Pro")
     assert model["generated_at"] and model["app_version"]
-    assert ("Clients", "3") in model["summary"]
+    assert ("Clients", "4") in model["summary"]
     titles = [s["title"] for s in model["sections"]]
     assert titles == [
         "Expiring documents",
         "Overdue services",
         "Pending tasks",
         "Renewals due",
+        "Tax filing overview",
         "Clients",
     ]
+    tax = next(s for s in model["sections"] if s["title"] == "Tax filing overview")
+    assert any(row[0] == "Tax Snapshot Co" for row in tax["rows"])
     clients = next(s for s in model["sections"] if s["title"] == "Clients")
-    assert len(clients["rows"]) == 3
+    assert len(clients["rows"]) == 4
     assert clients["rows"][0][0] == "Report Co 000"
 
 
@@ -44,6 +52,21 @@ def test_forbidden_guard_rejects_poisoned_model():
         _assert_no_forbidden({"rows": [{"ird_password": "x"}]})
     # Real model passes the same scan.
     _assert_no_forbidden({"title": "ok", "rows": [[1, 2]]})
+
+
+def test_project_strips_forbidden_columns():
+    row = {
+        "name": "Safe Co",
+        "email": "a@b.c",
+        "ird_password": "secret-should-never-export",
+        "password": "also-secret",
+    }
+    projected = _project(row, ("name", "email", "ird_password", "password", "status"))
+    assert projected == ["Safe Co", "a@b.c", "—"]
+    joined = " ".join(projected).lower()
+    for bad in FORBIDDEN_EXPORT_COLUMNS:
+        assert bad not in joined
+    assert "secret" not in joined
 
 
 def test_table_row_cap(db):
@@ -57,7 +80,7 @@ def test_table_row_cap(db):
 def test_render_produces_readable_pdf(db, tmp_path):
     _seed_clients(db, 2)
     dest = tmp_path / "report.pdf"
-    out = render_report(build_status_report(db), dest)
+    out = write_status_report_pdf(db, dest)
     assert out.is_file()
     assert out.read_bytes()[:5] == b"%PDF-"
     from pypdf import PdfReader
@@ -68,8 +91,18 @@ def test_render_produces_readable_pdf(db, tmp_path):
     assert "SkyAdmin Pro" in text
     assert "Report Co 000" in text
     assert "ird_password" not in text.lower()
+    assert "Tax filing overview" in text
 
 
 def test_sanitize_pdf_text_replaces_non_latin():
     assert sanitize_pdf_text("Acme Co") == "Acme Co"
     assert "?" in sanitize_pdf_text("บริษัท ทดสอบ")
+
+
+def test_build_report_never_includes_forbidden_keys(db):
+    _seed_clients(db, 1)
+    model = build_status_report(db)
+    # Walk already asserted inside build; double-check leaf strings.
+    blob = str(model).lower()
+    for col in FORBIDDEN_EXPORT_COLUMNS:
+        assert col not in blob

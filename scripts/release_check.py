@@ -1,9 +1,10 @@
 #!/usr/bin/env python3
-"""Pre-release gate for SkyAdmin Pro — run before shipping dist/SkyAdminPro.exe.
+"""Pre-release gate for SkyAdmin Pro — run before shipping.
 
 Usage:
   python scripts/release_check.py
   python scripts/release_check.py --skip-pytest
+  python scripts/release_check.py --skip-installer   # portable-only builds
   python scripts/release_check.py --exe path/to/SkyAdminPro.exe
 """
 
@@ -319,6 +320,11 @@ def main() -> int:
     parser.add_argument("--skip-pytest", action="store_true", help="Skip full pytest suite")
     parser.add_argument("--skip-worker", action="store_true", help="Skip Worker HTTP checks")
     parser.add_argument(
+        "--skip-installer",
+        action="store_true",
+        help="Skip installer artifact check (portable-only builds; ship path must not use this)",
+    )
+    parser.add_argument(
         "--require-signature",
         action="store_true",
         help="Fail when dist exe is not Authenticode-signed (Windows only)",
@@ -331,16 +337,20 @@ def main() -> int:
     failures.extend(check_version_alignment())
     failures.extend(check_embedded_public_key())
     failures.extend(check_exe(args.exe.resolve()))
-    # Installer-first ship path: installer is required, always checked.
     installer_path = (args.installer or default_installer_path()).resolve()
-    failures.extend(check_installer(installer_path))
+    if args.skip_installer:
+        print("  WARN  Skipping installer check (--skip-installer; portable-only path)")
+    else:
+        # Installer-first ship path: installer is required unless explicitly skipped.
+        failures.extend(check_installer(installer_path))
     if args.require_signature:
         failures.extend(check_authenticode_signature(args.exe.resolve(), required=True))
-        installer = installer_path
-        if installer.exists():
-            failures.extend(check_authenticode_signature(installer, required=True))
-        else:
-            failures.append(_fail(f"Installer not found for signature check: {installer}"))
+        if not args.skip_installer:
+            installer = installer_path
+            if installer.exists():
+                failures.extend(check_authenticode_signature(installer, required=True))
+            else:
+                failures.append(_fail(f"Installer not found for signature check: {installer}"))
     if args.linux_binary:
         failures.extend(check_linux_binary(args.linux_binary.resolve()))
 

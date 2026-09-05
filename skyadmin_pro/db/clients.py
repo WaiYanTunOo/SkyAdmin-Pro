@@ -20,7 +20,10 @@ class ClientsMixin:
         if cached is not None:
             return list(cached)
         with self.connection() as conn:
-            rows = conn.execute("SELECT name FROM clients ORDER BY name COLLATE NOCASE").fetchall()
+            rows = conn.execute(
+                "SELECT name FROM clients WHERE deleted_at IS NULL "
+                "ORDER BY name COLLATE NOCASE"
+            ).fetchall()
         names = [row["name"] for row in rows]
         self._client_names_cache = names
         return list(names)
@@ -29,11 +32,14 @@ class ClientsMixin:
         self._client_names_cache = None
 
     def client_id_by_name(self, name: str) -> int | None:
-        """Look up an existing client id without creating anything."""
+        """Look up an existing (non-archived) client id without creating anything."""
         cleaned = (name or "").strip()
         if not cleaned:
             return None
-        row = self._fetch_one("SELECT id FROM clients WHERE name = ? COLLATE NOCASE", (cleaned,))
+        row = self._fetch_one(
+            "SELECT id FROM clients WHERE name = ? COLLATE NOCASE AND deleted_at IS NULL",
+            (cleaned,),
+        )
         return int(row["id"]) if row else None
 
     def get_or_create_client(self, name: str) -> int:
@@ -42,7 +48,7 @@ class ClientsMixin:
             raise ValueError("Client name is required.")
         with self.connection() as conn:
             row = conn.execute(
-                "SELECT id FROM clients WHERE name = ? COLLATE NOCASE",
+                "SELECT id FROM clients WHERE name = ? COLLATE NOCASE AND deleted_at IS NULL",
                 (cleaned,),
             ).fetchone()
             if row is not None:
@@ -55,10 +61,19 @@ class ClientsMixin:
                 new_id = int(cursor.lastrowid)
             except sqlite3.IntegrityError:
                 row = conn.execute(
-                    "SELECT id FROM clients WHERE name = ? COLLATE NOCASE",
+                    "SELECT id FROM clients WHERE name = ? COLLATE NOCASE AND deleted_at IS NULL",
                     (cleaned,),
                 ).fetchone()
                 if row is None:
+                    # Name may belong to an archived row — surface a clear error.
+                    archived = conn.execute(
+                        "SELECT id FROM clients WHERE name = ? COLLATE NOCASE",
+                        (cleaned,),
+                    ).fetchone()
+                    if archived is not None:
+                        raise ValueError(
+                            "A client with that name is archived. Restore it or use a different name."
+                        ) from None
                     raise
                 return int(row["id"])
         self.add_new_client_tasks(new_id, cleaned)
@@ -342,6 +357,7 @@ class ClientsMixin:
                    registered_capital, vat_registration, business_address,
                    business_objectives, group_id, created_at, updated_at
             FROM clients
+            WHERE deleted_at IS NULL
             ORDER BY name COLLATE NOCASE
             """
         if limit is not None and int(limit) > 0:
@@ -351,7 +367,9 @@ class ClientsMixin:
     def count_clients(self, query: str = "") -> int:
         q = (query or "").strip()
         if not q:
-            row = self._fetch_one("SELECT COUNT(*) AS n FROM clients")
+            row = self._fetch_one(
+                "SELECT COUNT(*) AS n FROM clients WHERE deleted_at IS NULL"
+            )
             return int(row["n"]) if row else 0
         # LIKE fallback count (FTS count would need MATCH sync; LIKE is safe).
         from skyadmin_pro.db.sql_helpers import _escape_like as _esc
@@ -359,8 +377,9 @@ class ClientsMixin:
         like = f"%{_esc(q)}%"
         row = self._fetch_one(
             "SELECT COUNT(*) AS n FROM clients"
-            " WHERE name LIKE ? ESCAPE '\\' OR contact_name LIKE ? ESCAPE '\\'"
-            " OR email LIKE ? ESCAPE '\\'",
+            " WHERE deleted_at IS NULL"
+            " AND (name LIKE ? ESCAPE '\\' OR contact_name LIKE ? ESCAPE '\\'"
+            " OR email LIKE ? ESCAPE '\\')",
             (like, like, like),
         )
         return int(row["n"]) if row else 0
@@ -382,6 +401,7 @@ class ClientsMixin:
                    registered_capital, vat_registration, business_address,
                    business_objectives, group_id, created_at, updated_at
             FROM clients
+            WHERE deleted_at IS NULL
         """
         q = (query or "").strip()
         if not q:
@@ -400,7 +420,7 @@ class ClientsMixin:
                            c.business_objectives, c.group_id, c.created_at, c.updated_at
                     FROM clients c
                     INNER JOIN clients_fts fts ON fts.rowid = c.id
-                    WHERE fts MATCH ?
+                    WHERE fts MATCH ? AND c.deleted_at IS NULL
                     ORDER BY c.name COLLATE NOCASE
                     """
                 if limit is not None and int(limit) > 0:
@@ -411,7 +431,8 @@ class ClientsMixin:
         like = f"%{_escape_like(q)}%"
         base = (
             base_select
-            + " WHERE name LIKE ? ESCAPE '\\' OR contact_name LIKE ? ESCAPE '\\' OR email LIKE ? ESCAPE '\\'"
+            + " AND (name LIKE ? ESCAPE '\\' OR contact_name LIKE ? ESCAPE '\\'"
+            " OR email LIKE ? ESCAPE '\\')"
             + " ORDER BY name COLLATE NOCASE"
         )
         if limit is not None and int(limit) > 0:
@@ -540,42 +561,138 @@ class ClientsMixin:
         """Update status for multiple clients. Returns count updated."""
         if not client_ids:
             return 0
+        normalized = (status or "").strip().lower()
+        if normalized not in {"active", "inactive"}:
+            raise ValueError("Status must be active or inactive.")
         placeholders = ",".join("?" for _ in client_ids)
         with self.connection() as conn:
             cursor = conn.execute(
-                f"UPDATE clients SET status = ?, updated_at = ? WHERE id IN ({placeholders})",
-                [status, self._now(), *client_ids],
+                f"UPDATE clients SET status = ?, updated_at = ?"
+                f" WHERE id IN ({placeholders}) AND deleted_at IS NULL",
+                [normalized, self._now(), *client_ids],
             )
-        return cursor.rowcount
+            count = cursor.rowcount
+        self._client_names_cache = None
+        return count
+
+    def batch_assign_client_group(
+        self, client_ids: list[int], group_id: int | None
+    ) -> int:
+        """Assign (or clear) local group for multiple clients. Returns count updated.
+
+        ``group_id`` is local-only and is never synced.
+        """
+        if not client_ids:
+            return 0
+        if group_id is not None:
+            group = self._fetch_one(
+                "SELECT id FROM client_groups WHERE id = ?", (group_id,)
+            )
+            if group is None:
+                raise ValueError("Group not found.")
+        placeholders = ",".join("?" for _ in client_ids)
+        with self.connection() as conn:
+            cursor = conn.execute(
+                f"UPDATE clients SET group_id = ?, updated_at = ?"
+                f" WHERE id IN ({placeholders}) AND deleted_at IS NULL",
+                [group_id, self._now(), *client_ids],
+            )
+            count = cursor.rowcount
+        return count
+
+    def batch_archive_clients(self, client_ids: list[int]) -> int:
+        """Soft-delete clients by setting ``deleted_at``. Returns count archived."""
+        if not client_ids:
+            return 0
+        now = self._now()
+        placeholders = ",".join("?" for _ in client_ids)
+        with self.connection() as conn:
+            cursor = conn.execute(
+                f"UPDATE clients SET deleted_at = ?, updated_at = ?"
+                f" WHERE id IN ({placeholders}) AND deleted_at IS NULL",
+                [now, now, *client_ids],
+            )
+            count = cursor.rowcount
+        self._client_names_cache = None
+        return count
+
+    def batch_restore_clients(self, client_ids: list[int]) -> int:
+        """Clear ``deleted_at`` for archived clients. Returns count restored."""
+        if not client_ids:
+            return 0
+        placeholders = ",".join("?" for _ in client_ids)
+        with self.connection() as conn:
+            cursor = conn.execute(
+                f"UPDATE clients SET deleted_at = NULL, updated_at = ?"
+                f" WHERE id IN ({placeholders}) AND deleted_at IS NOT NULL",
+                [self._now(), *client_ids],
+            )
+            count = cursor.rowcount
+        self._client_names_cache = None
+        return count
 
     # -- Client groups --------------------------------------------------
 
     def list_client_groups(self) -> list[dict]:
         with self.connection() as conn:
             rows = conn.execute(
-                "SELECT id, name, color FROM client_groups ORDER BY name COLLATE NOCASE"
+                """
+                SELECT id, name, color, global_id
+                FROM client_groups
+                WHERE deleted_at IS NULL
+                ORDER BY name COLLATE NOCASE
+                """
             ).fetchall()
         return [dict(r) for r in rows]
 
     def add_client_group(self, name: str, color: str | None = None) -> int:
+        import uuid
+
+        cleaned = (name or "").strip()
+        if not cleaned:
+            raise ValueError("Group name is required.")
         with self.connection() as conn:
-            cur = conn.execute(
-                "INSERT INTO client_groups (name, color) VALUES (?, ?)",
-                (name, color),
-            )
-        return cur.lastrowid
+            try:
+                cur = conn.execute(
+                    """
+                    INSERT INTO client_groups (name, color, global_id, updated_at)
+                    VALUES (?, ?, ?, datetime('now', 'localtime'))
+                    """,
+                    (cleaned, color, uuid.uuid4().hex),
+                )
+            except sqlite3.IntegrityError:
+                raise ValueError("A group with that name already exists.") from None
+        return int(cur.lastrowid)
 
     def update_client_group(self, group_id: int, name: str, color: str | None = None) -> int:
+        cleaned = (name or "").strip()
+        if not cleaned:
+            raise ValueError("Group name is required.")
         with self.connection() as conn:
-            cur = conn.execute(
-                "UPDATE client_groups SET name = ?, color = ? WHERE id = ?",
-                (name, color, group_id),
-            )
+            try:
+                cur = conn.execute(
+                    """
+                    UPDATE client_groups
+                    SET name = ?, color = ?, updated_at = datetime('now', 'localtime')
+                    WHERE id = ? AND deleted_at IS NULL
+                    """,
+                    (cleaned, color, group_id),
+                )
+            except sqlite3.IntegrityError:
+                raise ValueError("A group with that name already exists.") from None
         return cur.rowcount
 
     def delete_client_group(self, group_id: int) -> int:
-        """Delete a group (clients in it become ungrouped)."""
+        """Soft-delete a group (clients in it become ungrouped). Synced via deleted_at."""
         with self.connection() as conn:
             conn.execute("UPDATE clients SET group_id = NULL WHERE group_id = ?", (group_id,))
-            cur = conn.execute("DELETE FROM client_groups WHERE id = ?", (group_id,))
+            cur = conn.execute(
+                """
+                UPDATE client_groups
+                SET deleted_at = datetime('now', 'localtime'),
+                    updated_at = datetime('now', 'localtime')
+                WHERE id = ? AND deleted_at IS NULL
+                """,
+                (group_id,),
+            )
         return cur.rowcount

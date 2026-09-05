@@ -120,14 +120,29 @@ def test_global_search_shortcut_bound(app):
 
 
 def test_keyboard_shortcuts_bound(app):
-    """Live keyboard shortcuts are bound; dead save/backup bindings are gone."""
+    """Live keyboard shortcuts are bound (including Ctrl+S save)."""
     assert app.bind("<Control-f>") is not None
     assert app.bind("<Control-d>") is not None
     assert app.bind("<Control-e>") is not None
     assert app.bind("<Control-n>") is not None
     assert app.bind("<Control-z>") is not None
-    assert app.bind("<Control-s>") in (None, "")
+    assert app.bind("<Control-s>") is not None
+    assert app.bind("<Control-S>") is not None
+    assert callable(getattr(app, "_shortcut_save", None))
+    assert callable(getattr(app, "_shortcut_new", None))
+    assert callable(getattr(app, "open_global_search", None))
+    # Backup remains Settings-only — no Ctrl+B.
     assert app.bind("<Control-b>") in (None, "")
+
+
+def test_shortcut_save_noop_status(app):
+    """Ctrl+S on a view without save reports Nothing to save."""
+    statuses: list[str] = []
+    app.set_status = statuses.append  # type: ignore[method-assign]
+    app.show_view("dashboard")
+    app.update()
+    app._shortcut_save()
+    assert statuses and statuses[-1] == "Nothing to save"
 
 
 def test_shortcut_dispatch_reaches_clients_panel(app, monkeypatch):
@@ -149,6 +164,28 @@ def test_shortcut_dispatch_reaches_clients_panel(app, monkeypatch):
     view._on_shortcut_new()
     assert undo_calls == ["undo"]
     assert new_calls == ["new"]
+
+
+def test_shortcut_new_from_dashboard_navigates(app, monkeypatch):
+    """Ctrl+N from Dashboard navigates to Database & Tasks and opens new client."""
+    app.show_view("dashboard")
+    app.update()
+    opened: list[str] = []
+
+    # Pre-create the view and stub the dialog before the shortcut runs.
+    tasks = app._ensure_view("database_tasks")
+    assert tasks is not None
+    tasks._ensure_lazy_panel("Clients & Expiry")
+    monkeypatch.setattr(
+        tasks.clients_panel,
+        "_open_client_dialog",
+        lambda: opened.append("new"),
+    )
+
+    app._shortcut_new()
+    app.update()
+    assert app._active_key == "database_tasks"
+    assert opened == ["new"]
 
 
 def test_audit_log_dialog_loads_without_crash(app):

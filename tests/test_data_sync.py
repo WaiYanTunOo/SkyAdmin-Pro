@@ -228,37 +228,175 @@ def test_save_sync_credentials_writes_ciphertext_on_disk(monkeypatch, fake_app_d
     assert sync.load_sync_credentials() == ("TESTMACHINE00001", "super-secret-token")
 
 
-def test_collect_and_apply_syncs_client_group_id(db):
+def test_collect_and_apply_client_groups_via_global_id(db):
+    """client_groups sync by global_id; clients carry group_global_id (not numeric group_id)."""
     gid = uuid.uuid4().hex
     group_id = db.add_client_group("VIP")
+    group = db._fetch_one("SELECT global_id FROM client_groups WHERE id = ?", (group_id,))
+    assert group and group["global_id"]
     with db.connection() as conn:
         conn.execute(
             "INSERT INTO clients (name, global_id, group_id, updated_at) VALUES (?, ?, ?, ?)",
             ("Grouped Co", gid, group_id, "2026-06-01 10:00:00"),
         )
     changes = sync.collect_local_changes(db)
+    group_change = next(c for c in changes if c["table"] == "client_groups")
+    assert group_change["row"]["name"] == "VIP"
+    assert "id" not in group_change["row"]
     client_change = next(c for c in changes if c["global_id"] == gid)
-    assert client_change["row"].get("group_id") == group_id
+    assert "group_id" not in client_change["row"]
+    assert client_change["row"].get("group_global_id") == group["global_id"]
 
-    remote_gid = uuid.uuid4().hex
-    change = {
-        "table": "clients",
-        "global_id": remote_gid,
-        "updated_at": "2026-06-02T10:00:00",
-        "deleted_at": None,
-        "row": {
-            "global_id": remote_gid,
-            "name": "Remote Grouped",
-            "status": "active",
-            "group_id": group_id,
-            "updated_at": "2026-06-02T10:00:00",
-        },
-    }
-    assert sync.apply_remote_changes(db, [change]) == (1, 0)
-    row = db._fetch_one("SELECT name, group_id FROM clients WHERE global_id = ?", (remote_gid,))
+    remote_group_gid = uuid.uuid4().hex
+    remote_client_gid = uuid.uuid4().hex
+    applied, conflicts = sync.apply_remote_changes(
+        db,
+        [
+            {
+                "table": "client_groups",
+                "global_id": remote_group_gid,
+                "updated_at": "2026-06-02T09:00:00",
+                "deleted_at": None,
+                "row": {
+                    "global_id": remote_group_gid,
+                    "name": "Remote VIP",
+                    "color": None,
+                    "updated_at": "2026-06-02T09:00:00",
+                },
+            },
+            {
+                "table": "clients",
+                "global_id": remote_client_gid,
+                "updated_at": "2026-06-02T10:00:00",
+                "deleted_at": None,
+                "row": {
+                    "global_id": remote_client_gid,
+                    "name": "Remote Grouped",
+                    "status": "active",
+                    "group_global_id": remote_group_gid,
+                    "updated_at": "2026-06-02T10:00:00",
+                },
+            },
+        ],
+    )
+    assert (applied, conflicts) == (2, 0)
+    remote_group = db._fetch_one(
+        "SELECT id, name FROM client_groups WHERE global_id = ?",
+        (remote_group_gid,),
+    )
+    assert remote_group["name"] == "Remote VIP"
+    row = db._fetch_one(
+        "SELECT name, group_id FROM clients WHERE global_id = ?",
+        (remote_client_gid,),
+    )
     assert row["name"] == "Remote Grouped"
-    assert row["group_id"] == group_id
+    assert row["group_id"] == remote_group["id"]
 
+    # Numeric group_id in a remote payload must still be ignored
+    stray_gid = uuid.uuid4().hex
+    sync.apply_remote_changes(
+        db,
+        [
+            {
+                "table": "clients",
+                "global_id": stray_gid,
+                "updated_at": "2026-06-03T10:00:00",
+                "deleted_at": None,
+                "row": {
+                    "global_id": stray_gid,
+                    "name": "Stray",
+                    "status": "active",
+                    "group_id": group_id,
+                    "updated_at": "2026-06-03T10:00:00",
+                },
+            },
+        ],
+    )
+    stray = db._fetch_one("SELECT group_id FROM clients WHERE global_id = ?", (stray_gid,))
+    assert stray["group_id"] is None
+
+
+def test_sync_pull_paginates_until_short_page(db, monkeypatch):
+    """Large pulls request multiple Worker pages and report page count."""
+    monkeypatch.setattr(sync, "SYNC_PULL_PAGE_SIZE", 2)
+    pages = [
+        {
+            "ok": True,
+            "server_time": "2026-06-01T12:00:00Z",
+            "changes": [
+                {
+                    "table": "clients",
+                    "global_id": "g0",
+                    "updated_at": "2026-06-01T11:00:00Z",
+                    "deleted_at": None,
+                    "row": {
+                        "global_id": "g0",
+                        "name": "Co 0",
+                        "status": "active",
+                        "updated_at": "2026-06-01T11:00:00Z",
+                    },
+                },
+                {
+                    "table": "clients",
+                    "global_id": "g1",
+                    "updated_at": "2026-06-01T11:00:01Z",
+                    "deleted_at": None,
+                    "row": {
+                        "global_id": "g1",
+                        "name": "Co 1",
+                        "status": "active",
+                        "updated_at": "2026-06-01T11:00:01Z",
+                    },
+                },
+            ],
+        },
+        {
+            "ok": True,
+            "server_time": "2026-06-01T12:00:01Z",
+            "changes": [
+                {
+                    "table": "clients",
+                    "global_id": "g-last",
+                    "updated_at": "2026-06-01T11:01:00Z",
+                    "deleted_at": None,
+                    "row": {
+                        "global_id": "g-last",
+                        "name": "Last Co",
+                        "status": "active",
+                        "updated_at": "2026-06-01T11:01:00Z",
+                    },
+                }
+            ],
+        },
+    ]
+    calls: list[str] = []
+
+    def fake_request(method, path, **kwargs):
+        if method == "GET" and path == "/api/sync/pull":
+            calls.append(kwargs.get("query") or "")
+            return True, pages.pop(0)
+        if method == "POST" and path == "/api/sync/push":
+            return True, {
+                "ok": True,
+                "applied": 0,
+                "conflicts": 0,
+                "server_time": "2026-06-01T12:00:01Z",
+            }
+        return False, "unexpected"
+
+    monkeypatch.setattr(sync, "is_data_sync_enabled", lambda _db: True)
+    monkeypatch.setattr(sync, "ensure_sync_credentials", lambda **_kw: ("MID", "tok"))
+    monkeypatch.setattr(sync, "get_machine_id", lambda: "MID")
+    monkeypatch.setattr(sync, "_sync_request", fake_request)
+    monkeypatch.setattr(sync, "API_BASE_URL", "https://example.test")
+
+    ok, msg = sync.sync_data(db, timeout=5)
+    assert ok
+    assert "pulled 3" in msg
+    assert "2 pull pages" in msg
+    assert len(calls) == 2
+    assert "limit=2" in calls[0]
+    assert "since=" in calls[1]
 
 def test_rotate_sync_credentials_after_license_change(monkeypatch, fake_app_dir):
     import urllib.request

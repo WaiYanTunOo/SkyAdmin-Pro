@@ -17,37 +17,35 @@ Delegate using the Task tool or `/subagent-name`. Each subagent reads its listed
 
 | Subagent | When to delegate | Primary duties | Skills |
 |----------|------------------|----------------|--------|
-| `ui-widgets` | Date pickers, form fields, calendar popups, `widgets.py` | DatePicker polish (multi-instance binds, grab, topmost); form widget consistency | `skyadmin-stack`, `skyadmin-ui-widgets` |
-| `ui-performance` | Scroll jank, nested scroll, first-paint, polling | Trees out of scroll; Settings nested scroll; Dashboard first-paint deferral | `skyadmin-stack`, `skyadmin-ui-performance` |
-| `company-details` | Company Details panel and sub-tabs | Trees outside `CanvasScrollFrame`; scroll architecture in `company_details/` | `skyadmin-stack`, `skyadmin-ui-widgets`, `skyadmin-ui-performance` |
-| `worker-api` | `skyadmin-worker/` routes, sync, license, D1 | Expired register Vitest; auth/doc wording; Worker routes | `skyadmin-stack`, `skyadmin-worker` |
-| `desktop-core` | `services/`, `db/`, sync, export, license logic | Finish `_migrate_*` extract; `group_id` sync allowlist; vault/ciphertext tests | `skyadmin-stack` |
+| `ui-widgets` | Date pickers, form fields, calendar popups, `widgets.py` | Form widget consistency; DatePicker regressions | `skyadmin-stack`, `skyadmin-ui-widgets` |
+| `ui-performance` | Scroll jank, nested scroll, first-paint, polling | Remaining scroll/perf polish | `skyadmin-stack`, `skyadmin-ui-performance` |
+| `company-details` | Company Details panel and sub-tabs | Sub-tab UX in `company_details/` | `skyadmin-stack`, `skyadmin-ui-widgets`, `skyadmin-ui-performance` |
+| `worker-api` | `skyadmin-worker/` routes, sync, license, D1 | Worker routes, Vitest, D1 migrations | `skyadmin-stack`, `skyadmin-worker` |
+| `desktop-core` | `services/`, `db/`, sync, export, license logic | Services/DB hardening, sync allowlists | `skyadmin-stack` |
 | `qa-verifier` | After UI or API changes; pre-ship | Run pytest/vitest/release_check; report pass/fail (read-only) | `skyadmin-qa` |
-| `packaging-release` | Builds, installer, CI, version bumps | Release Worker gate (`needs: worker`); version hardcode alignment | `skyadmin-stack`, `skyadmin-qa` |
+| `packaging-release` | Builds, installer, CI, version bumps | Release workflow, signing, version alignment | `skyadmin-stack`, `skyadmin-qa` |
 
 ## Landed (do not re-implement)
 
-Phases 7–11 quick wins and AGENTS priorities 1–3 are **done**:
+Phases 7–11, S1 hardening, and residual sprint P0–P2 are **done**:
 
-- `DatePickerField` transient `Toplevel` + flip-up near screen bottom
-- Database & Tasks active-tab-only refresh
-- Company Details lazy sub-tab creation
-- Document Hub lazy panels + poll pause
-- Worker timing-safe auth, sync token TTL, admin CSP (and related S1 hardening)
+- `DatePickerField` transient `Toplevel` + flip-up; class-level open tracking; grab without `after(80)` / `-topmost`
+- Database & Tasks active-tab-only refresh; Company Details lazy sub-tabs; Document Hub lazy panels
+- Trees outside `CanvasScrollFrame` (General form scroll + fixed trees); Settings nested checklist scroll removed
+- Dashboard progressive detail-tree staging on first show
+- Worker timing-safe auth, sync token TTL + `token_hash`, admin CSP, control/pull rate limits
+- Release publish `needs: [windows-release, worker]`; installer auto-update URL; tag fail-closed without `SKYADMIN_API_TOKEN`
+- `clients.group_id` numeric FK stays local; Wave C syncs `client_groups` + `group_global_id`
+- Versioned desktop migrations; thin `_migrate_*` CoreMixin wrappers removed
 
-Do **not** re-open timing-oracle / sync-TTL / CSP work as greenfield P0.
+Do **not** re-open timing-oracle / sync-TTL / CSP / trees-out-of-scroll / release Worker gate as greenfield P0.
 
-## Implementation priority (residual sprint backlog)
+## Implementation priority (post residual sprint)
 
-1. `company-details` + `ui-performance` — Company Details: keep trees **outside** `CanvasScrollFrame` (form scroll vs tree)
-2. `ui-performance` — Settings: remove nested `CTkScrollableFrame` checklist scroll
-3. `ui-widgets` — DatePicker polish (class-level open-popup tracking, safer grab, drop `-topmost` flicker)
-4. `ui-performance` — Dashboard: defer more of first `build()` cost (stat cards stay; heavy widgets later)
-5. `packaging-release` — Gate GitHub Release / Worker update on Worker job success (`needs: worker`)
-6. `worker-api` — Vitest for expired claim eligibility on `POST /api/sync/register` → 403
-7. `desktop-core` — Extract remaining `_migrate_*` into `db/migrations/`; add `group_id` to sync allowlists (or document local-only)
-
-Re-evaluate after this backlog; **do not** start Qt/Electron migration unless residual UX still fails after these fixes.
+1. Optional polish — Filing history already expandable; further UX only if measured pain
+2. Optional GitHub Environment protection on Worker deploy (concurrency already set)
+3. Wave B product features — see `docs/FEATURES_AND_UPGRADE_PLAN.md`
+4. Defer — deeper SQLite pool rewrite; Qt/Electron unless residual UX still fails
 
 ## Parallel workstreams
 
@@ -64,10 +62,10 @@ Avoid parallel edits to the same file. `company-details` and `ui-widgets` both t
 
 | Keep | Fix / improve | Do not rewrite (yet) |
 |------|----------------|----------------------|
-| Python `services/`, `db/` | Trees-out-of-scroll, Settings nested scroll | Entire app in Kotlin/Swift |
-| SQLite schema | DatePicker polish, Dashboard first-paint | Worker unless API/test gap |
-| TypeScript Worker | Release Worker gate; migrate extract; `group_id` sync | Full desktop framework migration |
-| Landed Phase 7–11 + S1 hardening | Expired-register Vitest | Re-do timing oracle / sync TTL / CSP |
+| Python `services/`, `db/` | Optional UX polish above | Entire app in Kotlin/Swift |
+| SQLite schema + versioned migrations | `deploy.yml` concurrency | Full desktop framework migration |
+| TypeScript Worker + D1 migrations | Doc drift only | Re-do S1 / P0–P2 landed work |
+| Landed Phase 7–11 + S1 + P0–P2 | Feature pack F1 later | |
 
 ## Key paths
 
@@ -75,9 +73,9 @@ Avoid parallel edits to the same file. `company-details` and `ui-widgets` both t
 skyadmin_pro/ui/widgets.py              # DatePickerField, shared widgets
 skyadmin_pro/ui/views/database_tasks/   # Tab view, lazy panels
 skyadmin_pro/ui/views/company_details/  # Company Details sub-tabs
-skyadmin_pro/ui/views/settings/         # Nested scroll residual
-skyadmin_pro/ui/views/dashboard.py      # Dashboard first-paint
-skyadmin_pro/db/migrations/             # Remaining _migrate_* extract
+skyadmin_pro/ui/views/settings/         # Settings tabs
+skyadmin_pro/ui/views/dashboard.py      # Dashboard
+skyadmin_pro/db/migrations/             # Versioned desktop migrations
 skyadmin-worker/src/                    # Worker API + Vitest
 .github/workflows/release.yml           # Worker gate for publish
 docs/WORKER_ADMIN.md                    # Admin UI split — multi-AI handoff
@@ -85,7 +83,7 @@ tests/                                  # pytest
 skyadmin-worker/src/*.test.ts           # Vitest
 docs/UI_CHECKLIST.md                    # Manual UI QA
 docs/ROADMAP.md                         # Phases 7–11 (landed)
-docs/MASTER_ROADMAP.md                  # Audit + current NEXT backlog
+docs/MASTER_ROADMAP.md                  # Audit + backlog
 ```
 
 ## Success criteria
@@ -94,7 +92,7 @@ docs/MASTER_ROADMAP.md                  # Audit + current NEXT backlog
 - Settings: single scroll surface per tab (no nested CTk scroll)
 - DatePicker multi-instance dismiss/grab polish; no `-topmost` flicker
 - Dashboard first paint lighter; existing dashboard refresh tests still pass
-- Tag release cannot publish if Worker Vitest fails
-- Expired sync register covered by Vitest; `group_id` sync intentional
+- Tag release cannot publish if Worker Vitest fails or `SKYADMIN_API_TOKEN` missing
+- Expired sync register covered by Vitest; groups sync via `global_id` / `group_global_id`
 - `pytest` and Worker Vitest pass
 - `python scripts/release_check.py` → RELEASE OK before ship

@@ -1,9 +1,11 @@
 #!/usr/bin/env python3
 """Publish a desktop app update on the Worker (LATEST line on control list).
 
+Ship path URL is the Windows installer (SkyAdminPro-Setup-<version>.exe), not the portable exe.
+
 Usage:
-  python scripts/publish_update.py --version 0.3.2 --url https://cdn.example/SkyAdminPro.exe
-  python scripts/publish_update.py --version 0.3.2 --url https://cdn.example/SkyAdminPro.exe --api-url https://worker.example --token YOUR_API_TOKEN
+  python scripts/publish_update.py --version 0.3.2 --url https://cdn.example/SkyAdminPro-Setup-0.3.2.exe
+  python scripts/publish_update.py --version 0.3.2 --url https://cdn.example/SkyAdminPro-Setup-0.3.2.exe --api-url https://worker.example --token YOUR_API_TOKEN
 """
 
 from __future__ import annotations

@@ -22,4 +22,10 @@ def test_dashboard_build_defers_header_extras():
     assert "self.next_tree" not in build_src
     assert "timeline_canvas" not in build_src
     assert "_build_header_extras" in text
-    assert "self._build_header_extras()" in text.split("def on_show")[1].split("def on_hide")[0]
+    on_show = text.split("def on_show")[1].split("def on_hide")[0]
+    assert "self._build_header_extras()" in on_show
+    assert "self._schedule_detail_trees_progressive()" in on_show
+    assert "self._build_detail_trees()" not in on_show
+    assert "def _build_detail_trees_priority" in text
+    assert "def _build_detail_trees_secondary" in text
+    assert "def _build_detail_trees_heavy" in text

@@ -799,27 +799,17 @@ class DatePickerField(ctk.CTkFrame):
             pass
 
     def _grab_calendar(self, top: ctk.CTkToplevel) -> None:
+        """Grab after the popup is mapped — prefer update() over delayed retry."""
         self._cancel_grab_retry()
-
-        def _try_grab() -> None:
-            try:
-                if self._calendar_top is not top or not self._widget_alive(top):
-                    return
-                top.grab_set()
-            except tk.TclError:
-                pass
-
-        _try_grab()
         try:
-            if (
-                self._calendar_top is top
-                and self._widget_alive(top)
-                and not top.grab_current()
-            ):
-                # Schedule on the field (not the popup) so destroy of `top`
-                # cannot leave an unguarded callback; identity check above
-                # no-ops if another calendar replaced this one.
-                self._grab_after_id = self.after(80, _try_grab)
+            if self._calendar_top is not top or not self._widget_alive(top):
+                return
+            # Flush geometry/map so grab_set succeeds without a delayed retry race.
+            top.update_idletasks()
+            top.update()
+            if self._calendar_top is not top or not self._widget_alive(top):
+                return
+            top.grab_set()
         except tk.TclError:
             pass
 
@@ -954,9 +944,9 @@ class DatePickerField(ctk.CTkFrame):
         self._register_open(top)
         try:
             if self._widget_alive(top):
-                top.update_idletasks()
                 top.deiconify()
                 top.lift()
+                top.update_idletasks()
         except tk.TclError:
             self._close_calendar()
             return

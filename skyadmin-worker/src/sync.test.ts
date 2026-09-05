@@ -55,8 +55,14 @@ function mockEnv(overrides: Partial<Env> & { dbState?: Record<string, unknown> }
             return nonces.has(String(args[0])) ? { nonce: String(args[0]) } : null;
           }
           if (sqlLower.includes("from sync_devices")) {
-            const token = state.sync_devices.get(String(args[0]));
-            return token ? { token } : null;
+            const tokenHash = state.sync_devices.get(String(args[0]));
+            if (!tokenHash) return null;
+            // Support both SELECT machine_id and SELECT token_hash lookups.
+            return {
+              machine_id: String(args[0]),
+              token_hash: tokenHash,
+              expires_at: "2027-01-01T00:00:00",
+            };
           }
           return null;
         },
@@ -73,8 +79,9 @@ function mockEnv(overrides: Partial<Env> & { dbState?: Record<string, unknown> }
           if (sqlLower.includes("insert into sync_devices")) {
             state.sync_devices.set(String(args[0]), String(args[1]));
           }
-          if (sqlLower.includes("update sync_devices set token")) {
-            state.sync_devices.set(String(args[1]), String(args[0]));
+          if (sqlLower.includes("update sync_devices set token_hash")) {
+            // UPDATE ... SET token_hash=?, ... expires_at=? WHERE machine_id=?
+            state.sync_devices.set(String(args[2]), String(args[0]));
           }
           return { success: true };
         },
@@ -286,6 +293,9 @@ describe("POST /api/sync/register", () => {
 describe("POST /api/sync/push LWW", () => {
   it("returns conflicts when client updated_at is older than server", async () => {
     const token = "test-sync-token";
+    const tokenHash = Array.from(new Uint8Array(await crypto.subtle.digest("SHA-256", new TextEncoder().encode(token))))
+      .map((b) => b.toString(16).padStart(2, "0"))
+      .join("");
     const future = new Date(Date.now() + 30 * 86400000).toISOString().slice(0, 19);
 
     const db = {
@@ -295,7 +305,7 @@ describe("POST /api/sync/push LWW", () => {
           bind: (..._args: unknown[]) => ({
             first: async () => {
               if (sqlLower.includes("from sync_devices")) {
-                return { machine_id: MID, expires_at: future };
+                return { machine_id: MID, token_hash: tokenHash, expires_at: future };
               }
               if (sqlLower.includes("returning count")) {
                 return { count: 1 };

@@ -82,6 +82,43 @@ class TestClientsMixin:
         db.delete_client_group(gid)
         assert db.get_client(cid)["group_id"] is None
 
+    def test_client_group_rejects_blank_and_duplicate(self, db):
+        with pytest.raises(ValueError, match="required"):
+            db.add_client_group("  ")
+        db.add_client_group("VIP")
+        with pytest.raises(ValueError, match="already exists"):
+            db.add_client_group("vip")
+
+    def test_batch_update_client_status(self, db):
+        ids = [db.get_or_create_client(f"Status {i}") for i in range(3)]
+        assert db.batch_update_client_status(ids, "Inactive") == 3
+        assert all(db.get_client(i)["status"] == "inactive" for i in ids)
+        with pytest.raises(ValueError, match="active or inactive"):
+            db.batch_update_client_status(ids, "paused")
+
+    def test_batch_assign_client_group(self, db):
+        ids = [db.get_or_create_client(f"Grouped {i}") for i in range(2)]
+        gid = db.add_client_group("Local VIP")
+        assert db.batch_assign_client_group(ids, gid) == 2
+        assert all(db.get_client(i)["group_id"] == gid for i in ids)
+        assert db.batch_assign_client_group(ids, None) == 2
+        assert all(db.get_client(i)["group_id"] is None for i in ids)
+        with pytest.raises(ValueError, match="not found"):
+            db.batch_assign_client_group(ids, 99999)
+
+    def test_batch_archive_and_restore_clients(self, db):
+        ids = [db.get_or_create_client(f"Archive Me {i}") for i in range(2)]
+        assert db.batch_archive_clients(ids) == 2
+        listed = {c["name"] for c in db.list_clients()}
+        assert "Archive Me 0" not in listed
+        assert db.search_clients("Archive") == []
+        assert db.count_clients() == 0
+        # Row still readable by id for undo/restore paths
+        assert db.get_client(ids[0]) is not None
+        assert db.get_client(ids[0])["deleted_at"]
+        assert db.batch_restore_clients(ids) == 2
+        assert {c["name"] for c in db.list_clients()} >= {"Archive Me 0", "Archive Me 1"}
+
     def test_record_document(self, db):
         cid = db.get_or_create_client("Acme Corp")
         doc_id = db.record_document(

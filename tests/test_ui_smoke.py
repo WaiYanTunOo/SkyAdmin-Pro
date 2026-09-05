@@ -31,6 +31,19 @@ def app(tmp_path_factory):
         pass
 
 
+def _open_settings_tab(app, tab_name: str):
+    """Show Settings and build the named lazy tab (General is eager by default)."""
+    app.show_view("settings")
+    app.update()
+    settings = app._views["settings"]
+    settings.tabs.set(tab_name)
+    settings._on_tab_changed()
+    # on_show only refreshed the previous tab; refresh after lazy build
+    settings.on_show()
+    app.update()
+    return settings
+
+
 def test_sidebar_toggle_collapses_and_expands(app):
     assert not app._sidebar_collapsed
     app._toggle_sidebar()
@@ -61,9 +74,7 @@ def test_views_lazy_loaded(app):
 
 
 def test_settings_license_controls(app):
-    app.show_view("settings")
-    app.update()
-    settings = app._views["settings"]
+    settings = _open_settings_tab(app, "License")
     texts = []
 
     def walk(w):
@@ -74,6 +85,7 @@ def test_settings_license_controls(app):
 
     walk(settings)
     assert sum("Activate / Manage" in t for t in texts) == 1
+    # Disclaimer lives on General (already built).
     assert any("Disclaimer" in t for t in texts)
 
 
@@ -102,17 +114,13 @@ def test_document_hub_lazy_tabs(app):
 
 
 def test_settings_workspace_field(app):
-    app.show_view("settings")
-    app.update()
-    settings = app._views["settings"]
+    settings = _open_settings_tab(app, "Data & backup")
     assert hasattr(settings, "workspace_var")
     assert settings.workspace_var.get().strip()
 
 
 def test_settings_sync_status_labels(app):
-    app.show_view("settings")
-    app.update()
-    settings = app._views["settings"]
+    settings = _open_settings_tab(app, "License")
     assert hasattr(settings, "data_sync_label")
     settings._refresh_license_label()
     app.update()

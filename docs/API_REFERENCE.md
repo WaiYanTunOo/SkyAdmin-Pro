@@ -4,7 +4,14 @@ Base URL: `https://<your-worker>.workers.dev`
 
 ## Authentication
 
-All protected endpoints require `Authorization: Bearer <API_TOKEN>` header.
+Protected **JSON API** routes accept either:
+
+1. `Authorization: Bearer <API_TOKEN>`, or
+2. Same-origin admin session cookie **plus** `X-CSRF-Token` on mutating requests (`auth.ts`)
+
+Admin **HTML** pages use the session cookie only (login CSRF on the form). Do not document the API as Bearer-only — see `docs/WORKER_ADMIN.md`.
+
+Public endpoints (`/api/ping`, `/api/control`, `/api/claim`, `/api/sync/register`, pricing GET, signing public key) do not require Bearer auth; several are rate-limited.
 
 ## Public Endpoints
 
@@ -19,22 +26,15 @@ Health check.
 
 ### GET /api/control
 
-Returns the control list (latest version, update URL, ban list, revocations).
+Returns a **SKYCTRL2-signed `text/plain` envelope** (not JSON). Rate-limited (~30/min per IP).
 
-**Response:** `200 OK`
-```json
-{
-  "ok": true,
-  "version": 42,
-  "update": { "version": "0.3.2", "url": "https://..." },
-  "bans": ["AABBCCDD11223344"],
-  "revocations": ["nonce1", "nonce2"]
-}
-```
+**Response:** `200 OK` with `Content-Type: text/plain; charset=utf-8`
+
+Body is a signed control list (revocations, bans, used nonces, optional `LATEST version url`). Clients verify via Ed25519; see desktop license/control consumers.
 
 ### POST /api/claim
 
-Public activation burn. No auth required.
+Public activation burn. No auth required. Rate-limited.
 
 **Request:**
 ```json
@@ -55,11 +55,21 @@ Public activation burn. No auth required.
 
 ### POST /api/sync/register
 
-Register a device for sync. Returns a sync token.
+Exchange a valid activation code for a device sync token. Rejects banned/revoked/**expired** licenses (403). Rate-limited. After D1 migration `0003_sync_tokens_hash`, devices must re-register (tokens stored as SHA-256 hashes).
 
 **Request:**
 ```json
-{ "machine_id": "AABBCCDD11223344", "device_name": "My Phone" }
+{ "code": "<activation-code>" }
+```
+
+**Response:** `200 OK`
+```json
+{
+  "ok": true,
+  "machine_id": "AABBCCDD11223344",
+  "sync_token": "...",
+  "schema_version": 1
+}
 ```
 
 ### GET /api/signing/public-key
@@ -83,11 +93,11 @@ Returns activation pricing packages.
 
 ### GET /api/update
 
-Returns the latest published app version.
+Returns the latest published app version (installer URL when published via release pipeline).
 
 ## Protected Endpoints
 
-Require `Authorization: Bearer <API_TOKEN>`.
+Require Bearer token **or** same-origin session cookie + CSRF (see Authentication).
 
 ### POST /api/generate
 
@@ -177,17 +187,21 @@ Archive old license records.
 
 ## Sync Endpoints
 
+Device sync uses `Authorization: Bearer <sync_token>` and `X-Machine-Id` (not the owner `API_TOKEN`). Tokens are stored hashed; null/missing `expires_at` is rejected. Pull and push are rate-limited (~30/min per IP).
+
 ### POST /api/sync/push
 
 Push local changes to the server.
 
 ### GET /api/sync/pull
 
-Pull server changes since last sync.
+Pull server changes since last sync. Rate-limited.
 
 ### GET /api/sync/schema
 
-Returns the D1 schema for client-side migration.
+Returns the sync table allowlist / schema version for clients.
+
+**Note:** `client_groups` syncs as its own table (`SYNC_SCHEMA_VERSION` 2+). Numeric `clients.group_id` is never uploaded; membership uses `group_global_id` remapped locally.
 
 ## Admin Endpoints
 

@@ -3,6 +3,22 @@
 All notable changes to SkyAdmin Pro are documented here.
 Format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 
+## [0.3.3] - 2026-09-05
+
+### Added
+
+- Sync `client_groups` across devices (`global_id` / soft-delete) with `group_global_id` membership remap.
+- Sync pull pagination (multi-page Worker pulls) with page count in status text.
+- Sync conflict dialog: table filter, copy Global ID, refresh (split into `sync_conflicts_dialog.py`).
+- Desktop `sync_schema.py` manifest aligned with Worker `sync_schema.ts`.
+- Wave B F1 product features (auto-backup UX, shortcuts, bulk clients, audit filters, PDF reports).
+- Worker migrations `0003`/`0004`, release Worker gate, Settings lazy tabs, Filing history expand.
+
+### Changed
+
+- Sync schema version 2 (desktop + Worker manifests).
+- Version bump to 0.3.3.
+
 ## [0.3.2] - 2026-09-03
 
 ### Added

@@ -27,6 +27,7 @@ Write-Host "Code signing (optional)..."
 if ($LASTEXITCODE -ne 0) { throw "sign-windows.ps1 failed" }
 
 Write-Host ""
-Write-Host "Running release checks..."
-& $Py scripts\release_check.py --skip-pytest
+Write-Host "Running release checks (portable path — installer not required)..."
+# Portable-only build: skip installer gate. Ship path is build-installer.ps1 / CI release.yml.
+& $Py scripts\release_check.py --skip-pytest --skip-installer
 if ($LASTEXITCODE -ne 0) { throw "release_check failed with exit code $LASTEXITCODE" }

@@ -10,7 +10,9 @@ from skyadmin_pro.services.auto_backup import (
     SETTING_AUTO_BACKUP_INTERVAL,
     SETTING_AUTO_BACKUP_LAST_RUN,
     AutoBackupScheduler,
+    auto_backups_dir,
     prune_old_backups,
+    retention_help_text,
     should_run_backup,
 )
 
@@ -74,6 +76,32 @@ class TestPruneOldBackups:
 
     def test_missing_dir_returns_zero(self, tmp_path):
         assert prune_old_backups(tmp_path / "nope") == 0
+
+
+class TestRetentionMessaging:
+    def test_help_text_mentions_keep_count(self):
+        text = retention_help_text()
+        assert str(AUTO_BACKUP_KEEP) in text
+        assert "AutoBackups" in text
+
+    def test_help_text_custom_keep(self):
+        assert "newest 3" in retention_help_text(3)
+
+    def test_auto_backups_dir(self, tmp_path):
+        assert auto_backups_dir(tmp_path) == tmp_path / "AutoBackups"
+
+
+class TestSchedulerNudge:
+    def test_nudge_schedules_soon_check(self, tmp_path):
+        db = _FakeDb()
+        app = _FakeApp(db, tmp_path)
+        sched = AutoBackupScheduler(app)
+        sched.start()
+        assert app._after_calls
+        app._after_calls.clear()
+        sched.nudge(delay_ms=250)
+        assert app._after_calls
+        assert app._after_calls[-1][0] == 250
 
 
 class TestShouldRunBackup:

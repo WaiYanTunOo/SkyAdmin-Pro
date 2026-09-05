@@ -17,7 +17,7 @@ describe("preparePushChanges", () => {
         table: "clients",
         global_id: "gid-1",
         updated_at: "2026-09-02T10:00:00Z",
-        row: { name: "Acme", ird_password: "secret" },
+        row: { name: "Acme", ird_password: "secret", group_id: 42 },
       },
       { table: "bad", global_id: "x", updated_at: "2026-09-02T10:00:00Z" },
       { table: "tasks", global_id: "", updated_at: "2026-09-02T10:00:00Z" },
@@ -26,6 +26,30 @@ describe("preparePushChanges", () => {
     expect(skipped).toBe(2);
     expect(prepared).toHaveLength(1);
     expect(JSON.parse(prepared[0].rowJson)).toEqual({ name: "Acme" });
+  });
+
+  it("accepts client_groups and keeps group_global_id on clients", () => {
+    const { prepared, skipped } = preparePushChanges([
+      {
+        table: "client_groups",
+        global_id: "grp-1",
+        updated_at: "2026-09-02T10:00:00Z",
+        row: { name: "VIP", color: "#fff" },
+      },
+      {
+        table: "clients",
+        global_id: "gid-1",
+        updated_at: "2026-09-02T10:00:00Z",
+        row: { name: "Acme", group_id: 42, group_global_id: "grp-1" },
+      },
+    ]);
+    expect(skipped).toBe(0);
+    expect(prepared).toHaveLength(2);
+    expect(JSON.parse(prepared[0].rowJson)).toEqual({ name: "VIP", color: "#fff" });
+    expect(JSON.parse(prepared[1].rowJson)).toEqual({
+      name: "Acme",
+      group_global_id: "grp-1",
+    });
   });
 
   it("skips oversized row payloads", () => {

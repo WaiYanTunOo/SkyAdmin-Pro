@@ -120,7 +120,11 @@ def test_ird_password_migrates_to_rd_credential(db, monkeypatch):
     client_id = db.get_or_create_client("Gamma Co")
     db.update_client_fields(client_id, ird_password="legacy-rd-pass")
 
-    db._migrate_ird_to_client_credentials()
+    from skyadmin_pro.db.migrations.m005_ird_to_client_credentials import (
+        migrate_ird_to_client_credentials,
+    )
+
+    migrate_ird_to_client_credentials(db)
 
     cred = db.get_client_rd_credential(client_id)
     assert cred is not None
@@ -128,7 +132,7 @@ def test_ird_password_migrates_to_rd_credential(db, monkeypatch):
     assert cred["password"] == "legacy-rd-pass"
 
     # Idempotent — second run must not duplicate.
-    db._migrate_ird_to_client_credentials()
+    migrate_ird_to_client_credentials(db)
     rows = db.list_client_credentials(client_id=client_id, credential_type="RD")
     assert len(rows) == 1
 

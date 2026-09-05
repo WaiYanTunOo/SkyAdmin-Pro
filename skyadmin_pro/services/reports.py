@@ -1,4 +1,4 @@
-"""Status report model — dashboard + Database & Tasks, English-only, redaction-safe.
+"""Status report model — dashboard + tax snapshot, English-only, redaction-safe.
 
 The model is plain data (dicts/lists/strings) so the PDF renderer stays dumb.
 Every row is projected through an explicit allowlist; a runtime assert scan
@@ -8,6 +8,7 @@ rejects forbidden columns (mirrors export.FORBIDDEN_EXPORT_COLUMNS).
 from __future__ import annotations
 
 from datetime import datetime
+from pathlib import Path
 from typing import TYPE_CHECKING
 
 if TYPE_CHECKING:
@@ -18,6 +19,18 @@ from skyadmin_pro.services.export import FORBIDDEN_EXPORT_COLUMNS
 #: Max rows per section table — keeps PDFs sane at 500+ clients.
 REPORT_TABLE_ROW_CAP = 60
 
+#: Tax overview columns — never include vault/password fields.
+_TAX_OVERVIEW_KEYS = (
+    "name",
+    "fs_status",
+    "pnd53_status",
+    "pp30_status",
+    "pnd51_status",
+    "pnd50_status",
+    "audit_status",
+    "payment_status",
+)
+
 
 def _cell(value: object) -> str:
     if value is None:
@@ -27,7 +40,8 @@ def _cell(value: object) -> str:
 
 
 def _project(row: dict, keys: tuple[str, ...]) -> list[str]:
-    return [_cell(row.get(key)) for key in keys]
+    safe_keys = tuple(k for k in keys if str(k).lower() not in FORBIDDEN_EXPORT_COLUMNS)
+    return [_cell(row.get(key)) for key in safe_keys]
 
 
 def _assert_no_forbidden(model: dict) -> None:
@@ -47,7 +61,7 @@ def _assert_no_forbidden(model: dict) -> None:
 
 
 def build_status_report(db: Database) -> dict:
-    """Assemble the dashboard + Database & Tasks status report model."""
+    """Assemble the dashboard + tax snapshot status report model."""
     from skyadmin_pro.config import APP_VERSION
 
     snap = db.dashboard_snapshot()
@@ -104,6 +118,14 @@ def build_status_report(db: Database) -> dict:
             for r in snap.get("renewal_due", [])
         ],
     )
+    add_section(
+        "Tax filing overview",
+        ["Client", "FS", "PND53", "PP30", "PND51", "PND50", "Audit", "Payment"],
+        [
+            _project(r, _TAX_OVERVIEW_KEYS)
+            for r in snap.get("accounting_clients", [])
+        ],
+    )
     clients = db.search_clients("")
     add_section(
         "Clients",
@@ -120,6 +142,13 @@ def build_status_report(db: Database) -> dict:
     }
     _assert_no_forbidden(model)
     return model
+
+
+def write_status_report_pdf(db: Database, dest: Path) -> Path:
+    """Build a redacted status report and render it to ``dest`` (atomic write)."""
+    from skyadmin_pro.services.pdf_render import render_report
+
+    return render_report(build_status_report(db), Path(dest))
 
 
 def default_report_name() -> str:

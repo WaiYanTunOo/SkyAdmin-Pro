@@ -15,6 +15,7 @@ from skyadmin_pro.config import (
     SETTING_PORTAL_URL,
     TRANSACTION_RANGES,
 )
+from skyadmin_pro.ui.canvas_scroll import CanvasScrollFrame
 from skyadmin_pro.ui.theme import TEXT_MUTED
 from skyadmin_pro.ui.treeview import ThemedTreeview
 from skyadmin_pro.ui.views.base import BaseView
@@ -31,7 +32,6 @@ from skyadmin_pro.ui.widgets import (
     labeled_entry,
     option_menu_style_kwargs,
     themed_entry,
-    themed_scrollable_frame,
     themed_tabview,
     themed_textbox,
 )
@@ -49,12 +49,13 @@ class SettingsView(BackupMixin, ChecklistMixin, LicenseMixin, PricingMixin, Work
         self.feedback = FeedbackLabel(self.body)
         self.feedback.grid(row=0, column=0, sticky="ew", pady=(0, 6))
 
-        self.tabs = themed_tabview(self.body)
+        self.tabs = themed_tabview(self.body, command=self._on_tab_changed)
         self.tabs.grid(row=1, column=0, sticky="nsew", pady=(0, 0))
 
         self._checklist_rows: list[tuple[ctk.CTkFrame, ctk.StringVar, ctk.StringVar]] = []
         self._pricing_rows: dict[str, dict] = {}
         self._selected_pricing_id: int | None = None
+        self._lazy_tabs: set[str] = set()
 
         for name in ("General", "License", "Business", "Data & backup"):
             self.tabs.add(name)
@@ -63,16 +64,49 @@ class SettingsView(BackupMixin, ChecklistMixin, LicenseMixin, PricingMixin, Work
             tab.grid_rowconfigure(0, weight=1)
             tab.grid_propagate(True)
 
-        self._build_general_tab(self.tabs.tab("General"))
-        self._build_license_tab(self.tabs.tab("License"))
-        self._build_business_tab(self.tabs.tab("Business"))
-        self._build_data_tab(self.tabs.tab("Data & backup"))
+        # General is the default tab — build it now; others on first visit.
+        self._ensure_lazy_tab("General")
 
-    def _scroll_tab(self, tab) -> ctk.CTkScrollableFrame:
-        scroll = themed_scrollable_frame(tab)
+    def _current_tab(self) -> str:
+        try:
+            return self.tabs.get()
+        except Exception:
+            return "General"
+
+    def _on_tab_changed(self) -> None:
+        name = self._current_tab()
+        self._ensure_lazy_tab(name)
+        if name == "License":
+            self._refresh_license_label()
+        elif name == "Business":
+            self._load_directory_lists()
+            self._refresh_pricing_services()
+            self._refresh_pricing_matrix()
+        elif name == "Data & backup":
+            self._refresh_backup_banner()
+
+    def _ensure_lazy_tab(self, name: str) -> None:
+        if name in self._lazy_tabs:
+            return
+        tab = self.tabs.tab(name)
+        if name == "General":
+            self._build_general_tab(tab)
+        elif name == "License":
+            self._build_license_tab(tab)
+        elif name == "Business":
+            self._build_business_tab(tab)
+        elif name == "Data & backup":
+            self._build_data_tab(tab)
+        else:
+            return
+        self._lazy_tabs.add(name)
+
+    def _scroll_tab(self, tab) -> ctk.CTkFrame:
+        scroll = CanvasScrollFrame(tab)
         scroll.grid(row=0, column=0, sticky="nsew", padx=0, pady=0)
-        scroll.grid_columnconfigure(0, weight=1)
-        return scroll
+        scroll.content.grid_columnconfigure(0, weight=1)
+        scroll.content.grid_rowconfigure(0, weight=1)
+        return scroll.content
 
     def _build_general_tab(self, tab) -> None:
         scroll = self._scroll_tab(tab)
@@ -144,8 +178,8 @@ class SettingsView(BackupMixin, ChecklistMixin, LicenseMixin, PricingMixin, Work
 
         ctk.CTkLabel(
             body,
-            text="Shortcuts (outside text fields):  Ctrl+F search   ·   Ctrl+E export   ·   "
-            "Ctrl+N new client   ·   Ctrl+Z undo   ·   Ctrl+D theme",
+            text="Shortcuts:  Ctrl+F search   ·   Ctrl+E export   ·   "
+            "Ctrl+N new client   ·   Ctrl+S save   ·   Ctrl+Z undo   ·   Ctrl+D theme",
             font=ctk.CTkFont(size=11),
             text_color=TEXT_MUTED,
             anchor="w",
@@ -699,12 +733,13 @@ class SettingsView(BackupMixin, ChecklistMixin, LicenseMixin, PricingMixin, Work
         self.backup_banner.grid(row=1, column=0, sticky="ew")
         bind_wrap_label(self.backup_banner, backup_body, pad=24)
 
-        # Auto-backup toggle
+        # Auto-backup toggle + retention / restore path
         auto_frame = ctk.CTkFrame(backup_body, fg_color="transparent")
         auto_frame.grid(row=2, column=0, sticky="ew", pady=(8, 0))
         from skyadmin_pro.services.auto_backup import (
             SETTING_AUTO_BACKUP_ENABLED,
             SETTING_AUTO_BACKUP_INTERVAL,
+            retention_help_text,
         )
         self._auto_backup_enabled_var = ctk.StringVar(
             value="1" if self.app.db.get_setting(SETTING_AUTO_BACKUP_ENABLED) == "1" else "0"
@@ -720,43 +755,75 @@ class SettingsView(BackupMixin, ChecklistMixin, LicenseMixin, PricingMixin, Work
             auto_frame, variable=self._auto_backup_interval_var,
             values=["daily", "weekly", "off"], width=100,
             command=lambda _: self._toggle_auto_backup(),
+        ).pack(side="left", padx=(0, 12))
+        ctk.CTkButton(
+            auto_frame,
+            text="Open AutoBackups folder",
+            width=180,
+            fg_color="transparent",
+            border_width=1,
+            command=self._open_auto_backups_folder,
         ).pack(side="left")
+        self.auto_backup_retention_label = ctk.CTkLabel(
+            backup_body,
+            text=retention_help_text(),
+            anchor="w",
+            justify="left",
+            text_color=TEXT_MUTED,
+        )
+        self.auto_backup_retention_label.grid(row=3, column=0, sticky="ew", pady=(6, 0))
+        bind_wrap_label(self.auto_backup_retention_label, backup_body, pad=24)
 
     def on_show(self) -> None:
-        current = ctk.get_appearance_mode()
-        self.appearance_menu.set(current)
-        theme = self.app.db.get_setting(SETTING_COLOR_THEME, DEFAULT_COLOR_THEME) or DEFAULT_COLOR_THEME
-        try:
-            self.color_theme_menu.set(theme)
-        except Exception:
-            pass
-        self.workspace_var.set(str(self.app.paths.root))
-        self.tagline_var.set(
-            self.app.db.get_setting("app_tagline")
-            or APP_TAGLINE
-        )
-        saved_lang = (self.app.db.get_setting("ui_language") or "en").upper()
-        try:
-            self.lang_menu.set(saved_lang)
-        except Exception:
-            pass
-        self.path_labels["Clients"].configure(text=str(self.app.paths.clients))
-        self.path_labels["Suppliers"].configure(text=str(self.app.paths.suppliers))
-        self.db_value.configure(text=str(self.app.db.db_file))
-        self.portal_var.set(self.app.db.get_setting(SETTING_PORTAL_URL, DEFAULT_PORTAL_URL) or DEFAULT_PORTAL_URL)
-        self.services_text.delete("1.0", "end")
-        self.services_text.insert("1.0", "\n".join(self.app.db.list_service_types()))
-        self._reload_checklists()
-        self._load_directory_lists()
-        self._refresh_pricing_services()
-        self._refresh_pricing_matrix()
-        self._refresh_license_label()
-        self._refresh_backup_banner()
-        self._refresh_integrity_banner()
-        self._refresh_update_banner()
-        from skyadmin_pro.config import SETTING_DATA_SYNC_ENABLED
+        # Ensure the visible tab exists before refreshing its widgets.
+        current = self._current_tab()
+        self._ensure_lazy_tab(current)
 
-        self.data_sync_var.set((self.app.db.get_setting(SETTING_DATA_SYNC_ENABLED) or "0").strip() == "1")
+        if "General" in self._lazy_tabs:
+            current_mode = ctk.get_appearance_mode()
+            self.appearance_menu.set(current_mode)
+            theme = self.app.db.get_setting(SETTING_COLOR_THEME, DEFAULT_COLOR_THEME) or DEFAULT_COLOR_THEME
+            try:
+                self.color_theme_menu.set(theme)
+            except Exception:
+                pass
+            self.tagline_var.set(
+                self.app.db.get_setting("app_tagline")
+                or APP_TAGLINE
+            )
+            saved_lang = (self.app.db.get_setting("ui_language") or "en").upper()
+            try:
+                self.lang_menu.set(saved_lang)
+            except Exception:
+                pass
+            self.portal_var.set(
+                self.app.db.get_setting(SETTING_PORTAL_URL, DEFAULT_PORTAL_URL) or DEFAULT_PORTAL_URL
+            )
+            self._refresh_update_banner()
+
+        if "License" in self._lazy_tabs:
+            self._refresh_license_label()
+            from skyadmin_pro.config import SETTING_DATA_SYNC_ENABLED
+
+            self.data_sync_var.set(
+                (self.app.db.get_setting(SETTING_DATA_SYNC_ENABLED) or "0").strip() == "1"
+            )
+
+        if "Business" in self._lazy_tabs:
+            self.services_text.delete("1.0", "end")
+            self.services_text.insert("1.0", "\n".join(self.app.db.list_service_types()))
+            self._reload_checklists()
+            self._load_directory_lists()
+            self._refresh_pricing_services()
+            self._refresh_pricing_matrix()
+
+        if "Data & backup" in self._lazy_tabs:
+            self.workspace_var.set(str(self.app.paths.root))
+            self.path_labels["Clients"].configure(text=str(self.app.paths.clients))
+            self.path_labels["Suppliers"].configure(text=str(self.app.paths.suppliers))
+            self.db_value.configure(text=str(self.app.db.db_file))
+            self._refresh_integrity_banner()
+            self._refresh_backup_banner()
 
     def _path_row(self, info, *, row: int, on_open) -> ctk.CTkLabel:
         frame = ctk.CTkFrame(info, fg_color="transparent")

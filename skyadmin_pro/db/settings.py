@@ -109,59 +109,119 @@ class SettingsMixin:
                 (key, value),
             )
 
+    def _has_table(self, name: str) -> bool:
+        with self.connection() as conn:
+            row = conn.execute(
+                "SELECT 1 FROM sqlite_master WHERE type='table' AND name=? LIMIT 1",
+                (name,),
+            ).fetchone()
+        return row is not None
+
     def count_sync_conflicts(self) -> int:
+        if not self._has_table("sync_conflicts"):
+            return 0
         with self.connection() as conn:
             row = conn.execute("SELECT COUNT(*) AS c FROM sync_conflicts").fetchone()
         return int(row["c"]) if row else 0
 
-    def list_sync_conflicts(self, limit: int = 100) -> list[dict]:
+    def list_sync_conflicts(self, limit: int = 100, *, table_name: str | None = None) -> list[dict]:
+        """Local LWW conflict audit rows (empty if table missing)."""
+        if not self._has_table("sync_conflicts"):
+            return []
         lim = max(1, min(int(limit), 500))
+        table = (table_name or "").strip()
+        with self.connection() as conn:
+            if table:
+                rows = conn.execute(
+                    """
+                    SELECT id, table_name, global_id, direction, local_updated_at, remote_updated_at, logged_at
+                    FROM sync_conflicts
+                    WHERE table_name = ?
+                    ORDER BY logged_at DESC, id DESC
+                    LIMIT ?
+                    """,
+                    (table, lim),
+                ).fetchall()
+            else:
+                rows = conn.execute(
+                    """
+                    SELECT id, table_name, global_id, direction, local_updated_at, remote_updated_at, logged_at
+                    FROM sync_conflicts
+                    ORDER BY logged_at DESC, id DESC
+                    LIMIT ?
+                    """,
+                    (lim,),
+                ).fetchall()
+        return [dict(r) for r in rows]
+
+    def list_sync_conflict_tables(self) -> list[str]:
+        if not self._has_table("sync_conflicts"):
+            return []
         with self.connection() as conn:
             rows = conn.execute(
                 """
-                SELECT id, table_name, global_id, direction, local_updated_at, remote_updated_at, logged_at
-                FROM sync_conflicts
-                ORDER BY logged_at DESC, id DESC
-                LIMIT ?
-                """,
-                (lim,),
+                SELECT DISTINCT table_name FROM sync_conflicts
+                ORDER BY table_name COLLATE NOCASE
+                """
             ).fetchall()
-        return [dict(r) for r in rows]
+        return [str(r["table_name"]) for r in rows if r["table_name"]]
 
     def clear_sync_conflicts(self) -> int:
+        if not self._has_table("sync_conflicts"):
+            return 0
         with self.connection() as conn:
             row = conn.execute("SELECT COUNT(*) AS c FROM sync_conflicts").fetchone()
             count = int(row["c"]) if row else 0
             conn.execute("DELETE FROM sync_conflicts")
         return count
 
-    def list_audit_log(self, limit: int = 200) -> list[dict]:
-        """Unified audit log: tax_cycle_log + sync_conflicts, newest first."""
+    def list_tax_cycle_log(self, limit: int = 200) -> list[dict]:
+        """Global filing / tax-cycle change history (newest first).
+
+        Returns empty when ``tax_cycle_log`` is absent (legacy DBs).
+        Does not call the Worker admin audit API.
+        """
+        if not self._has_table("tax_cycle_log"):
+            return []
         lim = max(1, min(int(limit), 1000))
         with self.connection() as conn:
-            tax_rows = conn.execute(
+            rows = conn.execute(
                 """
-                SELECT t.id, c.name AS client_name, t.field, t.old_value, t.new_value,
-                       t.changed_at AS timestamp, 'tax_change' AS log_type
+                SELECT t.id, t.client_id, c.name AS client_name, t.field,
+                       t.old_value, t.new_value, t.changed_at AS timestamp,
+                       'tax_change' AS log_type
                 FROM tax_cycle_log t
                 LEFT JOIN clients c ON c.id = t.client_id
-                ORDER BY t.changed_at DESC
+                ORDER BY t.changed_at DESC, t.id DESC
                 LIMIT ?
                 """,
                 (lim,),
             ).fetchall()
-            sync_rows = conn.execute(
-                """
-                SELECT id, table_name, global_id, direction,
-                       local_updated_at, remote_updated_at, logged_at AS timestamp,
-                       'sync_conflict' AS log_type
-                FROM sync_conflicts
-                ORDER BY logged_at DESC
-                LIMIT ?
-                """,
-                (lim,),
-            ).fetchall()
-        combined = [dict(r) for r in tax_rows] + [dict(r) for r in sync_rows]
+        return [dict(r) for r in rows]
+
+    def list_audit_log(self, limit: int = 200, *, log_type: str | None = None) -> list[dict]:
+        """Unified local audit: tax_cycle_log + sync_conflicts, newest first.
+
+        ``log_type`` may be ``tax_change``, ``sync_conflict``, or None (all).
+        Remote Worker ``admin_audit_log`` is intentionally not queried.
+        """
+        lim = max(1, min(int(limit), 1000))
+        wanted = (log_type or "").strip().lower() or None
+        if wanted == "tax_change":
+            return self.list_tax_cycle_log(limit=lim)
+        if wanted == "sync_conflict":
+            rows = self.list_sync_conflicts(limit=lim)
+            for row in rows:
+                row.setdefault("timestamp", row.get("logged_at"))
+                row.setdefault("log_type", "sync_conflict")
+            return rows
+
+        tax_rows = self.list_tax_cycle_log(limit=lim)
+        sync_rows = self.list_sync_conflicts(limit=lim)
+        for row in sync_rows:
+            row.setdefault("timestamp", row.get("logged_at"))
+            row.setdefault("log_type", "sync_conflict")
+        combined = tax_rows + sync_rows
         combined.sort(key=lambda r: r.get("timestamp") or "", reverse=True)
         return combined[:lim]
 

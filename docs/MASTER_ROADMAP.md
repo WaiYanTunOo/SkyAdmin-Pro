@@ -26,16 +26,18 @@ Comprehensive analysis of **features, security, code quality, optimization, load
 
 | Area | Score | Key Gap |
 |------|-------|---------|
-| **Security** | 8/10 | S1 hardening landed (timing-safe auth, sync TTL, CSP); residual: expired-register Vitest, auth doc wording |
-| **Performance** | 7/10 | Dashboard first-paint still heavy; SQLite pooling deferred; trees still inside Company Details scroll |
-| **UI/UX** | 7.5/10 | DatePicker polish; Settings nested scroll; Company Details tree/scroll fight |
-| **Code Quality** | 7/10 | Hybrid `_migrate_*` left in `core.py`; config.py bloat; bare excepts |
-| **Testing** | 7/10 | Expired sync register Vitest missing; vault/ciphertext-at-rest thin |
+| **Security** | 8.5/10 | S1 + P0 token hash/TTL fail-closed landed; residual: soft MFA, deploy concurrency |
+| **Performance** | 8/10 | Dashboard progressive trees landed; SQLite pooling deferred |
+| **UI/UX** | 8.5/10 | Trees-out-of-scroll, Settings checklist, DatePicker polish landed |
+| **Code Quality** | 7.5/10 | `_migrate_*` wrappers removed; config size / bare excepts residual |
+| **Testing** | 8/10 | Expired-register Vitest + rate-limit suites landed |
 | **Features** | 8/10 | Ed25519 licensing, sync, export, multi-language — solid foundation |
-| **Documentation** | 7.5/10 | Good roadmap/deploy docs, missing API reference and SECURITY.md |
-| **CI/CD** | 7.5/10 | Release publish does not `needs: worker`; Windows signing supported |
+| **Documentation** | 8/10 | SECURITY.md + API_REFERENCE updated; architecture/CONTRIBUTING optional |
+| **CI/CD** | 8.5/10 | Release `needs: worker`; installer update URL; tag fail-closed on missing token |
 
-**Overall: 7.5/10** — Phases 7–11 + S1 landed; residual UX/CI/core backlog remains (see Quick Wins NEXT).
+**Overall: ~8.5/10** — Phases 7–11 + S1 + P0–P3 + Wave B F1 landed; Wave A **human** QA still open.
+
+**Retest (2026-09-05):** pytest **417 passed / 2 skipped**; Vitest **133/133**; `release_check` **RELEASE OK**. Intermittent Tk teardown flake exists when stacking multiple CTk roots in one process; full suite run was green.
 
 ### File Inventory
 
@@ -150,7 +152,7 @@ Comprehensive analysis of **features, security, code quality, optimization, load
 
 | # | Issue | File:Line | Fix |
 |---|-------|-----------|-----|
-| U5 | First paint still heavy — defer more of `build()` cost | `dashboard.py` | ← **NEXT** — keep stat cards; heavy widgets later |
+| U5 | First paint still heavy — defer more of `build()` cost | `dashboard.py` | ✅ Progressive detail trees on `on_show` |
 | U6 | Fingerprint comparison can miss stale data (same count, different tasks) | `dashboard.py:50-87` | Include row IDs in fingerprint, not just counts |
 | U7 | Three-stage deferred refresh is complex but correct | `dashboard.py:682-913` | ✅ Good pattern; simplify if bugs arise |
 
@@ -387,7 +389,7 @@ Tag v* → Release (build + sign + installer + release_check + GitHub Release + 
 
 | # | Gap | Priority | Fix |
 |---|-----|----------|-----|
-| C0 | Release publish does not wait on Worker job | P0 | `windows-release` / publish `needs: [worker]` ← **NEXT** |
+| C0 | Release publish does not wait on Worker job | P0 | ✅ `publish` `needs: [windows-release, worker]` |
 | C1 | No code signing in CI for non-Windows builds | P1 | Add macOS/Linux signing steps |
 | C2 | No dependency vulnerability scanning | P1 | Add `pip-audit` and `npm audit` steps |
 | C3 | No integration tests in CI | P2 | Add Worker lifecycle test |
@@ -429,8 +431,8 @@ Tag v* → Release (build + sign + installer + release_check + GitHub Release + 
 |---|------|-------|-------|--------|
 | P1.1 | Connection pool for SQLite | `db/core.py` | `desktop-core` | **Deferred** — acceptable until measured pain |
 | P1.2 | Dashboard snapshot single connection | `db/tax.py` | `desktop-core` | ⚠️ Partial — budget relaxed (≤40 statements / 1 connection); full ≤3 rewrite out of sprint |
-| P1.3 | Remove monolithic `_migrate()` / extract remaining `_migrate_*` | `db/core.py`, `db/migrations/` | `desktop-core` | ← **NEXT** (hybrid left) |
-| P1.4 | Dashboard first-paint deferral | `ui/views/dashboard.py` | `ui-performance` | ← **NEXT** (stat cards stay; heavy widgets later) |
+| P1.3 | Remove monolithic `_migrate()` / extract remaining `_migrate_*` | `db/core.py`, `db/migrations/` | `desktop-core` | ✅ Done (wrappers removed; versioned migrations) |
+| P1.4 | Dashboard first-paint deferral | `ui/views/dashboard.py` | `ui-performance` | ✅ Progressive trees on `on_show` |
 | P1.5 | Worker `recordsHandler` optimization | `routes/records.ts` | `worker-api` | Later |
 | P1.6 | Worker static imports | `routes/generate.ts` | `worker-api` | Later |
 | P1.7 | D1 error handling in routes | `routes/generate.ts` | `worker-api` | Later |
@@ -439,9 +441,9 @@ Tag v* → Release (build + sign + installer + release_check + GitHub Release + 
 
 | # | Task | Files | Agent | Status |
 |---|------|-------|-------|--------|
-| U1.0a | Company Details: trees outside `CanvasScrollFrame` | `company_details/` | `company-details` + `ui-performance` | ← **NEXT** |
-| U1.0b | Settings: remove nested checklist scroll | `settings/view.py` | `ui-performance` | ← **NEXT** |
-| U1.1 | DatePickerField polish (root binds, grab, drop `-topmost`) | `widgets.py` | `ui-widgets` | ← **NEXT** (Toplevel + flip-up already landed) |
+| U1.0a | Company Details: trees outside `CanvasScrollFrame` | `company_details/` | `company-details` + `ui-performance` | ✅ Done |
+| U1.0b | Settings: remove nested checklist scroll | `settings/view.py` | `ui-performance` | ✅ Done |
+| U1.1 | DatePickerField polish (root binds, grab, drop `-topmost`) | `widgets.py` | `ui-widgets` | ✅ Done |
 | U1.2 | Consolidate Company Details refresh | `company_details/panel.py` | `company-details` | Later |
 | U1.3 | Add public `get_view()` method | `main_window.py` | `ui-performance` | Later |
 | U1.4 | Constants for tab names | `database_tasks/view.py`, `company_details/panel.py` | `ui-performance` | Later |
@@ -478,7 +480,7 @@ Tag v* → Release (build + sign + installer + release_check + GitHub Release + 
 
 | # | Task | Files | Agent | Status |
 |---|------|-------|-------|--------|
-| R1.0 | Gate tag release / Worker publish on Worker Vitest (`needs: worker`) | `.github/workflows/release.yml` | `packaging-release` | ← **NEXT** |
+| R1.0 | Gate tag release / Worker publish on Worker Vitest (`needs: worker`) | `.github/workflows/release.yml` | `packaging-release` | ✅ Done |
 | R1.1 | macOS notarization script | `packaging/build-macos.sh` | `packaging-release` | Later (Windows installer remains primary) |
 | R1.2 | Linux build script improvements | `packaging/build-linux.sh` | `packaging-release` | Later |
 | R1.3 | Dependency vulnerability scanning in CI | `.github/workflows/ci.yml` | `packaging-release` | Later |
@@ -507,7 +509,7 @@ Tag v* → Release (build + sign + installer + release_check + GitHub Release + 
 | Admin auth timing-safe | 100% of comparisons constant-time | ✅ Landed (`timingSafeEqual`) |
 | Sync token TTL | All tokens expire within 30 days | ✅ Landed |
 | CSP headers | All HTML responses have CSP | ✅ Landed |
-| Rate limiting | All write endpoints rate-limited | ⚠️ Partial (claim, sync register, admin) |
+| Rate limiting | All write endpoints rate-limited | ✅ claim/register/push/pull/control + admin writes |
 
 ### Performance
 
@@ -541,10 +543,11 @@ Tag v* → Release (build + sign + installer + release_check + GitHub Release + 
 
 | Metric | Target | Current |
 |--------|--------|---------|
-| SECURITY.md | Exists | ❌ |
-| API Reference | Exists | ❌ |
-| Architecture diagram | Exists | ❌ |
-| CONTRIBUTING.md | Exists | ❌ |
+| SECURITY.md | Exists | ✅ |
+| API Reference | Exists | ✅ |
+| Architecture diagram | Exists | ✅ |
+| CONTRIBUTING.md | Exists | ✅ |
+| Features & upgrade plan | Exists | ✅ `FEATURES_AND_UPGRADE_PLAN.md` |
 
 ---
 
@@ -562,14 +565,14 @@ flowchart LR
     ship --> F1[F1: Features later]
 ```
 
-**Current priority order (residual sprint — see [AGENTS.md](../AGENTS.md)):**
-1. **Company Details trees out of scroll** + Settings nested scroll + DatePicker polish + Dashboard first-paint
-2. **Release CI** — publish/`windows-release` must `needs: worker`
-3. **Worker** — expired register Vitest; auth doc wording
-4. **Desktop-core** — finish `_migrate_*` extract; `group_id` sync allowlist
-5. **QA** — pytest + Vitest + `release_check`
-6. **Defer** — SQLite pooling; Feature pack F1; framework rewrite
-7. **Do not re-do** — timing oracles, sync TTL, CSP, or AGENTS priorities 1–3 (already landed)
+**Current priority order (post P0–P3 — see [AGENTS.md](../AGENTS.md)):**
+1. Optional UX polish (Filing history weight, Settings lazy tabs)
+2. `deploy.yml` concurrency / staging
+3. Docs — architecture diagram / CONTRIBUTING if desired
+4. **QA** — pytest + Vitest + `release_check` before ship
+5. **Defer** — deeper SQLite pooling; Feature pack F1; framework rewrite
+6. **Do not re-do** — timing oracles, sync TTL, CSP, trees-out-of-scroll, release Worker gate
+   (numeric `group_id` still excluded; Wave C syncs groups via `global_id` / `group_global_id`)
 
 ---
 
@@ -602,16 +605,16 @@ flowchart LR
 - [x] Sync token TTL + rotation (S1) — **done; do not re-implement**
 - [x] Admin/viewer CSP (S1) — **done; do not re-implement**
 - [x] DatePicker Toplevel + flip-up; Database Tasks active-tab refresh; Company Details lazy sub-tabs — **done**
-- [ ] Company Details: trees outside `CanvasScrollFrame` ← **NEXT**
-- [ ] Settings: remove nested checklist scroll ← **NEXT**
-- [ ] DatePicker polish (multi-instance binds, grab, drop `-topmost`) ← **NEXT**
-- [ ] Dashboard first-paint deferral ← **NEXT**
-- [ ] Release workflow: publish gated on Worker job (`needs: worker`) ← **NEXT**
-- [ ] Vitest: expired eligibility on sync register → 403 ← **NEXT**
-- [ ] Extract remaining `_migrate_*` into `db/migrations/` ← **NEXT**
-- [ ] Sync allowlist: `clients.group_id` (desktop + Worker) ← **NEXT**
+- [x] Company Details: trees outside `CanvasScrollFrame`
+- [x] Settings: remove nested checklist scroll
+- [x] DatePicker polish (multi-instance binds, grab, drop `-topmost`)
+- [x] Dashboard first-paint deferral (progressive detail trees)
+- [x] Release workflow: publish gated on Worker job (`needs: worker`)
+- [x] Vitest: expired eligibility on sync register → 403
+- [x] Extract remaining `_migrate_*` into `db/migrations/` (wrappers removed)
+- [x] Sync allowlist: numeric `clients.group_id` omitted; Wave C syncs `client_groups` + `group_global_id`
 - [ ] SQLite connection pooling — deferred (acceptable until measured pain)
-- [ ] SECURITY.md — later (docs phase; not this sprint P0)
+- [x] SECURITY.md + API_REFERENCE auth/control contract sync
 
 ---
 
@@ -623,5 +626,6 @@ flowchart LR
 - [UI_CHECKLIST.md](UI_CHECKLIST.md) — Theme/layout QA
 - [PHASE4_WALKTHROUGH.md](PHASE4_WALKTHROUGH.md) — Per-view walkthrough
 - [WORKER_ADMIN.md](WORKER_ADMIN.md) — Admin UI split
+- [FEATURES_AND_UPGRADE_PLAN.md](FEATURES_AND_UPGRADE_PLAN.md) — Feature inventory + upgrade waves
 - [packaging/README.md](../packaging/README.md) — Build & installer
 - [AGENTS.md](../AGENTS.md) — Subagent orchestration

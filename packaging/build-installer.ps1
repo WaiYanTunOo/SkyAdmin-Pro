@@ -57,3 +57,12 @@ if ($env:SKYADMIN_SIGN_REQUIRED -eq "1") {
 }
 & powershell -NoProfile -ExecutionPolicy Bypass -File (Join-Path $PSScriptRoot "sign-windows.ps1") @signArgs
 if ($LASTEXITCODE -ne 0) { throw "sign-windows.ps1 failed" }
+
+Write-Host ""
+Write-Host "Running release checks (installer ship path)..."
+$checkArgs = @("scripts\release_check.py", "--skip-pytest")
+if ($env:SKYADMIN_SIGN_REQUIRED -eq "1") {
+    $checkArgs += "--require-signature"
+}
+& $Py @checkArgs
+if ($LASTEXITCODE -ne 0) { throw "release_check failed with exit code $LASTEXITCODE" }

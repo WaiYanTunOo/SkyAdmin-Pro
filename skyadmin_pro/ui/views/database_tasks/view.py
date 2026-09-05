@@ -383,9 +383,30 @@ class DatabaseTasksView(BaseView):
         self._export_excel()
 
     def _on_shortcut_new(self) -> None:
+        try:
+            self.tabs.set(TAB_CLIENTS)
+        except Exception:
+            pass
         self._ensure_lazy_panel(TAB_CLIENTS)
         if self.clients_panel is not None:
             self.clients_panel._open_client_dialog()
+
+    def _on_shortcut_save(self) -> bool:
+        """Save the obvious form on the active Database & Tasks tab.
+
+        Returns True when a save was invoked, False when nothing applies.
+        """
+        try:
+            tab = self.tabs.get()
+        except Exception:
+            return False
+        self._ensure_lazy_panel(tab)
+        if tab == TAB_TASKS and self.tasks_panel is not None:
+            self.tasks_panel._save()
+            return True
+        if tab == TAB_COMPANY and self.company_panel is not None:
+            return bool(self.company_panel._on_shortcut_save())
+        return False
 
     def _on_shortcut_undo(self) -> None:
         self._ensure_lazy_panel(TAB_CLIENTS)

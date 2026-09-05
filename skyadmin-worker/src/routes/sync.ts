@@ -5,7 +5,7 @@ import { Env } from "../db";
 import { checkRateLimit, purgeStaleRateLimits } from "../rate_limit";
 import { parseActivationClaim } from "../verification";
 import { checkActivationEligibility } from "../sync_eligibility";
-import { newSyncToken, syncAuthMiddleware } from "../sync_auth";
+import { hashSyncToken, newSyncToken, syncAuthMiddleware } from "../sync_auth";
 import { withSyncDevicesExpiresAt } from "../sync_devices_schema";
 import {
   MAX_PUSH_CHANGES,
@@ -24,54 +24,32 @@ import {
 
 async function upsertSyncDevice(db: D1Database, machineId: string): Promise<string> {
   const token = newSyncToken();
+  const tokenHash = await hashSyncToken(token);
   const expiry = new Date(Date.now() + 30 * 86400 * 1000).toISOString().slice(0, 19);
   return withSyncDevicesExpiresAt(db, async () => {
     const existing = await db
-      .prepare("SELECT token FROM sync_devices WHERE machine_id = ?")
+      .prepare("SELECT machine_id FROM sync_devices WHERE machine_id = ?")
       .bind(machineId)
-      .first<{ token: string }>();
-    if (existing?.token) {
+      .first<{ machine_id: string }>();
+    if (existing) {
       await db
         .prepare(
-          "UPDATE sync_devices SET token = ?, last_seen_at = datetime('now'), expires_at = ? WHERE machine_id = ?",
+          "UPDATE sync_devices SET token_hash = ?, last_seen_at = datetime('now'), expires_at = ? WHERE machine_id = ?",
         )
-        .bind(token, expiry, machineId)
+        .bind(tokenHash, expiry, machineId)
         .run();
       return token;
     }
     await db
-      .prepare("INSERT INTO sync_devices (machine_id, token, expires_at) VALUES (?, ?, ?)")
-      .bind(machineId, token, expiry)
+      .prepare("INSERT INTO sync_devices (machine_id, token_hash, expires_at) VALUES (?, ?, ?)")
+      .bind(machineId, tokenHash, expiry)
       .run();
     return token;
   });
 }
 
-const REGISTER_WINDOW_SECONDS = 60;
-const REGISTER_MAX_PER_WINDOW = 10;
-
-async function isRegisterRateLimited(db: D1Database, ip: string): Promise<boolean> {
-  const key = `register:${ip}`;
-  const row = await db
-    .prepare(
-      `INSERT INTO rate_limits (key, window_start, count) VALUES (?, datetime('now'), 1)
-       ON CONFLICT(key) DO UPDATE SET
-         count = CASE WHEN window_start < datetime('now', '-${REGISTER_WINDOW_SECONDS} seconds') THEN 1 ELSE count + 1 END,
-         window_start = CASE WHEN window_start < datetime('now', '-${REGISTER_WINDOW_SECONDS} seconds') THEN datetime('now') ELSE window_start END
-       RETURNING count`
-    )
-    .bind(key)
-    .first<{ count: number }>();
-  const count = row?.count ?? 1;
-  return count > REGISTER_MAX_PER_WINDOW;
-}
-
 /** POST /api/sync/register — prove valid license, receive device sync token. */
 export async function syncRegisterHandler(c: Context<{ Bindings: Env }>) {
-  const ip = c.req.header("cf-connecting-ip") || "unknown";
-  if (await isRegisterRateLimited(c.env.DB, ip)) {
-    return c.json({ ok: false, error: "Too many registration attempts — try again shortly." }, 429);
-  }
   let body: { code?: string };
   try {
     body = await c.req.json<{ code?: string }>();
@@ -133,6 +111,9 @@ export async function syncSchemaHandler(c: Context<{ Bindings: Env }>) {
 /** GET /api/sync/pull?since=ISO&tables=a,b&limit=N */
 export async function syncPullHandler(c: Context<{ Bindings: Env }>) {
   const machineId = (c.req.header("X-Machine-Id") || "").trim().toUpperCase();
+  const limited = await checkRateLimit(c, "pull", { windowSeconds: 60, max: 30 });
+  if (limited) return limited;
+
   const since = (c.req.query("since") || "").trim();
   const tablesParam = (c.req.query("tables") || "").trim();
   const parsedLimit = parseInt(c.req.query("limit") || "500", 10);

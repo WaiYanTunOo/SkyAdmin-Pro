@@ -8,9 +8,16 @@ on:
       - ".github/workflows/deploy.yml"
   workflow_dispatch:
 
+# Prevent overlapping migrate+deploy runs on main (schema ahead of code risk).
+concurrency:
+  group: skyadmin-worker-deploy
+  cancel-in-progress: false
+
 jobs:
   deploy:
     runs-on: ubuntu-latest
+    # Tip: add `environment: production` here after creating a protected
+    # GitHub Environment (required reviewers / wait timer) in repo settings.
     defaults:
       run:
         working-directory: skyadmin-worker

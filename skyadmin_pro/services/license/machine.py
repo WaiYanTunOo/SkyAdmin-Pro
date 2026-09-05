@@ -12,31 +12,39 @@ from skyadmin_pro.services.license._constants import HARDWARE_ID_FILENAME, LICEN
 
 
 def _check_debugger() -> None:
-    """Detect common Python debuggers — exit if found.
+    """Detect common Python debuggers — warn if found.
 
     Only checks OS-level debugger attachment (IsDebuggerPresent on Windows)
     and known debug environment variables. Does NOT check sys.gettrace()
     which can trigger false positives in packaged apps.
+
+    Emits a warning instead of sys.exit(1) so packaged apps don't crash
+    unexpectedly. The actual license activation still proceeds.
     """
     import os
     import sys as _sys
+    import logging as _logging
+
+    _log = _logging.getLogger(__name__)
 
     # Check for common debugger environment variables
     for var in ("PYDEVD", "PYCHARM_DEBUG", "PYDEV_DEBUG", "REMOTE_DEBUG"):
         if os.environ.get(var):
-            _sys.exit(1)
+            _log.warning("Debugger environment variable detected: %s", var)
+            return
     # Check for attached debugger via Windows API (fast, non-blocking)
     if _sys.platform == "win32":
         try:
             import ctypes as _ct
 
             if _ct.windll.kernel32.IsDebuggerPresent():
-                _sys.exit(1)
+                _log.warning("Debugger is attached — license activation may be blocked.")
+                return
         except Exception:
             pass
 
 
-# Run once at import time — fast, non-blocking
+# Run once at import time — warn, do not exit.
 _check_debugger()
 
 

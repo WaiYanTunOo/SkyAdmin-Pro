@@ -350,6 +350,11 @@ class CoreMixin:
             finally:
                 conn.close()
 
+            # Close pooled/WAL handles BEFORE overwriting the DB file
+            # (Windows file locks + torn WAL if copy happens while open).
+            self._close_pooled_conn()
+            self._wal_enabled = None
+
             # Copy backup to current database location
             import shutil
 
@@ -357,8 +362,6 @@ class CoreMixin:
             remove_sqlite_sidecars(self.db_file)
 
             # Reinitialize with the restored database
-            self._wal_enabled = None
-            self._close_pooled_conn()
             self._client_names_cache = None
             self._service_types_cache = None
             self._initialize()
@@ -436,44 +439,6 @@ class CoreMixin:
             END
             """
         )
-
-    def _backfill_sync_global_ids(self) -> None:
-        """Assign stable global_id UUIDs for P4 sync (delegates to m002)."""
-        from skyadmin_pro.db.migrations.m002_backfill_sync_global_ids import upgrade
-
-        upgrade(self)
-
-    def _migrate_secret_fields(self) -> None:
-        """Encrypt legacy plaintext IRD passwords at rest (delegates to m003)."""
-        from skyadmin_pro.db.migrations.m003_secret_fields import upgrade
-
-        upgrade(self)
-
-    def _migrate_legacy_vault(self) -> None:
-        """Move legacy vault_entries into credential tables (delegates to m004)."""
-        from skyadmin_pro.db.migrations.m004_legacy_vault import upgrade
-
-        upgrade(self)
-
-    def _migrate_ird_to_client_credentials(self) -> int:
-        """Import legacy clients.ird_password into Office Hub RD credentials (m005)."""
-        from skyadmin_pro.db.migrations.m005_ird_to_client_credentials import (
-            migrate_ird_to_client_credentials,
-        )
-
-        return migrate_ird_to_client_credentials(self)
-
-    def _migrate_pricing_matrix_services(self) -> None:
-        """Add pricing_matrix.service_type (delegates to m006)."""
-        from skyadmin_pro.db.migrations.m006_pricing_matrix_services import upgrade
-
-        upgrade(self)
-
-    def _migrate_client_credentials_login_id(self) -> None:
-        """Backfill client_credentials.login_id (delegates to m007)."""
-        from skyadmin_pro.db.migrations.m007_client_credentials_login_id import upgrade
-
-        upgrade(self)
 
     @staticmethod
     def _prepare_client_record(row: dict | None) -> dict | None:

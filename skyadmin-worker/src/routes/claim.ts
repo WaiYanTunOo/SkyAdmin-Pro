@@ -2,12 +2,10 @@
 
 import { Context } from "hono";
 import { Env } from "../db";
-import { isRateLimited, purgeStaleRateLimits } from "../rate_limit";
+import { purgeStaleRateLimits } from "../rate_limit";
 import { resignActivatedLicense } from "../signing";
 import { parseActivationClaim } from "../verification";
 import { checkActivationEligibility } from "../sync_eligibility";
-
-const CLAIM_RATE_LIMIT = { windowSeconds: 60, max: 20 } as const;
 
 function licenseIatFromKey(licenseKey: string): string | null {
   try {
@@ -22,11 +20,6 @@ function licenseIatFromKey(licenseKey: string): string | null {
 }
 
 export async function claimHandler(c: Context<{ Bindings: Env }>) {
-  const ip = c.req.header("cf-connecting-ip") || "unknown";
-  if (await isRateLimited(c.env.DB, `claim:${ip}`)) {
-    return c.json({ ok: false, error: "Too many claim attempts — try again shortly." }, 429);
-  }
-
   let body: { code?: string };
   try {
     body = await c.req.json<{ code?: string }>();

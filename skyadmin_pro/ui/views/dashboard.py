@@ -102,6 +102,8 @@ class DashboardView(BaseView):
         self._snap_fingerprint: tuple | None = None
         self._timeline_mode: str | None = None
         self._detail_built = False
+        self._detail_stage = 0
+        self._detail_build_after: str | None = None
         self._header_extras_built = False
         self._snap_seq = 0
 
@@ -263,10 +265,51 @@ class DashboardView(BaseView):
         self.next_tree.grid(row=2, column=0, sticky="nsew", padx=12, pady=(0, 12))
 
     def _build_detail_trees(self) -> None:
-        """Build heavyweight detail tree widgets — deferred until first on_show()."""
+        """Build all detail trees synchronously (tests / force refresh)."""
+        self._cancel_detail_tree_build()
+        self._build_detail_trees_priority()
+        self._build_detail_trees_secondary()
+        self._build_detail_trees_heavy()
+
+    def _cancel_detail_tree_build(self) -> None:
+        after_id = getattr(self, "_detail_build_after", None)
+        if after_id is not None:
+            try:
+                self.after_cancel(after_id)
+            except Exception:
+                pass
+            self._detail_build_after = None
+
+    def _schedule_detail_trees_progressive(self) -> None:
+        """Stage heavy trees across idle turns so first paint stays light."""
         if self._detail_built:
             return
-        self._detail_built = True
+        self._cancel_detail_tree_build()
+        self._build_detail_trees_priority()
+        if self._detail_built:
+            return
+        self._detail_build_after = self.after(1, self._progressive_detail_secondary)
+
+    def _progressive_detail_secondary(self) -> None:
+        self._detail_build_after = None
+        if not self.winfo_exists():
+            return
+        self._build_detail_trees_secondary()
+        if self._detail_built:
+            return
+        self._detail_build_after = self.after(1, self._progressive_detail_heavy)
+
+    def _progressive_detail_heavy(self) -> None:
+        self._detail_build_after = None
+        if not self.winfo_exists():
+            return
+        self._build_detail_trees_heavy()
+
+    def _build_detail_trees_priority(self) -> None:
+        """Above-the-fold trees: month panel, expiry, pending."""
+        if getattr(self, "_detail_stage", 0) >= 1:
+            return
+        self._detail_stage = 1
 
         self.month_panel = MonthStatusPanel(
             self._detail, self.app, showheight=6, title="Client month closes — tax status"
@@ -337,6 +380,14 @@ class DashboardView(BaseView):
             ),
         )
         self.pending_tree.grid(row=1, column=0, sticky="nsew", padx=12, pady=(0, 12))
+
+    def _build_detail_trees_secondary(self) -> None:
+        """Mid-weight payment / service trees."""
+        if getattr(self, "_detail_stage", 0) >= 2:
+            return
+        if getattr(self, "_detail_stage", 0) < 1:
+            self._build_detail_trees_priority()
+        self._detail_stage = 2
 
         ongoing = ctk.CTkFrame(self._detail, corner_radius=12)
         ongoing.grid(row=2, column=0, sticky="ew", pady=(0, 12))
@@ -446,6 +497,13 @@ class DashboardView(BaseView):
             text="Select a row, then mark it paid.",
             text_color=TEXT_MUTED,
         ).pack(side="right")
+
+    def _build_detail_trees_heavy(self) -> None:
+        """Heaviest trees: incentive report and tax overview."""
+        if self._detail_built:
+            return
+        if getattr(self, "_detail_stage", 0) < 2:
+            self._build_detail_trees_secondary()
 
         report_card = ctk.CTkFrame(self._detail, corner_radius=12)
         report_card.grid(row=5, column=0, sticky="ew", pady=(0, 12))
@@ -564,6 +622,8 @@ class DashboardView(BaseView):
         )
         self.tax_overview_tree.tree.configure(height=12)
         self.tax_overview_tree.grid(row=1, column=0, sticky="nsew", padx=12, pady=(0, 12))
+        self._detail_stage = 3
+        self._detail_built = True
 
     def _stat_card(self, master, column: int, label: str, value: str) -> ctk.CTkLabel:
         card = ctk.CTkFrame(master, corner_radius=14, height=110)
@@ -673,7 +733,7 @@ class DashboardView(BaseView):
     def on_show(self) -> None:
         self._visible = True
         self._build_header_extras()
-        self._build_detail_trees()
+        self._schedule_detail_trees_progressive()
         self.refresh_async()
 
     def on_hide(self) -> None:
@@ -681,6 +741,7 @@ class DashboardView(BaseView):
         self._snap_seq = int(getattr(self, "_snap_seq", 0)) + 1
         had_pending = bool(self._tree_refresh_after or self._detail_trees_after or self._timeline_after)
         self._cancel_deferred_refresh()
+        self._cancel_detail_tree_build()
         if had_pending:
             self._trees_ready = False
 
@@ -755,7 +816,7 @@ class DashboardView(BaseView):
     def _apply_snapshot(self, snap: dict, *, force: bool = False) -> None:
         fingerprint = snap_fingerprint(snap)
         self._apply_stat_cards(snap)
-        if self._detail_built:
+        if getattr(self, "_detail_stage", 0) >= 1:
             self.month_panel.refresh()
 
         if not force and self._trees_ready and fingerprint == self._snap_fingerprint:
@@ -842,6 +903,9 @@ class DashboardView(BaseView):
         self._detail_trees_after = None
         if not self._visible or not self.winfo_exists():
             return
+        if not self._detail_built:
+            # Finish any remaining progressive stages before populating rows.
+            self._build_detail_trees()
         if not self._detail_built:
             return
 
@@ -1316,14 +1380,8 @@ class DashboardView(BaseView):
     def _export_pdf(self) -> None:
         from pathlib import Path
 
-        from skyadmin_pro.services.pdf_render import render_report
-        from skyadmin_pro.services.reports import build_status_report, default_report_name
+        from skyadmin_pro.services.reports import default_report_name, write_status_report_pdf
 
-        try:
-            model = build_status_report(self.app.db)
-        except Exception as exc:
-            self.workflow_feedback.error(str(exc))
-            return
         path = filedialog.asksaveasfilename(
             parent=self.winfo_toplevel(),
             defaultextension=".pdf",
@@ -1334,7 +1392,7 @@ class DashboardView(BaseView):
         if not path:
             return
         try:
-            render_report(model, Path(path))
+            write_status_report_pdf(self.app.db, Path(path))
         except Exception as exc:
             self.workflow_feedback.error(str(exc))
             return

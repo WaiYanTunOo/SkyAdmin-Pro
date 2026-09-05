@@ -4,6 +4,7 @@ import { describe, expect, it } from "vitest";
 import app from "../index";
 import type { Env } from "../db";
 import { purgeStaleRateLimits } from "../rate_limit";
+import { hashSyncToken } from "../sync_auth";
 
 function mockEnv(overrides: Partial<Env> = {}): Env {
   return {
@@ -81,6 +82,88 @@ describe("claim rate limiting", () => {
     const body = await res.json() as { ok: boolean; error: string };
     expect(body.ok).toBe(false);
     expect(body.error).toContain("Too many claim attempts");
+  });
+});
+
+describe("control rate limiting", () => {
+  it("rejects /api/control when rate limit exceeded", async () => {
+    const db = {
+      prepare: (sql: string) => ({
+        bind: () => ({
+          first: async () => {
+            if (sql.includes("rate_limits")) return { count: 31 };
+            return null;
+          },
+          run: async () => ({ success: true }),
+          all: async () => ({ results: [] }),
+        }),
+      }),
+    } as unknown as D1Database;
+
+    const res = await app.request("http://localhost/api/control", {}, mockEnv({ DB: db }));
+    expect(res.status).toBe(429);
+    const body = await res.json() as { ok: boolean; error: string };
+    expect(body.ok).toBe(false);
+    expect(body.error).toContain("Too many control requests");
+  });
+
+  it("allows /api/control under the limit (before signing key check)", async () => {
+    const db = {
+      prepare: (sql: string) => ({
+        bind: () => ({
+          first: async () => {
+            if (sql.includes("rate_limits")) return { count: 1 };
+            return null;
+          },
+          run: async () => ({ success: true }),
+          all: async () => ({ results: [] }),
+        }),
+      }),
+    } as unknown as D1Database;
+
+    // No Ed25519 key configured → 503 after rate-limit pass
+    const res = await app.request("http://localhost/api/control", {}, mockEnv({ DB: db }));
+    expect(res.status).toBe(503);
+    expect(res.status).not.toBe(429);
+  });
+});
+
+describe("sync pull rate limiting", () => {
+  it("rejects authenticated /api/sync/pull when rate limit exceeded", async () => {
+    const token = "pull-rl-token";
+    const tokenHash = await hashSyncToken(token);
+    const mid = "AABBCCDD11223344";
+    const db = {
+      prepare: (sql: string) => ({
+        bind: (..._args: unknown[]) => ({
+          first: async () => {
+            if (sql.includes("rate_limits")) return { count: 31 };
+            if (sql.includes("SELECT machine_id, token_hash, expires_at")) {
+              const future = new Date(Date.now() + 30 * 86400000).toISOString().slice(0, 19);
+              return { machine_id: mid, token_hash: tokenHash, expires_at: future };
+            }
+            return null;
+          },
+          run: async () => ({ success: true }),
+          all: async () => ({ results: [] }),
+        }),
+      }),
+    } as unknown as D1Database;
+
+    const res = await app.request(
+      "http://localhost/api/sync/pull",
+      {
+        headers: {
+          "X-Machine-Id": mid,
+          Authorization: `Bearer ${token}`,
+        },
+      },
+      mockEnv({ DB: db }),
+    );
+    expect(res.status).toBe(429);
+    const body = await res.json() as { ok: boolean; error: string };
+    expect(body.ok).toBe(false);
+    expect(body.error).toContain("Too many requests");
   });
 });
 

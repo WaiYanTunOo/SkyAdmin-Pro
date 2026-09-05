@@ -46,10 +46,32 @@ class BackupMixin:
         interval = self._auto_backup_interval_var.get()
         self.app.db.set_setting(SETTING_AUTO_BACKUP_ENABLED, enabled)
         self.app.db.set_setting(SETTING_AUTO_BACKUP_INTERVAL, interval)
+        scheduler = getattr(self.app, "_auto_backup", None)
+        nudge = getattr(scheduler, "nudge", None)
+        if callable(nudge):
+            try:
+                nudge()
+            except Exception:
+                pass
         if enabled == "1":
             self.feedback.info(f"Auto-backup enabled ({interval}).")
+            self.app.set_status(f"Auto-backup on ({interval}) — schedule updated")
         else:
             self.feedback.info("Auto-backup disabled.")
+            self.app.set_status("Auto-backup disabled")
+
+    def _open_auto_backups_folder(self) -> None:
+        """Create AutoBackups/ if missing and open it for restore/browse."""
+        from skyadmin_pro.services.auto_backup import auto_backups_dir
+
+        folder = auto_backups_dir(self.app.paths.root)
+        try:
+            folder.mkdir(parents=True, exist_ok=True)
+        except OSError as exc:
+            self.feedback.error(f"Could not create AutoBackups folder: {exc}")
+            return
+        self._open_path(folder)
+        self.app.set_status(f"Opened AutoBackups: {folder}")
 
     def _backup_encrypted(self) -> None:
         dest = filedialog.asksaveasfilename(
@@ -107,9 +129,14 @@ class BackupMixin:
         )
 
     def _restore_encrypted(self) -> None:
+        from skyadmin_pro.services.auto_backup import auto_backups_dir
+
+        auto_dir = auto_backups_dir(self.app.paths.root)
+        initial = str(auto_dir) if auto_dir.is_dir() else None
         src = filedialog.askopenfilename(
             parent=self.winfo_toplevel(),
             title="Restore Encrypted Backup",
+            initialdir=initial,
             filetypes=[("SkyAdmin Backup", "*.skybackup"), ("All files", "*.*")],
         )
         if not src:

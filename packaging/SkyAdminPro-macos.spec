@@ -76,7 +76,7 @@ app = BUNDLE(
     icon=os.path.join(ROOT, "icon.png"),
     bundle_identifier="com.skycreation.skyadminpro",
     info_plist={
-        "CFBundleShortVersionString": "0.3.2",
+        "CFBundleShortVersionString": "0.3.3",
         "NSHighResolutionCapable": True,
     },
 )

@@ -162,7 +162,7 @@ class FilingTabMixin:
                 ("old", "From", 120),
                 ("new", "To", 120),
             ),
-            showheight=5,
+            showheight=8,
             table_id="company.filing_history",
             db=self.app.db,
         )

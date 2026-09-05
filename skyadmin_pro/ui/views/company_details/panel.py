@@ -40,7 +40,6 @@ from skyadmin_pro.ui.widgets import (
     themed_tabview,
 )
 
-
 # Sub-tab names — single source of truth for the tab bar, lazy loader,
 # refresh dispatcher, and cross-module callers (database_tasks/view.py).
 SUBTAB_ACCOUNTING = "Accounting Setup"
@@ -133,6 +132,24 @@ class CompanyDetailsPanel(    GeneralTabMixin,
         except Exception:
             return SUBTAB_ACCOUNTING
 
+    def _on_shortcut_save(self) -> bool:
+        """Ctrl+S: save the primary form for the visible Company Details sub-tab."""
+        tab = self._current_subtab()
+        self._ensure_lazy_tab(tab)
+        if tab == SUBTAB_GENERAL:
+            self._save_company_info()
+            return True
+        if tab == SUBTAB_TAX_IDS:
+            self._save_tax_ids()
+            return True
+        if tab == SUBTAB_FILING:
+            self._save_filing_statuses()
+            return True
+        if tab == SUBTAB_VO_CSH:
+            self._save_vo_csh()
+            return True
+        return False
+
     def _on_subtab_changed(self) -> None:
         self._ensure_lazy_tab(self._current_subtab())
         self.refresh()
@@ -142,54 +159,53 @@ class CompanyDetailsPanel(    GeneralTabMixin,
             return
         tab = self.tabs.tab(name)
         if name == SUBTAB_ACCOUNTING:
+            # Tree-first tab: no CanvasScrollFrame so the tree owns the wheel.
             tab.grid_columnconfigure(0, weight=1)
             tab.grid_rowconfigure(0, weight=1)
-            setup_scroll = CanvasScrollFrame(tab)
-            setup_scroll.grid(row=0, column=0, sticky="nsew")
-            setup_scroll.content.grid_columnconfigure(0, weight=1)
-            setup_scroll.content.grid_rowconfigure(0, weight=1)
-            self._accounting_setup_frame = self._build_accounting_setup(setup_scroll.content)
+            self._accounting_setup_frame = self._build_accounting_setup(tab)
             self._accounting_setup_frame.grid(row=0, column=0, sticky="nsew")
         elif name == SUBTAB_GENERAL:
-            # Trees live on the tab (outside CanvasScrollFrame) to avoid dual wheel fight.
+            # Company info form scrolls; service/doc trees stay outside CanvasScrollFrame.
             tab.grid_columnconfigure(0, weight=1)
-            tab.grid_rowconfigure(0, weight=0)
+            tab.grid_rowconfigure(0, weight=1)
             tab.grid_rowconfigure(1, weight=1)
             tab.grid_rowconfigure(2, weight=1)
-            self._company_frame = self._build_company_info(tab)
+            general_scroll = CanvasScrollFrame(tab)
+            general_scroll.grid(row=0, column=0, sticky="nsew")
+            general_scroll.content.grid_columnconfigure(0, weight=1)
+            self._company_frame = self._build_company_info(general_scroll.content)
             self._company_frame.grid(row=0, column=0, sticky="ew", pady=(0, 8))
             self._services_frame = self._build_services(tab)
             self._services_frame.grid(row=1, column=0, sticky="nsew", pady=(0, 8))
             self._docs_frame = self._build_documents(tab)
             self._docs_frame.grid(row=2, column=0, sticky="nsew")
         elif name == SUBTAB_TAX_IDS:
+            # Form scrolls; client cred tree stays fixed outside the canvas.
             tab.grid_columnconfigure(0, weight=1)
             tab.grid_rowconfigure(0, weight=1)
+            tab.grid_rowconfigure(2, weight=0)
             tax_ids_scroll = CanvasScrollFrame(tab)
             tax_ids_scroll.grid(row=0, column=0, sticky="nsew")
             tax_ids_scroll.content.grid_columnconfigure(0, weight=1)
-            self._tax_ids_frame = self._build_tax_ids(tax_ids_scroll.content)
+            self._tax_ids_frame = self._build_tax_ids(tax_ids_scroll.content, tab)
             self._tax_ids_frame.grid(row=0, column=0, sticky="ew")
         elif name == SUBTAB_FILING:
-            # Form scrolls; history tree stays fixed outside the canvas.
+            # Form scrolls; history tree stays outside canvas with expandable band.
             tab.grid_columnconfigure(0, weight=1)
-            tab.grid_rowconfigure(0, weight=1)
-            tab.grid_rowconfigure(1, weight=0)
+            tab.grid_rowconfigure(0, weight=2)
+            tab.grid_rowconfigure(1, weight=1)
             filing_scroll = CanvasScrollFrame(tab)
             filing_scroll.grid(row=0, column=0, sticky="nsew")
             filing_scroll.content.grid_columnconfigure(0, weight=1)
             self._filing_form_frame = self._build_filing_statuses_form(filing_scroll.content)
             self._filing_form_frame.grid(row=0, column=0, sticky="ew")
             self._filing_history_frame = self._build_filing_history(tab)
-            self._filing_history_frame.grid(row=1, column=0, sticky="ew", pady=(8, 0))
+            self._filing_history_frame.grid(row=1, column=0, sticky="nsew", pady=(8, 0))
         elif name == SUBTAB_VO_CSH_SETUP:
+            # Tree-first tab: no CanvasScrollFrame so the tree owns the wheel.
             tab.grid_columnconfigure(0, weight=1)
             tab.grid_rowconfigure(0, weight=1)
-            vo_setup_scroll = CanvasScrollFrame(tab)
-            vo_setup_scroll.grid(row=0, column=0, sticky="nsew")
-            vo_setup_scroll.content.grid_columnconfigure(0, weight=1)
-            vo_setup_scroll.content.grid_rowconfigure(0, weight=1)
-            self._vo_csh_setup_frame = self._build_vo_csh_setup(vo_setup_scroll.content)
+            self._vo_csh_setup_frame = self._build_vo_csh_setup(tab)
             self._vo_csh_setup_frame.grid(row=0, column=0, sticky="nsew")
         elif name == SUBTAB_VO_CSH:
             tab.grid_columnconfigure(0, weight=1)

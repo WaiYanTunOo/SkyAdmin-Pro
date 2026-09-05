@@ -97,19 +97,21 @@ class MainWindow(dnd_base_class()):
         self.protocol("WM_DELETE_WINDOW", self._on_close)
 
     def _bind_keyboard_shortcuts(self) -> None:
-        """Global keyboard shortcuts — Ctrl+E export, Ctrl+F find, Ctrl+N new, Ctrl+D theme.
+        """Global keyboard shortcuts — Ctrl+E export, Ctrl+F find, Ctrl+N new,
+        Ctrl+S save-when-obvious, Ctrl+D theme.
 
         Ctrl+Z undoes the last client change (outside text inputs, where the
-        keystroke stays with the field). No Ctrl+S/Ctrl+B: edits save
-        immediately and backup lives in Settings — dead bindings were removed
-        rather than kept as no-ops.
+        keystroke stays with the field). Ctrl+S/F/N are bound globally on purpose
+        (they are not needed for typing in entries).
         """
         self.bind("<Control-e>", lambda _e: self._shortcut_action("export"))
         self.bind("<Control-E>", lambda _e: self._shortcut_action("export"))
         self.bind("<Control-f>", lambda _e: self.open_global_search())
         self.bind("<Control-F>", lambda _e: self.open_global_search())
-        self.bind("<Control-n>", lambda _e: self._shortcut_action("new"))
-        self.bind("<Control-N>", lambda _e: self._shortcut_action("new"))
+        self.bind("<Control-n>", lambda _e: self._shortcut_new())
+        self.bind("<Control-N>", lambda _e: self._shortcut_new())
+        self.bind("<Control-s>", lambda _e: self._shortcut_save())
+        self.bind("<Control-S>", lambda _e: self._shortcut_save())
         self.bind("<Control-z>", lambda _e: self._shortcut_action("undo"))
         self.bind("<Control-Z>", lambda _e: self._shortcut_action("undo"))
         self.bind("<Control-d>", lambda _e: self._toggle_dark_light())
@@ -135,6 +137,32 @@ class MainWindow(dnd_base_class()):
         """Open the global search dialog (Ctrl+F)."""
         from skyadmin_pro.ui.views.global_search import GlobalSearchDialog
         GlobalSearchDialog(self)
+
+    def _shortcut_new(self) -> None:
+        """Ctrl+N — new client via active view, else Database & Tasks → Clients."""
+        from skyadmin_pro.config import NAV_DATABASE_TASKS
+
+        view = self._views.get(self._active_key) if self._active_key else None
+        handler = getattr(view, "_on_shortcut_new", None) if view is not None else None
+        if callable(handler):
+            handler()
+            return
+        self.show_view(NAV_DATABASE_TASKS)
+        tasks = self.get_view(NAV_DATABASE_TASKS)
+        new_handler = getattr(tasks, "_on_shortcut_new", None) if tasks is not None else None
+        if callable(new_handler):
+            new_handler()
+
+    def _shortcut_save(self) -> None:
+        """Ctrl+S — call an obvious view save when present; else status no-op."""
+        view = self._views.get(self._active_key) if self._active_key else None
+        handler = getattr(view, "_on_shortcut_save", None) if view is not None else None
+        if callable(handler):
+            handled = handler()
+            if handled is False:
+                self.set_status("Nothing to save")
+            return
+        self.set_status("Nothing to save")
 
     def _focus_in_text_input(self) -> bool:
         """True when keyboard focus sits inside an editable text widget."""

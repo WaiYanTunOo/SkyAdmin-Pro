@@ -58,10 +58,11 @@ export async function checkRateLimit(
   c: Context<{ Bindings: Env }>,
   name: string,
   opts: RateLimitOpts = {},
+  message = "Too many requests — try again shortly.",
 ): Promise<Response | null> {
   const ip = c.req.header("cf-connecting-ip") || "unknown";
   if (await isRateLimited(c.env.DB, `${name}:${ip}`, opts)) {
-    return c.json({ ok: false, error: "Too many requests — try again shortly." }, 429);
+    return c.json({ ok: false, error: message }, 429);
   }
   return null;
 }

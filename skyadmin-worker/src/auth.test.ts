@@ -11,8 +11,18 @@ const PASS = "admin-pass";
 const SALT = "test-license-secret";
 
 function mockEnv(): Env {
+  const result = {
+    first: async () => null,
+    all: async () => ({ results: [] }),
+    run: async () => ({ success: true }),
+  };
   return {
-    DB: {} as D1Database,
+    DB: {
+      prepare: () => ({
+        ...result,
+        bind: () => result,
+      }),
+    } as unknown as D1Database,
     LICENSE_SECRET: SALT,
     API_TOKEN: "test-api-token",
     ADMIN_PATH: ADMIN,

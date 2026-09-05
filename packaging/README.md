@@ -7,10 +7,11 @@
 python -m venv .venv
 .\.venv\Scripts\pip install -r requirements.txt -r requirements-dev.txt
 
-# Build portable exe
+# Build portable exe (dev only — not the ship path)
 .\packaging\build.cmd
 # Or if scripts are allowed: .\packaging\build.ps1
 # Output: dist\SkyAdminPro.exe
+# release_check uses --skip-installer on this path
 ```
 
 If PowerShell reports *running scripts is disabled*, use `build.cmd` (recommended) or:
@@ -81,16 +82,17 @@ Notes:
 After a tagged release (recommended):
 
 ```bash
-# CI does this automatically on git tag v* when SKYADMIN_API_TOKEN is set.
-# Manual one-shot after a local build:
-python scripts/publish_release.py --version 0.3.2 --exe dist/SkyAdminPro.exe --github
+# CI publishes the Worker LATEST line on git tag v* (requires SKYADMIN_API_TOKEN —
+# missing token fails the tag publish job; soft-skip removed).
+# Manual one-shot after a local installer build:
+python scripts/publish_release.py --version 0.3.2 --exe dist/SkyAdminPro-Setup-0.3.2.exe --github
 ```
 
-Or publish only the Worker LATEST line (URL must already be public):
+Or publish only the Worker LATEST line (URL must already be public; use the **installer**):
 
 ```bash
 # Bearer token = Worker API_TOKEN
-python scripts/publish_update.py --version 0.3.2 --url https://github.com/WaiYanTunOo/SkyAdmin-Pro/releases/download/v0.3.2/SkyAdminPro.exe
+python scripts/publish_update.py --version 0.3.2 --url https://github.com/WaiYanTunOo/SkyAdmin-Pro/releases/download/v0.3.2/SkyAdminPro-Setup-0.3.2.exe
 ```
 
 Update `CHANGELOG.md` before tagging:

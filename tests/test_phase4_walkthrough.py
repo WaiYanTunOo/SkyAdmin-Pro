@@ -134,6 +134,10 @@ def test_phase4_settings_phase3_controls(app):
     app.show_view("settings")
     app.update()
     settings = app._views["settings"]
+    settings.tabs.set("License")
+    settings._on_tab_changed()
+    settings.on_show()
+    app.update()
     assert hasattr(settings, "data_sync_label")
     settings._refresh_license_label()
     app.update()
@@ -145,6 +149,10 @@ def test_phase5_settings_sync_conflicts_button(app):
     app.show_view("settings")
     app.update()
     settings = app._views["settings"]
+    settings.tabs.set("License")
+    settings._on_tab_changed()
+    settings.on_show()
+    app.update()
     assert hasattr(settings, "conflicts_btn")
     with app.db.connection() as conn:
         conn.execute(

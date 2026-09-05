@@ -4,6 +4,7 @@ import { Hono } from "hono";
 import { Env } from "./db";
 import { authMiddleware } from "./auth";
 import { corsMiddleware } from "./cors";
+import { checkRateLimit } from "./rate_limit";
 import { generateHandler } from "./routes/generate";
 import { controlHandler } from "./routes/control";
 import { revokeHandler, unrevokeHandler } from "./routes/revoke";
@@ -50,8 +51,20 @@ app.get("/favicon.ico", (c) =>
 
 app.get("/api/control", controlHandler);
 
+// Rate-limited public activation endpoint
+app.use("/api/claim", async (c, next) => {
+  const limited = await checkRateLimit(c, "claim", { windowSeconds: 60, max: 20 }, "Too many claim attempts — try again shortly.");
+  if (limited) return limited;
+  await next();
+});
 app.post("/api/claim", claimHandler);
 
+// Rate-limited sync registration endpoint
+app.use("/api/sync/register", async (c, next) => {
+  const limited = await checkRateLimit(c, "register", { windowSeconds: 60, max: 10 }, "Too many registration attempts — try again shortly.");
+  if (limited) return limited;
+  await next();
+});
 app.post("/api/sync/register", syncRegisterHandler);
 
 app.use("/api/sync/schema", syncAuthMiddleware);

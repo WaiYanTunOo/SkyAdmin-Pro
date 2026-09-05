@@ -6,6 +6,7 @@ import getpass
 import json
 import logging
 import os
+import sqlite3
 import sys
 import urllib.error
 import urllib.parse
@@ -15,123 +16,41 @@ from typing import TYPE_CHECKING, Any
 
 from skyadmin_pro.config import API_BASE_URL, SETTING_DATA_SYNC_ENABLED, SETTING_SYNC_LAST_PULL, SETTING_SYNC_LAST_PUSH
 from skyadmin_pro.services.license import find_license_file, get_machine_id
+from skyadmin_pro.services.sync_schema import (
+    FK_CLIENT_COLUMN,
+    FK_GROUP_COLUMN,
+    SYNC_ALLOWED_COLUMNS,
+    SYNC_EXCLUDED_COLUMNS,
+    SYNC_PULL_MAX_PAGES,
+    SYNC_PULL_PAGE_SIZE,
+    SYNC_PUSH_ORDER,
+    SYNC_SCHEMA_VERSION,
+    SYNC_TABLES,
+)
 
 if TYPE_CHECKING:
     from skyadmin_pro.database import Database
 
 logger = logging.getLogger(__name__)
 
-SYNC_SCHEMA_VERSION = 1
-SYNC_TABLES: tuple[str, ...] = ("clients", "tasks", "office_contacts", "notebook_entries")
-SYNC_PUSH_ORDER: tuple[str, ...] = SYNC_TABLES
-
-FK_CLIENT_COLUMN = "client_global_id"
-
-SYNC_EXCLUDED_COLUMNS: dict[str, frozenset[str]] = {
-    "clients": frozenset({"ird_password", "id"}),
-    "tasks": frozenset({"id"}),
-    "office_contacts": frozenset({"id"}),
-    "notebook_entries": frozenset({"id"}),
-}
-
-SYNC_ALLOWED_COLUMNS: dict[str, frozenset[str]] = {
-    "clients": frozenset(
-        {
-            "name",
-            "company_name",
-            "contact_name",
-            "email",
-            "status",
-            "notes",
-            "registration_number",
-            "director",
-            "contact_number",
-            "registered_capital",
-            "vat_registration",
-            "business_address",
-            "business_objectives",
-            "tax_id",
-            "vat_registered",
-            "vat_registered_date",
-            "service_type",
-            "num_transactions",
-            "service_fee",
-            "payment_status",
-            "sla",
-            "headcount",
-            "fs_status",
-            "pnd53_status",
-            "pp30_status",
-            "pnd51_status",
-            "pnd50_status",
-            "audit_status",
-            "vo_address",
-            "vo_service_provider",
-            "vo_renewal_date",
-            "csh_service_provider",
-            "csh_renewal_date",
-            "shareholder_info",
-            "group_id",
-            "global_id",
-            "created_at",
-            "updated_at",
-            "deleted_at",
-        }
-    ),
-    "tasks": frozenset(
-        {
-            "title",
-            "description",
-            "status",
-            "category",
-            "due_date",
-            "completed_at",
-            "pipeline_item_id",
-            "pipeline_step",
-            "source_document_id",
-            "global_id",
-            "created_at",
-            "updated_at",
-            "deleted_at",
-            FK_CLIENT_COLUMN,
-        }
-    ),
-    "office_contacts": frozenset(
-        {
-            "name",
-            "role_title",
-            "organization",
-            "department",
-            "phone",
-            "email",
-            "line_id",
-            "category",
-            "notes",
-            "is_favorite",
-            "global_id",
-            "created_at",
-            "updated_at",
-            "deleted_at",
-            FK_CLIENT_COLUMN,
-        }
-    ),
-    "notebook_entries": frozenset(
-        {
-            "entry_type",
-            "title",
-            "body",
-            "entry_date",
-            "author",
-            "follow_up_date",
-            "is_pinned",
-            "global_id",
-            "created_at",
-            "updated_at",
-            "deleted_at",
-            FK_CLIENT_COLUMN,
-        }
-    ),
-}
+# Re-export schema constants for callers/tests that import from data_sync.
+__all__ = [
+    "FK_CLIENT_COLUMN",
+    "FK_GROUP_COLUMN",
+    "SYNC_ALLOWED_COLUMNS",
+    "SYNC_EXCLUDED_COLUMNS",
+    "SYNC_PULL_MAX_PAGES",
+    "SYNC_PULL_PAGE_SIZE",
+    "SYNC_PUSH_ORDER",
+    "SYNC_SCHEMA_VERSION",
+    "SYNC_TABLES",
+    "apply_remote_changes",
+    "collect_local_changes",
+    "ensure_sync_ids",
+    "is_data_sync_enabled",
+    "log_sync_conflict",
+    "sync_data",
+]
 
 
 def _credentials_path() -> Path:
@@ -353,6 +272,45 @@ def _client_id_for_global(db: Database, global_id: str | None) -> int | None:
     return int(row["id"]) if row else None
 
 
+def _group_id_for_global(db: Database, global_id: str | None) -> int | None:
+    if not global_id:
+        return None
+    row = db._fetch_one(
+        "SELECT id FROM client_groups WHERE global_id = ? AND deleted_at IS NULL",
+        (str(global_id),),
+    )
+    return int(row["id"]) if row else None
+
+
+def _unique_group_name(db: Database, name: str, global_id: str) -> str:
+    """Avoid UNIQUE name collisions when two devices create the same label."""
+    cleaned = (name or "").strip() or "Group"
+    existing = db._fetch_one(
+        """
+        SELECT id, global_id FROM client_groups
+        WHERE name = ? COLLATE NOCASE AND deleted_at IS NULL
+        """,
+        (cleaned,),
+    )
+    if not existing:
+        return cleaned
+    if str(existing.get("global_id") or "") == global_id:
+        return cleaned
+    short = (global_id or "x")[:6]
+    candidate = f"{cleaned} ({short})"
+    clash = db._fetch_one(
+        """
+        SELECT id FROM client_groups
+        WHERE name = ? COLLATE NOCASE AND deleted_at IS NULL
+          AND (global_id IS NULL OR global_id != ?)
+        """,
+        (candidate, global_id),
+    )
+    if not clash:
+        return candidate
+    return f"{cleaned} ({global_id[:12]})"
+
+
 def _filter_sync_row(table: str, row: dict[str, Any]) -> dict[str, Any]:
     allowed = SYNC_ALLOWED_COLUMNS.get(table, frozenset())
     return {k: v for k, v in row.items() if k in allowed}
@@ -389,6 +347,17 @@ def _row_to_sync_payload(db: Database, table: str, row: dict) -> dict[str, Any]:
     if table in ("tasks", "office_contacts", "notebook_entries"):
         payload[FK_CLIENT_COLUMN] = _client_global_id(db, row.get("client_id"))
         payload.pop("client_id", None)
+    if table == "clients":
+        gid = row.get("group_id")
+        if gid is not None:
+            g_row = db._fetch_one(
+                "SELECT global_id FROM client_groups WHERE id = ? AND deleted_at IS NULL",
+                (int(gid),),
+            )
+            payload[FK_GROUP_COLUMN] = str(g_row["global_id"]) if g_row and g_row.get("global_id") else None
+        else:
+            payload[FK_GROUP_COLUMN] = None
+        payload.pop("group_id", None)
     payload["global_id"] = str(row.get("global_id") or "")
     return payload
 
@@ -430,14 +399,21 @@ def collect_local_changes(db: Database, *, since: str = "", limit: int = 500) ->
     """Collect active rows and soft-delete tombstones for push (bounded)."""
     changes: list[dict[str, Any]] = []
     since = (since or "").strip()
-    # Batch client global_id lookup for tasks/office_contacts/notebook_entries
+    # Batch client / group global_id lookups for FK remapping
     client_gid_map: dict[int, str | None] = {}
+    group_gid_map: dict[int, str | None] = {}
     try:
         for row in db._fetch_all("SELECT id, global_id FROM clients"):
             client_gid_map[int(row["id"])] = str(row["global_id"]) if row.get("global_id") else None
     except Exception:
         logger.warning("Batch client GID lookup failed, using per-row fallback", exc_info=True)
         client_gid_map = {}
+    try:
+        for row in db._fetch_all("SELECT id, global_id FROM client_groups WHERE deleted_at IS NULL"):
+            group_gid_map[int(row["id"])] = str(row["global_id"]) if row.get("global_id") else None
+    except Exception:
+        logger.warning("Batch group GID lookup failed, using per-row fallback", exc_info=True)
+        group_gid_map = {}
     for table in SYNC_PUSH_ORDER:
         if since:
             rows = db._fetch_all(
@@ -459,7 +435,7 @@ def collect_local_changes(db: Database, *, since: str = "", limit: int = 500) ->
             if deleted_at:
                 row_payload = {"global_id": str(row["global_id"])}
             else:
-                # Use batched client_gid_map to avoid per-row DB connection
+                # Use batched maps to avoid per-row DB connection
                 payload = dict(row)
                 for col in SYNC_EXCLUDED_COLUMNS.get(table, frozenset()):
                     payload.pop(col, None)
@@ -468,11 +444,23 @@ def collect_local_changes(db: Database, *, since: str = "", limit: int = 500) ->
                     gid = client_gid_map.get(int(cid)) if cid is not None else None
                     payload[FK_CLIENT_COLUMN] = gid
                     payload.pop("client_id", None)
+                if table == "clients":
+                    local_gid = row.get("group_id")
+                    payload[FK_GROUP_COLUMN] = group_gid_map.get(int(local_gid)) if local_gid is not None else None
+                    payload.pop("group_id", None)
                 payload = {
                     k: v
                     for k, v in payload.items()
                     if k in SYNC_ALLOWED_COLUMNS.get(table, frozenset())
-                    or k in ("global_id", "created_at", "updated_at", "deleted_at", FK_CLIENT_COLUMN)
+                    or k
+                    in (
+                        "global_id",
+                        "created_at",
+                        "updated_at",
+                        "deleted_at",
+                        FK_CLIENT_COLUMN,
+                        FK_GROUP_COLUMN,
+                    )
                 }
                 payload["global_id"] = str(row.get("global_id") or "")
                 row_payload = _filter_sync_row(table, payload)
@@ -519,6 +507,13 @@ def _apply_remote_change(db: Database, change: dict[str, Any]) -> str:
                     f"UPDATE {table} SET deleted_at = ?, updated_at = ? WHERE global_id = ?",
                     (change.get("deleted_at"), updated_at, global_id),
                 )
+            if table == "client_groups":
+                local_id = int(local["id"])
+                with db.connection() as conn:
+                    conn.execute(
+                        "UPDATE clients SET group_id = NULL WHERE group_id = ?",
+                        (local_id,),
+                    )
         return "applied"
 
     row = _filter_sync_row(table, dict(change.get("row") or {}))
@@ -530,11 +525,19 @@ def _apply_remote_change(db: Database, change: dict[str, Any]) -> str:
         client_gid = row.pop(FK_CLIENT_COLUMN, None) or row.pop("client_global_id", None)
         row["client_id"] = _client_id_for_global(db, str(client_gid) if client_gid else None)
 
+    if table == "clients":
+        group_gid = row.pop(FK_GROUP_COLUMN, None) or row.pop("group_global_id", None)
+        row.pop("group_id", None)
+        row["group_id"] = _group_id_for_global(db, str(group_gid) if group_gid else None)
+
+    if table == "client_groups" and "name" in row:
+        row["name"] = _unique_group_name(db, str(row.get("name") or ""), global_id)
+
     if not row or (len(row) <= 2 and not change.get("deleted_at")):
         return "invalid"
 
     if local:
-        cols = [k for k in row.keys() if k != "global_id"]
+        cols = [k for k in row if k != "global_id"]
         if not cols:
             return "invalid"
         assignments = ", ".join(f"{col} = ?" for col in cols)
@@ -545,11 +548,21 @@ def _apply_remote_change(db: Database, change: dict[str, Any]) -> str:
 
     cols = list(row.keys())
     placeholders = ", ".join("?" for _ in cols)
-    with db.connection() as conn:
-        conn.execute(
-            f"INSERT INTO {table} ({', '.join(cols)}) VALUES ({placeholders})",
-            [row[col] for col in cols],
-        )
+    try:
+        with db.connection() as conn:
+            conn.execute(
+                f"INSERT INTO {table} ({', '.join(cols)}) VALUES ({placeholders})",
+                [row[col] for col in cols],
+            )
+    except sqlite3.IntegrityError:
+        if table != "client_groups" or "name" not in row:
+            raise
+        row["name"] = _unique_group_name(db, f"{row.get('name')}*", global_id)
+        with db.connection() as conn:
+            conn.execute(
+                f"INSERT INTO {table} ({', '.join(cols)}) VALUES ({placeholders})",
+                [row[col] for col in cols],
+            )
     return "applied"
 
 
@@ -611,23 +624,41 @@ def sync_data(db: Database, *, timeout: float = 25.0) -> tuple[bool, str]:
     ensure_sync_ids(db)
 
     since = db.get_setting(SETTING_SYNC_LAST_PULL) or ""
-    pull_ok, pull_result = _sync_request(
-        "GET",
-        "/api/sync/pull",
-        machine_id=machine_id,
-        token=token,
-        query=f"since={urllib.parse.quote(since)}" if since else "",
-        timeout=timeout,
-    )
-    if not pull_ok:
-        return False, f"Pull failed: {pull_result}"
-
-    pull_data = pull_result if isinstance(pull_result, dict) else {}
-    changes = pull_data.get("changes") or []
     pulled = 0
     pull_conflicts = 0
-    if isinstance(changes, list):
-        pulled, pull_conflicts = apply_remote_changes(db, changes)
+    pages = 0
+    pull_data: dict[str, Any] = {}
+    while pages < SYNC_PULL_MAX_PAGES:
+        pages += 1
+        query_parts = [f"limit={SYNC_PULL_PAGE_SIZE}"]
+        if since:
+            query_parts.insert(0, f"since={urllib.parse.quote(str(since))}")
+        pull_ok, pull_result = _sync_request(
+            "GET",
+            "/api/sync/pull",
+            machine_id=machine_id,
+            token=token,
+            query="&".join(query_parts),
+            timeout=timeout,
+        )
+        if not pull_ok:
+            return False, f"Pull failed: {pull_result}"
+
+        pull_data = pull_result if isinstance(pull_result, dict) else {}
+        changes = pull_data.get("changes") or []
+        if not isinstance(changes, list) or not changes:
+            break
+
+        page_pulled, page_conflicts = apply_remote_changes(db, changes)
+        pulled += page_pulled
+        pull_conflicts += page_conflicts
+
+        if len(changes) < SYNC_PULL_PAGE_SIZE:
+            break
+        last_ua = str(changes[-1].get("updated_at") or "").strip()
+        if not last_ua or last_ua == since:
+            break
+        since = last_ua
 
     local_changes = collect_local_changes(db, since=db.get_setting(SETTING_SYNC_LAST_PUSH) or "")
     push_ok, push_result = _sync_request(
@@ -651,7 +682,8 @@ def sync_data(db: Database, *, timeout: float = 25.0) -> tuple[bool, str]:
     applied = int(push_data.get("applied") or 0)
     push_conflicts = int(push_data.get("conflicts") or 0)
     conflicts = pull_conflicts + push_conflicts
-    msg = f"Data sync OK — pulled {pulled}, pushed {applied}."
+    page_note = f" ({pages} pull page{'s' if pages != 1 else ''})" if pages > 1 else ""
+    msg = f"Data sync OK — pulled {pulled}, pushed {applied}{page_note}."
     if conflicts:
         msg += f" {conflicts} conflict(s) logged."
     return True, msg

@@ -22,7 +22,8 @@ from skyadmin_pro.ui.widgets import DatePickerField, themed_entry
 
 
 class TaxIdsTabMixin:
-    def _build_tax_ids(self, master) -> ctk.CTkFrame:
+    def _build_tax_ids(self, master, tree_master=None) -> ctk.CTkFrame:
+        tree_master = tree_master or master
         frame = ctk.CTkFrame(master, corner_radius=CARD_RADIUS)
         frame.grid_columnconfigure(0, weight=1)
         ctk.CTkLabel(
@@ -73,7 +74,7 @@ class TaxIdsTabMixin:
         ctk.CTkLabel(form, text="Headcount").grid(row=8, column=1, sticky="w", pady=(6, 2))
         themed_entry(form, textvariable=self.headcount_var).grid(row=9, column=1, sticky="ew", pady=(0, 4))
 
-        cred_card = ctk.CTkFrame(frame, corner_radius=12)
+        cred_card = ctk.CTkFrame(tree_master, corner_radius=12)
         cred_card.grid(row=2, column=0, sticky="ew", padx=16, pady=(4, 8))
         cred_card.grid_columnconfigure(0, weight=1)
         self._client_cred_rows: dict[str, dict] = {}
@@ -129,7 +130,7 @@ class TaxIdsTabMixin:
             text="Save Tax IDs & Service Info",
             width=200,
             command=self._save_tax_ids,
-        ).grid(row=3, column=0, sticky="w", padx=16, pady=(8, 14))
+        ).grid(row=2, column=0, sticky="w", padx=16, pady=(8, 14))
 
         self.acct_txn_volume.configure(command=self._on_txn_volume_change)
         return frame

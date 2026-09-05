@@ -1,5 +1,6 @@
--- SkyAdmin Pro — D1 Database Schema
--- Run: npx wrangler d1 execute skyadmin-db --remote --file=schema.sql
+-- SkyAdmin Pro — D1 Database Schema (END-STATE REFERENCE ONLY)
+-- Do NOT apply this file with `wrangler d1 execute` / `npm run db:init`.
+-- Setup path: `npx wrangler d1 migrations apply skyadmin-db --remote` (or `npm run db:migrate`).
 
 CREATE TABLE IF NOT EXISTS issued_licenses (
     id INTEGER PRIMARY KEY AUTOINCREMENT,
@@ -95,11 +96,13 @@ CREATE INDEX IF NOT EXISTS idx_revoked_passcodes_passcode ON revoked_passcodes(p
 -- P4: cross-device data sync (per licensed machine_id namespace)
 CREATE TABLE IF NOT EXISTS sync_devices (
     machine_id TEXT NOT NULL PRIMARY KEY,
-    token TEXT NOT NULL UNIQUE,
+    token_hash TEXT NOT NULL,
     created_at TEXT NOT NULL DEFAULT (datetime('now')),
     last_seen_at TEXT,
     expires_at TEXT NOT NULL DEFAULT (datetime('now', '+30 days'))
 );
+
+CREATE INDEX IF NOT EXISTS idx_sync_devices_machine_id ON sync_devices(machine_id);
 
 CREATE TABLE IF NOT EXISTS sync_rows (
     id INTEGER PRIMARY KEY AUTOINCREMENT,
@@ -126,4 +129,17 @@ CREATE TABLE IF NOT EXISTS sync_conflicts (
     logged_at TEXT NOT NULL DEFAULT (datetime('now'))
 );
 CREATE INDEX IF NOT EXISTS idx_sync_conflicts_machine ON sync_conflicts(machine_id, logged_at);
+
+-- P0.5: admin action audit log
+CREATE TABLE IF NOT EXISTS admin_audit_log (
+    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    admin_path TEXT NOT NULL,
+    action TEXT NOT NULL,
+    target TEXT,
+    ip TEXT NOT NULL,
+    timestamp TEXT NOT NULL DEFAULT (datetime('now'))
+);
+CREATE INDEX IF NOT EXISTS idx_admin_audit_log_timestamp ON admin_audit_log(timestamp);
+CREATE INDEX IF NOT EXISTS idx_admin_audit_log_action ON admin_audit_log(action);
+CREATE INDEX IF NOT EXISTS idx_admin_audit_log_target ON admin_audit_log(target);
 

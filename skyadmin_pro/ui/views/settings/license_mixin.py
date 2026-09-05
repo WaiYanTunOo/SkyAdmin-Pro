@@ -12,8 +12,6 @@ from skyadmin_pro.config import (
     OWNER_EMAIL,
 )
 from skyadmin_pro.ui.theme import TEXT_MUTED
-from skyadmin_pro.ui.treeview import ThemedTreeview
-from skyadmin_pro.ui.widgets import make_modal
 
 
 class LicenseMixin:
@@ -423,90 +421,14 @@ class LicenseMixin:
         )
 
     def _open_sync_conflicts(self) -> None:
-        total = self.app.db.count_sync_conflicts()
-        rows = self.app.db.list_sync_conflicts(limit=500)
-        if not rows:
-            messagebox.showinfo(
-                "Sync conflicts",
-                "No sync conflicts logged.\n\n"
-                "Conflicts are recorded when the server has older data than your PC "
-                "(last-write-wins keeps your local copy).",
-                parent=self.winfo_toplevel(),
-            )
-            return
+        from skyadmin_pro.ui.views.settings.sync_conflicts_dialog import open_sync_conflicts_dialog
 
-        top = ctk.CTkToplevel(self)
-        top.title("SkyAdmin Pro — Sync conflicts")
-        top.geometry("900x520")
-        top.minsize(720, 400)
-        make_modal(top)
-        top.grid_columnconfigure(0, weight=1)
-        top.grid_rowconfigure(1, weight=1)
-
-        shown = len(rows)
-        summary = (
-            f"{total} conflict(s) logged — your local data was kept."
-            if shown >= total
-            else f"Showing {shown} of {total} conflict(s) — your local data was kept."
+        open_sync_conflicts_dialog(
+            self,
+            db=self.app.db,
+            feedback=self.feedback,
+            on_cleared=self._refresh_license_label,
         )
-        ctk.CTkLabel(
-            top,
-            text=(
-                f"{summary} "
-                "These rows were not overwritten because your copy is newer. "
-                "Scroll the table to review; Clear log removes the audit only."
-            ),
-            anchor="w",
-            justify="left",
-            text_color=TEXT_MUTED,
-            wraplength=840,
-        ).grid(row=0, column=0, sticky="ew", padx=16, pady=(14, 8))
-
-        tree = ThemedTreeview(
-            top,
-            columns=(
-                ("logged", "Logged", 130),
-                ("table", "Table", 100),
-                ("global_id", "Global ID", 180),
-                ("direction", "Dir", 50),
-                ("local", "Local updated", 120),
-                ("remote", "Remote updated", 120),
-            ),
-            showheight=16,
-        )
-        tree.grid(row=1, column=0, sticky="nsew", padx=16, pady=(0, 8))
-        tree.set_rows(
-            [
-                (
-                    str(row.get("logged_at") or "")[:19],
-                    row.get("table_name") or "",
-                    row.get("global_id") or "",
-                    row.get("direction") or "",
-                    str(row.get("local_updated_at") or "")[:19],
-                    str(row.get("remote_updated_at") or "")[:19],
-                )
-                for row in rows
-            ]
-        )
-
-        actions = ctk.CTkFrame(top, fg_color="transparent")
-        actions.grid(row=2, column=0, sticky="ew", padx=16, pady=(0, 14))
-        actions.grid_columnconfigure(0, weight=1)
-
-        def _clear() -> None:
-            if not messagebox.askyesno(
-                "Clear conflict log",
-                f"Remove all {total} logged conflict(s)?\n\nThis only clears the audit log — your data is unchanged.",
-                parent=top,
-            ):
-                return
-            cleared = self.app.db.clear_sync_conflicts()
-            self.feedback.success(f"Cleared {cleared} sync conflict log entries.")
-            self._refresh_license_label()
-            top.destroy()
-
-        ctk.CTkButton(actions, text="Clear log", width=100, fg_color=("#b45309", "#92400e"), command=_clear).pack(side="left")
-        ctk.CTkButton(actions, text="Close", width=90, command=top.destroy).pack(side="right")
 
     def _on_data_sync_toggle(self) -> None:
         from skyadmin_pro.config import SETTING_DATA_SYNC_ENABLED

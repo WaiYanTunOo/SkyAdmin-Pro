@@ -19,12 +19,15 @@ cp .dev.vars.example .dev.vars   # edit locally — never commit
 
 ### 1. Create / bind D1
 
-`wrangler.jsonc` already references database `skyadmin-db`. Apply schema:
+`wrangler.jsonc` already references database `skyadmin-db`. Apply **versioned migrations** (required):
 
 ```bash
-npm run db:init        # remote D1
-# npm run db:init:local  # local dev only
+npm run db:migrate        # remote D1 — wrangler d1 migrations apply
+# npm run db:migrate:local  # local dev only
 ```
+
+**Deprecated:** `npm run db:init` / applying `schema.sql` directly. That path exits with an error.
+`schema.sql` remains an end-state reference only.
 
 ### 2. Configure secrets
 
@@ -71,12 +74,12 @@ curl -s "https://YOUR-WORKER.workers.dev/api/control" | head -c 80
 
 Control output must start with `SKYCTRL2:`.
 
-### 5. Apply P4 sync tables (existing deployments)
+### 5. Apply pending migrations (existing deployments)
 
-If the Worker was deployed before P4, re-run schema (idempotent):
+If the Worker was deployed before newer migrations, apply pending files:
 
 ```bash
-npm run db:init
+npm run db:migrate
 ```
 
 ## Desktop app configuration

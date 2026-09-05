@@ -91,7 +91,9 @@ def test_plaintext_ird_password_migrated_on_startup(tmp_path, fake_app_dir, monk
         )
         conn.commit()
 
-    db._migrate_secret_fields()
+    from skyadmin_pro.db.migrations.m003_secret_fields import upgrade
+
+    upgrade(db)
     client = db.get_client(client_id)
     assert client is not None
     assert client["ird_password"] == "plain-old-pass"

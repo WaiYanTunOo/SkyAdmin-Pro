@@ -177,6 +177,17 @@ jobs:
           name: SkyAdminPro-windows-${{ needs.windows-release.outputs.version }}
           path: dist
 
+      - name: Require SKYADMIN_API_TOKEN for tag publish
+        env:
+          SKYADMIN_API_TOKEN: ${{ secrets.SKYADMIN_API_TOKEN }}
+        shell: bash
+        run: |
+          if [ -z "$SKYADMIN_API_TOKEN" ]; then
+            echo "::error::SKYADMIN_API_TOKEN is required for tag releases — refusing to create GitHub Release without updating the auto-update channel."
+            exit 1
+          fi
+          echo "SKYADMIN_API_TOKEN present."
+
       - name: Create GitHub Release
         uses: softprops/action-gh-release@v2
         with:
@@ -198,11 +209,12 @@ jobs:
         shell: bash
         run: |
           if [ -z "$SKYADMIN_API_TOKEN" ]; then
-            echo "SKIP  Worker publish - SKYADMIN_API_TOKEN not configured"
-            exit 0
+            echo "::error::SKYADMIN_API_TOKEN is required for tag releases — refusing to ship without updating the auto-update channel."
+            exit 1
           fi
           version="${{ needs.windows-release.outputs.version }}"
-          url="https://github.com/${{ github.repository }}/releases/download/v${version}/SkyAdminPro.exe"
+          # Ship path is the Inno Setup installer (not the portable exe).
+          url="https://github.com/${{ github.repository }}/releases/download/v${version}/SkyAdminPro-Setup-${version}.exe"
           if [ -n "$SKYADMIN_API_URL" ]; then
             python scripts/publish_update.py --version "$version" --url "$url" --api-url "$SKYADMIN_API_URL" --token "$SKYADMIN_API_TOKEN"
           else

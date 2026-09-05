@@ -6,6 +6,8 @@ import pytest
 
 from skyadmin_pro.services.client_commands import (
     AddClientCommand,
+    ArchiveClientsCommand,
+    AssignGroupCommand,
     DeleteClientsCommand,
     EditClientCommand,
     SetStatusCommand,
@@ -115,6 +117,34 @@ class TestSetStatusCommand:
         assert mgr.execute(SetStatusCommand(db, ids, "inactive")) == 3
         mgr.undo()
         assert [db.get_client(i)["status"] for i in ids] == ["inactive", "active", "active"]
+
+    def test_accepts_display_case_status(self, db):
+        cid = db.get_or_create_client("Case Co")
+        mgr = UndoManager()
+        assert mgr.execute(SetStatusCommand(db, [cid], "Inactive")) == 1
+        assert db.get_client(cid)["status"] == "inactive"
+
+
+class TestAssignGroupCommand:
+    def test_batch_assign_then_undo(self, db):
+        ids = [db.get_or_create_client(f"Group Co {i}") for i in range(2)]
+        gid = db.add_client_group("Local Only")
+        mgr = UndoManager()
+        assert mgr.execute(AssignGroupCommand(db, ids, gid)) == 2
+        assert all(db.get_client(i)["group_id"] == gid for i in ids)
+        mgr.undo()
+        assert all(db.get_client(i)["group_id"] is None for i in ids)
+
+
+class TestArchiveClientsCommand:
+    def test_archive_then_undo_restores(self, db):
+        ids = [db.get_or_create_client(f"Soft Del {i}") for i in range(2)]
+        mgr = UndoManager()
+        assert mgr.execute(ArchiveClientsCommand(db, ids)) == 2
+        assert db.list_clients() == []
+        mgr.undo()
+        names = {c["name"] for c in db.list_clients()}
+        assert names >= {"Soft Del 0", "Soft Del 1"}
 
 
 class TestDeleteClientsCommand:

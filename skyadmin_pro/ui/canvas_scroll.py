@@ -119,6 +119,12 @@ class CanvasScrollFrame(ctk.CTkFrame):
             self._canvas.yview_scroll(1, "units")
         return "break"
 
+    def winfo_children(self):
+        children = list(super().winfo_children())
+        if self.content not in children:
+            children.append(self.content)
+        return children
+
     def refresh_theme(self) -> None:
         mode = ctk.get_appearance_mode()
         self._canvas.configure(bg=SURFACE_BG[1 if mode == "Dark" else 0])

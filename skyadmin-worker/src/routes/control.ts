@@ -2,9 +2,18 @@
 
 import { Context } from "hono";
 import { Env, listRevocations, listBans, listUsedNonces, listRevokedPasscodes, getMeta } from "../db";
+import { checkRateLimit } from "../rate_limit";
 import { buildControlEnvelopeV2 } from "../signing";
 
 export async function controlHandler(c: Context<{ Bindings: Env }>) {
+  const limited = await checkRateLimit(
+    c,
+    "control",
+    { windowSeconds: 60, max: 30 },
+    "Too many control requests — try again shortly.",
+  );
+  if (limited) return limited;
+
   const db = c.env.DB;
   const ed25519Key = (c.env.LICENSE_ED25519_PRIVATE_KEY_B64 || "").trim();
   if (!ed25519Key) {

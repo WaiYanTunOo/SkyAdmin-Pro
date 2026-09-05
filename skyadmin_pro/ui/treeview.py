@@ -129,6 +129,7 @@ class ThemedTreeview(ctk.CTkFrame):
         showheight: int = 10,
         table_id: str | None = None,
         db=None,
+        selectmode: str = "browse",
         **kwargs,
     ) -> None:
         super().__init__(master, fg_color="transparent", **kwargs)
@@ -150,11 +151,12 @@ class ThemedTreeview(ctk.CTkFrame):
         self.grid_columnconfigure(0, weight=1)
         self.grid_rowconfigure(0, weight=1)
 
+        mode = selectmode if selectmode in {"browse", "extended", "none"} else "browse"
         self.tree = ttk.Treeview(
             self,
             columns=self._column_ids,
             show="headings",
-            selectmode="browse",
+            selectmode=mode,
             height=showheight,
         )
         self._vscroll = ttk.Scrollbar(

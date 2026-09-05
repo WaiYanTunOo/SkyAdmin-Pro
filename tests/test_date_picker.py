@@ -70,6 +70,11 @@ def test_datepicker_class_tracks_open_fields():
     assert "_close_all_open()" in class_src
     assert "tk.TclError" in class_src
     assert "_grab_after_id" in class_src
+    # U2: map via update/update_idletasks, not a fragile delayed grab retry.
+    grab_src = class_src.split("def _grab_calendar")[1].split("def _open_calendar")[0]
+    assert "after(" not in grab_src
+    assert "update_idletasks()" in grab_src
+    assert ".update()" in grab_src or "top.update()" in grab_src
 
 
 def test_datepicker_rapid_multi_instance_switch_no_tcl_error():

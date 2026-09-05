@@ -91,7 +91,7 @@ Store in repository secrets:
 | `AZURE_TRUSTED_SIGNING_SECRET` | Service principal secret |
 | `AZURE_TRUSTED_SIGNING_TENANT_ID` | Azure tenant ID |
 
-When both are set, the release workflow signs `dist/SkyAdminPro.exe` and runs `release_check.py --require-signature`.
+When both are set, the release workflow signs `dist/SkyAdminPro.exe` and `dist/SkyAdminPro-Setup-*.exe`, then runs `release_check.py --require-signature`.
 
 Encode a PFX for GitHub:
 

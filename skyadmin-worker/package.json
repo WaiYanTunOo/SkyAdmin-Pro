@@ -7,8 +7,8 @@
     "deploy": "wrangler deploy",
     "typecheck": "tsc --noEmit",
     "test": "vitest run",
-    "db:init": "wrangler d1 execute skyadmin-db --remote --file=schema.sql",
-    "db:init:local": "wrangler d1 execute skyadmin-db --local --file=schema.sql",
+    "db:init": "node -e \"console.error('DEPRECATED: use npm run db:migrate (wrangler d1 migrations apply). schema.sql is reference-only.'); process.exit(1)\"",
+    "db:init:local": "node -e \"console.error('DEPRECATED: use npm run db:migrate:local. schema.sql is reference-only.'); process.exit(1)\"",
     "db:migrate": "wrangler d1 migrations apply skyadmin-db --remote",
     "db:migrate:local": "wrangler d1 migrations apply skyadmin-db --local",
     "db:migrate:new": "echo \"Create migrations/NNNN_name.sql then run db:migrate\""

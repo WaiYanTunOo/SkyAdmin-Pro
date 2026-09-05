@@ -19,6 +19,7 @@ import {
   sessionMessage,
   validateCsrfToken,
 } from "./session";
+import { auditLog, purgeOldAuditLogs } from "../../admin_security";
 
 export async function adminHandler(c: Context<{ Bindings: Env }>): Promise<Response> {
   const url = new URL(c.req.url);
@@ -49,6 +50,8 @@ export async function adminHandler(c: Context<{ Bindings: Env }>): Promise<Respo
       if (timingSafeEqual(pw, c.env.ADMIN_PASS)) {
         // Clear failed attempts on success
         await c.env.DB.prepare("DELETE FROM login_attempts WHERE ip = ?").bind(ip).run();
+        await purgeOldAuditLogs(c.env.DB);
+        await auditLog(c.env.DB, adminPath, "LOGIN_SUCCESS", null, ip);
 
         const salt = adminSessionSalt(c.env);
         if (!salt) {
@@ -67,6 +70,7 @@ export async function adminHandler(c: Context<{ Bindings: Env }>): Promise<Respo
       }
 
       // Record failed attempt
+      await auditLog(c.env.DB, adminPath, "LOGIN_FAILURE", null, ip);
       await recordLoginAttempt(c, ip);
     } catch {}
     c.header("Content-Security-Policy", ADMIN_CSP);
@@ -87,6 +91,7 @@ export async function adminHandler(c: Context<{ Bindings: Env }>): Promise<Respo
       c.header("Content-Security-Policy", ADMIN_CSP);
       return c.html(loginPage(adminPath, "Invalid form. Please try again."), 403);
     }
+    await auditLog(c.env.DB, adminPath, "LOGOUT", null, ip);
     await bumpSessionEpoch(c.env.DB);
     const cookieName = sessionKey(adminSessionSalt(c.env));
     return new Response(null, {
@@ -114,6 +119,9 @@ export async function adminHandler(c: Context<{ Bindings: Env }>): Promise<Respo
   // Authenticated dashboard — embed a short-lived CSRF token for API POSTs
   // (master API_TOKEN never touches the DOM; see auth.ts session fallback).
   // Inline dashboard JS runs under a per-response CSP nonce.
+  // Purge before write so refresh storms cannot grow the table without bound.
+  await purgeOldAuditLogs(c.env.DB);
+  await auditLog(c.env.DB, adminPath, "DASHBOARD_ACCESS", null, ip);
   const epoch = await getSessionEpoch(c.env.DB);
   const dashboardCsrf = await generateCsrfToken(c.env.ADMIN_PASS, c.env.ADMIN_PATH, epoch);
   const nonce = randomCspNonce();

@@ -4,6 +4,7 @@ import { describe, expect, it } from "vitest";
 import { timingSafeEqual } from "./timing_safe";
 import app from "./index";
 import type { Env } from "./db";
+import { hashSyncToken } from "./sync_auth";
 
 function mockEnv(overrides: Partial<Env> = {}): Env {
   return {
@@ -130,14 +131,14 @@ describe("Admin CSP headers", () => {
 
 describe("Sync token TTL", () => {
   it("rejects expired sync token with 401", async () => {
+    const tokenHash = await hashSyncToken("expired-token");
     const db = {
       prepare: (sql: string) => ({
         bind: (...args: unknown[]) => ({
           first: async () => {
-            if (sql.includes("SELECT machine_id, expires_at")) {
-              // Return a token that expired yesterday
+            if (sql.includes("SELECT machine_id, token_hash, expires_at")) {
               const yesterday = new Date(Date.now() - 86400000).toISOString().slice(0, 19);
-              return { machine_id: "AABBCCDD11223344", expires_at: yesterday };
+              return { machine_id: "AABBCCDD11223344", token_hash: tokenHash, expires_at: yesterday };
             }
             return null;
           },
@@ -166,15 +167,15 @@ describe("Sync token TTL", () => {
   });
 
   it("allows valid sync token and refreshes expiry", async () => {
+    const tokenHash = await hashSyncToken("valid-token");
     let updatedExpiry: string | null = null;
     const db = {
       prepare: (sql: string) => ({
         bind: (...args: unknown[]) => ({
           first: async () => {
-            if (sql.includes("SELECT machine_id, expires_at")) {
-              // Token expires in 30 days
+            if (sql.includes("SELECT machine_id, token_hash, expires_at")) {
               const future = new Date(Date.now() + 30 * 86400000).toISOString().slice(0, 19);
-              return { machine_id: "AABBCCDD11223344", expires_at: future };
+              return { machine_id: "AABBCCDD11223344", token_hash: tokenHash, expires_at: future };
             }
             return null;
           },
@@ -202,19 +203,18 @@ describe("Sync token TTL", () => {
       },
       env,
     );
-    // Should not be 401 — the token is valid
     expect(res.status).not.toBe(401);
-    // Expiry should have been refreshed
     expect(updatedExpiry).toBeTruthy();
   });
 
-  it("allows sync token with null expires_at (legacy)", async () => {
+  it("rejects sync token with null expires_at (fail closed)", async () => {
+    const tokenHash = await hashSyncToken("legacy-token");
     const db = {
       prepare: (sql: string) => ({
         bind: (...args: unknown[]) => ({
           first: async () => {
-            if (sql.includes("SELECT machine_id, expires_at")) {
-              return { machine_id: "AABBCCDD11223344", expires_at: null };
+            if (sql.includes("SELECT machine_id, token_hash, expires_at")) {
+              return { machine_id: "AABBCCDD11223344", token_hash: tokenHash, expires_at: null };
             }
             return null;
           },
@@ -237,7 +237,9 @@ describe("Sync token TTL", () => {
       },
       env,
     );
-    expect(res.status).not.toBe(401);
+    expect(res.status).toBe(401);
+    const body = await res.json();
+    expect(String(body.error || "")).toMatch(/expired/i);
   });
 });
 

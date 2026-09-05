@@ -57,4 +57,8 @@ def seed_liaison_contacts(db: Database, *, only_missing: bool = True, client_id:
 
 
 def migrate_legacy_ird_passwords(db: Database) -> int:
-    return db._migrate_ird_to_client_credentials()
+    from skyadmin_pro.db.migrations.m005_ird_to_client_credentials import (
+        migrate_ird_to_client_credentials,
+    )
+
+    return migrate_ird_to_client_credentials(db)

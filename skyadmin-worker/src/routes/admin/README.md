@@ -33,7 +33,7 @@ Admin page JS calls these — **do not break paths or shapes** without updating 
 cd skyadmin-worker && npm test
 ```
 
-No dedicated `admin.test.ts` yet — auth covered by `auth.test.ts`, packages by `packages.test.ts`. Add Vitest if changing session/CSRF logic.
+No dedicated coverage gap for admin HTML — see `src/routes/admin.test.ts` plus `auth.test.ts`.
 
 ## Future splits (optional)
 

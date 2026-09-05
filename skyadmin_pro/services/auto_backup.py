@@ -17,6 +17,19 @@ SETTING_AUTO_BACKUP_LAST_RUN = "auto_backup_last_run"
 AUTO_BACKUP_KEEP = 7
 
 
+def retention_help_text(keep: int = AUTO_BACKUP_KEEP) -> str:
+    """User-facing Settings copy for how many AutoBackups files are kept."""
+    return (
+        f"Keeps the newest {keep} encrypted backups in the AutoBackups folder. "
+        "Older files are deleted automatically after each successful run."
+    )
+
+
+def auto_backups_dir(workspace_root: Path) -> Path:
+    """Path to the encrypted scheduled-backup folder under the workspace root."""
+    return Path(workspace_root) / "AutoBackups"
+
+
 def should_run_backup(db, interval: str, last_run: str | None) -> bool:
     """Check if a backup should run based on interval and last run timestamp."""
     if interval == "off" or not interval:
@@ -97,6 +110,14 @@ class AutoBackupScheduler:
                 pass
             self._timer_id = None
 
+    def nudge(self, *, delay_ms: int = 500) -> None:
+        """Re-read settings soon after the user changes toggle/interval in Settings."""
+        self.stop()
+        try:
+            self._timer_id = self.app.after(max(0, int(delay_ms)), self._check)
+        except Exception:
+            self.start()
+
     def _schedule_check(self) -> None:
         try:
             self._timer_id = self.app.after(self._check_interval_ms, self._check)
@@ -113,7 +134,7 @@ class AutoBackupScheduler:
             interval = db.get_setting(SETTING_AUTO_BACKUP_INTERVAL) or "daily"
             last_run = db.get_setting(SETTING_AUTO_BACKUP_LAST_RUN)
             if should_run_backup(db, interval, last_run):
-                backup_dir = self.app.paths.root / "AutoBackups"
+                backup_dir = auto_backups_dir(self.app.paths.root)
                 result = run_auto_backup(self.app.paths.root, db.db_file, backup_dir)
                 if result:
                     now = datetime.now()

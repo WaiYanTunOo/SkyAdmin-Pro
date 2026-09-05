@@ -1,0 +1,66 @@
+{
+  "$schema": "https://opencode.ai/config.json",
+  "instructions": ["AGENTS.md"],
+  "default_agent": "build",
+  "agent": {
+    "ui-widgets": {
+      "mode": "subagent",
+      "description": "Fix DatePickerField clipping, transient Toplevel popups, form widget consistency. Delegates when tasks involve widgets.py, date pickers, form fields, or calendar popups.",
+      "permission": {
+        "edit": "allow",
+        "bash": { "pytest *": "allow", "*": "ask" }
+      }
+    },
+    "ui-performance": {
+      "mode": "subagent",
+      "description": "Fix scroll jank, tab refresh storms, lazy loading, polling. Delegates when tasks involve active-tab-only refresh, pausing hidden polling, or reducing nested CTkScrollableFrame.",
+      "permission": {
+        "edit": "allow",
+        "bash": { "pytest *": "allow", "*": "ask" }
+      }
+    },
+    "company-details": {
+      "mode": "subagent",
+      "description": "Company Details panel and sub-tabs. Handles lazy sub-tab build and scroll architecture in company_details/.",
+      "permission": {
+        "edit": "allow",
+        "bash": { "pytest *": "allow", "*": "ask" }
+      }
+    },
+    "worker-api": {
+      "mode": "subagent",
+      "description": "skyadmin-worker/ routes, sync, license, D1 database. Handles Worker routes, Vitest, wrangler deploy patterns.",
+      "permission": {
+        "edit": "allow",
+        "bash": { "npm *": "allow", "npx *": "allow", "pytest *": "allow", "*": "ask" }
+      }
+    },
+    "desktop-core": {
+      "mode": "subagent",
+      "description": "services/, db/, sync, export, license logic. Business logic and SQLite; keeps UI thin.",
+      "permission": {
+        "edit": "allow",
+        "bash": { "pytest *": "allow", "*": "ask" }
+      }
+    },
+    "qa-verifier": {
+      "mode": "subagent",
+      "description": "After UI or API changes, pre-ship. Runs pytest/vitest/release_check, reports pass/fail (read-only).",
+      "permission": {
+        "edit": "deny",
+        "bash": { "pytest *": "allow", "npm *": "allow", "npx *": "allow", "python scripts/release_check.py": "allow", "*": "ask" }
+      }
+    },
+    "packaging-release": {
+      "mode": "subagent",
+      "description": "Builds, installer, CI, version bumps. PyInstaller, Inno Setup, release_check.py, GitHub workflows.",
+      "permission": {
+        "edit": "allow",
+        "bash": { "npm *": "allow", "npx *": "allow", "python *": "allow", "pyinstaller *": "allow", "*": "ask" }
+      }
+    }
+  },
+  "skills": {
+    "paths": [".opencode/skills"]
+  }
+}

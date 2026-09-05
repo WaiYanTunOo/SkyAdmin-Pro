@@ -43,6 +43,14 @@ desktop.ini
 *.swp
 .cursor/
 
+# OpenCode local install (agents/skills are tracked; deps are not)
+.opencode/node_modules/
+.opencode/package-lock.json
+.opencode/bun.lock
+
+# Local QA smoke artifacts (screenshots, profile backups)
+.qa_smoke_shots/
+
 # Backup files
 *.bak
 *.bak.*

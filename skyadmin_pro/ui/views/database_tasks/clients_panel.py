@@ -59,13 +59,19 @@ class ClientsExpiryPanel(ctk.CTkFrame):
             title_row, variable=self._group_filter_var,
             values=["All"], width=120, command=lambda _: self._refresh_clients(),
         )
-        self.group_filter_menu.grid(row=0, column=2, padx=(0, 8))
+        self.group_filter_menu.grid(row=0, column=2, padx=(0, 4))
+        ctk.CTkLabel(
+            title_row,
+            text="(this PC only)",
+            font=ctk.CTkFont(size=11),
+            text_color=TEXT_MUTED,
+        ).grid(row=0, column=3, padx=(0, 8), sticky="w")
         ctk.CTkButton(
             title_row,
             text="Export to Excel",
             width=130,
             command=self._export_excel,
-        ).grid(row=0, column=3, sticky="e", padx=(8, 0))
+        ).grid(row=0, column=4, sticky="e", padx=(8, 0))
         self.client_tree = ThemedTreeview(
             left,
             columns=(
@@ -77,8 +83,10 @@ class ClientsExpiryPanel(ctk.CTkFrame):
             showheight=9,
             table_id="clients",
             db=self.app.db,
+            selectmode="extended",
         )
         self.client_tree.grid(row=1, column=0, sticky="nsew", padx=12, pady=(0, 4))
+        left.grid_rowconfigure(1, weight=1)
         client_pager = ctk.CTkFrame(left, fg_color="transparent")
         client_pager.grid(row=2, column=0, sticky="ew", padx=12, pady=(0, 4))
         self.client_prev = ctk.CTkButton(
@@ -100,7 +108,7 @@ class ClientsExpiryPanel(ctk.CTkFrame):
         self.client_page_size.set("250")
         self.client_page_size.pack(side="right")
         actions = ctk.CTkFrame(left, fg_color="transparent")
-        actions.grid(row=3, column=0, sticky="ew", padx=12, pady=(0, 8))
+        actions.grid(row=3, column=0, sticky="ew", padx=12, pady=(0, 4))
         ctk.CTkButton(actions, text="Add / Edit client", width=125, command=self._open_client_dialog).pack(side="left")
         ctk.CTkButton(
             actions,
@@ -149,14 +157,25 @@ class ClientsExpiryPanel(ctk.CTkFrame):
             command=self._open_suppliers,
         ).pack(side="left", padx=(8, 0))
 
-        # Batch action row (visible when items are selected)
+        # Batch action row — Ctrl/Shift+click multi-select (selectmode extended)
         batch_row = ctk.CTkFrame(left, fg_color="transparent")
-        batch_row.grid(row=3, column=0, sticky="ew", padx=12, pady=(0, 4))
+        batch_row.grid(row=4, column=0, sticky="ew", padx=12, pady=(0, 8))
         ctk.CTkLabel(
             batch_row, text="Batch:",
             font=ctk.CTkFont(size=11, weight="bold"),
             text_color=TEXT_MUTED,
         ).pack(side="left", padx=(0, 6))
+        ctk.CTkLabel(
+            batch_row,
+            text="Ctrl/Shift+click",
+            font=ctk.CTkFont(size=10),
+            text_color=TEXT_MUTED,
+        ).pack(side="left", padx=(0, 8))
+        ctk.CTkButton(
+            batch_row, text="Archive selected", width=120,
+            fg_color="transparent", border_width=1,
+            command=self._batch_archive,
+        ).pack(side="left", padx=(0, 4))
         ctk.CTkButton(
             batch_row, text="Delete selected", width=110,
             fg_color="#dc2626", hover_color="#b91c1c",
@@ -165,12 +184,17 @@ class ClientsExpiryPanel(ctk.CTkFrame):
         ctk.CTkButton(
             batch_row, text="Mark Active", width=95,
             fg_color="transparent", border_width=1,
-            command=lambda: self._batch_set_status("Active"),
+            command=lambda: self._batch_set_status("active"),
         ).pack(side="left", padx=(0, 4))
         ctk.CTkButton(
             batch_row, text="Mark Inactive", width=95,
             fg_color="transparent", border_width=1,
-            command=lambda: self._batch_set_status("Inactive"),
+            command=lambda: self._batch_set_status("inactive"),
+        ).pack(side="left", padx=(0, 4))
+        ctk.CTkButton(
+            batch_row, text="Assign group…", width=110,
+            fg_color="transparent", border_width=1,
+            command=self._batch_assign_group,
         ).pack(side="left", padx=(0, 4))
         ctk.CTkButton(
             batch_row, text="Undo", width=70,
@@ -418,7 +442,7 @@ class ClientsExpiryPanel(ctk.CTkFrame):
         top = ctk.CTkToplevel(self.winfo_toplevel())
         top.title("Manage client groups")
         top.resizable(False, False)
-        top.geometry("380x360")
+        top.geometry("400x400")
         make_modal(top)
         body = ctk.CTkFrame(top, corner_radius=CARD_RADIUS)
         body.grid(row=0, column=0, padx=16, pady=16, sticky="nsew")
@@ -426,16 +450,23 @@ class ClientsExpiryPanel(ctk.CTkFrame):
         top.grid_columnconfigure(0, weight=1)
         top.grid_rowconfigure(0, weight=1)
 
-        ctk.CTkLabel(body, text="Groups", anchor="w").grid(row=0, column=0, sticky="w", pady=(0, 6))
+        ctk.CTkLabel(body, text="Groups", anchor="w").grid(row=0, column=0, sticky="w", pady=(0, 2))
+        ctk.CTkLabel(
+            body,
+            text="Groups are this PC only — not synced across devices.",
+            anchor="w",
+            font=ctk.CTkFont(size=11),
+            text_color=TEXT_MUTED,
+        ).grid(row=1, column=0, sticky="w", pady=(0, 8))
         group_var = ctk.StringVar(value="")
         group_menu = ctk.CTkOptionMenu(body, variable=group_var, values=[""], width=280)
-        group_menu.grid(row=1, column=0, sticky="ew", pady=(0, 6))
+        group_menu.grid(row=2, column=0, sticky="ew", pady=(0, 6))
         name_var = ctk.StringVar(value="")
         themed_entry(body, textvariable=name_var, placeholder_text="Group name").grid(
-            row=2, column=0, sticky="ew", pady=(0, 6)
+            row=3, column=0, sticky="ew", pady=(0, 6)
         )
         msg = ctk.CTkLabel(body, text="", anchor="w")
-        msg.grid(row=3, column=0, sticky="ew", pady=(0, 6))
+        msg.grid(row=4, column=0, sticky="ew", pady=(0, 6))
 
         def id_map() -> dict[str, int]:
             return {g["name"]: g["id"] for g in self.app.db.list_client_groups()}
@@ -480,15 +511,14 @@ class ClientsExpiryPanel(ctk.CTkFrame):
             self.refresh()
 
         def delete_group() -> None:
-            from tkinter import messagebox
-
             old = group_var.get().strip()
             if not old:
                 note("Select a group first.")
                 return
             if not messagebox.askyesno(
                 "Delete group",
-                f"Delete group '{old}'? Its clients become ungrouped (not deleted).",
+                f"Delete group '{old}'? Its clients become ungrouped (not deleted).\n\n"
+                "Groups are this PC only — not synced.",
                 parent=top,
             ):
                 return
@@ -502,7 +532,7 @@ class ClientsExpiryPanel(ctk.CTkFrame):
             self.refresh()
 
         btns = ctk.CTkFrame(body, fg_color="transparent")
-        btns.grid(row=4, column=0, sticky="ew", pady=(6, 0))
+        btns.grid(row=5, column=0, sticky="ew", pady=(6, 0))
         ctk.CTkButton(btns, text="Add", width=80, command=add_group).pack(side="left")
         ctk.CTkButton(
             btns, text="Rename", width=80, fg_color="transparent", border_width=1,
@@ -522,9 +552,9 @@ class ClientsExpiryPanel(ctk.CTkFrame):
         top = ctk.CTkToplevel(self.winfo_toplevel())
         top.title("Edit client" if current else "Add client")
         top.resizable(False, False)
-        top.geometry("460x380")
+        top.geometry("460x420")
         top.update_idletasks()
-        width, height = 460, 380
+        width, height = 460, 420
         x = (self.winfo_rootx() + self.winfo_width() // 2) - width // 2
         y = (self.winfo_rooty() + self.winfo_height() // 2) - height // 2
         top.geometry(f"{width}x{height}+{x}+{y}")
@@ -563,9 +593,16 @@ class ClientsExpiryPanel(ctk.CTkFrame):
         group_var = ctk.StringVar(value=current_gname if current_gname in group_names else "(No group)")
         group_menu = ctk.CTkOptionMenu(body, values=group_names, variable=group_var)
         group_menu.grid(row=4, column=1, sticky="ew", pady=6)
+        ctk.CTkLabel(
+            body,
+            text="Groups are this PC only — not synced.",
+            anchor="w",
+            font=ctk.CTkFont(size=11),
+            text_color=TEXT_MUTED,
+        ).grid(row=5, column=0, columnspan=2, sticky="w", pady=(0, 4))
 
         buttons = ctk.CTkFrame(body, fg_color="transparent")
-        buttons.grid(row=5, column=0, columnspan=2, sticky="e", pady=(12, 0))
+        buttons.grid(row=6, column=0, columnspan=2, sticky="e", pady=(12, 0))
         ctk.CTkButton(
             buttons,
             text="Save",
@@ -697,7 +734,9 @@ class ClientsExpiryPanel(ctk.CTkFrame):
             return
         if not messagebox.askyesno(
             "Batch delete",
-            f"Delete {len(iids)} selected client(s)? You can undo once with Ctrl+Z.",
+            f"Permanently delete {len(iids)} selected client(s)?\n\n"
+            "This cannot be undone after leaving this screen (Ctrl+Z works once). "
+            "Prefer Archive to soft-delete instead.",
             parent=self.winfo_toplevel(),
         ):
             return
@@ -706,6 +745,26 @@ class ClientsExpiryPanel(ctk.CTkFrame):
         ids = [int(iid) for iid in iids]
         count = self._undo.execute(DeleteClientsCommand(self.app.db, ids))
         self.feedback.success(f"Deleted {count} client(s). (Ctrl+Z to undo)")
+        self.refresh()
+
+    def _batch_archive(self) -> None:
+        iids = self.client_tree.selected_iids()
+        if not iids:
+            self.feedback.error("Select one or more clients first.")
+            return
+        if not messagebox.askyesno(
+            "Archive clients",
+            f"Archive {len(iids)} selected client(s)?\n\n"
+            "They are hidden from the company list (soft-delete). "
+            "You can undo once with Ctrl+Z.",
+            parent=self.winfo_toplevel(),
+        ):
+            return
+        from skyadmin_pro.services.client_commands import ArchiveClientsCommand
+
+        ids = [int(iid) for iid in iids]
+        count = self._undo.execute(ArchiveClientsCommand(self.app.db, ids))
+        self.feedback.success(f"Archived {count} client(s). (Ctrl+Z to undo)")
         self.refresh()
 
     def _batch_set_status(self, status: str) -> None:
@@ -717,8 +776,62 @@ class ClientsExpiryPanel(ctk.CTkFrame):
 
         ids = [int(iid) for iid in iids]
         count = self._undo.execute(SetStatusCommand(self.app.db, ids, status))
-        self.feedback.success(f"Updated {count} client(s) to {status}.")
+        label = "Active" if status.lower() == "active" else "Inactive"
+        self.feedback.success(f"Updated {count} client(s) to {label}.")
         self.refresh()
+
+    def _batch_assign_group(self) -> None:
+        iids = self.client_tree.selected_iids()
+        if not iids:
+            self.feedback.error("Select one or more clients first.")
+            return
+        groups = self.app.db.list_client_groups()
+        top = ctk.CTkToplevel(self.winfo_toplevel())
+        top.title("Assign group")
+        top.resizable(False, False)
+        top.geometry("360x220")
+        make_modal(top)
+        body = ctk.CTkFrame(top, corner_radius=CARD_RADIUS)
+        body.grid(row=0, column=0, padx=16, pady=16, sticky="nsew")
+        body.grid_columnconfigure(0, weight=1)
+        ctk.CTkLabel(
+            body,
+            text=f"Assign {len(iids)} selected client(s) to a group.",
+            anchor="w",
+        ).grid(row=0, column=0, sticky="w", pady=(0, 4))
+        ctk.CTkLabel(
+            body,
+            text="Groups are this PC only — not synced.",
+            anchor="w",
+            font=ctk.CTkFont(size=11),
+            text_color=TEXT_MUTED,
+        ).grid(row=1, column=0, sticky="w", pady=(0, 10))
+        group_names = ["(No group)"] + [g["name"] for g in groups]
+        group_var = ctk.StringVar(value="(No group)")
+        ctk.CTkOptionMenu(body, values=group_names, variable=group_var, width=280).grid(
+            row=2, column=0, sticky="ew", pady=(0, 12)
+        )
+        group_map = {g["name"]: g["id"] for g in groups}
+
+        def apply() -> None:
+            from skyadmin_pro.services.client_commands import AssignGroupCommand
+
+            name = group_var.get().strip()
+            gid = group_map.get(name)  # None for "(No group)"
+            ids = [int(iid) for iid in iids]
+            count = self._undo.execute(AssignGroupCommand(self.app.db, ids, gid))
+            top.destroy()
+            label = name if gid is not None else "no group"
+            self.feedback.success(f"Assigned {count} client(s) to {label}.")
+            self.refresh()
+
+        btns = ctk.CTkFrame(body, fg_color="transparent")
+        btns.grid(row=3, column=0, sticky="ew")
+        ctk.CTkButton(btns, text="Assign", width=100, command=apply).pack(side="right")
+        ctk.CTkButton(
+            btns, text="Cancel", width=90, fg_color="transparent", border_width=1,
+            command=top.destroy,
+        ).pack(side="right", padx=(0, 8))
 
     def _open_client_folder(self) -> None:
         name = self._selected_client_name()
