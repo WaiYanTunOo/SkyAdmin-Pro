@@ -71,6 +71,7 @@ SYNC_ALLOWED_COLUMNS: dict[str, frozenset[str]] = {
             "csh_service_provider",
             "csh_renewal_date",
             "shareholder_info",
+            "group_id",
             "global_id",
             "created_at",
             "updated_at",

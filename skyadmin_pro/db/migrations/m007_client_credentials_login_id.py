@@ -12,4 +12,18 @@ if TYPE_CHECKING:
 
 
 def upgrade(db: CoreMixin) -> None:
-    db._migrate_client_credentials_login_id()
+    with db.connection() as conn:
+        columns = {row["name"] for row in conn.execute("PRAGMA table_info(client_credentials)")}
+        if "login_id" not in columns:
+            conn.execute("ALTER TABLE client_credentials ADD COLUMN login_id TEXT")
+        conn.execute(
+            """
+            UPDATE client_credentials
+            SET login_id = COALESCE(
+                NULLIF(TRIM(login_id), ''),
+                NULLIF(TRIM(registration_number), ''),
+                NULLIF(TRIM(username), '')
+            )
+            WHERE login_id IS NULL OR TRIM(login_id) = ''
+            """
+        )

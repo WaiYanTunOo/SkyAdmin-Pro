@@ -23,7 +23,7 @@ Admin page JS calls these — **do not break paths or shapes** without updating 
 ## Security rules
 
 - Admin **HTML** routes: cookie session (`session.ts`).
-- Admin **JSON** API: `Authorization: Bearer {API_TOKEN}` only (no cookie auth on API).
+- Admin **JSON** API: `Authorization: Bearer {API_TOKEN}` **or** same-origin session cookie + `X-CSRF-Token` on mutating requests (`auth.ts`).
 - Login form: CSRF hidden field; token injected in `handler.ts` before `loginPage`.
 - IP block: `admin_security.ts` + `login_attempts` D1 table.
 

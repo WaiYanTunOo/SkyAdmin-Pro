@@ -96,7 +96,7 @@ python -c "from cryptography.hazmat.primitives.asymmetric.ed25519 import Ed25519
 
 ## 4. First-time Setup
 
-1. **D1 migration**: Run `npx wrangler d1 migrations apply skyadmin-db --remote` from `skyadmin-worker/` (versioned `migrations/`; legacy `schema.sql` replay only for archaeology).
+1. **D1 migration**: Run `npx wrangler d1 migrations apply skyadmin-db --remote` from `skyadmin-worker/` (versioned `migrations/`; legacy `schema.sql` replay only for archaeology). Apply `0002_sync_devices_expires_at` on any D1 created before sync-token TTL so `POST /api/sync/register` does not 500 on missing `expires_at`.
 2. **Admin account**: Set `ADMIN_PASS` in environment variables. Access admin panel at `/{ADMIN_PATH}`.
 3. **Desktop DB**: SQLite schema auto-applies on first app launch via `skyadmin_pro/db/schema.py` + versioned `skyadmin_pro/db/migrations/`.
 4. **Support note — reinstalls**: activation codes burn strictly one-time (`used_nonces`). A wiped/reinstalled PC cannot re-register with its old code — issue a fresh code from the admin panel (Generate). Sync tokens additionally expire after 30 days idle and rotate on re-register.

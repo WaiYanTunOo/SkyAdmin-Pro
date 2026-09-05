@@ -177,9 +177,14 @@ def test_register_sync_device_persists_credentials(monkeypatch, fake_app_dir):
 
     import skyadmin_pro.config as config
     import skyadmin_pro.paths as paths_mod
+    from skyadmin_pro.services.secret_fields import is_encrypted_secret
 
     monkeypatch.setattr(paths_mod, "app_data_dir", lambda: fake_app_dir)
     monkeypatch.setattr(config, "API_BASE_URL", "https://worker.test")
+    monkeypatch.setattr(
+        "skyadmin_pro.services.secret_fields.get_machine_id",
+        lambda: "ABCD1234EFGH5678",
+    )
 
     class FakeResp:
         def read(self, n=-1):
@@ -198,6 +203,61 @@ def test_register_sync_device_persists_credentials(monkeypatch, fake_app_dir):
     assert ok
     creds = sync.load_sync_credentials()
     assert creds == ("ABCD1234EFGH5678", "tok123")
+
+    on_disk = (fake_app_dir / "sync_device.json").read_text(encoding="utf-8")
+    assert on_disk.startswith("SKYSECRET1:")
+    assert is_encrypted_secret(on_disk)
+    assert "tok123" not in on_disk
+    assert "ABCD1234EFGH5678" not in on_disk
+
+
+def test_save_sync_credentials_writes_ciphertext_on_disk(monkeypatch, fake_app_dir):
+    import skyadmin_pro.paths as paths_mod
+    from skyadmin_pro.services.secret_fields import is_encrypted_secret
+
+    monkeypatch.setattr(paths_mod, "app_data_dir", lambda: fake_app_dir)
+    monkeypatch.setattr(
+        "skyadmin_pro.services.secret_fields.get_machine_id",
+        lambda: "TESTMACHINE00001",
+    )
+    sync.save_sync_credentials("TESTMACHINE00001", "super-secret-token")
+    raw = (fake_app_dir / "sync_device.json").read_text(encoding="utf-8")
+    assert raw.startswith("SKYSECRET1:")
+    assert is_encrypted_secret(raw)
+    assert "super-secret-token" not in raw
+    assert sync.load_sync_credentials() == ("TESTMACHINE00001", "super-secret-token")
+
+
+def test_collect_and_apply_syncs_client_group_id(db):
+    gid = uuid.uuid4().hex
+    group_id = db.add_client_group("VIP")
+    with db.connection() as conn:
+        conn.execute(
+            "INSERT INTO clients (name, global_id, group_id, updated_at) VALUES (?, ?, ?, ?)",
+            ("Grouped Co", gid, group_id, "2026-06-01 10:00:00"),
+        )
+    changes = sync.collect_local_changes(db)
+    client_change = next(c for c in changes if c["global_id"] == gid)
+    assert client_change["row"].get("group_id") == group_id
+
+    remote_gid = uuid.uuid4().hex
+    change = {
+        "table": "clients",
+        "global_id": remote_gid,
+        "updated_at": "2026-06-02T10:00:00",
+        "deleted_at": None,
+        "row": {
+            "global_id": remote_gid,
+            "name": "Remote Grouped",
+            "status": "active",
+            "group_id": group_id,
+            "updated_at": "2026-06-02T10:00:00",
+        },
+    }
+    assert sync.apply_remote_changes(db, [change]) == (1, 0)
+    row = db._fetch_one("SELECT name, group_id FROM clients WHERE global_id = ?", (remote_gid,))
+    assert row["name"] == "Remote Grouped"
+    assert row["group_id"] == group_id
 
 
 def test_rotate_sync_credentials_after_license_change(monkeypatch, fake_app_dir):

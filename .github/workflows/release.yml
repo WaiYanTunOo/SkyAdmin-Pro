@@ -14,8 +14,26 @@ concurrency:
   cancel-in-progress: false
 
 jobs:
+  worker:
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: skyadmin-worker
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: "22"
+          cache: npm
+          cache-dependency-path: skyadmin-worker/package-lock.json
+      - run: npm ci
+      - run: npm run typecheck
+      - run: npm test
+
   windows-release:
     runs-on: windows-latest
+    outputs:
+      version: ${{ steps.version.outputs.version }}
     steps:
       - uses: actions/checkout@v4
         with:
@@ -131,40 +149,6 @@ jobs:
         run: |
           python scripts\generate_changelog.py --version ${{ steps.version.outputs.version }} --output dist\RELEASE_NOTES.md
 
-      - name: Create GitHub Release
-        if: startsWith(github.ref, 'refs/tags/')
-        uses: softprops/action-gh-release@v2
-        with:
-          tag_name: v${{ steps.version.outputs.version }}
-          name: SkyAdmin Pro ${{ steps.version.outputs.version }}
-          body_path: dist/RELEASE_NOTES.md
-          files: |
-            dist/SkyAdminPro.exe
-            dist/SkyAdminPro-Setup-*.exe
-            dist/RELEASE_NOTES.md
-            dist/SHA256SUMS
-          draft: false
-          prerelease: false
-
-      - name: Publish Worker update
-        if: startsWith(github.ref, 'refs/tags/')
-        env:
-          SKYADMIN_API_TOKEN: ${{ secrets.SKYADMIN_API_TOKEN }}
-          SKYADMIN_API_URL: ${{ secrets.SKYADMIN_API_URL }}
-        shell: pwsh
-        run: |
-          if (-not $env:SKYADMIN_API_TOKEN) {
-            Write-Host "SKIP  Worker publish - SKYADMIN_API_TOKEN not configured"
-            exit 0
-          }
-          $version = "${{ steps.version.outputs.version }}"
-          $url = "https://github.com/${{ github.repository }}/releases/download/v$version/SkyAdminPro.exe"
-          if ($env:SKYADMIN_API_URL) {
-            python scripts\publish_update.py --version $version --url $url --api-url $env:SKYADMIN_API_URL --token $env:SKYADMIN_API_TOKEN
-          } else {
-            python scripts\publish_update.py --version $version --url $url --token $env:SKYADMIN_API_TOKEN
-          }
-
       - name: Upload artifacts
         uses: actions/upload-artifact@v4
         with:
@@ -175,18 +159,52 @@ jobs:
             dist/RELEASE_NOTES.md
             dist/SHA256SUMS
 
-  worker:
+  # Tag publish only after both Windows build and Worker Vitest succeed.
+  publish:
+    if: startsWith(github.ref, 'refs/tags/')
+    needs: [windows-release, worker]
     runs-on: ubuntu-latest
-    defaults:
-      run:
-        working-directory: skyadmin-worker
     steps:
       - uses: actions/checkout@v4
-      - uses: actions/setup-node@v4
+
+      - uses: actions/setup-python@v5
         with:
-          node-version: "22"
-          cache: npm
-          cache-dependency-path: skyadmin-worker/package-lock.json
-      - run: npm ci
-      - run: npm run typecheck
-      - run: npm test
+          python-version: "3.12"
+
+      - name: Download Windows artifacts
+        uses: actions/download-artifact@v4
+        with:
+          name: SkyAdminPro-windows-${{ needs.windows-release.outputs.version }}
+          path: dist
+
+      - name: Create GitHub Release
+        uses: softprops/action-gh-release@v2
+        with:
+          tag_name: v${{ needs.windows-release.outputs.version }}
+          name: SkyAdmin Pro ${{ needs.windows-release.outputs.version }}
+          body_path: dist/RELEASE_NOTES.md
+          files: |
+            dist/SkyAdminPro.exe
+            dist/SkyAdminPro-Setup-*.exe
+            dist/RELEASE_NOTES.md
+            dist/SHA256SUMS
+          draft: false
+          prerelease: false
+
+      - name: Publish Worker update
+        env:
+          SKYADMIN_API_TOKEN: ${{ secrets.SKYADMIN_API_TOKEN }}
+          SKYADMIN_API_URL: ${{ secrets.SKYADMIN_API_URL }}
+        shell: bash
+        run: |
+          if [ -z "$SKYADMIN_API_TOKEN" ]; then
+            echo "SKIP  Worker publish - SKYADMIN_API_TOKEN not configured"
+            exit 0
+          fi
+          version="${{ needs.windows-release.outputs.version }}"
+          url="https://github.com/${{ github.repository }}/releases/download/v${version}/SkyAdminPro.exe"
+          if [ -n "$SKYADMIN_API_URL" ]; then
+            python scripts/publish_update.py --version "$version" --url "$url" --api-url "$SKYADMIN_API_URL" --token "$SKYADMIN_API_TOKEN"
+          else
+            python scripts/publish_update.py --version "$version" --url "$url" --token "$SKYADMIN_API_TOKEN"
+          fi

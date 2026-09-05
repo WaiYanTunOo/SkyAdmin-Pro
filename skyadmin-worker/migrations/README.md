@@ -31,3 +31,6 @@ npx wrangler d1 migrations apply skyadmin-db --local
 - Each migration is applied exactly once (tracked by D1 internally)
 - The `schema.sql` file is kept for reference / legacy `db:init` usage
 - For new databases, use `migrations apply` instead of `db:init`
+- `0002_sync_devices_expires_at.sql` ALTERs legacy `sync_devices` tables that
+  pre-date sync token TTL. Fresh installs get the column via 0002 (0001 creates
+  the table without it). `schema.sql` remains the full desired end-state.

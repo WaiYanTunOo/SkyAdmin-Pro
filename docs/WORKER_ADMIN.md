@@ -15,6 +15,15 @@ skyadmin-worker/src/routes/admin/
 
 **Do not** recreate `routes/admin.ts` as a single file — split is intentional (ROADMAP Phase 9B).
 
+## Auth (admin JSON APIs)
+
+Admin `/api/*` mutating routes accept **either**:
+
+1. `Authorization: Bearer {API_TOKEN}`, or
+2. Same-origin admin session cookie **plus** `X-CSRF-Token` (dashboard `api()` helper)
+
+Do **not** document this as Bearer-only — cookie+CSRF is live (`auth.ts`, covered by `auth.test.ts`). CORS credentials stay same-origin only (Phase 8.5).
+
 ## Before you change anything
 
 1. Read `skyadmin-worker/src/routes/admin/README.md`

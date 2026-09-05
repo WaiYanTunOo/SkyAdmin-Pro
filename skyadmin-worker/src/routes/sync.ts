@@ -6,6 +6,7 @@ import { checkRateLimit, purgeStaleRateLimits } from "../rate_limit";
 import { parseActivationClaim } from "../verification";
 import { checkActivationEligibility } from "../sync_eligibility";
 import { newSyncToken, syncAuthMiddleware } from "../sync_auth";
+import { withSyncDevicesExpiresAt } from "../sync_devices_schema";
 import {
   MAX_PUSH_CHANGES,
   fetchExistingUpdatedAt,
@@ -24,24 +25,26 @@ import {
 async function upsertSyncDevice(db: D1Database, machineId: string): Promise<string> {
   const token = newSyncToken();
   const expiry = new Date(Date.now() + 30 * 86400 * 1000).toISOString().slice(0, 19);
-  const existing = await db
-    .prepare("SELECT token FROM sync_devices WHERE machine_id = ?")
-    .bind(machineId)
-    .first<{ token: string }>();
-  if (existing?.token) {
+  return withSyncDevicesExpiresAt(db, async () => {
+    const existing = await db
+      .prepare("SELECT token FROM sync_devices WHERE machine_id = ?")
+      .bind(machineId)
+      .first<{ token: string }>();
+    if (existing?.token) {
+      await db
+        .prepare(
+          "UPDATE sync_devices SET token = ?, last_seen_at = datetime('now'), expires_at = ? WHERE machine_id = ?",
+        )
+        .bind(token, expiry, machineId)
+        .run();
+      return token;
+    }
     await db
-      .prepare(
-        "UPDATE sync_devices SET token = ?, last_seen_at = datetime('now'), expires_at = ? WHERE machine_id = ?",
-      )
-      .bind(token, expiry, machineId)
+      .prepare("INSERT INTO sync_devices (machine_id, token, expires_at) VALUES (?, ?, ?)")
+      .bind(machineId, token, expiry)
       .run();
     return token;
-  }
-  await db
-    .prepare("INSERT INTO sync_devices (machine_id, token, expires_at) VALUES (?, ?, ?)")
-    .bind(machineId, token, expiry)
-    .run();
-  return token;
+  });
 }
 
 const REGISTER_WINDOW_SECONDS = 60;

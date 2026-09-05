@@ -547,7 +547,7 @@ class SettingsView(BackupMixin, ChecklistMixin, LicenseMixin, PricingMixin, Work
             command=self._delete_checklist_list,
         ).grid(row=0, column=5)
 
-        self.checklist_scroll = themed_scrollable_frame(cl_body, height=170)
+        self.checklist_scroll = ctk.CTkFrame(cl_body, fg_color="transparent")
         self.checklist_scroll.grid(row=1, column=0, sticky="ew", pady=(0, 4))
         self.checklist_scroll.grid_columnconfigure(0, weight=1)
 

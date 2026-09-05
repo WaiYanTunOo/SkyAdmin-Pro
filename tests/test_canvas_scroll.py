@@ -43,12 +43,26 @@ def test_filing_history_outside_form_scroll():
     panel_src = (
         Path(__file__).resolve().parents[1] / "skyadmin_pro" / "ui" / "views" / "company_details" / "panel.py"
     ).read_text(encoding="utf-8")
-    # Filing form and history share a single CanvasScrollFrame (unified scroll)
+    # Form scrolls; history tree is parented on the tab (outside CanvasScrollFrame).
     assert "filing_scroll = CanvasScrollFrame(tab)" in panel_src
     assert "_build_filing_statuses_form(filing_scroll.content)" in panel_src
-    assert "_build_filing_history(filing_scroll.content)" in panel_src
+    assert "_build_filing_history(tab)" in panel_src
+    assert "_build_filing_history(filing_scroll.content)" not in panel_src
     assert "filing_scroll.grid(row=0" in panel_src
     assert "_filing_history_frame.grid(row=1" in panel_src
+
+
+def test_general_and_financial_trees_outside_canvas_scroll():
+    from pathlib import Path
+
+    panel_src = (
+        Path(__file__).resolve().parents[1] / "skyadmin_pro" / "ui" / "views" / "company_details" / "panel.py"
+    ).read_text(encoding="utf-8")
+    assert "general_scroll = CanvasScrollFrame(tab)" not in panel_src
+    assert "_build_services(tab)" in panel_src
+    assert "_build_documents(tab)" in panel_src
+    assert "fin_scroll = CanvasScrollFrame(fin_tab)" not in panel_src
+    assert "_build_financial_docs(fin_tab)" in panel_src
 
 
 def test_tax_ids_and_vo_tabs_use_canvas_scroll():
@@ -62,6 +76,16 @@ def test_tax_ids_and_vo_tabs_use_canvas_scroll():
     assert "vo_scroll = CanvasScrollFrame(tab)" in panel_src
     assert "_build_vo_csh(vo_scroll.content)" in panel_src
     assert "themed_scrollable_frame(tab)" not in panel_src
+
+
+def test_settings_checklist_not_nested_scroll():
+    from pathlib import Path
+
+    text = (Path(__file__).resolve().parents[1] / "skyadmin_pro" / "ui" / "views" / "settings" / "view.py").read_text(
+        encoding="utf-8"
+    )
+    assert "self.checklist_scroll = themed_scrollable_frame(cl_body" not in text
+    assert "self.checklist_scroll = ctk.CTkFrame(cl_body" in text
 
 
 def test_wheel_rebind_does_not_stack_handlers():

@@ -152,7 +152,7 @@ services/license/           verify.py, online.py, machine.py  (package; monolith
 - [x] Settings integrity banner on open (Phase 7.3)
 - [x] Dashboard deferred tree refresh + expanded snapshot (Phase 7.2 / 9.3)
 - [x] Sync column allowlist + worker push/pull hardening (Phase 8)
-- [x] Admin API CSRF fix — Bearer-only auth + CORS credentials same-origin only (Phase 8.5)
+- [x] Admin API CSRF fix — Bearer **or** same-origin cookie+CSRF; CORS credentials same-origin only (Phase 8.5)
 - [x] Office Hub lazy tabs (Phase 9.1)
 - [x] Filing status save debounce 300ms (Phase 9C)
 - [x] Sync token rotation on license save / re-register (`sync.ts`, `data_sync.py`) (Phase 8.6)

@@ -12,3 +12,14 @@ def test_dashboard_detail_trees_not_in_canvas_scroll():
     assert "self._detail_scroll = CanvasScrollFrame(self.body" in text
     assert "self._detail = ctk.CTkFrame(self._detail_scroll.content" in text
     assert "self._header = ctk.CTkFrame(self.body" in text
+
+
+def test_dashboard_build_defers_header_extras():
+    text = (Path(__file__).resolve().parents[1] / "skyadmin_pro" / "ui" / "views" / "dashboard.py").read_text(
+        encoding="utf-8"
+    )
+    build_src = text.split("def build(self)")[1].split("def _build_header_extras")[0]
+    assert "self.next_tree" not in build_src
+    assert "timeline_canvas" not in build_src
+    assert "_build_header_extras" in text
+    assert "self._build_header_extras()" in text.split("def on_show")[1].split("def on_hide")[0]

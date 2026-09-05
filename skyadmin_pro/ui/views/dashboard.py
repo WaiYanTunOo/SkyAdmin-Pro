@@ -102,6 +102,7 @@ class DashboardView(BaseView):
         self._snap_fingerprint: tuple | None = None
         self._timeline_mode: str | None = None
         self._detail_built = False
+        self._header_extras_built = False
         self._snap_seq = 0
 
         self._header = ctk.CTkFrame(self.body, fg_color="transparent")
@@ -117,7 +118,7 @@ class DashboardView(BaseView):
         self._detail.grid_columnconfigure(0, weight=1)
         self._detail.grid_rowconfigure(1, weight=1)
 
-        # -- Row 1: core operational cards --
+        # -- Row 1: core operational cards (first paint only) --
         self._row1 = ctk.CTkFrame(self._header, fg_color="transparent")
         self._row1.grid(row=0, column=0, sticky="ew", pady=(0, 8))
         for i in range(5):
@@ -141,7 +142,12 @@ class DashboardView(BaseView):
         self.card_revenue = self._stat_card(self._row2, 3, "Monthly revenue", "0")
         self.card_vo_csh = self._stat_card(self._row2, 4, "VO/CSH expiring", "0")
 
-        # -- Row 1.5: expiry timeline chart --
+    def _build_header_extras(self) -> None:
+        """Timeline, workflow, and next-actions — deferred until first on_show()."""
+        if self._header_extras_built:
+            return
+        self._header_extras_built = True
+
         timeline_card = ctk.CTkFrame(self._header, corner_radius=12)
         timeline_card.grid(row=2, column=0, sticky="ew", pady=(0, 12))
         timeline_card.grid_columnconfigure(0, weight=1)
@@ -173,21 +179,6 @@ class DashboardView(BaseView):
         workflow = ctk.CTkFrame(self._header, corner_radius=12)
         workflow.grid(row=3, column=0, sticky="ew", pady=(0, 12))
         workflow.grid_columnconfigure(1, weight=1)
-
-        ctk.CTkButton(
-            workflow,
-            text="Generate Workspace",
-            width=170,
-            command=self._generate_workspace,
-        ).grid(row=0, column=2, padx=(0, 8), pady=14, sticky="w")
-        ctk.CTkButton(
-            workflow,
-            text="Export PDF",
-            width=110,
-            fg_color="transparent",
-            border_width=1,
-            command=self._export_pdf,
-        ).grid(row=0, column=3, padx=(0, 16), pady=14, sticky="w")
 
         self.onboard_var = ctk.StringVar()
         themed_entry(
@@ -229,6 +220,14 @@ class DashboardView(BaseView):
             border_width=1,
             command=lambda: self._open_folder(self.app.paths.suppliers),
         ).grid(row=0, column=2, sticky="w", padx=(8, 0))
+        ctk.CTkButton(
+            folders,
+            text="Export PDF",
+            width=110,
+            fg_color="transparent",
+            border_width=1,
+            command=self._export_pdf,
+        ).grid(row=0, column=3, sticky="w", padx=(8, 0))
 
         self.workflow_feedback = FeedbackLabel(workflow)
         self.workflow_feedback.grid(row=2, column=0, columnspan=3, sticky="ew", padx=16, pady=(0, 12))
@@ -589,6 +588,8 @@ class DashboardView(BaseView):
 
     def _draw_timeline(self, snap: dict | None = None) -> None:
         """Draw a bar-per-day expiry timeline for the next 45 days."""
+        if not getattr(self, "_header_extras_built", False):
+            return
         canvas = self.timeline_canvas
         canvas.delete("all")
         mode = ctk.get_appearance_mode()
@@ -671,6 +672,7 @@ class DashboardView(BaseView):
 
     def on_show(self) -> None:
         self._visible = True
+        self._build_header_extras()
         self._build_detail_trees()
         self.refresh_async()
 
@@ -700,6 +702,10 @@ class DashboardView(BaseView):
     def refresh(self, *, force: bool = False) -> None:
         """Synchronous refresh (kept for tests / programmatic callers)."""
         self._cancel_deferred_refresh()
+        if not getattr(self, "_header_extras_built", False):
+            self._build_header_extras()
+        if not self._detail_built:
+            self._build_detail_trees()
         snap = self.app.db.dashboard_snapshot()
         self._apply_snapshot(snap, force=force)
 
@@ -813,8 +819,11 @@ class DashboardView(BaseView):
         self._tree_refresh_after = None
         if not self._visible or not self.winfo_exists():
             return
+        if not getattr(self, "_header_extras_built", False):
+            self._build_header_extras()
 
-        self._refresh_tax_overview(snap.get("accounting_clients"))
+        if self._detail_built:
+            self._refresh_tax_overview(snap.get("accounting_clients"))
         self.next_tree.apply_theme()
         self._refresh_next_actions(
             snap["overdue"],
@@ -832,6 +841,8 @@ class DashboardView(BaseView):
     def _refresh_detail_trees(self, snap: dict) -> None:
         self._detail_trees_after = None
         if not self._visible or not self.winfo_exists():
+            return
+        if not self._detail_built:
             return
 
         self.expiry_tree.apply_theme()

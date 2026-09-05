@@ -29,6 +29,7 @@ class FinancialDocsTabMixin:
     def _build_financial_docs(self, master) -> ctk.CTkFrame:
         frame = ctk.CTkFrame(master, corner_radius=CARD_RADIUS)
         frame.grid_columnconfigure(0, weight=1)
+        frame.grid_rowconfigure(3, weight=1)
         ctk.CTkLabel(
             frame,
             text="Financial Documents",
@@ -72,7 +73,7 @@ class FinancialDocsTabMixin:
             db=self.app.db,
         )
         self.fin_doc_tree.tree.configure(height=8)
-        self.fin_doc_tree.grid(row=3, column=0, sticky="ew", padx=12, pady=(0, 8))
+        self.fin_doc_tree.grid(row=3, column=0, sticky="nsew", padx=12, pady=(0, 8))
 
         # Buttons
         btn_row = ctk.CTkFrame(frame, fg_color="transparent")

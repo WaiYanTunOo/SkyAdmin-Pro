@@ -11,7 +11,11 @@ export const SYNC_TABLES = [
 
 export type SyncTableName = (typeof SYNC_TABLES)[number];
 
-/** Columns never uploaded from the desktop client. */
+/**
+ * Columns never uploaded from the desktop client.
+ * Desktop allowlist lives in skyadmin_pro/services/data_sync.py (SYNC_ALLOWED_COLUMNS).
+ * clients.group_id is intentionally NOT excluded — groups sync via row_json.
+ */
 export const SYNC_EXCLUDED_COLUMNS: Record<SyncTableName, readonly string[]> = {
   clients: ["ird_password"],
   tasks: [],

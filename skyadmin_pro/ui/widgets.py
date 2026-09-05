@@ -3,10 +3,11 @@
 from __future__ import annotations
 
 import calendar
+import tkinter as tk
 from collections.abc import Callable
 from datetime import date, datetime
 from pathlib import Path
-from typing import Any
+from typing import Any, ClassVar
 
 import customtkinter as ctk
 
@@ -585,13 +586,17 @@ def calendar_popup_position(
 class DatePickerField(ctk.CTkFrame):
     """Text entry plus a calendar popup; the StringVar always holds ISO YYYY-MM-DD."""
 
+    # Class-level open-popup tracking: one root bind dispatches to all instances.
+    _open_fields: ClassVar[set[DatePickerField]] = set()
+    _root_click_binds: ClassVar[dict[int, str]] = {}
+    _root_escape_binds: ClassVar[dict[int, str]] = {}
+
     def __init__(self, master, *, var: ctk.StringVar | None = None, **kwargs) -> None:
         super().__init__(master, fg_color="transparent", **kwargs)
         self.grid_columnconfigure(0, weight=1)
         self.var = var if var is not None else ctk.StringVar()
         self._calendar_top: ctk.CTkToplevel | None = None
-        self._dismiss_bind_id: str | None = None
-        self._escape_bind_id: str | None = None
+        self._grab_after_id: str | None = None
         self._entry = ctk.CTkEntry(self, textvariable=self.var, placeholder_text="YYYY-MM-DD", **entry_style_kwargs())
         self._entry.grid(row=0, column=0, sticky="ew")
         ctk.CTkButton(
@@ -600,14 +605,36 @@ class DatePickerField(ctk.CTkFrame):
             width=96,
             command=self._open_calendar,
         ).grid(row=0, column=1, padx=(8, 0))
-        # Cleanup if parent destroyed while popup open
         self.bind("<Destroy>", self._on_destroy)
-        # Validate manual entry on focus out
         self._entry.bind("<FocusOut>", lambda _e: self._validate_entry())
 
     def _on_destroy(self, event) -> None:
         if event.widget is self:
             self._close_calendar()
+
+    @staticmethod
+    def _widget_alive(widget) -> bool:
+        try:
+            return widget is not None and bool(widget.winfo_exists())
+        except tk.TclError:
+            return False
+
+    def _cancel_grab_retry(self) -> None:
+        after_id = self._grab_after_id
+        self._grab_after_id = None
+        if after_id is None:
+            return
+        try:
+            self.after_cancel(after_id)
+        except (tk.TclError, ValueError):
+            pass
+
+    def _safe_focus_calendar(self, top: ctk.CTkToplevel) -> None:
+        try:
+            if self._calendar_top is top and self._widget_alive(top):
+                top.focus_force()
+        except tk.TclError:
+            pass
 
     def _validate_entry(self) -> None:
         value = self.var.get().strip()
@@ -632,99 +659,175 @@ class DatePickerField(ctk.CTkFrame):
                 continue
         return date.today()
 
-    def _close_calendar(self) -> None:
-        top = self._calendar_top
-        root = self.winfo_toplevel()
-        if self._dismiss_bind_id is not None:
-            try:
-                root.unbind("<Button-1>", self._dismiss_bind_id)
-            except Exception:
-                pass
-            self._dismiss_bind_id = None
-        if self._escape_bind_id is not None:
-            try:
-                root.unbind("<Escape>", self._escape_bind_id)
-            except Exception:
-                pass
-            self._escape_bind_id = None
-        if top is not None and top.winfo_exists():
-            try:
-                top.grab_release()
-            except Exception:
-                pass
-            top.destroy()
-        self._calendar_top = None
-
-    def _bind_dismiss_on_click_outside(self, top: ctk.CTkToplevel) -> None:
-        root = self.winfo_toplevel()
-        # Close any other open DatePickerField calendar on the same root
-        for child in root.winfo_children():
-            try:
-                if hasattr(child, "_calendar_top") and child._calendar_top is not None and child is not self:
-                    child._close_calendar()
-            except Exception:
-                pass
-
-        def _contains(widget, root_x: int, root_y: int) -> bool:
-            try:
-                if not widget.winfo_exists():
-                    return False
-                x = widget.winfo_rootx()
-                y = widget.winfo_rooty()
-                return x <= root_x <= x + widget.winfo_width() and y <= root_y <= y + widget.winfo_height()
-            except Exception:
+    @staticmethod
+    def _widget_contains(widget, root_x: int, root_y: int) -> bool:
+        try:
+            if not DatePickerField._widget_alive(widget):
                 return False
+            x = widget.winfo_rootx()
+            y = widget.winfo_rooty()
+            return x <= root_x <= x + widget.winfo_width() and y <= root_y <= y + widget.winfo_height()
+        except tk.TclError:
+            return False
 
-        def _on_click(event) -> None:
-            if not top.winfo_exists():
-                return
-            if _contains(top, event.x_root, event.y_root) or _contains(self, event.x_root, event.y_root):
-                return
-            self._close_calendar()
+    @classmethod
+    def _on_root_click(cls, event) -> None:
+        for field in list(cls._open_fields):
+            top = field._calendar_top
+            if not cls._widget_alive(top):
+                field._close_calendar()
+                continue
+            if cls._widget_contains(top, event.x_root, event.y_root) or cls._widget_contains(
+                field, event.x_root, event.y_root
+            ):
+                continue
+            field._close_calendar()
 
-        self._dismiss_bind_id = root.bind("<Button-1>", _on_click, add="+")
-        # Also dismiss on Escape from root (unbound in _close_calendar to avoid buildup)
-        if self._escape_bind_id is not None:
+    @classmethod
+    def _on_root_escape(cls, _event=None) -> None:
+        for field in list(cls._open_fields):
+            field._close_calendar()
+
+    @classmethod
+    def _close_all_open(cls) -> None:
+        for field in list(cls._open_fields):
+            field._close_calendar()
+
+    @classmethod
+    def _ensure_root_binds(cls, root) -> None:
+        rid = id(root)
+        if rid not in cls._root_click_binds:
+            cls._root_click_binds[rid] = root.bind("<Button-1>", cls._on_root_click, add="+")
+        if rid not in cls._root_escape_binds:
+            cls._root_escape_binds[rid] = root.bind("<Escape>", cls._on_root_escape, add="+")
+
+    @classmethod
+    def _release_root_binds_if_idle(cls, root) -> None:
+        try:
+            if any(
+                True
+                for field in cls._open_fields
+                if cls._widget_alive(field) and field.winfo_toplevel() is root
+            ):
+                return
+        except tk.TclError:
+            pass
+        rid = id(root)
+        click_id = cls._root_click_binds.pop(rid, None)
+        if click_id is not None:
             try:
-                root.unbind("<Escape>", self._escape_bind_id)
-            except Exception:
+                root.unbind("<Button-1>", click_id)
+            except tk.TclError:
                 pass
-        top.bind("<Escape>", lambda _e: self._close_calendar())
-        self._escape_bind_id = root.bind(
-            "<Escape>", lambda _e: self._close_calendar() if self._calendar_top else None, add="+"
-        )
+        escape_id = cls._root_escape_binds.pop(rid, None)
+        if escape_id is not None:
+            try:
+                root.unbind("<Escape>", escape_id)
+            except tk.TclError:
+                pass
+
+    def _close_calendar(self) -> None:
+        self._cancel_grab_retry()
+        top = self._calendar_top
+        self._calendar_top = None
+        root = None
+        try:
+            if self._widget_alive(self):
+                root = self.winfo_toplevel()
+        except tk.TclError:
+            root = None
+        self._open_fields.discard(self)
+        if top is not None:
+            try:
+                if self._widget_alive(top):
+                    try:
+                        top.grab_release()
+                    except tk.TclError:
+                        pass
+                    top.destroy()
+            except tk.TclError:
+                pass
+        if root is not None:
+            try:
+                self._release_root_binds_if_idle(root)
+            except tk.TclError:
+                pass
+
+    def _register_open(self, top: ctk.CTkToplevel) -> None:
+        # Defensive: only this field should remain tracked as open.
+        for other in list(self._open_fields):
+            if other is not self:
+                other._close_calendar()
+        self._open_fields.add(self)
+        root = self.winfo_toplevel()
+        self._ensure_root_binds(root)
+        try:
+            if self._widget_alive(top):
+                top.bind("<Escape>", lambda _e: self._close_calendar())
+        except tk.TclError:
+            pass
 
     def _place_calendar_popup(self, top: ctk.CTkToplevel, width: int, height: int) -> None:
-        top.update_idletasks()
-        # Use widget's screen for multi-monitor; fallback to top's screen
+        try:
+            if not self._widget_alive(top):
+                return
+            top.update_idletasks()
+        except tk.TclError:
+            return
         try:
             screen_w = self.winfo_screenwidth()
             screen_h = self.winfo_screenheight()
-        except Exception:
-            screen_w = top.winfo_screenwidth()
-            screen_h = top.winfo_screenheight()
-        # Scale popup for DPI (CustomTkinter scaling)
+        except tk.TclError:
+            try:
+                screen_w = top.winfo_screenwidth()
+                screen_h = top.winfo_screenheight()
+            except tk.TclError:
+                return
         try:
-            scaling = float(self.tk.call("tk", "scaling"))  # type: ignore[attr-defined]
-            if scaling and scaling != 1.0:
-                # Keep logical size but ensure placement accounts for scaled screen
-                pass
-        except Exception:
+            x, y = calendar_popup_position(
+                anchor_x=self.winfo_rootx(),
+                anchor_y=self.winfo_rooty(),
+                anchor_w=max(self.winfo_width(), 1),
+                anchor_h=max(self.winfo_height(), 1),
+                popup_w=width,
+                popup_h=height,
+                screen_w=screen_w,
+                screen_h=screen_h,
+            )
+            top.geometry(f"{width}x{height}+{x}+{y}")
+        except tk.TclError:
             pass
-        x, y = calendar_popup_position(
-            anchor_x=self.winfo_rootx(),
-            anchor_y=self.winfo_rooty(),
-            anchor_w=max(self.winfo_width(), 1),
-            anchor_h=max(self.winfo_height(), 1),
-            popup_w=width,
-            popup_h=height,
-            screen_w=screen_w,
-            screen_h=screen_h,
-        )
-        top.geometry(f"{width}x{height}+{x}+{y}")
+
+    def _grab_calendar(self, top: ctk.CTkToplevel) -> None:
+        self._cancel_grab_retry()
+
+        def _try_grab() -> None:
+            try:
+                if self._calendar_top is not top or not self._widget_alive(top):
+                    return
+                top.grab_set()
+            except tk.TclError:
+                pass
+
+        _try_grab()
+        try:
+            if (
+                self._calendar_top is top
+                and self._widget_alive(top)
+                and not top.grab_current()
+            ):
+                # Schedule on the field (not the popup) so destroy of `top`
+                # cannot leave an unguarded callback; identity check above
+                # no-ops if another calendar replaced this one.
+                self._grab_after_id = self.after(80, _try_grab)
+        except tk.TclError:
+            pass
 
     def _open_calendar(self) -> None:
-        self._close_calendar()
+        # Close every open calendar *before* creating a new CTkToplevel.
+        # CTk schedules delayed focus restore after titlebar setup; destroying
+        # another popup afterwards races focus_set on a dead path.
+        self._close_all_open()
         today = date.today()
         view = self._initial_date().replace(day=1)
 
@@ -848,29 +951,17 @@ class DatePickerField(ctk.CTkFrame):
         _sync_month_menu()
         draw()
         self._place_calendar_popup(top, width, height)
-        self._bind_dismiss_on_click_outside(top)
-        top.deiconify()
-        top.lift()
+        self._register_open(top)
         try:
-            top.attributes("-topmost", True)
-            top.after(200, lambda: top.attributes("-topmost", False) if top.winfo_exists() else None)
-        except Exception:
-            pass
-
-        # Best-effort grab for modal dismissal
-        def _try_grab() -> None:
-            try:
-                if top.winfo_exists():
-                    top.grab_set()
-            except Exception:
-                pass
-
-        top.after(80, _try_grab)
-        try:
-            top.focus_force()
-        except Exception:
-            pass
-        bind_escape(top)
+            if self._widget_alive(top):
+                top.update_idletasks()
+                top.deiconify()
+                top.lift()
+        except tk.TclError:
+            self._close_calendar()
+            return
+        self._grab_calendar(top)
+        self._safe_focus_calendar(top)
 
     def _pick(self, top: ctk.CTkToplevel, chosen: date) -> None:
         self.var.set(chosen.isoformat())

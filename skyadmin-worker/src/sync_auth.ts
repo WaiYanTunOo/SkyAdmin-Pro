@@ -9,6 +9,7 @@
 
 import { Context, Next } from "hono";
 import { Env } from "./db";
+import { withSyncDevicesExpiresAt } from "./sync_devices_schema";
 
 export type SyncContext = {
   syncMachineId: string;
@@ -26,31 +27,39 @@ export async function syncAuthMiddleware(c: Context<{ Bindings: Env }>, next: Ne
     return c.json({ ok: false, error: "Sync authorization required." }, 401);
   }
 
-  const row = await c.env.DB.prepare(
-    "SELECT machine_id, expires_at FROM sync_devices WHERE machine_id = ? AND token = ?",
-  )
-    .bind(machineId, token)
-    .first<{ machine_id: string; expires_at: string | null }>();
+  const result = await withSyncDevicesExpiresAt(c.env.DB, async () => {
+    const row = await c.env.DB.prepare(
+      "SELECT machine_id, expires_at FROM sync_devices WHERE machine_id = ? AND token = ?",
+    )
+      .bind(machineId, token)
+      .first<{ machine_id: string; expires_at: string | null }>();
 
-  if (!row) {
-    return c.json({ ok: false, error: "Invalid sync credentials." }, 401);
-  }
-
-  // Check token expiry — if expired, require re-registration
-  if (row.expires_at) {
-    const expiresAt = new Date(row.expires_at);
-    if (expiresAt < new Date()) {
-      return c.json({ ok: false, error: "Sync token expired. Please re-register." }, 401);
+    if (!row) {
+      return { ok: false as const, error: "Invalid sync credentials." };
     }
-  }
 
-  // Update last_seen_at and refresh expiry window on each use
-  const newExpiry = new Date(Date.now() + SYNC_TOKEN_TTL_DAYS * 86400 * 1000).toISOString().slice(0, 19);
-  await c.env.DB.prepare(
-    "UPDATE sync_devices SET last_seen_at = datetime('now'), expires_at = ? WHERE machine_id = ?",
-  )
-    .bind(newExpiry, machineId)
-    .run();
+    if (row.expires_at) {
+      const expiresAt = new Date(row.expires_at);
+      if (expiresAt < new Date()) {
+        return { ok: false as const, error: "Sync token expired. Please re-register." };
+      }
+    }
+
+    const newExpiry = new Date(Date.now() + SYNC_TOKEN_TTL_DAYS * 86400 * 1000)
+      .toISOString()
+      .slice(0, 19);
+    await c.env.DB.prepare(
+      "UPDATE sync_devices SET last_seen_at = datetime('now'), expires_at = ? WHERE machine_id = ?",
+    )
+      .bind(newExpiry, machineId)
+      .run();
+
+    return { ok: true as const };
+  });
+
+  if (!result.ok) {
+    return c.json({ ok: false, error: result.error }, 401);
+  }
 
   await next();
 }

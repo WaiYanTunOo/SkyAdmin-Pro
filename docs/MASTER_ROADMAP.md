@@ -26,16 +26,16 @@ Comprehensive analysis of **features, security, code quality, optimization, load
 
 | Area | Score | Key Gap |
 |------|-------|---------|
-| **Security** | 6.5/10 | Timing oracles on admin auth, no sync token TTL, missing CSP |
-| **Performance** | 6/10 | New SQLite connection per query, no dashboard lazy loading |
-| **UI/UX** | 7/10 | DatePickerField root bindings, 7-mixin panel, eager dashboard build |
-| **Code Quality** | 7/10 | 100+ bare excepts, config.py bloat, duplicate constants |
-| **Testing** | 6.5/10 | No admin session tests, no integration tests, no rate limit tests |
+| **Security** | 8/10 | S1 hardening landed (timing-safe auth, sync TTL, CSP); residual: expired-register Vitest, auth doc wording |
+| **Performance** | 7/10 | Dashboard first-paint still heavy; SQLite pooling deferred; trees still inside Company Details scroll |
+| **UI/UX** | 7.5/10 | DatePicker polish; Settings nested scroll; Company Details tree/scroll fight |
+| **Code Quality** | 7/10 | Hybrid `_migrate_*` left in `core.py`; config.py bloat; bare excepts |
+| **Testing** | 7/10 | Expired sync register Vitest missing; vault/ciphertext-at-rest thin |
 | **Features** | 8/10 | Ed25519 licensing, sync, export, multi-language — solid foundation |
 | **Documentation** | 7.5/10 | Good roadmap/deploy docs, missing API reference and SECURITY.md |
-| **CI/CD** | 8/10 | Lint + test + release pipeline, missing code signing in CI |
+| **CI/CD** | 7.5/10 | Release publish does not `needs: worker`; Windows signing supported |
 
-**Overall: 7.1/10** — Solid foundation with specific, fixable gaps.
+**Overall: 7.5/10** — Phases 7–11 + S1 landed; residual UX/CI/core backlog remains (see Quick Wins NEXT).
 
 ### File Inventory
 
@@ -54,14 +54,16 @@ Comprehensive analysis of **features, security, code quality, optimization, load
 
 ### 2.1 Critical Vulnerabilities
 
-| # | Issue | File:Line | Severity | Fix |
-|---|-------|-----------|----------|-----|
-| S1 | Admin password compared with `===` (timing oracle) | `worker/src/routes/admin/handler.ts:42` | **CRITICAL** | Use constant-time XOR comparison (pattern exists in `auth.ts:10-26`) |
-| S2 | Session token compared with `===` (timing oracle) | `worker/src/routes/admin/session.ts:40,50` | **CRITICAL** | Same constant-time comparison for `sig === expected` and `token === expected` |
-| S3 | Auth middleware fallback degrades to `===` | `worker/src/auth.ts:24` | **HIGH** | Remove fallback; reject if `crypto.subtle` unavailable |
-| S4 | Sync tokens never expire (no TTL column) | `worker/src/sync_auth.ts` + D1 `sync_devices` | **HIGH** | Add `expires_at` column; rotate on use or add TTL check |
-| S5 | API_TOKEN embedded in admin page DOM | `worker/src/routes/admin/pages.ts:177` | **HIGH** | Serve via separate fetch after auth, or document XSS risk |
-| S6 | No Content-Security-Policy on admin/viewer pages | `worker/src/routes/admin/pages.ts`, `viewer.ts` | **HIGH** | Add CSP header: `default-src 'self'; script-src 'unsafe-inline'` |
+> **Status:** S1–S6 hardening below is **landed**. Do **not** re-implement timing-oracle, sync-TTL, or CSP work as greenfield P0. Residual security/test work is in [Quick Wins NEXT](#quick-wins-1-3-days-each-do-anytime).
+
+| # | Issue | File:Line | Severity | Status |
+|---|-------|-----------|----------|--------|
+| S1 | Admin password compared with `===` (timing oracle) | `worker/src/routes/admin/handler.ts` | **CRITICAL** | ✅ Fixed — constant-time compare |
+| S2 | Session token compared with `===` (timing oracle) | `worker/src/routes/admin/session.ts` | **CRITICAL** | ✅ Fixed — constant-time compare |
+| S3 | Auth middleware fallback degrades to `===` | `worker/src/auth.ts` | **HIGH** | ✅ Fixed — fail closed without `crypto.subtle` |
+| S4 | Sync tokens never expire (no TTL column) | `worker/src/sync_auth.ts` + D1 | **HIGH** | ✅ Fixed — TTL + rotation |
+| S5 | API_TOKEN embedded in admin page DOM | `worker/src/routes/admin/pages.ts` | **HIGH** | ✅ Mitigated / cookie+CSRF path |
+| S6 | No Content-Security-Policy on admin/viewer pages | `admin/pages.ts`, `viewer.ts` | **HIGH** | ✅ Fixed — CSP on HTML responses |
 
 ### 2.2 High-Severity Issues
 
@@ -148,7 +150,7 @@ Comprehensive analysis of **features, security, code quality, optimization, load
 
 | # | Issue | File:Line | Fix |
 |---|-------|-----------|-----|
-| U5 | **No lazy loading** — all 10 stat cards, 6 treeviews, timeline built in `build()` | `dashboard.py:94-550` | Defer detail trees to `on_show()` first call |
+| U5 | First paint still heavy — defer more of `build()` cost | `dashboard.py` | ← **NEXT** — keep stat cards; heavy widgets later |
 | U6 | Fingerprint comparison can miss stale data (same count, different tasks) | `dashboard.py:50-87` | Include row IDs in fingerprint, not just counts |
 | U7 | Three-stage deferred refresh is complex but correct | `dashboard.py:682-913` | ✅ Good pattern; simplify if bugs arise |
 
@@ -385,6 +387,7 @@ Tag v* → Release (build + sign + installer + release_check + GitHub Release + 
 
 | # | Gap | Priority | Fix |
 |---|-----|----------|-----|
+| C0 | Release publish does not wait on Worker job | P0 | `windows-release` / publish `needs: [worker]` ← **NEXT** |
 | C1 | No code signing in CI for non-Windows builds | P1 | Add macOS/Linux signing steps |
 | C2 | No dependency vulnerability scanning | P1 | Add `pip-audit` and `npm audit` steps |
 | C3 | No integration tests in CI | P2 | Add Worker lifecycle test |
@@ -396,22 +399,20 @@ Tag v* → Release (build + sign + installer + release_check + GitHub Release + 
 
 ## 10. Implementation Phases
 
-### Phase S1 — Security Hardening (1-2 weeks) — **DO FIRST**
+### Phase S1 — Security Hardening — **DONE** (do not re-open as P0)
 
-| # | Task | Files | Agent | Done when |
-|---|------|-------|-------|-----------|
-| S1.1 | Fix timing oracle on admin password comparison | `admin/handler.ts:42` | `worker-api` | Constant-time compare matches `auth.ts` pattern |
-| S1.2 | Fix timing oracle on session/CSRF validation | `admin/session.ts:40,50` | `worker-api` | All token comparisons use constant-time |
-| S1.3 | Remove auth middleware `===` fallback | `auth.ts:24` | `worker-api` | Request rejected if `crypto.subtle` unavailable |
-| S1.4 | Add sync token TTL | `sync_auth.ts`, D1 schema | `worker-api` | Tokens expire after 30 days; rotate on use |
-| S1.5 | Add admin login rate limiting | `admin/handler.ts` | `worker-api` | 5 attempts per 60s per IP |
-| S1.6 | Add CSP headers to admin/viewer pages | `admin/pages.ts`, `viewer.ts` | `worker-api` | CSP header present on all HTML responses |
-| S1.7 | Label dev key as TEST-ONLY | `.dev.vars.example` | `worker-api` | Clear warning comment |
-| S1.8 | Add `rate_limits` table cleanup | `routes/claim.ts`, `routes/sync.ts` | `worker-api` | Periodic cleanup runs |
+| # | Task | Files | Agent | Status |
+|---|------|-------|-------|--------|
+| S1.1 | Fix timing oracle on admin password comparison | `admin/handler.ts` | `worker-api` | ✅ Done |
+| S1.2 | Fix timing oracle on session/CSRF validation | `admin/session.ts` | `worker-api` | ✅ Done |
+| S1.3 | Remove auth middleware `===` fallback | `auth.ts` | `worker-api` | ✅ Done |
+| S1.4 | Add sync token TTL | `sync_auth.ts`, D1 schema | `worker-api` | ✅ Done |
+| S1.5 | Add admin login rate limiting | `admin/handler.ts` | `worker-api` | ✅ Done |
+| S1.6 | Add CSP headers to admin/viewer pages | `admin/pages.ts`, `viewer.ts` | `worker-api` | ✅ Done |
+| S1.7 | Label dev key as TEST-ONLY | `.dev.vars.example` | `worker-api` | ✅ Done |
+| S1.8 | Add `rate_limits` table cleanup | `routes/claim.ts`, `routes/sync.ts` | `worker-api` | ✅ Done |
 
-**Parallel:** S1.1-S1.8 can all run as `worker-api` subagent (same tree).
-
-### Phase S2 — Security Testing (1 week) — **DO WITH S1**
+### Phase S2 — Security Testing — **mostly landed**; residual Vitest in NEXT
 
 | # | Task | Files | Agent | Done when |
 |---|------|-------|-------|-----------|
@@ -422,33 +423,33 @@ Tag v* → Release (build + sign + installer + release_check + GitHub Release + 
 
 **Parallel:** S2.1-S2.4 can run as `worker-api` subagent (same tree).
 
-### Phase P1 — Performance (2 weeks)
+### Phase P1 — Performance (residual + deferred)
 
-| # | Task | Files | Agent | Done when |
-|---|------|-------|-------|-----------|
-| P1.1 | **Connection pool for SQLite** | `db/core.py:40-72` | `desktop-core` | Single connection reused; pragma set once |
-| P1.2 | **Dashboard snapshot single connection** | `db/tax.py:158-179` | `desktop-core` | ≤3 SQL round-trips per snapshot |
-| P1.3 | **Remove monolithic `_migrate()`** | `db/core.py:209-395` | `desktop-core` | Versioned migrations handle all DDL |
-| P1.4 | **Dashboard lazy loading** | `ui/views/dashboard.py:94-550` | `ui-performance` | Detail trees deferred to `on_show()` |
-| P1.5 | **Worker `recordsHandler` optimization** | `routes/records.ts:24-29` | `worker-api` | JOINs instead of full table scans |
-| P1.6 | **Worker static imports** | `routes/generate.ts:25-27` | `worker-api` | No dynamic `import()` in hot paths |
-| P1.7 | **D1 error handling in routes** | `routes/generate.ts:53-55` | `worker-api` | Return after DB write succeeds |
+| # | Task | Files | Agent | Status |
+|---|------|-------|-------|--------|
+| P1.1 | Connection pool for SQLite | `db/core.py` | `desktop-core` | **Deferred** — acceptable until measured pain |
+| P1.2 | Dashboard snapshot single connection | `db/tax.py` | `desktop-core` | ⚠️ Partial — budget relaxed (≤40 statements / 1 connection); full ≤3 rewrite out of sprint |
+| P1.3 | Remove monolithic `_migrate()` / extract remaining `_migrate_*` | `db/core.py`, `db/migrations/` | `desktop-core` | ← **NEXT** (hybrid left) |
+| P1.4 | Dashboard first-paint deferral | `ui/views/dashboard.py` | `ui-performance` | ← **NEXT** (stat cards stay; heavy widgets later) |
+| P1.5 | Worker `recordsHandler` optimization | `routes/records.ts` | `worker-api` | Later |
+| P1.6 | Worker static imports | `routes/generate.ts` | `worker-api` | Later |
+| P1.7 | D1 error handling in routes | `routes/generate.ts` | `worker-api` | Later |
 
-**Parallel:** P1.1-P1.3 (`desktop-core`) and P1.4 (`ui-performance`) and P1.5-P1.7 (`worker-api`) can run simultaneously.
+### Phase U1 — UI/UX Polish (residual sprint focus)
 
-### Phase U1 — UI/UX Polish (2 weeks)
+| # | Task | Files | Agent | Status |
+|---|------|-------|-------|--------|
+| U1.0a | Company Details: trees outside `CanvasScrollFrame` | `company_details/` | `company-details` + `ui-performance` | ← **NEXT** |
+| U1.0b | Settings: remove nested checklist scroll | `settings/view.py` | `ui-performance` | ← **NEXT** |
+| U1.1 | DatePickerField polish (root binds, grab, drop `-topmost`) | `widgets.py` | `ui-widgets` | ← **NEXT** (Toplevel + flip-up already landed) |
+| U1.2 | Consolidate Company Details refresh | `company_details/panel.py` | `company-details` | Later |
+| U1.3 | Add public `get_view()` method | `main_window.py` | `ui-performance` | Later |
+| U1.4 | Constants for tab names | `database_tasks/view.py`, `company_details/panel.py` | `ui-performance` | Later |
+| U1.5 | Narrow exception handlers in services | `services/*.py` | `desktop-core` | Later |
+| U1.6 | Split `config.py` | `config.py` | `desktop-core` | Later |
+| U1.7 | Replace `__import__()` calls | 9+ files | `desktop-core` | Later |
 
-| # | Task | Files | Agent | Done when |
-|---|------|-------|-------|-----------|
-| U1.1 | **Fix DatePickerField root bindings** | `widgets.py:635-814` | `ui-widgets` | No conflicts with multiple instances |
-| U1.2 | **Consolidate Company Details refresh** | `company_details/panel.py:244-302` | `company-details` | Single parameterized refresh method |
-| U1.3 | **Add public `get_view()` method** | `main_window.py` | `ui-performance` | No private `_views` access from other modules |
-| U1.4 | **Constants for tab names** | `database_tasks/view.py`, `company_details/panel.py` | `ui-performance` | Tab names are constants, not raw strings |
-| U1.5 | **Narrow exception handlers in services** | `services/*.py` | `desktop-core` | Catch specific exceptions, add logging |
-| U1.6 | **Split `config.py`** | `config.py` | `desktop-core` | Domain-specific modules |
-| U1.7 | **Replace `__import__()` calls** | 9+ files | `desktop-core` | Top-level imports |
-
-**Parallel:** U1.1 (`ui-widgets`) and U1.2 (`company-details`) must be sequenced (both touch `widgets.py`). U1.3-U1.4 (`ui-performance`) and U1.5-U1.7 (`desktop-core`) can run in parallel with the others.
+**Sequence:** `ui-widgets` then `company-details` if both touch `widgets.py`.
 
 ### Phase T1 — Test Expansion (1-2 weeks)
 
@@ -473,17 +474,16 @@ Tag v* → Release (build + sign + installer + release_check + GitHub Release + 
 
 **Parallel:** D1.1-D1.4 can all run simultaneously (different files).
 
-### Phase R1 — Release & Operations (1-2 weeks)
+### Phase R1 — Release & Operations (residual + later)
 
-| # | Task | Files | Agent | Done when |
-|---|------|-------|-------|-----------|
-| R1.1 | macOS notarization script | `packaging/build-macos.sh` | `packaging-release` | Script tested on macOS runner |
-| R1.2 | Linux build script improvements | `packaging/build-linux.sh` | `packaging-release` | AppImage or deb output |
-| R1.3 | Dependency vulnerability scanning in CI | `.github/workflows/ci.yml` | `packaging-release` | `pip-audit` + `npm audit` pass |
-| R1.4 | Security scanning (SAST) in CI | `.github/workflows/ci.yml` | `packaging-release` | `bandit` + `semgrep` pass |
-| R1.5 | Worker D1 migration framework | `worker/src/migrations/` | `worker-api` | Numbered SQL files, not full schema replay |
-
-**Parallel:** R1.1-R1.2 (`packaging-release`) and R1.3-R1.4 (`packaging-release`) and R1.5 (`worker-api`) can run simultaneously.
+| # | Task | Files | Agent | Status |
+|---|------|-------|-------|--------|
+| R1.0 | Gate tag release / Worker publish on Worker Vitest (`needs: worker`) | `.github/workflows/release.yml` | `packaging-release` | ← **NEXT** |
+| R1.1 | macOS notarization script | `packaging/build-macos.sh` | `packaging-release` | Later (Windows installer remains primary) |
+| R1.2 | Linux build script improvements | `packaging/build-linux.sh` | `packaging-release` | Later |
+| R1.3 | Dependency vulnerability scanning in CI | `.github/workflows/ci.yml` | `packaging-release` | Later |
+| R1.4 | Security scanning (SAST) in CI | `.github/workflows/ci.yml` | `packaging-release` | Later |
+| R1.5 | Worker D1 migration framework | `worker/src/migrations/` | `worker-api` | Later |
 
 ### Phase F1 — Feature Additions (2-3 weeks) — **AFTER SECURITY + PERFORMANCE**
 
@@ -504,10 +504,10 @@ Tag v* → Release (build + sign + installer + release_check + GitHub Release + 
 
 | Metric | Target | Current |
 |--------|--------|---------|
-| Admin auth timing-safe | 100% of comparisons constant-time | ❌ 0% (uses `===`) |
-| Sync token TTL | All tokens expire within 30 days | ❌ No TTL |
-| CSP headers | All HTML responses have CSP | ❌ None |
-| Rate limiting | All write endpoints rate-limited | ⚠️ Partial (claim, sync register) |
+| Admin auth timing-safe | 100% of comparisons constant-time | ✅ Landed (`timingSafeEqual`) |
+| Sync token TTL | All tokens expire within 30 days | ✅ Landed |
+| CSP headers | All HTML responses have CSP | ✅ Landed |
+| Rate limiting | All write endpoints rate-limited | ⚠️ Partial (claim, sync register, admin) |
 
 ### Performance
 
@@ -552,35 +552,24 @@ Tag v* → Release (build + sign + installer + release_check + GitHub Release + 
 
 ```mermaid
 flowchart LR
-    S1[S1: Security Hardening] --> S2[S2: Security Testing]
-    S1 --> P1[P1: Performance]
-    S2 --> U1[U1: UI/UX Polish]
-    P1 --> U1
-    U1 --> T1[T1: Test Expansion]
-    T1 --> D1[D1: Documentation]
-    D1 --> R1[R1: Release Ops]
-    R1 --> F1[F1: Feature Additions]
-    
-    S1 -.-> D1_docs[D1: Docs - can start early]
-    
-    style S1 fill:#ff6b6b,color:#fff
-    style S2 fill:#ff6b6b,color:#fff
-    style P1 fill:#ffa94d,color:#fff
-    style U1 fill:#ffd43b,color:#333
-    style T1 fill:#a9e34b,color:#333
-    style D1 fill:#69db7c,color:#333
-    style R1 fill:#4dabf7,color:#fff
-    style F1 fill:#9775fa,color:#fff
+    done[Phases7-11 + S1 landed] --> residual[ResidualUX]
+    residual --> releaseCI[ReleaseWorkerGate]
+    residual --> core[DesktopCoreCleanup]
+    releaseCI --> workerGap[ExpiredRegisterVitest]
+    core --> workerGap
+    workerGap --> qa[QAVerifier]
+    qa --> ship[ShipReady]
+    ship --> F1[F1: Features later]
 ```
 
-**Priority order:**
-1. **S1+S2** — Security (highest risk)
-2. **P1** — Performance (biggest daily pain)
-3. **U1** — UI/UX polish (visible quality)
-4. **T1** — Test expansion (confidence)
-5. **D1** — Documentation (can start in parallel)
-6. **R1** — Release ops (before wide distribution)
-7. **F1** — Features (after foundation is solid)
+**Current priority order (residual sprint — see [AGENTS.md](../AGENTS.md)):**
+1. **Company Details trees out of scroll** + Settings nested scroll + DatePicker polish + Dashboard first-paint
+2. **Release CI** — publish/`windows-release` must `needs: worker`
+3. **Worker** — expired register Vitest; auth doc wording
+4. **Desktop-core** — finish `_migrate_*` extract; `group_id` sync allowlist
+5. **QA** — pytest + Vitest + `release_check`
+6. **Defer** — SQLite pooling; Feature pack F1; framework rewrite
+7. **Do not re-do** — timing oracles, sync TTL, CSP, or AGENTS priorities 1–3 (already landed)
 
 ---
 
@@ -609,11 +598,20 @@ flowchart LR
 - [x] Windows code signing (Phase 11.2)
 - [x] Changelog generator (Phase 11.5)
 - [x] Publish pipeline (Phase 11.6)
-- [ ] Fix admin timing oracles ← **NEXT**
-- [ ] Add sync token TTL ← **NEXT**
-- [ ] SQLite connection pooling ← **NEXT**
-- [ ] Dashboard lazy loading ← **NEXT**
-- [ ] SECURITY.md ← **NEXT**
+- [x] Admin timing oracles / `timingSafeEqual` (S1) — **done; do not re-implement**
+- [x] Sync token TTL + rotation (S1) — **done; do not re-implement**
+- [x] Admin/viewer CSP (S1) — **done; do not re-implement**
+- [x] DatePicker Toplevel + flip-up; Database Tasks active-tab refresh; Company Details lazy sub-tabs — **done**
+- [ ] Company Details: trees outside `CanvasScrollFrame` ← **NEXT**
+- [ ] Settings: remove nested checklist scroll ← **NEXT**
+- [ ] DatePicker polish (multi-instance binds, grab, drop `-topmost`) ← **NEXT**
+- [ ] Dashboard first-paint deferral ← **NEXT**
+- [ ] Release workflow: publish gated on Worker job (`needs: worker`) ← **NEXT**
+- [ ] Vitest: expired eligibility on sync register → 403 ← **NEXT**
+- [ ] Extract remaining `_migrate_*` into `db/migrations/` ← **NEXT**
+- [ ] Sync allowlist: `clients.group_id` (desktop + Worker) ← **NEXT**
+- [ ] SQLite connection pooling — deferred (acceptable until measured pain)
+- [ ] SECURITY.md — later (docs phase; not this sprint P0)
 
 ---
 

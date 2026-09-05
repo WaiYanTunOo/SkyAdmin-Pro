@@ -91,9 +91,10 @@ CREATE TABLE IF NOT EXISTS sync_devices (
     machine_id TEXT NOT NULL PRIMARY KEY,
     token TEXT NOT NULL UNIQUE,
     created_at TEXT NOT NULL DEFAULT (datetime('now')),
-    last_seen_at TEXT,
-    expires_at TEXT NOT NULL DEFAULT (datetime('now', '+30 days'))
+    last_seen_at TEXT
 );
+-- expires_at added in 0002_sync_devices_expires_at.sql (TTL); do not bake into
+-- CREATE here — existing prod tables skip CREATE IF NOT EXISTS and need ALTER.
 
 CREATE TABLE IF NOT EXISTS sync_rows (
     id INTEGER PRIMARY KEY AUTOINCREMENT,

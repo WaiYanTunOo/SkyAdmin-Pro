@@ -151,18 +151,16 @@ class CompanyDetailsPanel(    GeneralTabMixin,
             self._accounting_setup_frame = self._build_accounting_setup(setup_scroll.content)
             self._accounting_setup_frame.grid(row=0, column=0, sticky="nsew")
         elif name == SUBTAB_GENERAL:
+            # Trees live on the tab (outside CanvasScrollFrame) to avoid dual wheel fight.
             tab.grid_columnconfigure(0, weight=1)
-            tab.grid_rowconfigure(0, weight=1)
-            general_scroll = CanvasScrollFrame(tab)
-            general_scroll.grid(row=0, column=0, sticky="nsew")
-            general_scroll.content.grid_columnconfigure(0, weight=1)
-            general_scroll.content.grid_rowconfigure(1, weight=1)
-            general_scroll.content.grid_rowconfigure(2, weight=1)
-            self._company_frame = self._build_company_info(general_scroll.content)
+            tab.grid_rowconfigure(0, weight=0)
+            tab.grid_rowconfigure(1, weight=1)
+            tab.grid_rowconfigure(2, weight=1)
+            self._company_frame = self._build_company_info(tab)
             self._company_frame.grid(row=0, column=0, sticky="ew", pady=(0, 8))
-            self._services_frame = self._build_services(general_scroll.content)
+            self._services_frame = self._build_services(tab)
             self._services_frame.grid(row=1, column=0, sticky="nsew", pady=(0, 8))
-            self._docs_frame = self._build_documents(general_scroll.content)
+            self._docs_frame = self._build_documents(tab)
             self._docs_frame.grid(row=2, column=0, sticky="nsew")
         elif name == SUBTAB_TAX_IDS:
             tab.grid_columnconfigure(0, weight=1)
@@ -173,15 +171,17 @@ class CompanyDetailsPanel(    GeneralTabMixin,
             self._tax_ids_frame = self._build_tax_ids(tax_ids_scroll.content)
             self._tax_ids_frame.grid(row=0, column=0, sticky="ew")
         elif name == SUBTAB_FILING:
+            # Form scrolls; history tree stays fixed outside the canvas.
             tab.grid_columnconfigure(0, weight=1)
             tab.grid_rowconfigure(0, weight=1)
+            tab.grid_rowconfigure(1, weight=0)
             filing_scroll = CanvasScrollFrame(tab)
             filing_scroll.grid(row=0, column=0, sticky="nsew")
             filing_scroll.content.grid_columnconfigure(0, weight=1)
             self._filing_form_frame = self._build_filing_statuses_form(filing_scroll.content)
             self._filing_form_frame.grid(row=0, column=0, sticky="ew")
-            self._filing_history_frame = self._build_filing_history(filing_scroll.content)
-            self._filing_history_frame.grid(row=1, column=0, sticky="nsew", pady=(8, 0))
+            self._filing_history_frame = self._build_filing_history(tab)
+            self._filing_history_frame.grid(row=1, column=0, sticky="ew", pady=(8, 0))
         elif name == SUBTAB_VO_CSH_SETUP:
             tab.grid_columnconfigure(0, weight=1)
             tab.grid_rowconfigure(0, weight=1)
@@ -200,13 +200,11 @@ class CompanyDetailsPanel(    GeneralTabMixin,
             self._vo_frame = self._build_vo_csh(vo_scroll.content)
             self._vo_frame.grid(row=0, column=0, sticky="ew")
         elif name == SUBTAB_FINANCIAL_DOCS:
+            # Tree-first tab: no CanvasScrollFrame so the tree owns the wheel.
             fin_tab = self.tabs.tab(SUBTAB_FINANCIAL_DOCS)
             fin_tab.grid_columnconfigure(0, weight=1)
             fin_tab.grid_rowconfigure(0, weight=1)
-            fin_scroll = CanvasScrollFrame(fin_tab)
-            fin_scroll.grid(row=0, column=0, sticky="nsew")
-            fin_scroll.content.grid_columnconfigure(0, weight=1)
-            self._fin_frame = self._build_financial_docs(fin_scroll.content)
+            self._fin_frame = self._build_financial_docs(fin_tab)
             self._fin_frame.grid(row=0, column=0, sticky="nsew")
         self._lazy_tabs.add(name)
 

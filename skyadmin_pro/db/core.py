@@ -438,201 +438,42 @@ class CoreMixin:
         )
 
     def _backfill_sync_global_ids(self) -> None:
-        """Assign stable global_id UUIDs for P4 sync."""
-        import uuid
+        """Assign stable global_id UUIDs for P4 sync (delegates to m002)."""
+        from skyadmin_pro.db.migrations.m002_backfill_sync_global_ids import upgrade
 
-        with self.connection() as conn:
-            fts_exists = conn.execute(
-                "SELECT 1 FROM sqlite_master WHERE type='table' AND name='clients_fts'"
-            ).fetchone()
-            if fts_exists:
-                self._drop_clients_fts_triggers(conn)
-            for table in ("clients", "tasks", "office_contacts", "notebook_entries"):
-                rows = conn.execute(
-                    f"SELECT id FROM {table} WHERE global_id IS NULL OR TRIM(global_id) = ''"
-                ).fetchall()
-                for row in rows:
-                    conn.execute(
-                        f"UPDATE {table} SET global_id = ? WHERE id = ?",
-                        (uuid.uuid4().hex, int(row["id"])),
-                    )
-            if fts_exists:
-                self._ensure_clients_fts_triggers(conn)
-                try:
-                    conn.execute("INSERT INTO clients_fts(clients_fts) VALUES('rebuild')")
-                except sqlite3.Error:
-                    self._log.warning("clients_fts rebuild after backfill failed", exc_info=True)
+        upgrade(self)
 
     def _migrate_secret_fields(self) -> None:
-        """Encrypt legacy plaintext IRD passwords at rest."""
-        from skyadmin_pro.services.secret_fields import encrypt_secret, is_encrypted_secret
+        """Encrypt legacy plaintext IRD passwords at rest (delegates to m003)."""
+        from skyadmin_pro.db.migrations.m003_secret_fields import upgrade
 
-        with self.connection() as conn:
-            rows = conn.execute(
-                """
-                SELECT id, ird_password
-                FROM clients
-                WHERE ird_password IS NOT NULL AND TRIM(ird_password) != ''
-                """
-            ).fetchall()
-            for row in rows:
-                raw = str(row["ird_password"] or "")
-                if raw and not is_encrypted_secret(raw):
-                    conn.execute(
-                        "UPDATE clients SET ird_password = ? WHERE id = ?",
-                        (encrypt_secret(raw), int(row["id"])),
-                    )
+        upgrade(self)
 
     def _migrate_legacy_vault(self) -> None:
-        """Move legacy vault_entries rows into client_credentials / office_credentials."""
-        with self.connection() as conn:
-            tables = {row[0] for row in conn.execute("SELECT name FROM sqlite_master WHERE type='table'").fetchall()}
-            if "vault_entries" not in tables:
-                return
-            rows = conn.execute("SELECT * FROM vault_entries").fetchall()
-            if not rows:
-                return
-            for row in rows:
-                data = dict(row)
-                secret = data.get("secret_value") or ""
-                if data.get("client_id"):
-                    conn.execute(
-                        """
-                        INSERT INTO client_credentials
-                            (client_id, credential_type, registration_number, username,
-                             secret_value, portal_url, notes, is_favorite, updated_at)
-                        VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)
-                        """,
-                        (
-                            data["client_id"],
-                            data.get("category") or "Other",
-                            data.get("title"),
-                            data.get("username"),
-                            secret,
-                            data.get("url"),
-                            data.get("notes"),
-                            data.get("is_favorite") or 0,
-                            self._now(),
-                        ),
-                    )
-                else:
-                    conn.execute(
-                        """
-                        INSERT INTO office_credentials
-                            (account_label, login_id, email, secret_value, system_type,
-                             portal_url, contact_id, notes, is_favorite, updated_at)
-                        VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
-                        """,
-                        (
-                            data.get("title") or "Office account",
-                            data.get("username"),
-                            data.get("username"),
-                            secret,
-                            data.get("category") or "Email",
-                            data.get("url"),
-                            data.get("contact_id"),
-                            data.get("notes"),
-                            data.get("is_favorite") or 0,
-                            self._now(),
-                        ),
-                    )
-            conn.execute("DELETE FROM vault_entries")
+        """Move legacy vault_entries into credential tables (delegates to m004)."""
+        from skyadmin_pro.db.migrations.m004_legacy_vault import upgrade
+
+        upgrade(self)
 
     def _migrate_ird_to_client_credentials(self) -> int:
-        """Import legacy clients.ird_password into Office Hub RD credentials."""
-        from skyadmin_pro.services.secret_fields import encrypt_secret, read_plaintext_for_migration
+        """Import legacy clients.ird_password into Office Hub RD credentials (m005)."""
+        from skyadmin_pro.db.migrations.m005_ird_to_client_credentials import (
+            migrate_ird_to_client_credentials,
+        )
 
-        migrated = 0
-        with self.connection() as conn:
-            clients = conn.execute(
-                """
-                SELECT id, ird_password FROM clients
-                WHERE ird_password IS NOT NULL AND TRIM(ird_password) != ''
-                """
-            ).fetchall()
-            for client in clients:
-                cid = int(client["id"])
-                existing = conn.execute(
-                    """
-                    SELECT COUNT(*) AS n FROM client_credentials
-                    WHERE client_id = ? AND credential_type = 'RD'
-                    """,
-                    (cid,),
-                ).fetchone()["n"]
-                if existing:
-                    continue
-                raw = str(client["ird_password"] or "")
-                plain = read_plaintext_for_migration(raw)
-                if not plain:
-                    continue
-                conn.execute(
-                    """
-                    INSERT INTO client_credentials
-                        (client_id, credential_type, username, secret_value, notes, updated_at)
-                    VALUES (?, 'RD', '', ?, 'Imported from Company Details IRD field', ?)
-                    """,
-                    (cid, encrypt_secret(plain), self._now()),
-                )
-                migrated += 1
-        return migrated
+        return migrate_ird_to_client_credentials(self)
 
     def _migrate_pricing_matrix_services(self) -> None:
-        """Add service_type column and unique (service_type, transaction_range)."""
-        from skyadmin_pro.config import PRICING_DEFAULT_SERVICE
+        """Add pricing_matrix.service_type (delegates to m006)."""
+        from skyadmin_pro.db.migrations.m006_pricing_matrix_services import upgrade
 
-        with self.connection() as conn:
-            tables = {row[0] for row in conn.execute("SELECT name FROM sqlite_master WHERE type='table'").fetchall()}
-            if "pricing_matrix" not in tables:
-                return
-            columns = {row["name"] for row in conn.execute("PRAGMA table_info(pricing_matrix)")}
-            if "service_type" in columns:
-                return
-            conn.execute(
-                """
-                CREATE TABLE pricing_matrix_new (
-                    id                  INTEGER PRIMARY KEY AUTOINCREMENT,
-                    service_type        TEXT NOT NULL DEFAULT 'General',
-                    transaction_range   TEXT NOT NULL,
-                    monthly_fee         INTEGER,
-                    annual_fee          INTEGER,
-                    sla_hours           INTEGER,
-                    headcount           INTEGER,
-                    required_docs       TEXT,
-                    UNIQUE(service_type, transaction_range)
-                )
-                """
-            )
-            conn.execute(
-                """
-                INSERT INTO pricing_matrix_new
-                    (id, service_type, transaction_range, monthly_fee, annual_fee,
-                     sla_hours, headcount, required_docs)
-                SELECT id, ?, transaction_range, monthly_fee, annual_fee,
-                       sla_hours, headcount, required_docs
-                FROM pricing_matrix
-                """,
-                (PRICING_DEFAULT_SERVICE,),
-            )
-            conn.execute("DROP TABLE pricing_matrix")
-            conn.execute("ALTER TABLE pricing_matrix_new RENAME TO pricing_matrix")
-        self._seed_all_service_pricing()
+        upgrade(self)
 
     def _migrate_client_credentials_login_id(self) -> None:
-        with self.connection() as conn:
-            columns = {row["name"] for row in conn.execute("PRAGMA table_info(client_credentials)")}
-            if "login_id" not in columns:
-                conn.execute("ALTER TABLE client_credentials ADD COLUMN login_id TEXT")
-            conn.execute(
-                """
-                UPDATE client_credentials
-                SET login_id = COALESCE(
-                    NULLIF(TRIM(login_id), ''),
-                    NULLIF(TRIM(registration_number), ''),
-                    NULLIF(TRIM(username), '')
-                )
-                WHERE login_id IS NULL OR TRIM(login_id) = ''
-                """
-            )
+        """Backfill client_credentials.login_id (delegates to m007)."""
+        from skyadmin_pro.db.migrations.m007_client_credentials_login_id import upgrade
+
+        upgrade(self)
 
     @staticmethod
     def _prepare_client_record(row: dict | None) -> dict | None:

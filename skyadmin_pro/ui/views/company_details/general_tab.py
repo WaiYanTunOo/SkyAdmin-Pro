@@ -115,6 +115,8 @@ class GeneralTabMixin:
     def _build_services(self, master) -> ctk.CTkFrame:
         frame = ctk.CTkFrame(master, corner_radius=CARD_RADIUS)
         frame.grid_columnconfigure(0, weight=1)
+        frame.grid_columnconfigure(1, weight=0)
+        frame.grid_rowconfigure(1, weight=1)
         ctk.CTkLabel(
             frame,
             text="Services — expiry, payment & progress",
@@ -143,10 +145,10 @@ class GeneralTabMixin:
             db=self.app.db,
         )
         self.service_tree.tree.configure(height=7)
-        self.service_tree.grid(row=1, column=0, sticky="ew", padx=12, pady=(0, 8))
+        self.service_tree.grid(row=1, column=0, columnspan=2, sticky="nsew", padx=12, pady=(0, 8))
 
         form = ctk.CTkFrame(frame, fg_color="transparent")
-        form.grid(row=2, column=0, sticky="ew", padx=12, pady=(0, 12))
+        form.grid(row=2, column=0, columnspan=2, sticky="ew", padx=12, pady=(0, 12))
         form.grid_columnconfigure((0, 1, 2, 3), weight=1)
 
         self.service_status_label = ctk.CTkLabel(form, text="New service record", text_color=TEXT_MUTED)
@@ -230,6 +232,7 @@ class GeneralTabMixin:
     def _build_documents(self, master) -> ctk.CTkFrame:
         frame = ctk.CTkFrame(master, corner_radius=CARD_RADIUS)
         frame.grid_columnconfigure(0, weight=1)
+        frame.grid_rowconfigure(1, weight=1)
         ctk.CTkLabel(
             frame,
             text="Important documents",
@@ -249,7 +252,7 @@ class GeneralTabMixin:
             db=self.app.db,
         )
         self.doc_tree.tree.configure(height=7)
-        self.doc_tree.grid(row=1, column=0, sticky="ew", padx=12, pady=(0, 8))
+        self.doc_tree.grid(row=1, column=0, sticky="nsew", padx=12, pady=(0, 8))
 
         form = ctk.CTkFrame(frame, fg_color="transparent")
         form.grid(row=2, column=0, sticky="ew", padx=12, pady=(0, 12))
