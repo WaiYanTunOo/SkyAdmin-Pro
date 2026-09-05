@@ -80,6 +80,11 @@ jobs:
           WINDOWS_CERT_PFX: ${{ secrets.WINDOWS_CERT_PFX }}
           WINDOWS_CERT_PASSWORD: ${{ secrets.WINDOWS_CERT_PASSWORD }}
           SKYADMIN_SIGN_REQUIRED: ${{ secrets.WINDOWS_CERT_PFX != '' && '1' || '0' }}
+          AZURE_TRUSTED_SIGNING_VAULT_URL: ${{ secrets.AZURE_TRUSTED_SIGNING_VAULT_URL }}
+          AZURE_TRUSTED_SIGNING_CERT: ${{ secrets.AZURE_TRUSTED_SIGNING_CERT }}
+          AZURE_TRUSTED_SIGNING_CLIENT_ID: ${{ secrets.AZURE_TRUSTED_SIGNING_CLIENT_ID }}
+          AZURE_TRUSTED_SIGNING_SECRET: ${{ secrets.AZURE_TRUSTED_SIGNING_SECRET }}
+          AZURE_TRUSTED_SIGNING_TENANT_ID: ${{ secrets.AZURE_TRUSTED_SIGNING_TENANT_ID }}
         run: |
           pwsh -NoProfile -ExecutionPolicy Bypass -File packaging/sign-windows.ps1 -Paths dist/SkyAdminPro.exe
 
@@ -102,6 +107,11 @@ jobs:
           WINDOWS_CERT_PFX: ${{ secrets.WINDOWS_CERT_PFX }}
           WINDOWS_CERT_PASSWORD: ${{ secrets.WINDOWS_CERT_PASSWORD }}
           SKYADMIN_SIGN_REQUIRED: ${{ secrets.WINDOWS_CERT_PFX != '' && '1' || '0' }}
+          AZURE_TRUSTED_SIGNING_VAULT_URL: ${{ secrets.AZURE_TRUSTED_SIGNING_VAULT_URL }}
+          AZURE_TRUSTED_SIGNING_CERT: ${{ secrets.AZURE_TRUSTED_SIGNING_CERT }}
+          AZURE_TRUSTED_SIGNING_CLIENT_ID: ${{ secrets.AZURE_TRUSTED_SIGNING_CLIENT_ID }}
+          AZURE_TRUSTED_SIGNING_SECRET: ${{ secrets.AZURE_TRUSTED_SIGNING_SECRET }}
+          AZURE_TRUSTED_SIGNING_TENANT_ID: ${{ secrets.AZURE_TRUSTED_SIGNING_TENANT_ID }}
         run: |
           pwsh -NoProfile -ExecutionPolicy Bypass -File packaging/sign-windows.ps1 -Paths dist/SkyAdminPro-Setup-*.exe
 

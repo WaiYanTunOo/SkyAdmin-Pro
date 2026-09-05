@@ -10,11 +10,15 @@
 #   2. SKYADMIN_SIGN_PFX + SKYADMIN_SIGN_PASSWORD (or WINDOWS_CERT_PFX_PATH + WINDOWS_CERT_PASSWORD)
 #   3. WINDOWS_CERT_PFX (base64) + WINDOWS_CERT_PASSWORD — typical in GitHub Actions
 #   4. SKYADMIN_SIGN_THUMBPRINT — certificate already in CurrentUser\My
-#   5. /a auto-select from the user certificate store (USB token / locally installed cert)
+#   5. Azure Trusted Signing — only when no PFX/thumbprint resolved above
+#      (AZURE_TRUSTED_SIGNING_VAULT_URL + _CERT + optional service-principal vars)
+#   6. /a auto-select from the user certificate store (USB token / locally installed cert)
 #
 # Env:
 #   SKYADMIN_SIGN_TIMESTAMP_URL  — default http://timestamp.digicert.com
 #   SKYADMIN_SIGN_REQUIRED=1     — same as -Required
+#   AZURE_TRUSTED_SIGNING_VAULT_URL / _CERT / _CLIENT_ID / _SECRET / _TENANT_ID
+#                                — cloud signing via AzureSignTool (dotnet tool); see SIGNING.md
 param(
     [Parameter(Mandatory = $true)]
     [string[]]$Paths,
@@ -148,6 +152,58 @@ $pfx = Resolve-PfxPath -ExplicitPath $PfxPath
 $pw = Resolve-Password -ExplicitPassword $Password
 $thumb = Resolve-Thumbprint -ExplicitPath $Thumbprint
 $hasCert = [bool]($pfx -or $thumb)
+
+$azureVault = [Environment]::GetEnvironmentVariable("AZURE_TRUSTED_SIGNING_VAULT_URL")
+$azureCert = [Environment]::GetEnvironmentVariable("AZURE_TRUSTED_SIGNING_CERT")
+if ((-not $hasCert) -and $azureVault -and $azureCert) {
+    # Cloud signing via AzureSignTool — no local PFX/USB token needed.
+    # Explicitly requested via env, so missing tooling is always fatal.
+    $azureSignTool = Get-Command AzureSignTool -ErrorAction SilentlyContinue
+    if ((-not $azureSignTool) -and (Get-Command dotnet -ErrorAction SilentlyContinue)) {
+        $dotnetTools = Join-Path $env:USERPROFILE ".dotnet\tools"
+        Write-Host "Installing AzureSignTool (dotnet tool)..."
+        & dotnet tool install --global AzureSignTool 2>&1 | Out-Null
+        if ($env:PATH -notlike "*$dotnetTools*") { $env:PATH += ";$dotnetTools" }
+        $azureSignTool = Get-Command AzureSignTool -ErrorAction SilentlyContinue
+    }
+    if (-not $azureSignTool) {
+        throw @"
+Azure Trusted Signing requested (AZURE_TRUSTED_SIGNING_VAULT_URL is set) but AzureSignTool is unavailable.
+Install .NET SDK, then: dotnet tool install --global AzureSignTool
+"@
+    }
+    $azArgs = @("sign", "-kvu", $azureVault, "-kvc", $azureCert, "-tr", $TimestampUrl, "-td", "sha256", "-v")
+    foreach ($pair in @(
+        @("AZURE_TRUSTED_SIGNING_CLIENT_ID", "-kvi"),
+        @("AZURE_TRUSTED_SIGNING_SECRET", "-kvs"),
+        @("AZURE_TRUSTED_SIGNING_TENANT_ID", "-kvt")
+    )) {
+        $value = [Environment]::GetEnvironmentVariable($pair[0])
+        if ($value) { $azArgs += $pair[1], $value }
+    }
+    Write-Host "Signing $($resolvedPaths.Count) file(s) with Azure Trusted Signing ($azureCert)"
+    $azSigned = 0
+    foreach ($target in $resolvedPaths) {
+        if (Test-SignatureValid -FilePath $target) {
+            Write-Host "OK    already signed: $target"
+            $azSigned++
+            continue
+        }
+        Write-Host "SIGN  $target"
+        & AzureSignTool @azArgs $target
+        if ($LASTEXITCODE -ne 0) {
+            throw "AzureSignTool failed for $target (exit $LASTEXITCODE)"
+        }
+        if (-not (Test-SignatureValid -FilePath $target)) {
+            throw "Signature verification failed for $target"
+        }
+        Write-Host "OK    signed: $target"
+        $azSigned++
+    }
+    Write-Host ""
+    Write-Host "Code signing complete ($azSigned/$($resolvedPaths.Count) file(s))."
+    exit 0
+}
 
 if (-not $hasCert) {
     $storeCerts = @(Get-ChildItem Cert:\CurrentUser\My -CodeSigningCert -ErrorAction SilentlyContinue)

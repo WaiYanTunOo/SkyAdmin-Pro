@@ -199,8 +199,10 @@ One-page view of what blocks “perfect on Windows” vs polish already in code.
 | B.6 | **`admin.ts` split** (Worker maintainability) | ✅ | See `docs/WORKER_ADMIN.md` |
 | B.7 | Client undo (Ctrl+Z / Undo button) | ✅ | Delete a test client → Ctrl+Z → row + document links back |
 | B.8 | Auto-backup retention + banner | ✅ | `AutoBackups/` caps at 7; Settings banner green after auto-run |
+| B.9 | Light/dark theme toggle | ✅ | Ctrl+D + Settings → Appearance; Dashboard, Company Details, Audit Log readable both ways |
+| B.10 | Table column hide/show | ✅ | Right-click any table header → hide a column → restart → still hidden; ⋮ Columns button on Tasks/Payments/Services |
 
-**Ship when:** A.1–A.6 checked. B.1–B.8 are regression checks during A.4.
+**Ship when:** A.1–A.6 checked. B.1–B.10 are regression checks during A.4.
 
 ---
 
