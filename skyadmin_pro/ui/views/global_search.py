@@ -165,18 +165,19 @@ class GlobalSearchDialog(ctk.CTkToplevel):
             row.grid_columnconfigure(1, weight=1)
             row.configure(cursor="hand2")
 
-            # Type badge
+            # Type badge — (light, dark) pairs; CTk resolves fg_color tuples
+            # per appearance mode. Light variants are darkened for white text.
             badge_colors = {
                 "Client": ("#2563eb", "#3b82f6"),
-                "Task": ("#d97706", "#f59e0b"),
-                "Document": ("#059669", "#10b981"),
-                "Contact": ("#7c3aed", "#8b5cf6"),
+                "Task": ("#b45309", "#f59e0b"),
+                "Document": ("#047857", "#10b981"),
+                "Contact": ("#6d28d9", "#8b5cf6"),
             }
-            bg, fg = badge_colors.get(item["type"], ("#6b7280", "#9ca3af"))
             badge = ctk.CTkLabel(
                 row, text=item["type"], width=70,
                 font=ctk.CTkFont(size=10, weight="bold"),
-                fg_color=bg, text_color="white", corner_radius=4,
+                fg_color=badge_colors.get(item["type"], ("#6b7280", "#9ca3af")),
+                text_color="white", corner_radius=4,
             )
             badge.grid(row=0, column=0, rowspan=2, padx=(0, 8))
 

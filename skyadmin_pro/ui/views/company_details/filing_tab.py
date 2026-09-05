@@ -50,10 +50,10 @@ class FilingTabMixin:
         self.filing_summary_labels: dict[str, ctk.CTkLabel] = {}
         for idx, (key, color) in enumerate(
             [
-                ("complete", "#16a34a"),
-                ("ongoing", "#ca8a04"),
-                ("pending", "#dc2626"),
-                ("na", "#6b7280"),
+                ("complete", ("#15803d", "#4ade80")),
+                ("ongoing", ("#a16207", "#fbbf24")),
+                ("pending", ("#b91c1c", "#f87171")),
+                ("na", TEXT_MUTED),
             ]
         ):
             lbl = ctk.CTkLabel(
@@ -162,6 +162,8 @@ class FilingTabMixin:
                 ("new", "To", 120),
             ),
             showheight=5,
+            table_id="company.filing_history",
+            db=self.app.db,
         )
         self.filing_history_tree.grid(row=1, column=0, sticky="nsew", padx=12, pady=(0, 14))
         return frame

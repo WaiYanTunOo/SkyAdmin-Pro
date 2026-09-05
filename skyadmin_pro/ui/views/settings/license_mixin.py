@@ -505,7 +505,7 @@ class LicenseMixin:
             self._refresh_license_label()
             top.destroy()
 
-        ctk.CTkButton(actions, text="Clear log", width=100, fg_color="#b45309", command=_clear).pack(side="left")
+        ctk.CTkButton(actions, text="Clear log", width=100, fg_color=("#b45309", "#92400e"), command=_clear).pack(side="left")
         ctk.CTkButton(actions, text="Close", width=90, command=top.destroy).pack(side="right")
 
     def _on_data_sync_toggle(self) -> None:

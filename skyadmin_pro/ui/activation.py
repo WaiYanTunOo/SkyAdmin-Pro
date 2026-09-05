@@ -157,7 +157,7 @@ class ActivationDialog(ctk.CTkToplevel):
             req_row,
             text="Discuss on WhatsApp",
             height=38,
-            fg_color="#128C7E",
+            fg_color=("#0f766e", "#14b8a6"),
             hover_color="#075E54",
             command=lambda: open_whatsapp_chat(activation_request_message(self._customer_email())),
         ).grid(row=1, column=0, sticky="ew", pady=(6, 0))
@@ -269,7 +269,7 @@ class ActivationDialog(ctk.CTkToplevel):
             text="WhatsApp us",
             width=130,
             height=30,
-            fg_color="#128C7E",
+            fg_color=("#0f766e", "#14b8a6"),
             hover_color="#075E54",
             command=lambda: open_whatsapp_chat(
                 f"SkyAdmin Pro — I'm interested in a license over 1 year.\nMachine ID: {get_machine_id()}"

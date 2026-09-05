@@ -39,6 +39,12 @@ class SupplierPaymentsTab:
             text="Supplier payments (AP)",
             font=ctk.CTkFont(size=CARD_TITLE_SIZE, weight="bold"),
         ).grid(row=0, column=0, sticky="w", padx=16, pady=(14, 8))
+        self.columns_btn = ctk.CTkButton(
+            pay_card, text="⋮ Columns", width=90,
+            fg_color="transparent", border_width=1,
+            command=self._show_columns_menu,
+        )
+        self.columns_btn.grid(row=0, column=1, sticky="e", padx=(0, 16), pady=(14, 8))
 
         pay_form = ctk.CTkFrame(pay_card, fg_color="transparent")
         pay_form.grid(row=1, column=0, sticky="ew", padx=16)
@@ -89,6 +95,8 @@ class SupplierPaymentsTab:
                 ("notes", "Notes", 160),
             ),
             showheight=10,
+            table_id="suppliers.payments",
+            db=self.app.db,
         )
         self.pay_tree.grid(row=3, column=0, sticky="nsew", padx=12, pady=(0, 8))
         pay_btns = ctk.CTkFrame(pay_card, fg_color="transparent")
@@ -102,6 +110,14 @@ class SupplierPaymentsTab:
             border_width=1,
             command=self._delete_payment,
         ).pack(side="left", padx=(8, 0))
+
+    def _show_columns_menu(self) -> None:
+        try:
+            x = self.columns_btn.winfo_rootx()
+            y = self.columns_btn.winfo_rooty() + self.columns_btn.winfo_height()
+        except Exception:
+            return
+        self.pay_tree.show_column_menu(x, y)
 
     def refresh(self, suppliers: list[dict] | None = None) -> None:
         self.pay_tree.apply_theme()

@@ -68,6 +68,8 @@ class FinancialDocsTabMixin:
                 ("amount", "Amount", 100),
                 ("desc", "Description", 180),
             ),
+            table_id="company.fin_docs",
+            db=self.app.db,
         )
         self.fin_doc_tree.tree.configure(height=8)
         self.fin_doc_tree.grid(row=3, column=0, sticky="ew", padx=12, pady=(0, 8))
@@ -96,7 +98,7 @@ class FinancialDocsTabMixin:
             width=80,
             fg_color="transparent",
             border_width=1,
-            text_color="#dc2626",
+            text_color=("#b91c1c", "#f87171"),
             command=self._delete_financial_doc,
         ).grid(row=0, column=2, sticky="w", padx=(8, 0))
 

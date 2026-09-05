@@ -18,7 +18,7 @@ class ExportFilterDialog(ctk.CTkToplevel):
         self.app = app
         self.on_export = on_export
         self.title("Export Filters")
-        self.geometry("420x380")
+        self.geometry("420x440")
         self.resizable(False, False)
         self.transient(app)
         self.grab_set()
@@ -77,9 +77,26 @@ class ExportFilterDialog(ctk.CTkToplevel):
         )
         status_menu.grid(row=1, column=1, padx=12, pady=4, sticky="ew")
 
-        # ── Buttons ───────────────────────────────────────────────────
+        # ── Columns ─────────────────────────────────────────────────────
+        columns_frame = ctk.CTkFrame(self, fg_color=WRAP_CARD, corner_radius=8)
+        columns_frame.grid(row=3, column=0, sticky="ew", padx=CONTENT_PAD, pady=(0, 8))
+        self.visible_only_var = ctk.BooleanVar(value=False)
+        ctk.CTkCheckBox(
+            columns_frame, text="Export visible columns only",
+            variable=self.visible_only_var,
+            font=ctk.CTkFont(size=11),
+        ).grid(row=0, column=0, padx=12, pady=8, sticky="w")
+        ctk.CTkLabel(
+            columns_frame,
+            text="Off = every sheet exports all columns (auditable). "
+            "On = sheets follow hidden columns in Database & Tasks tables.",
+            font=ctk.CTkFont(size=10), text_color="gray",
+            wraplength=360, justify="left",
+        ).grid(row=1, column=0, padx=12, pady=(0, 8), sticky="w")
+
+        # ── Buttons ─────────────────────────────────────────────────────
         btn_frame = ctk.CTkFrame(self, fg_color="transparent")
-        btn_frame.grid(row=3, column=0, sticky="ew", padx=CONTENT_PAD, pady=(12, CONTENT_PAD))
+        btn_frame.grid(row=4, column=0, sticky="ew", padx=CONTENT_PAD, pady=(12, CONTENT_PAD))
 
         ctk.CTkButton(
             btn_frame, text="Export All (No Filters)", width=160,
@@ -93,7 +110,7 @@ class ExportFilterDialog(ctk.CTkToplevel):
         ).pack(side="right")
 
         self.feedback = FeedbackLabel(self)
-        self.feedback.grid(row=4, column=0, sticky="ew", padx=CONTENT_PAD, pady=(0, 8))
+        self.feedback.grid(row=5, column=0, sticky="ew", padx=CONTENT_PAD, pady=(0, 8))
 
     def _validate_date(self, value: str) -> str | None:
         if not value.strip():
@@ -105,7 +122,7 @@ class ExportFilterDialog(ctk.CTkToplevel):
             return None
 
     def _export_all(self) -> None:
-        self.on_export(date_from=None, date_to=None, status=None)
+        self.on_export(date_from=None, date_to=None, status=None, visible_only=self.visible_only_var.get())
         self.destroy()
 
     def _export_filtered(self) -> None:
@@ -120,5 +137,5 @@ class ExportFilterDialog(ctk.CTkToplevel):
             self.feedback.error("Invalid 'to' date format. Use YYYY-MM-DD.")
             return
 
-        self.on_export(date_from=d_from, date_to=d_to, status=status)
+        self.on_export(date_from=d_from, date_to=d_to, status=status, visible_only=self.visible_only_var.get())
         self.destroy()

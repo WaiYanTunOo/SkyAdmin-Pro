@@ -100,6 +100,7 @@ class DashboardView(BaseView):
         self._visible = False
         self._trees_ready = False
         self._snap_fingerprint: tuple | None = None
+        self._timeline_mode: str | None = None
         self._detail_built = False
 
         self._header = ctk.CTkFrame(self.body, fg_color="transparent")
@@ -152,7 +153,7 @@ class DashboardView(BaseView):
         self.timeline_canvas = tk.Canvas(
             timeline_card,
             height=120,
-            bg=ctk.ThemeManager.theme["CTkFrame"]["fg_color"][1 if ctk.get_appearance_mode() == "Dark" else 0],
+            bg=CANVAS_BG[1 if ctk.get_appearance_mode() == "Dark" else 0],
             highlightthickness=0,
         )
         self.timeline_canvas.grid(row=1, column=0, sticky="ew", padx=16, pady=(0, 14))
@@ -665,6 +666,7 @@ class DashboardView(BaseView):
             canvas.create_rectangle(lx, 6, lx + 8, 14, fill=col, outline="")
             canvas.create_text(lx + 12, 10, text=txt, anchor="w", fill=text_color, font=("Segoe UI", 8))
             lx += 45
+        self._timeline_mode = mode
 
     def on_show(self) -> None:
         self._visible = True
@@ -703,6 +705,12 @@ class DashboardView(BaseView):
             self.month_panel.refresh()
 
         if not force and self._trees_ready and fingerprint == self._snap_fingerprint:
+            # Data unchanged — but a theme switch still needs a timeline redraw
+            # (tk.Canvas is outside the apply_form_theme walk).
+            if self._timeline_mode == ctk.get_appearance_mode():
+                return
+            self._draw_timeline(snap)
+            self._timeline_mode = ctk.get_appearance_mode()
             return
 
         self._snap_fingerprint = fingerprint

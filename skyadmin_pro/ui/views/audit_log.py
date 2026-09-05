@@ -59,13 +59,15 @@ class AuditLogDialog(ctk.CTkToplevel):
                 ("timestamp", "Timestamp", 160),
             ),
             showheight=15,
+            table_id="audit_log",
+            db=self.app.db,
         )
         self.tree.grid(row=1, column=0, sticky="nsew", padx=CONTENT_PAD, pady=(0, 8))
 
         # Footer
         ctk.CTkButton(
             self, text="Clear All Logs", width=120,
-            fg_color="#dc2626", hover_color="#b91c1c",
+            fg_color=("#dc2626", "#b91c1c"), hover_color="#b91c1c",
             command=self._clear_logs,
         ).grid(row=3, column=0, sticky="w", padx=CONTENT_PAD, pady=(0, CONTENT_PAD))
 
@@ -77,6 +79,8 @@ class AuditLogDialog(ctk.CTkToplevel):
         self._load_log()
 
     def _load_log(self) -> None:
+        # Toplevel dialogs sit outside the apply_form_theme walk — re-theme here.
+        self.tree.apply_theme()
         self.tree.clear()
         logs = self.app.db.list_audit_log(limit=500)
         filter_type = self._filter.get()

@@ -91,6 +91,8 @@ class SupplierServicesTab:
                 ("notes", "Notes", 200),
             ),
             showheight=10,
+            table_id="suppliers.services",
+            db=self.app.db,
         )
         self.supplier_svc_tree.grid(row=4, column=0, sticky="nsew", padx=12, pady=(0, 12))
 

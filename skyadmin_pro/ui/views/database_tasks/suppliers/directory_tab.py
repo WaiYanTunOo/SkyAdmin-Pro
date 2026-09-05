@@ -77,6 +77,8 @@ class SupplierDirectoryTab:
             ),
             on_select=self._on_supplier_select,
             showheight=8,
+            table_id="suppliers.directory",
+            db=self.app.db,
         )
         self.supplier_tree.grid(row=3, column=0, sticky="nsew", padx=12, pady=(0, 8))
         ctk.CTkButton(

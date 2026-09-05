@@ -63,6 +63,8 @@ class ServicePipelinePanel(ctk.CTkFrame):
                 ("updated", "Updated", 120),
             ),
             on_double_click=self._advance_item,
+            table_id="pipeline",
+            db=self.app.db,
         )
         self.pipe_tree.grid(row=2, column=0, sticky="nsew", padx=12, pady=(0, 12))
 

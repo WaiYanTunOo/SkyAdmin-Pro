@@ -100,6 +100,8 @@ class TaxIdsTabMixin:
             ),
             on_select=self._on_client_cred_select,
             showheight=4,
+            table_id="company.tax_ids",
+            db=self.app.db,
         )
         self.client_cred_tree.grid(row=2, column=0, sticky="ew", padx=16, pady=(0, 8))
 

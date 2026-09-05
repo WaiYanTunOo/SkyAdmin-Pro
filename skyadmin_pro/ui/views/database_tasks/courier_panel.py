@@ -47,6 +47,8 @@ class CourierPanel(ctk.CTkFrame):
                 ("destination", "Destination", 160),
                 ("task", "Related task", 160),
             ),
+            table_id="courier",
+            db=self.app.db,
         )
         self.tree.grid(row=1, column=0, sticky="nsew", padx=12, pady=(0, 12))
 

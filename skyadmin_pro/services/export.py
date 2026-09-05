@@ -58,7 +58,15 @@ def export_to_excel(
     date_to: str | None = None,
     status: str | None = None,
     client_ids: list[int] | None = None,
+    visible_only: dict[str, list[str]] | None = None,
 ) -> Path:
+    """Export all sheets to Excel.
+
+    visible_only maps sheet name → DB field names to keep (from the opt-in
+    "visible columns only" checkbox). Sheets absent from the map, or whose
+    filter would empty them, export complete — a sheet is never silently
+    emptied. FORBIDDEN_EXPORT_COLUMNS never export regardless.
+    """
     import pandas as pd
 
     tasks = db.list_tasks()
@@ -101,6 +109,14 @@ def export_to_excel(
             payments_frame["paid"] = payments_frame["paid"].apply(
                 lambda value: "Yes" if value in (1, True) else ("No" if value in (0, False) else value)
             )
+
+        def effective_mapping(sheet: str, mapping: dict[str, str]) -> dict[str, str]:
+            if not visible_only or sheet not in visible_only:
+                return mapping
+            keep = [field for field in mapping if field in set(visible_only[sheet])]
+            # Never silently empty a sheet — fall back to complete mapping.
+            return {k: mapping[k] for k in keep} if keep else mapping
+
         with pd.ExcelWriter(target, engine="openpyxl") as writer:
             for sheet_name, frame, mapping in (
                 ("Tasks", pd.DataFrame(tasks), _TASK_COLUMNS),
@@ -114,7 +130,9 @@ def export_to_excel(
                 ("Renewals", pd.DataFrame(renewals), _RENEWAL_COLUMNS),
                 ("Financial Docs", pd.DataFrame(financial_docs), _FINANCIAL_DOC_COLUMNS),
             ):
-                _sheet(frame, mapping).to_excel(writer, sheet_name=sheet_name[:31], index=False)
+                _sheet(frame, effective_mapping(sheet_name, mapping)).to_excel(
+                    writer, sheet_name=sheet_name[:31], index=False
+                )
 
     return _atomic_excel_write(build, Path(dest))
 

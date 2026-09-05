@@ -120,6 +120,12 @@ class GeneralTabMixin:
             text="Services — expiry, payment & progress",
             font=ctk.CTkFont(size=CARD_TITLE_SIZE, weight="bold"),
         ).grid(row=0, column=0, sticky="w", padx=16, pady=(14, 8))
+        self.svc_columns_btn = ctk.CTkButton(
+            frame, text="⋮ Columns", width=90,
+            fg_color="transparent", border_width=1,
+            command=self._show_service_columns_menu,
+        )
+        self.svc_columns_btn.grid(row=0, column=1, sticky="e", padx=(0, 16), pady=(14, 8))
 
         self.service_tree = ThemedTreeview(
             frame,
@@ -133,6 +139,8 @@ class GeneralTabMixin:
                 ("paid", "Paid", 55),
             ),
             on_double_click=self._edit_service,
+            table_id="company.services",
+            db=self.app.db,
         )
         self.service_tree.tree.configure(height=7)
         self.service_tree.grid(row=1, column=0, sticky="ew", padx=12, pady=(0, 8))
@@ -211,6 +219,14 @@ class GeneralTabMixin:
         ).grid(row=0, column=1, sticky="ew", padx=(4, 0))
         return frame
 
+    def _show_service_columns_menu(self) -> None:
+        try:
+            x = self.svc_columns_btn.winfo_rootx()
+            y = self.svc_columns_btn.winfo_rooty() + self.svc_columns_btn.winfo_height()
+        except Exception:
+            return
+        self.service_tree.show_column_menu(x, y)
+
     def _build_documents(self, master) -> ctk.CTkFrame:
         frame = ctk.CTkFrame(master, corner_radius=CARD_RADIUS)
         frame.grid_columnconfigure(0, weight=1)
@@ -229,6 +245,8 @@ class GeneralTabMixin:
                 ("added", "Added", 120),
             ),
             on_double_click=self._edit_document,
+            table_id="company.documents",
+            db=self.app.db,
         )
         self.doc_tree.tree.configure(height=7)
         self.doc_tree.grid(row=1, column=0, sticky="ew", padx=12, pady=(0, 8))

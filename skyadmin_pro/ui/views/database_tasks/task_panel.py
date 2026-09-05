@@ -39,6 +39,12 @@ class TaskPanel(ctk.CTkFrame):
         )
         self.filter.set("Pending")
         self.filter.pack(side="left")
+        self.columns_btn = ctk.CTkButton(
+            top, text="⋮ Columns", width=90,
+            fg_color="transparent", border_width=1,
+            command=self._show_columns_menu,
+        )
+        self.columns_btn.pack(side="right")
 
         tree_card = ctk.CTkFrame(self, corner_radius=CARD_RADIUS)
         tree_card.grid(row=1, column=0, sticky="nsew", padx=(0, 10))
@@ -61,6 +67,8 @@ class TaskPanel(ctk.CTkFrame):
                 ("completed", "Completed", 130),
             ),
             on_select=self._on_select,
+            table_id="tasks",
+            db=self.app.db,
         )
         self.tree.grid(row=1, column=0, sticky="nsew", padx=12, pady=(0, 12))
 
@@ -129,6 +137,14 @@ class TaskPanel(ctk.CTkFrame):
             border_width=1,
             command=self._delete,
         ).grid(row=2, column=1, sticky="ew", padx=(4, 0), pady=3)
+
+    def _show_columns_menu(self) -> None:
+        try:
+            x = self.columns_btn.winfo_rootx()
+            y = self.columns_btn.winfo_rooty() + self.columns_btn.winfo_height()
+        except Exception:
+            return
+        self.tree.show_column_menu(x, y)
 
     def refresh(self) -> None:
         self.tree.apply_theme()

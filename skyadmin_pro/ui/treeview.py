@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import sys
+import tkinter as tk
 from collections.abc import Callable, Iterable, Sequence
 from tkinter import ttk
 
@@ -126,11 +127,19 @@ class ThemedTreeview(ctk.CTkFrame):
         on_select: Callable[[str | None], None] | None = None,
         on_double_click: Callable[[str | None], None] | None = None,
         showheight: int = 10,
+        table_id: str | None = None,
+        db=None,
         **kwargs,
     ) -> None:
         super().__init__(master, fg_color="transparent", **kwargs)
         self._on_select = on_select
         self._column_ids = [column[0] for column in columns]
+        self._column_headings = {column[0]: column[1] for column in columns}
+        # Persistence identity: trees with table_id+db remember hidden columns
+        # across restarts; without them the column menu is session-only.
+        self._table_id = table_id
+        self._db = db
+        self._column_menu: tk.Menu | None = None
         self._showheight = showheight
         self._virtual_active = False
         self._virtual_offset = 0
@@ -179,8 +188,121 @@ class ThemedTreeview(ctk.CTkFrame):
         self.tree.bind("<<TreeviewSelect>>", self._handle_select)
         if on_double_click:
             self.tree.bind("<Double-1>", lambda _e: on_double_click(self.selected_iid()))
+        # Excel-like column menu (hide/show); header click stays sort.
+        self.tree.bind("<Button-3>", self._on_header_right_click)
 
         self.apply_theme()
+        self._apply_column_state()
+
+    # -- Column visibility -------------------------------------------------
+
+    def get_visible_columns(self) -> list[str]:
+        """Column ids currently shown, in original order."""
+        try:
+            shown = list(self.tree["displaycolumns"])
+        except Exception:
+            return list(self._column_ids)
+        if not shown or shown == ["#all"]:
+            return list(self._column_ids)
+        known = set(self._column_ids)
+        return [c for c in self._column_ids if c in shown and c in known]
+
+    def set_column_hidden(self, col_id: str, hidden: bool, *, persist: bool = True) -> None:
+        """Hide/show one column. Refuses to hide the last visible column."""
+        if col_id not in self._column_ids:
+            return
+        visible = self.get_visible_columns()
+        if hidden and col_id in visible:
+            if len(visible) <= 1:
+                return
+            visible = [c for c in visible if c != col_id]
+        elif not hidden and col_id not in visible:
+            visible = [c for c in self._column_ids if c == col_id or c in visible]
+        else:
+            return
+        try:
+            self.tree.configure(displaycolumns=visible)
+        except Exception:
+            return
+        if persist:
+            self._persist_column_state()
+
+    def show_column_menu(self, x: int, y: int) -> None:
+        """Popup checklist of columns; persisted per table when configured."""
+        try:
+            self._close_column_menu()
+            menu = tk.Menu(self, tearoff=0)
+            visible = set(self.get_visible_columns())
+            menu_vars: list = []
+            for col_id in self._column_ids:
+                var = tk.BooleanVar(self, value=col_id in visible)
+                menu_vars.append(var)
+                state = "normal" if (col_id in visible and len(visible) > 1) or col_id not in visible else "disabled"
+                menu.add_checkbutton(
+                    label=self._column_headings.get(col_id, col_id),
+                    onvalue=True,
+                    offvalue=False,
+                    variable=var,
+                    state=state,
+                    command=lambda c=col_id, v=var: self.set_column_hidden(c, not v.get()),
+                )
+            menu.add_separator()
+            menu.add_command(label="Reset columns", command=self._reset_columns)
+            menu._state_vars = menu_vars  # keep BooleanVars alive with the menu
+            self._column_menu = menu
+            menu.post(x, y)
+        except Exception:
+            pass
+
+    def _close_column_menu(self) -> None:
+        if self._column_menu is not None:
+            try:
+                self._column_menu.unpost()
+                self._column_menu.destroy()
+            except Exception:
+                pass
+            self._column_menu = None
+
+    def _reset_columns(self) -> None:
+        self._close_column_menu()
+        try:
+            self.tree.configure(displaycolumns=self._column_ids)
+        except Exception:
+            pass
+        self._persist_column_state()
+
+    def _on_header_right_click(self, event) -> None:
+        try:
+            if self.tree.identify_region(event.x, event.y) != "heading":
+                return
+        except Exception:
+            return
+        self.show_column_menu(event.x_root, event.y_root)
+
+    def _apply_column_state(self) -> None:
+        """Restore persisted hidden columns (best effort — never breaks construction)."""
+        if not self._table_id or self._db is None:
+            return
+        try:
+            from skyadmin_pro.services.column_state import load_hidden_columns
+
+            for col_id in load_hidden_columns(self._db, self._table_id):
+                self.set_column_hidden(col_id, True, persist=False)
+        except Exception:
+            pass
+
+    def _persist_column_state(self) -> None:
+        if not self._table_id or self._db is None:
+            return
+        try:
+            from skyadmin_pro.services.column_state import save_hidden_columns
+
+            visible = set(self.get_visible_columns())
+            save_hidden_columns(
+                self._db, self._table_id, [c for c in self._column_ids if c not in visible]
+            )
+        except Exception:
+            pass
 
     def apply_theme(self) -> None:
         mode = ctk.get_appearance_mode()

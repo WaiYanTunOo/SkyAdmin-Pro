@@ -27,7 +27,7 @@ SIDEBAR_ICONS = {
 # Surfaces — tab panes, scroll areas, cards (readable in light + dark)
 SURFACE_BG = ("#e8e8e8", "#2b2b2b")
 SCROLLABLE_BG = ("#f0f0f0", "#1e1e1e")
-CARD_BG = ("#ebebeb", "#2b2b2b")
+CARD_BG = ("#ffffff", "#2b2b2b")
 CONTENT_BG = ("#dbdbdb", "#242424")
 
 # Content — airier density
@@ -55,7 +55,7 @@ FONT_SIZE_HERO = 22
 # Semantic text colors — accessible in both Light/Dark
 TEXT_MUTED = ("gray40", "gray70")
 TEXT_SUBTLE = ("gray45", "gray65")
-TEXT_FAINT = ("gray50", "gray60")
+TEXT_FAINT = ("gray40", "gray60")
 TEXT_INVERSE = ("gray10", "gray90")
 
 # Feedback — refined accent & accessible contrast
@@ -71,7 +71,7 @@ STATUS_BAR_HEIGHT = 32
 
 # Chart / canvas (tk.Canvas is not theme-aware by default)
 CANVAS_BG = ("#f4f4f5", "#2b2b2b")
-CANVAS_TEXT = ("#6b7280", "#9ca3af")
+CANVAS_TEXT = ("#4b5563", "#9ca3af")
 CANVAS_VALUE_TEXT = ("#111827", "#f4f4f5")
 
 # Wrapping — prefer dynamic (bind <Configure>) over these, but they are
@@ -155,7 +155,7 @@ def table_palette(mode: str) -> dict[str, str]:
         "heading": "#e4e4e7",
         "heading_fg": "#18181b",
         "fieldbackground": "#ffffff",
-        "selected": "#3b8ed0",
+        "selected": "#2563eb",
         "odd": "#ffffff",
         "even": "#f4f4f5",
         "scrollbar": "#d4d4d8",
@@ -165,7 +165,7 @@ def table_palette(mode: str) -> dict[str, str]:
         "watch": "#fde68a",
         "green": "#dcfce7",
         "yellow": "#fef08a",
-        "orange": "#fed7aa",
+        "orange": "#fdba74",
         "red": "#fecaca",
         "done": "#dcfce7",
         "wip": "#fef3c7",

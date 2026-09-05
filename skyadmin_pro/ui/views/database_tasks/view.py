@@ -288,7 +288,7 @@ class DatabaseTasksView(BaseView):
     def _export_excel(self) -> None:
         from skyadmin_pro.ui.views.export_filter_dialog import ExportFilterDialog
 
-        def _do_export(*, date_from=None, date_to=None, status=None):
+        def _do_export(*, date_from=None, date_to=None, status=None, visible_only=False):
             target = filedialog.asksaveasfilename(
                 parent=self.winfo_toplevel(),
                 title="Export database to Excel",
@@ -303,6 +303,7 @@ class DatabaseTasksView(BaseView):
                 path = export_to_excel(
                     self.app.db, target,
                     date_from=date_from, date_to=date_to, status=status,
+                    visible_only=self._visible_sheet_columns() if visible_only else None,
                 )
             except Exception as exc:
                 self.feedback.error(f"Export failed: {exc}")
@@ -312,6 +313,67 @@ class DatabaseTasksView(BaseView):
             self.app.set_status(f"Exported database to {path}")
 
         ExportFilterDialog(self.winfo_toplevel(), on_export=_do_export)
+
+    def _visible_sheet_columns(self) -> dict[str, list[str]]:
+        """Map export sheet name → visible DB fields (opt-in visible-only export).
+
+        Only sheets whose panel tree is currently built contribute; the rest
+        export complete. UI column ids that don't map to DB fields (derived
+        values like document status) are ignored.
+        """
+        # (panel attr, tree attr, sheet name, {ui col id: db field})
+        specs = (
+            ("clients_panel", "client_tree", "Clients",
+             {"company": "name", "contact": "contact_name", "email": "email", "status": "status"}),
+            ("clients_panel", "doc_tree", "Documents",
+             {"client": "client_name", "type": "document_type", "expiry": "expiry_date"}),
+            ("tasks_panel", "tree", "Tasks",
+             {"client": "client_name", "title": "title", "category": "category",
+              "status": "status", "due": "due_date", "completed": "completed_at"}),
+            ("courier_panel", "tree", "Courier",
+             {"sent": "date_sent", "client": "client_name", "tracking": "tracking_number",
+              "driver": "driver_name", "destination": "destination", "task": "task_title"}),
+            ("pipeline_panel", "pipe_tree", "Pipeline",
+             {"client": "client_name", "service": "service", "step": "step", "status": "status"}),
+        )
+        result: dict[str, list[str]] = {}
+        for panel_attr, tree_attr, sheet, id_map in specs:
+            panel = getattr(self, panel_attr, None)
+            tree = getattr(panel, tree_attr, None) if panel is not None and tree_attr else None
+            if tree is None or not hasattr(tree, "get_visible_columns"):
+                continue
+            try:
+                visible = tree.get_visible_columns()
+            except Exception:
+                continue
+            fields = [id_map[c] for c in visible if c in id_map]
+            if fields:
+                result[sheet] = fields
+        # Suppliers panel hosts three tab tables — collect whichever tabs exist.
+        suppliers = getattr(self, "suppliers_panel", None)
+        if suppliers is not None:
+            for tab_attr, tree_attr, sheet, id_map in (
+                ("directory", "supplier_tree", "Suppliers",
+                 {"name": "name", "company": "company_name", "contact": "contact", "notes": "notes"}),
+                ("payments", "pay_tree", "Supplier Payments",
+                 {"supplier": "supplier_name", "client": "client_name", "amount": "amount",
+                  "due": "due_date", "paid": "paid", "paid_date": "paid_date", "notes": "notes"}),
+                ("services", "supplier_svc_tree", "Supplier Services",
+                 {"company": "company_name", "service": "service_type",
+                  "expiry": "expiry_date", "notes": "notes"}),
+            ):
+                tab = getattr(suppliers, tab_attr, None)
+                tree = getattr(tab, tree_attr, None) if tab is not None else None
+                if tree is None or not hasattr(tree, "get_visible_columns"):
+                    continue
+                try:
+                    visible = tree.get_visible_columns()
+                except Exception:
+                    continue
+                fields = [id_map[c] for c in visible if c in id_map]
+                if fields:
+                    result[sheet] = fields
+        return result
 
     def _on_shortcut_export(self) -> None:
         self._export_excel()

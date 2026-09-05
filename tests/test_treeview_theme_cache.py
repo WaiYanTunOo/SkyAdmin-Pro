@@ -79,3 +79,69 @@ def test_apply_theme_twice_keeps_style(tree_widget):
     assert tree_widget.tree.cget("style") == "Sky.Treeview"
     tree_widget.apply_theme()
     assert tree_widget.tree.cget("style") == "Sky.Treeview"
+
+
+def test_hide_show_round_trip(tree_widget):
+    from skyadmin_pro.ui.treeview import ThemedTreeview
+
+    root = tree_widget.master
+    tree = ThemedTreeview(
+        root,
+        columns=(("a", "A", 100), ("b", "B", 100), ("c", "C", 100)),
+        showheight=3,
+    )
+    try:
+        assert tree.get_visible_columns() == ["a", "b", "c"]
+        tree.set_column_hidden("b", True)
+        assert tree.get_visible_columns() == ["a", "c"]
+        tree.set_column_hidden("b", False)
+        assert tree.get_visible_columns() == ["a", "b", "c"]
+    finally:
+        tree.destroy()
+
+
+def test_cannot_hide_last_visible_column(tree_widget):
+    from skyadmin_pro.ui.treeview import ThemedTreeview
+
+    root = tree_widget.master
+    tree = ThemedTreeview(
+        root,
+        columns=(("a", "A", 100), ("b", "B", 100)),
+        showheight=3,
+    )
+    try:
+        tree.set_column_hidden("a", True)
+        tree.set_column_hidden("b", True)  # refused
+        assert tree.get_visible_columns() == ["b"]
+    finally:
+        tree.destroy()
+
+
+def test_hidden_state_persists_and_restores(db, tree_widget):
+    from skyadmin_pro.services.column_state import load_hidden_columns
+    from skyadmin_pro.ui.treeview import ThemedTreeview
+
+    root = tree_widget.master
+    tree = ThemedTreeview(
+        root,
+        columns=(("a", "A", 100), ("b", "B", 100)),
+        showheight=3,
+        table_id="test.persist",
+        db=db,
+    )
+    try:
+        tree.set_column_hidden("b", True)
+        assert load_hidden_columns(db, "test.persist") == {"b"}
+    finally:
+        tree.destroy()
+    tree2 = ThemedTreeview(
+        root,
+        columns=(("a", "A", 100), ("b", "B", 100)),
+        showheight=3,
+        table_id="test.persist",
+        db=db,
+    )
+    try:
+        assert tree2.get_visible_columns() == ["a"]
+    finally:
+        tree2.destroy()

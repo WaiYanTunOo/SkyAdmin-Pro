@@ -15,7 +15,7 @@ from skyadmin_pro.services.tracking import (
 )
 from skyadmin_pro.services.workflow import create_client_workspace
 from skyadmin_pro.ui.combo_utils import fill_combo
-from skyadmin_pro.ui.theme import CARD_RADIUS, CARD_TITLE_SIZE
+from skyadmin_pro.ui.theme import CARD_RADIUS, CARD_TITLE_SIZE, TEXT_MUTED
 from skyadmin_pro.ui.treeview import ThemedTreeview
 from skyadmin_pro.ui.widgets import DatePickerField, FeedbackLabel, make_modal, themed_entry
 
@@ -70,6 +70,8 @@ class ClientsExpiryPanel(ctk.CTkFrame):
                 ("status", "Status", 90),
             ),
             showheight=9,
+            table_id="clients",
+            db=self.app.db,
         )
         self.client_tree.grid(row=1, column=0, sticky="nsew", padx=12, pady=(0, 8))
         actions = ctk.CTkFrame(left, fg_color="transparent")
@@ -120,7 +122,7 @@ class ClientsExpiryPanel(ctk.CTkFrame):
         ctk.CTkLabel(
             batch_row, text="Batch:",
             font=ctk.CTkFont(size=11, weight="bold"),
-            text_color="#9ca3af",
+            text_color=TEXT_MUTED,
         ).pack(side="left", padx=(0, 6))
         ctk.CTkButton(
             batch_row, text="Delete selected", width=110,
@@ -179,6 +181,8 @@ class ClientsExpiryPanel(ctk.CTkFrame):
                 ("status", "Status", 140),
             ),
             showheight=9,
+            table_id="clients.expiry",
+            db=self.app.db,
         )
         self.doc_tree.grid(row=3, column=0, sticky="nsew", padx=12, pady=(0, 8))
         ctk.CTkButton(
