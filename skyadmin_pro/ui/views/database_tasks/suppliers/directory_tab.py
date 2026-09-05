@@ -89,24 +89,53 @@ class SupplierDirectoryTab:
             command=self._delete_supplier,
         ).grid(row=4, column=0, sticky="w", padx=16, pady=(0, 14))
 
-    def refresh(self) -> list[dict]:
-        """Reload the supplier tree. Returns the supplier rows for sibling tabs."""
+    def refresh(self) -> None:
+        """Reload the supplier tree (non-blocking; DB off the Tk thread)."""
+        from skyadmin_pro.ui.async_ui import run_background
+
         self.supplier_tree.apply_theme()
-        suppliers = self.app.db.list_suppliers()
-        self.supplier_tree.set_rows(
-            [
-                (
-                    s["name"],
-                    s.get("company_name") or "",
-                    s.get("contact") or "",
-                    (s.get("notes") or "")[:80],
-                )
-                for s in suppliers
-            ],
-            iids=[str(s["id"]) for s in suppliers],
-            empty_message="No suppliers yet — add one above.",
-        )
-        return suppliers
+        if not hasattr(self, "_refresh_seq"):
+            self._refresh_seq = 0
+        self._refresh_seq += 1
+        seq = self._refresh_seq
+        db = self.app.db
+        host = self.host
+
+        def work():
+            return db.list_suppliers()
+
+        def on_success(suppliers) -> None:
+            if seq != self._refresh_seq:
+                return
+            try:
+                exists = host.winfo_exists()
+            except Exception:
+                return
+            if not exists:
+                return
+            self.supplier_tree.set_rows(
+                [
+                    (
+                        s["name"],
+                        s.get("company_name") or "",
+                        s.get("contact") or "",
+                        (s.get("notes") or "")[:80],
+                    )
+                    for s in suppliers
+                ],
+                iids=[str(s["id"]) for s in suppliers],
+                empty_message="No suppliers yet — add one above.",
+            )
+
+        def on_error(msg: str) -> None:
+            if seq != self._refresh_seq:
+                return
+            try:
+                self.feedback.error(f"Suppliers failed to load: {msg}")
+            except Exception:
+                pass
+
+        run_background(host, work=work, on_success=on_success, on_error=on_error)
 
     def _on_supplier_select(self, iid: str | None) -> None:
         if iid is None:

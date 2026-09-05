@@ -26,6 +26,10 @@ class TaskPanel(ctk.CTkFrame):
         self.app = app
         self.feedback = feedback
         self._editing_id: int | None = None
+        self._refresh_seq = 0
+        self._page = 0
+        self._page_size = 250
+        self._has_more = False
         self.grid_columnconfigure(0, weight=1)
         self.grid_columnconfigure(1, weight=0, minsize=FORM_SIDEBAR_MIN_WIDTH)
         self.grid_rowconfigure(1, weight=1)
@@ -35,7 +39,7 @@ class TaskPanel(ctk.CTkFrame):
         self.filter = ctk.CTkSegmentedButton(
             top,
             values=["Pending", "Completed", "All"],
-            command=lambda _v: self.refresh(),
+            command=lambda _v: (setattr(self, "_page", 0), self.refresh()),
         )
         self.filter.set("Pending")
         self.filter.pack(side="left")
@@ -70,7 +74,28 @@ class TaskPanel(ctk.CTkFrame):
             table_id="tasks",
             db=self.app.db,
         )
-        self.tree.grid(row=1, column=0, sticky="nsew", padx=12, pady=(0, 12))
+        self.tree.grid(row=1, column=0, sticky="nsew", padx=12, pady=(0, 4))
+
+        pager = ctk.CTkFrame(tree_card, fg_color="transparent")
+        pager.grid(row=2, column=0, sticky="ew", padx=12, pady=(0, 10))
+        self.prev_btn = ctk.CTkButton(
+            pager, text="◀ Prev", width=80, fg_color="transparent", border_width=1,
+            command=self._prev_page,
+        )
+        self.prev_btn.pack(side="left")
+        self.page_label = ctk.CTkLabel(pager, text="Page 1", text_color=TEXT_MUTED)
+        self.page_label.pack(side="left", padx=10)
+        self.next_btn = ctk.CTkButton(
+            pager, text="Next ▶", width=80, fg_color="transparent", border_width=1,
+            command=self._next_page,
+        )
+        self.next_btn.pack(side="left")
+        self.page_size_menu = ctk.CTkOptionMenu(
+            pager, values=["100", "250", "500", "1000"],
+            width=90, command=self._on_page_size,
+        )
+        self.page_size_menu.set("250")
+        self.page_size_menu.pack(side="right")
 
         form = themed_scrollable_frame(self, corner_radius=12, width=FORM_SIDEBAR_MIN_WIDTH)
         form.grid(row=1, column=1, sticky="nsew")
@@ -147,34 +172,96 @@ class TaskPanel(ctk.CTkFrame):
         self.tree.show_column_menu(x, y)
 
     def refresh(self) -> None:
-        self.tree.apply_theme()
-        names = self.app.db.list_client_names()
-        current = self.client_box.get()
-        fill_combo(self.client_box, names, current)
+        """Non-blocking refresh: DB work off the Tk thread, Treeview on it."""
+        from skyadmin_pro.ui.async_ui import run_background
 
-        choice = self.filter.get()
+        self.tree.apply_theme()
+        try:
+            choice = self.filter.get()
+        except Exception:
+            choice = "Pending"
+        try:
+            current_combo = self.client_box.get()
+        except Exception:
+            current_combo = ""
         status = None
         if choice == "Pending":
             status = TASK_STATUS_PENDING
         elif choice == "Completed":
             status = TASK_STATUS_COMPLETED
-        tasks = self.app.db.list_tasks(status=status)
 
-        rows, iids, tags = [], [], []
-        for task in tasks:
-            rows.append(
-                (
-                    task.get("client_name") or "—",
-                    task.get("title") or "",
-                    task.get("category") or "",
-                    (task.get("status") or "").title(),
-                    task.get("due_date") or "—",
-                    (task.get("completed_at") or "—")[:16],
+        self._refresh_seq += 1
+        seq = self._refresh_seq
+        db = self.app.db
+        page, page_size = self._page, self._page_size
+        self.feedback.info("Loading tasks…")
+
+        def work():
+            names = db.list_client_names()
+            # Fetch one extra row to know whether a next page exists.
+            tasks = db.list_tasks(status=status, limit=page_size + 1, offset=page * page_size)
+            return {"names": names, "tasks": tasks, "choice": choice, "current": current_combo}
+
+        def on_success(payload) -> None:
+            if seq != self._refresh_seq or not self.winfo_exists():
+                return
+            fill_combo(self.client_box, payload["names"], payload["current"])
+            fetched = payload["tasks"]
+            self._has_more = len(fetched) > self._page_size
+            shown = fetched[: self._page_size]
+            rows, iids, tags = [], [], []
+            for task in shown:
+                rows.append(
+                    (
+                        task.get("client_name") or "—",
+                        task.get("title") or "",
+                        task.get("category") or "",
+                        (task.get("status") or "").title(),
+                        task.get("due_date") or "—",
+                        (task.get("completed_at") or "—")[:16],
+                    )
                 )
-            )
-            iids.append(str(task["id"]))
-            tags.append(("completed",) if task.get("status") == TASK_STATUS_COMPLETED else ())
-        self.tree.set_rows(rows, iids=iids, tags=tags, empty_message="No tasks in this view.")
+                iids.append(str(task["id"]))
+                tags.append(("completed",) if task.get("status") == TASK_STATUS_COMPLETED else ())
+            self.tree.set_rows(rows, iids=iids, tags=tags, empty_message="No tasks in this view.")
+            self._update_pager(len(shown))
+            self.feedback.clear()
+
+        def on_error(msg: str) -> None:
+            if seq != self._refresh_seq or not self.winfo_exists():
+                return
+            self.feedback.error(f"Tasks failed to load: {msg}")
+
+        run_background(self, work=work, on_success=on_success, on_error=on_error)
+
+    def _update_pager(self, shown: int) -> None:
+        label = f"Page {self._page + 1} · {shown} shown"
+        if self._has_more:
+            label += " · more…"
+        try:
+            self.page_label.configure(text=label)
+            self.prev_btn.configure(state="normal" if self._page > 0 else "disabled")
+            self.next_btn.configure(state="normal" if self._has_more else "disabled")
+        except Exception:
+            pass
+
+    def _prev_page(self) -> None:
+        if self._page > 0:
+            self._page -= 1
+            self.refresh()
+
+    def _next_page(self) -> None:
+        if self._has_more:
+            self._page += 1
+            self.refresh()
+
+    def _on_page_size(self, value: str) -> None:
+        try:
+            self._page_size = max(50, int(value))
+        except ValueError:
+            self._page_size = 250
+        self._page = 0
+        self.refresh()
 
     def _on_select(self, iid: str | None) -> None:
         if iid is None:

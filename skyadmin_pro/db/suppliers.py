@@ -11,8 +11,11 @@ from skyadmin_pro.services.tracking import days_until
 
 
 class SuppliersMixin:
-    def list_suppliers(self) -> list[dict]:
-        return self._fetch_all("SELECT * FROM suppliers ORDER BY name COLLATE NOCASE ASC")
+    def list_suppliers(self, *, limit: int | None = None, offset: int = 0) -> list[dict]:
+        base = "SELECT * FROM suppliers ORDER BY name COLLATE NOCASE ASC"
+        if limit is not None and int(limit) > 0:
+            return self._fetch_page(base, (), limit=limit, offset=offset)
+        return self._fetch_all(base)
 
     def get_supplier(self, supplier_id: int) -> dict | None:
         return self._fetch_one("SELECT * FROM suppliers WHERE id = ?", (supplier_id,))

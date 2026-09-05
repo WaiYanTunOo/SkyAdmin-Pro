@@ -100,16 +100,33 @@ def test_dashboard_skips_deferred_trees_when_fingerprint_unchanged(monkeypatch, 
     monkeypatch.setattr(view.month_panel, "refresh", counting_month)
 
     view.on_show()
+    # on_show() is now async (snapshot off thread): pump Tk + wait for worker.
+    # NOTE: no time.sleep in the main thread — background run_on_main needs
+    # the main thread inside Tcl (update/mainloop) to schedule its callback.
+    import time as _time
+
+    deadline = _time.time() + 10.0
+    while _time.time() < deadline:
+        app.update()
+        if month_calls:
+            break
     app.update()
 
     assert month_calls == [1]
     assert report_calls == []
-    assert scheduled == []
+    # Pumps (after 0/50ms queue drains) are expected with async refresh;
+    # only tree rebuilds (100/80/120ms) must be skipped when unchanged.
+    assert [ms for ms, _ in scheduled if ms in (100, 80, 120)] == []
 
 
 def test_dashboard_mark_stale_forces_tree_rebuild(monkeypatch, app):
     app.show_view("dashboard")
     view = app._views["dashboard"]
+    # Invalidate any in-flight async on_show snapshot so it can't schedule
+    # trees after we install tracking (would duplicate [100,80,120]).
+    view._snap_seq = int(getattr(view, "_snap_seq", 0)) + 1
+    view._cancel_deferred_refresh()
+    app.update()
     snap = app.db.dashboard_snapshot()
     view._snap_fingerprint = snap_fingerprint(snap)
     view._trees_ready = True
@@ -126,7 +143,8 @@ def test_dashboard_mark_stale_forces_tree_rebuild(monkeypatch, app):
     view.refresh()
     app.update()
 
-    assert scheduled == [100, 80, 120]
+    # Filter queue-pump afters (0/50ms); only tree rebuilds matter here.
+    assert [ms for ms in scheduled if ms in (100, 80, 120)] == [100, 80, 120]
 
 
 def test_dashboard_settings_round_trip_skips_priority_trees(monkeypatch, app):
@@ -183,6 +201,9 @@ def test_dashboard_deferred_trees_skip_when_hidden_before_callback(app):
 def test_dashboard_force_refresh_schedules_trees(monkeypatch, app):
     app.show_view("dashboard")
     view = app._views["dashboard"]
+    view._snap_seq = int(getattr(view, "_snap_seq", 0)) + 1
+    view._cancel_deferred_refresh()
+    app.update()
     snap = app.db.dashboard_snapshot()
     view._snap_fingerprint = snap_fingerprint(snap)
     view._trees_ready = True
@@ -199,5 +220,5 @@ def test_dashboard_force_refresh_schedules_trees(monkeypatch, app):
     view.refresh(force=True)
     app.update()
 
-    assert scheduled == [100, 80, 120]
+    assert [ms for ms in scheduled if ms in (100, 80, 120)] == [100, 80, 120]
     assert view._trees_ready is True

@@ -24,6 +24,7 @@ class RenewalPanel(ctk.CTkFrame):
         super().__init__(master, fg_color="transparent")
         self.app = app
         self.feedback = feedback
+        self._refresh_seq = 0
         self._checkboxes: dict[int, ctk.CTkCheckBox] = {}
         self._services: list[dict] = []
         self._service_by_value: dict[str, dict] = {}
@@ -142,62 +143,139 @@ class RenewalPanel(ctk.CTkFrame):
         return services
 
     def refresh(self) -> None:
-        self._fill_combo(self.company_box.get())
-        client_id = self._selected_client_id()
-        if client_id is None:
-            self._fill_service_box()
-            self.countdown.configure(
-                text="Select a company and a service to plan the renewal.",
-                text_color=TEXT_MUTED,
-            )
-            self.checklist_title.configure(text="Renewal document checklist")
-            self._clear_checklist()
-            return
-        client = self.company_box.get().strip()
-        services = self._fill_service_box()
-        if not services:
-            self.countdown.configure(
-                text="No renewal service with an expiry date set for this client.",
-                text_color=TEXT_MUTED,
-            )
-            self.checklist_title.configure(text="Renewal document checklist")
-            self._clear_checklist()
-            return
+        """Non-blocking renewal load: names/services/checklist off thread."""
+        from skyadmin_pro.ui.async_ui import run_background
 
-        service = self._service_by_value.get(self.service_box.get())
-        if service is None:
-            return
-        left = days_until(effective_expiry_date(service.get("expiry_date"), service.get("document_type")))
-        if left is None:
-            self.countdown.configure(
-                text="No renewal expiry date set for this service.",
-                text_color=TEXT_MUTED,
+        try:
+            cur_company = self.company_box.get()
+        except Exception:
+            cur_company = ""
+        try:
+            cur_service = self.service_box.get()
+        except Exception:
+            cur_service = ""
+        company_key = (cur_company or "").strip()
+
+        self._refresh_seq += 1
+        seq = self._refresh_seq
+        db = self.app.db
+
+        def work():
+            names = db.list_client_names()
+            client_id = db.client_id_by_name(company_key) if company_key else None
+            if client_id is None:
+                return {
+                    "names": names, "client_id": None, "client": company_key,
+                    "services": [], "labels": [], "items": [], "template": self._template,
+                    "cur_company": cur_company, "cur_service": cur_service,
+                }
+            services = [
+                item for item in db.list_client_services(client_id) if item.get("expiry_date")
+            ]
+            services.sort(
+                key=lambda s: effective_expiry_date(s.get("expiry_date"), s.get("document_type")) or ""
             )
-            return
+            labels: list[str] = []
+            seen: set[str] = set()
+            by_value: dict[str, dict] = {}
+            for item in services:
+                base = item.get("document_type") or "Service"
+                label = base if base not in seen else f"{base} — {item.get('expiry_date')}"
+                seen.add(base)
+                labels.append(label)
+                by_value[label] = item
+            # Resolve selected service (prefer current combo, else nearest).
+            wanted = (cur_service or "").strip()
+            service = by_value.get(wanted) or (by_value[labels[0]] if labels else None)
+            items: list[dict] = []
+            template = self._template
+            if service is not None:
+                document_type = service.get("document_type") or ""
+                template = renewal_template_for(document_type) or GENERAL_RENEWAL_TEMPLATE_NAME
+                db.ensure_renewal_checklist(client_id, template)
+                items = db.list_renewal_checklist(client_id, template)
+            return {
+                "names": names, "client_id": client_id, "client": company_key,
+                "services": services, "labels": labels, "by_value": by_value,
+                "service": service, "items": items, "template": template,
+                "cur_company": cur_company, "cur_service": cur_service,
+            }
 
-        document_type = service.get("document_type") or ""
-        template = renewal_template_for(document_type) or GENERAL_RENEWAL_TEMPLATE_NAME
-        self._template = template
-        tag = classify_expiry(left)
-        if left < 0:
-            detail = f"expired {abs(left)} day(s) ago"
-        elif left == 0:
-            detail = "expires today"
-        else:
-            detail = f"{left} day(s) left"
-        tag_color = {
-            "red": ("#b91c1c", "#f87171"),
-            "orange": ("#b45309", "#fbbf24"),
-            "yellow": ("#a16207", "#fde047"),
-            "green": ("#15803d", "#4ade80"),
-        }.get(tag, ("gray10", "gray90"))
-        self.countdown.configure(text=f"{document_type} — {detail}", text_color=tag_color)
-        self.app.set_status(f"Renewal for {client}: {document_type} — {detail} ({template}).")
+        def on_success(payload) -> None:
+            if seq != self._refresh_seq or not self.winfo_exists():
+                return
+            fill_combo(self.company_box, payload["names"], payload["cur_company"])
+            self._service_by_value = payload.get("by_value", {})
+            labels = payload.get("labels", [])
+            self.service_box.configure(values=labels)
+            if labels:
+                want = payload.get("cur_service") or ""
+                self.service_box.set(want if want in labels else labels[0])
+            else:
+                try:
+                    self.service_box.set("")
+                except Exception:
+                    pass
+            if payload["client_id"] is None:
+                self.countdown.configure(
+                    text="Select a company and a service to plan the renewal.",
+                    text_color=TEXT_MUTED,
+                )
+                self.checklist_title.configure(text="Renewal document checklist")
+                self._clear_checklist()
+                return
+            if not payload.get("services"):
+                self.countdown.configure(
+                    text="No renewal service with an expiry date set for this client.",
+                    text_color=TEXT_MUTED,
+                )
+                self.checklist_title.configure(text="Renewal document checklist")
+                self._clear_checklist()
+                return
+            service = payload.get("service")
+            if service is None:
+                return
+            left = days_until(
+                effective_expiry_date(service.get("expiry_date"), service.get("document_type"))
+            )
+            if left is None:
+                self.countdown.configure(
+                    text="No renewal expiry date set for this service.",
+                    text_color=TEXT_MUTED,
+                )
+                return
+            document_type = service.get("document_type") or ""
+            template = payload.get("template") or GENERAL_RENEWAL_TEMPLATE_NAME
+            self._template = template
+            tag = classify_expiry(left)
+            if left < 0:
+                detail = f"expired {abs(left)} day(s) ago"
+            elif left == 0:
+                detail = "expires today"
+            else:
+                detail = f"{left} day(s) left"
+            tag_color = {
+                "red": ("#b91c1c", "#f87171"),
+                "orange": ("#b45309", "#fbbf24"),
+                "yellow": ("#a16207", "#fde047"),
+                "green": ("#15803d", "#4ade80"),
+            }.get(tag, ("gray10", "gray90"))
+            self.countdown.configure(text=f"{document_type} — {detail}", text_color=tag_color)
+            try:
+                self.app.set_status(
+                    f"Renewal for {payload.get('client')}: {document_type} — {detail} ({template})."
+                )
+            except Exception:
+                pass
+            self.checklist_title.configure(text=f"{template} checklist — {payload.get('client')}")
+            self._rebuild_checklist(payload.get("items", []))
 
-        self.app.db.ensure_renewal_checklist(client_id, template)
-        items = self.app.db.list_renewal_checklist(client_id, template)
-        self.checklist_title.configure(text=f"{template} checklist — {client}")
-        self._rebuild_checklist(items)
+        def on_error(msg: str) -> None:
+            if seq != self._refresh_seq or not self.winfo_exists():
+                return
+            self.feedback.error(f"Renewals failed to load: {msg}")
+
+        run_background(self, work=work, on_success=on_success, on_error=on_error)
 
     def _clear_checklist(self) -> None:
         for child in self.scroll.winfo_children():

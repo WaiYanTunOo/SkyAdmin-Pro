@@ -102,6 +102,7 @@ class DashboardView(BaseView):
         self._snap_fingerprint: tuple | None = None
         self._timeline_mode: str | None = None
         self._detail_built = False
+        self._snap_seq = 0
 
         self._header = ctk.CTkFrame(self.body, fg_color="transparent")
         self._header.grid(row=0, column=0, sticky="ew")
@@ -671,10 +672,11 @@ class DashboardView(BaseView):
     def on_show(self) -> None:
         self._visible = True
         self._build_detail_trees()
-        self.refresh()
+        self.refresh_async()
 
     def on_hide(self) -> None:
         self._visible = False
+        self._snap_seq = int(getattr(self, "_snap_seq", 0)) + 1
         had_pending = bool(self._tree_refresh_after or self._detail_trees_after or self._timeline_after)
         self._cancel_deferred_refresh()
         if had_pending:
@@ -696,9 +698,55 @@ class DashboardView(BaseView):
                 setattr(self, attr, None)
 
     def refresh(self, *, force: bool = False) -> None:
+        """Synchronous refresh (kept for tests / programmatic callers)."""
         self._cancel_deferred_refresh()
-
         snap = self.app.db.dashboard_snapshot()
+        self._apply_snapshot(snap, force=force)
+
+    def refresh_async(self, *, force: bool = False) -> None:
+        """Non-blocking entry for on_show/tab switches: snapshot off thread."""
+        from skyadmin_pro.ui.async_ui import run_background
+
+        self._cancel_deferred_refresh()
+        self._snap_seq = int(getattr(self, "_snap_seq", 0)) + 1
+        seq = self._snap_seq
+        db = self.app.db
+        try:
+            self.app.set_status("Loading dashboard…")
+        except Exception:
+            pass
+
+        def work():
+            return db.dashboard_snapshot()
+
+        def on_success(snap) -> None:
+            if seq != getattr(self, "_snap_seq", 0) or not self.winfo_exists():
+                return
+            if not getattr(self, "_visible", True):
+                # Hidden while loading: still cache cards, skip tree storms.
+                try:
+                    self._apply_stat_cards(snap)
+                except Exception:
+                    pass
+                self._snap_fingerprint = snap_fingerprint(snap)
+                return
+            self._apply_snapshot(snap, force=force)
+            try:
+                self.app.set_status("Ready")
+            except Exception:
+                pass
+
+        def on_error(msg: str) -> None:
+            if seq != getattr(self, "_snap_seq", 0) or not self.winfo_exists():
+                return
+            try:
+                self.app.set_status(f"Dashboard failed to load: {msg}")
+            except Exception:
+                pass
+
+        run_background(self, work=work, on_success=on_success, on_error=on_error)
+
+    def _apply_snapshot(self, snap: dict, *, force: bool = False) -> None:
         fingerprint = snap_fingerprint(snap)
         self._apply_stat_cards(snap)
         if self._detail_built:

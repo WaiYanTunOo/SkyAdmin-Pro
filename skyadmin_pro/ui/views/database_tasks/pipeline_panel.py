@@ -20,6 +20,10 @@ class ServicePipelinePanel(ctk.CTkFrame):
         super().__init__(master, fg_color="transparent")
         self.app = app
         self.feedback = feedback
+        self._refresh_seq = 0
+        self._page = 0
+        self._page_size = 250
+        self._has_more = False
         self.grid_columnconfigure(0, weight=1)
         self.grid_rowconfigure(1, weight=1)
 
@@ -66,7 +70,27 @@ class ServicePipelinePanel(ctk.CTkFrame):
             table_id="pipeline",
             db=self.app.db,
         )
-        self.pipe_tree.grid(row=2, column=0, sticky="nsew", padx=12, pady=(0, 12))
+        self.pipe_tree.grid(row=2, column=0, sticky="nsew", padx=12, pady=(0, 4))
+
+        pager = ctk.CTkFrame(pipeline_card, fg_color="transparent")
+        pager.grid(row=3, column=0, sticky="ew", padx=12, pady=(0, 10))
+        self.prev_btn = ctk.CTkButton(
+            pager, text="◀ Prev", width=80, fg_color="transparent", border_width=1,
+            command=self._prev_page,
+        )
+        self.prev_btn.pack(side="left")
+        self.page_label = ctk.CTkLabel(pager, text="Page 1", text_color=TEXT_MUTED)
+        self.page_label.pack(side="left", padx=10)
+        self.next_btn = ctk.CTkButton(
+            pager, text="Next ▶", width=80, fg_color="transparent", border_width=1,
+            command=self._next_page,
+        )
+        self.next_btn.pack(side="left")
+        self.page_size_menu = ctk.CTkOptionMenu(
+            pager, values=["100", "250", "500", "1000"], width=90, command=self._on_page_size,
+        )
+        self.page_size_menu.set("250")
+        self.page_size_menu.pack(side="right")
 
         controls = ctk.CTkFrame(self, fg_color="transparent")
         controls.grid(row=2, column=0, sticky="ew")
@@ -101,31 +125,98 @@ class ServicePipelinePanel(ctk.CTkFrame):
         bind_wrap_label(hint, controls, pad=16)
 
     def refresh(self) -> None:
+        from skyadmin_pro.ui.async_ui import run_background
+
         self.pipe_tree.apply_theme()
-        fill_combo(self.pipe_client, self.app.db.list_client_names(), self.pipe_client.get())
-        self.pipe_service.configure(values=self.app.db.list_service_types())
-        items = self.app.db.list_pipeline_items()
-        rows: list[tuple] = []
-        iids: list[str] = []
-        tags: list[list[str]] = []
-        for item in items:
-            step = max(1, min(int(item["step"]), PIPELINE_MAX_STEP))
-            status = PIPELINE_STEPS[step - 1]
-            tag = "done" if step == PIPELINE_MAX_STEP else ("wip" if step in (4, 5, 6, 7, 8) else "")
-            rows.append(
-                (
-                    item.get("client_name") or "Unassigned",
-                    item["service"],
-                    f"{step}/{PIPELINE_MAX_STEP}",
-                    status,
-                    item.get("updated_at") or "",
+        try:
+            current_client = self.pipe_client.get()
+        except Exception:
+            current_client = ""
+
+        self._refresh_seq += 1
+        seq = self._refresh_seq
+        db = self.app.db
+        page, page_size = self._page, self._page_size
+        self.feedback.info("Loading pipeline…")
+
+        def work():
+            return {
+                "names": db.list_client_names(),
+                "service_types": db.list_service_types(),
+                "items": db.list_pipeline_items(limit=page_size + 1, offset=page * page_size),
+                "summary": db.pipeline_summary(),
+                "current_client": current_client,
+            }
+
+        def on_success(payload) -> None:
+            if seq != self._refresh_seq or not self.winfo_exists():
+                return
+            fill_combo(self.pipe_client, payload["names"], payload["current_client"])
+            self.pipe_service.configure(values=payload["service_types"])
+            fetched = payload["items"]
+            self._has_more = len(fetched) > self._page_size
+            shown = fetched[: self._page_size]
+            rows: list[tuple] = []
+            iids: list[str] = []
+            tags: list[list[str]] = []
+            for item in shown:
+                step = max(1, min(int(item["step"]), PIPELINE_MAX_STEP))
+                status = PIPELINE_STEPS[step - 1]
+                tag = "done" if step == PIPELINE_MAX_STEP else ("wip" if step in (4, 5, 6, 7, 8) else "")
+                rows.append(
+                    (
+                        item.get("client_name") or "Unassigned",
+                        item["service"],
+                        f"{step}/{PIPELINE_MAX_STEP}",
+                        status,
+                        item.get("updated_at") or "",
+                    )
                 )
+                iids.append(str(item["id"]))
+                tags.append([tag] if tag else [])
+            self.pipe_tree.set_rows(rows, iids=iids, tags=tags, empty_message="No pipeline items yet.")
+            summary = payload["summary"]
+            self.summary.configure(
+                text=f"{summary['total']} engagement(s) tracked — {summary['completed']} completed."
             )
-            iids.append(str(item["id"]))
-            tags.append([tag] if tag else [])
-        self.pipe_tree.set_rows(rows, iids=iids, tags=tags, empty_message="No pipeline items yet.")
-        summary = self.app.db.pipeline_summary()
-        self.summary.configure(text=f"{summary['total']} engagement(s) tracked — {summary['completed']} completed.")
+            self._update_pager(len(shown))
+            self.feedback.clear()
+
+        def on_error(msg: str) -> None:
+            if seq != self._refresh_seq or not self.winfo_exists():
+                return
+            self.feedback.error(f"Pipeline failed to load: {msg}")
+
+        run_background(self, work=work, on_success=on_success, on_error=on_error)
+
+    def _update_pager(self, shown: int) -> None:
+        label = f"Page {self._page + 1} · {shown} shown"
+        if self._has_more:
+            label += " · more…"
+        try:
+            self.page_label.configure(text=label)
+            self.prev_btn.configure(state="normal" if self._page > 0 else "disabled")
+            self.next_btn.configure(state="normal" if self._has_more else "disabled")
+        except Exception:
+            pass
+
+    def _prev_page(self) -> None:
+        if self._page > 0:
+            self._page -= 1
+            self.refresh()
+
+    def _next_page(self) -> None:
+        if self._has_more:
+            self._page += 1
+            self.refresh()
+
+    def _on_page_size(self, value: str) -> None:
+        try:
+            self._page_size = max(50, int(value))
+        except ValueError:
+            self._page_size = 250
+        self._page = 0
+        self.refresh()
 
     def _refresh_tasks_panel(self) -> None:
         view = self.app.get_view("database_tasks")

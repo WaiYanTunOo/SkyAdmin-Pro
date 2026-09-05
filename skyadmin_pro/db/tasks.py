@@ -17,7 +17,9 @@ from skyadmin_pro.services.tracking import days_until, effective_expiry_date
 
 
 class TasksMixin:
-    def list_tasks(self, status: str | None = None) -> list[dict]:
+    def list_tasks(
+        self, status: str | None = None, *, limit: int | None = None, offset: int = 0
+    ) -> list[dict]:
         sql = """
             SELECT t.id, t.client_id, t.title, t.description, t.status, t.category,
                    t.due_date, t.completed_at, t.created_at, t.updated_at,
@@ -36,7 +38,18 @@ class TasksMixin:
                      t.due_date,
                      t.id DESC
         """
+        if limit is not None and int(limit) > 0:
+            return self._fetch_page(sql, params, limit=limit, offset=offset)
         return self._fetch_all(sql, params)
+
+    def count_tasks(self, status: str | None = None) -> int:
+        sql = "SELECT COUNT(*) AS n FROM tasks"
+        params: tuple = ()
+        if status:
+            sql += " WHERE status = ?"
+            params = (status,)
+        row = self._fetch_one(sql, params)
+        return int(row["n"]) if row else 0
 
     def get_task(self, task_id: int) -> dict | None:
         return self._fetch_one(
@@ -206,14 +219,16 @@ class TasksMixin:
             """
         )
 
-    def list_documents(self, *, expiring_only: bool = False) -> list[dict]:
+    def list_documents(
+        self, *, expiring_only: bool = False, limit: int | None = None, offset: int = 0
+    ) -> list[dict]:
         where = ""
         if expiring_only:
             # Lets idx_documents_expiry drive the filter instead of loading
             # the whole table and discarding rows in Python. Orphaned records
             # (client deleted) are excluded — they have nobody to alert.
             where = "WHERE d.expiry_date IS NOT NULL AND trim(d.expiry_date) != '' AND d.client_id IS NOT NULL"
-        return self._fetch_all(
+        base = (
             f"""
             SELECT d.id, d.client_id, d.document_type, d.expiry_date, d.amount,
                    d.payment_date, d.start_date, d.file_name, d.file_path, d.created_at,
@@ -224,6 +239,9 @@ class TasksMixin:
             ORDER BY d.expiry_date IS NULL, d.expiry_date, d.id DESC
             """
         )
+        if limit is not None and int(limit) > 0:
+            return self._fetch_page(base, (), limit=limit, offset=offset)
+        return self._fetch_all(base)
 
     def list_expiring_documents(self) -> list[dict]:
         rows = self._fetch_all(

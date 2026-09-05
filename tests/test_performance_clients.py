@@ -196,3 +196,32 @@ def test_large_client_headroom(large_tax_db, query_stats):
     start = time.perf_counter()
     assert len(large_tax_db.list_clients()) == 5000
     assert time.perf_counter() - start < 1.0
+
+
+def test_paged_lists_page1_under_budget_at_5k(large_tax_db):
+    """P0/P3 gate: first page of every big list renders from <500ms of SQL."""
+    db = large_tax_db
+    budgets = {
+        "clients": lambda: db.search_clients("", limit=251, offset=0),
+        "tasks": lambda: db.list_tasks(limit=251, offset=0),
+        "courier": lambda: db.list_courier_logs(limit=251, offset=0),
+        "pipeline": lambda: db.list_pipeline_items(limit=251, offset=0),
+        "documents": lambda: db.list_documents(limit=251, offset=0),
+        "suppliers": lambda: db.list_suppliers(limit=251, offset=0),
+    }
+    for name, fn in budgets.items():
+        start = time.perf_counter()
+        rows = fn()
+        elapsed = time.perf_counter() - start
+        assert len(rows) <= 251, name
+        assert elapsed < 0.5, f"{name} page-1 took {elapsed:.2f}s"
+
+
+def test_client_names_cache_invalidates(populated_db):
+    db = populated_db
+    before = db.list_client_names()
+    assert len(before) == 500
+    db.get_or_create_client("Cache Probe Co")
+    after = db.list_client_names()
+    assert "Cache Probe Co" in after
+    assert len(after) == 501

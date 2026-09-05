@@ -25,6 +25,11 @@ class ClientsExpiryPanel(ctk.CTkFrame):
         super().__init__(master, fg_color="transparent")
         self.app = app
         self.feedback = feedback
+        self._refresh_seq = 0
+        self._table_seq = 0
+        self._page = 0
+        self._page_size = 250
+        self._has_more = False
         from skyadmin_pro.services.undo_manager import UndoManager
 
         self._undo = UndoManager()
@@ -73,9 +78,29 @@ class ClientsExpiryPanel(ctk.CTkFrame):
             table_id="clients",
             db=self.app.db,
         )
-        self.client_tree.grid(row=1, column=0, sticky="nsew", padx=12, pady=(0, 8))
+        self.client_tree.grid(row=1, column=0, sticky="nsew", padx=12, pady=(0, 4))
+        client_pager = ctk.CTkFrame(left, fg_color="transparent")
+        client_pager.grid(row=2, column=0, sticky="ew", padx=12, pady=(0, 4))
+        self.client_prev = ctk.CTkButton(
+            client_pager, text="◀ Prev", width=80, fg_color="transparent", border_width=1,
+            command=self._client_prev_page,
+        )
+        self.client_prev.pack(side="left")
+        self.client_page_label = ctk.CTkLabel(client_pager, text="Page 1", text_color=TEXT_MUTED)
+        self.client_page_label.pack(side="left", padx=10)
+        self.client_next = ctk.CTkButton(
+            client_pager, text="Next ▶", width=80, fg_color="transparent", border_width=1,
+            command=self._client_next_page,
+        )
+        self.client_next.pack(side="left")
+        self.client_page_size = ctk.CTkOptionMenu(
+            client_pager, values=["100", "250", "500", "1000"], width=90,
+            command=self._on_client_page_size,
+        )
+        self.client_page_size.set("250")
+        self.client_page_size.pack(side="right")
         actions = ctk.CTkFrame(left, fg_color="transparent")
-        actions.grid(row=2, column=0, sticky="ew", padx=12, pady=(0, 8))
+        actions.grid(row=3, column=0, sticky="ew", padx=12, pady=(0, 8))
         ctk.CTkButton(actions, text="Add / Edit client", width=125, command=self._open_client_dialog).pack(side="left")
         ctk.CTkButton(
             actions,
@@ -202,41 +227,73 @@ class ClientsExpiryPanel(ctk.CTkFrame):
         ).grid(row=4, column=0, sticky="w", padx=16, pady=(0, 14))
 
     def refresh(self) -> None:
+        from skyadmin_pro.ui.async_ui import run_background
+
         self.client_tree.apply_theme()
         self.doc_tree.apply_theme()
-        # Refresh group filter options
-        groups = self.app.db.list_client_groups()
-        group_names = ["All"] + [g["name"] for g in groups]
-        self._group_map = {g["name"]: g["id"] for g in groups}
-        current = self._group_filter_var.get()
-        self.group_filter_menu.configure(values=group_names)
-        if current in group_names:
-            self._group_filter_var.set(current)
-        else:
-            self._group_filter_var.set("All")
-        self._refresh_client_table()
-        clients = self.app.db.list_clients()
-        names = [item["name"] for item in clients]
-        fill_combo(self.expiry_client, names, self.expiry_client.get())
+        try:
+            current_group = self._group_filter_var.get()
+        except Exception:
+            current_group = "All"
+        try:
+            current_expiry = self.expiry_client.get()
+        except Exception:
+            current_expiry = ""
 
-        documents = self.app.db.list_documents(expiring_only=True)
-        rows, iids, tags = [], [], []
-        for item in documents:
-            eff = effective_expiry_date(item.get("expiry_date"), item.get("document_type"))
-            left = days_until(eff)
-            status = expiry_label(left) if left is not None else "—"
-            tag = classify_expiry(left) if left is not None else "odd"
-            rows.append(
-                (
-                    item.get("client_name") or "—",
-                    item.get("document_type") or "—",
-                    eff or "—",
-                    status,
+        self._refresh_seq += 1
+        seq = self._refresh_seq
+        db = self.app.db
+        self.feedback.info("Loading clients…")
+        # Client table has its own seq; kick it (it shows its own status).
+        self._refresh_client_table()
+
+        def work():
+            return {
+                "groups": db.list_client_groups(),
+                "clients": db.list_clients(),
+                "documents": db.list_documents(expiring_only=True),
+                "current_group": current_group,
+                "current_expiry": current_expiry,
+            }
+
+        def on_success(payload) -> None:
+            if seq != self._refresh_seq or not self.winfo_exists():
+                return
+            groups = payload["groups"]
+            group_names = ["All"] + [g["name"] for g in groups]
+            self._group_map = {g["name"]: g["id"] for g in groups}
+            self.group_filter_menu.configure(values=group_names)
+            cur = payload["current_group"]
+            self._group_filter_var.set(cur if cur in group_names else "All")
+            names = [item["name"] for item in payload["clients"]]
+            fill_combo(self.expiry_client, names, payload["current_expiry"])
+            rows, iids, tags = [], [], []
+            for item in payload["documents"]:
+                eff = effective_expiry_date(item.get("expiry_date"), item.get("document_type"))
+                left = days_until(eff)
+                status = expiry_label(left) if left is not None else "—"
+                tag = classify_expiry(left) if left is not None else "odd"
+                rows.append(
+                    (
+                        item.get("client_name") or "—",
+                        item.get("document_type") or "—",
+                        eff or "—",
+                        status,
+                    )
                 )
+                iids.append(str(item["id"]))
+                tags.append((tag,) if left is not None else ())
+            self.doc_tree.set_rows(
+                rows, iids=iids, tags=tags, empty_message="No expiring documents match this filter."
             )
-            iids.append(str(item["id"]))
-            tags.append((tag,) if left is not None else ())
-        self.doc_tree.set_rows(rows, iids=iids, tags=tags, empty_message="No expiring documents match this filter.")
+            self.feedback.clear()
+
+        def on_error(msg: str) -> None:
+            if seq != self._refresh_seq or not self.winfo_exists():
+                return
+            self.feedback.error(f"Clients failed to load: {msg}")
+
+        run_background(self, work=work, on_success=on_success, on_error=on_error)
 
     def _debounced_search(self) -> None:
         # Wait for a pause in typing before hitting the database.
@@ -249,29 +306,98 @@ class ClientsExpiryPanel(ctk.CTkFrame):
 
     def _run_search(self) -> None:
         self._search_after = None
+        self._page = 0
         self._refresh_client_table()
 
+    def _refresh_clients(self) -> None:
+        """Group-filter menu legacy entry point (was missing → AttributeError)."""
+        self._page = 0
+        self._refresh_client_table()
+
+    def _client_prev_page(self) -> None:
+        if self._page > 0:
+            self._page -= 1
+            self._refresh_client_table()
+
+    def _client_next_page(self) -> None:
+        if self._has_more:
+            self._page += 1
+            self._refresh_client_table()
+
+    def _on_client_page_size(self, value: str) -> None:
+        try:
+            self._page_size = max(50, int(value))
+        except ValueError:
+            self._page_size = 250
+        self._page = 0
+        self._refresh_client_table()
+
+    def _update_client_pager(self, shown: int) -> None:
+        label = f"Page {self._page + 1} · {shown} shown"
+        if self._has_more:
+            label += " · more…"
+        try:
+            self.client_page_label.configure(text=label)
+            self.client_prev.configure(state="normal" if self._page > 0 else "disabled")
+            self.client_next.configure(state="normal" if self._has_more else "disabled")
+        except Exception:
+            pass
+
     def _refresh_client_table(self) -> None:
-        clients = self.app.db.search_clients(self.search_var.get())
-        # Apply group filter
-        group_filter = self._group_filter_var.get()
-        if group_filter != "All":
-            group_id = getattr(self, "_group_map", {}).get(group_filter)
-            if group_id is not None:
-                clients = [c for c in clients if c.get("group_id") == group_id]
-        rows, iids, tags = [], [], []
-        for item in clients:
-            rows.append(
-                (
-                    item.get("name") or "—",
-                    item.get("contact_name") or "—",
-                    item.get("email") or "—",
-                    "Active" if item.get("status") != "inactive" else "Inactive",
+        from skyadmin_pro.ui.async_ui import run_background
+
+        try:
+            query = self.search_var.get()
+        except Exception:
+            query = ""
+        try:
+            group_filter = self._group_filter_var.get()
+        except Exception:
+            group_filter = "All"
+        group_map = dict(getattr(self, "_group_map", {}))
+        page, page_size = self._page, self._page_size
+
+        self._table_seq += 1
+        seq = self._table_seq
+        db = self.app.db
+
+        def work():
+            if group_filter != "All":
+                gid = group_map.get(group_filter)
+                # Group subsets are small: filter in Python, then page.
+                clients = db.search_clients(query)
+                if gid is not None:
+                    clients = [c for c in clients if c.get("group_id") == gid]
+                window = clients[page * page_size : page * page_size + page_size + 1]
+                return window
+            return db.search_clients(query, limit=page_size + 1, offset=page * page_size)
+
+        def on_success(clients) -> None:
+            if seq != self._table_seq or not self.winfo_exists():
+                return
+            self._has_more = len(clients) > self._page_size
+            shown = clients[: self._page_size]
+            rows, iids, tags = [], [], []
+            for item in shown:
+                rows.append(
+                    (
+                        item.get("name") or "—",
+                        item.get("contact_name") or "—",
+                        item.get("email") or "—",
+                        "Active" if item.get("status") != "inactive" else "Inactive",
+                    )
                 )
-            )
-            iids.append(str(item["id"]))
-            tags.append(("inactive",) if item.get("status") == "inactive" else ())
-        self.client_tree.set_rows(rows, iids=iids, tags=tags, empty_message="No clients match this search.")
+                iids.append(str(item["id"]))
+                tags.append(("inactive",) if item.get("status") == "inactive" else ())
+            self.client_tree.set_rows(rows, iids=iids, tags=tags, empty_message="No clients match this search.")
+            self._update_client_pager(len(shown))
+
+        def on_error(msg: str) -> None:
+            if seq != self._table_seq or not self.winfo_exists():
+                return
+            self.feedback.error(f"Client search failed: {msg}")
+
+        run_background(self, work=work, on_success=on_success, on_error=on_error)
 
     def _export_excel(self) -> None:
         view = self.app.get_view("database_tasks")

@@ -35,11 +35,20 @@ class CoreMixin:
         self._service_types_cache: list[str] | None = None
         self._organization_list_cache: list[str] | None = None
         self._department_list_cache: list[str] | None = None
+        self._client_names_cache: list[str] | None = None
         self._wal_enabled: bool | None = None
         self._pooled_conn: sqlite3.Connection | None = None
         self._bundle_conn: sqlite3.Connection | None = None
         self._bundle_owner: int | None = None
         self._bundle_depth: int = 0
+        # Thread-safety: one SQLite handle per thread. SQLite connections
+        # must not cross threads (check_same_thread). Main thread keeps the
+        # historic pooled handle; background threads get their own pooled
+        # handle via thread-local storage so run_background() workers are safe.
+        self._local = threading.local()
+        self._lock = threading.RLock()
+        self._main_ident = threading.get_ident()
+        self._bg_conns: list[sqlite3.Connection] = []
         self._initialize()
 
     def _connect(self) -> sqlite3.Connection:
@@ -64,37 +73,82 @@ class CoreMixin:
             self._wal_enabled = False
         return conn
 
-    def _get_pooled_conn(self) -> sqlite3.Connection:
-        """Return the reused connection, creating it on first call.
+    def _validate_conn(self, conn: sqlite3.Connection) -> bool:
+        try:
+            conn.execute("SELECT 1")
+            return True
+        except (sqlite3.ProgrammingError, sqlite3.OperationalError):
+            return False
 
-        Validates the connection is still alive with a lightweight query.
-        """
-        conn = self._pooled_conn
+    def _track_bg_conn(self, conn: sqlite3.Connection) -> None:
+        with self._lock:
+            if conn not in self._bg_conns:
+                self._bg_conns.append(conn)
+
+    def _get_bg_conn(self) -> sqlite3.Connection:
+        """Per-background-thread pooled handle (never shares main's handle)."""
+        conn = getattr(self._local, "conn", None)
+        if conn is not None and self._validate_conn(conn):
+            return conn
         if conn is not None:
             try:
-                conn.execute("SELECT 1")
-                return conn
-            except (sqlite3.ProgrammingError, sqlite3.OperationalError):
-                # Connection was closed or broken; create a fresh one.
+                conn.close()
+            except Exception:
+                pass
+            with self._lock:
                 try:
-                    conn.close()
-                except Exception:
+                    self._bg_conns.remove(conn)
+                except ValueError:
                     pass
-                self._pooled_conn = None
+            self._local.conn = None
         conn = self._connect()
-        self._pooled_conn = conn
+        self._local.conn = conn
+        self._track_bg_conn(conn)
         return conn
+
+    def _get_pooled_conn(self) -> sqlite3.Connection:
+        """Return the reused connection for the calling thread.
+
+        Main thread uses the historic ``_pooled_conn``; any other thread
+        uses its own thread-local handle. Validates liveness first.
+        """
+        if threading.get_ident() == getattr(self, "_main_ident", threading.get_ident()):
+            with self._lock:
+                conn = self._pooled_conn
+                if conn is not None and self._validate_conn(conn):
+                    return conn
+                if conn is not None:
+                    try:
+                        conn.close()
+                    except Exception:
+                        pass
+                    self._pooled_conn = None
+                conn = self._connect()
+                self._pooled_conn = conn
+                return conn
+        return self._get_bg_conn()
 
     def _bundle_active(self) -> bool:
         """True when the calling thread holds a pinned bundle connection."""
+        if getattr(self._local, "bundle_conn", None) is not None:
+            return True
         return self._bundle_conn is not None and self._bundle_owner == threading.get_ident()
+
+    def _bundle_conn_for_thread(self) -> sqlite3.Connection | None:
+        conn = getattr(self._local, "bundle_conn", None)
+        if conn is not None:
+            return conn
+        if self._bundle_active():
+            return self._bundle_conn
+        return None
 
     @contextmanager
     def connection(self) -> Generator[sqlite3.Connection, None, None]:
         # Inside a bundle_queries() block on this thread, reuse the pinned
         # handle with no per-checkout validation or intermediate commits.
-        if self._bundle_active():
-            yield self._bundle_conn  # type: ignore[misc]
+        pinned = self._bundle_conn_for_thread()
+        if pinned is not None:
+            yield pinned
             return
         conn = self._get_pooled_conn()
         try:
@@ -108,27 +162,33 @@ class CoreMixin:
     def bundle_queries(self) -> Generator[sqlite3.Connection, None, None]:
         """Pin one pooled connection for a batch of queries (e.g. dashboard snapshot).
 
-        Nested connection() checkouts on the same thread reuse the pin: one
-        validation, one commit on clean exit (rollback on error). Nest-safe.
-        A thread that did not open the bundle gets a normal checkout instead,
-        preserving the pool's cross-thread fallback (fresh connection).
+        Nest-safe per thread: nested connection() checkouts on the same
+        thread reuse the pin with one commit on clean exit (rollback on
+        error). Each thread pins its *own* handle; a thread that did not
+        open the bundle never touches another thread's pin.
         """
-        if self._bundle_active():
-            self._bundle_depth += 1
+        existing = getattr(self._local, "bundle_conn", None)
+        if existing is not None:
+            self._local.bundle_depth = int(getattr(self._local, "bundle_depth", 1)) + 1
             try:
-                yield self._bundle_conn  # type: ignore[misc]
+                yield existing
             finally:
-                self._bundle_depth -= 1
+                self._local.bundle_depth -= 1
             return
-        if self._bundle_conn is not None:
-            # Another thread holds a bundle — do not touch its pin.
+        # Legacy pin held by a *different* thread — do not touch it.
+        if self._bundle_conn is not None and self._bundle_owner != threading.get_ident():
             with self.connection() as conn:
                 yield conn
             return
         conn = self._get_pooled_conn()
-        self._bundle_conn = conn
-        self._bundle_owner = threading.get_ident()
-        self._bundle_depth = 1
+        self._local.bundle_conn = conn
+        self._local.bundle_depth = 1
+        is_main = threading.get_ident() == getattr(self, "_main_ident", threading.get_ident())
+        if is_main:
+            with self._lock:
+                self._bundle_conn = conn
+                self._bundle_owner = threading.get_ident()
+                self._bundle_depth = 1
         try:
             yield conn
             conn.commit()
@@ -136,9 +196,16 @@ class CoreMixin:
             conn.rollback()
             raise
         finally:
-            self._bundle_conn = None
-            self._bundle_owner = None
-            self._bundle_depth = 0
+            try:
+                delattr(self._local, "bundle_conn")
+            except AttributeError:
+                pass
+            self._local.bundle_depth = 0
+            if is_main:
+                with self._lock:
+                    self._bundle_conn = None
+                    self._bundle_owner = None
+                    self._bundle_depth = 0
 
     def _fetch_all(self, sql: str, params: tuple = ()) -> list[dict]:
         with self.connection() as conn:
@@ -149,6 +216,32 @@ class CoreMixin:
         with self.connection() as conn:
             row = conn.execute(sql, params).fetchone()
         return dict(row) if row is not None else None
+
+    @staticmethod
+    def _apply_pagination(sql: str, limit: int | None, offset: int | None) -> tuple[str, tuple]:
+        """Append LIMIT/OFFSET safely. limit<=0 means no limit."""
+        extra: list[str] = []
+        extra_params: list = []
+        if limit is not None and int(limit) > 0:
+            extra.append("LIMIT ?")
+            extra_params.append(int(limit))
+            if offset is not None and int(offset) > 0:
+                extra.append("OFFSET ?")
+                extra_params.append(int(offset))
+        elif offset is not None and int(offset) > 0:
+            # SQLite requires LIMIT with OFFSET; -1 = no limit.
+            extra.append("LIMIT -1 OFFSET ?")
+            extra_params.append(int(offset))
+        if not extra:
+            return sql, ()
+        return f"{sql} {' '.join(extra)}", tuple(extra_params)
+
+    def _fetch_page(
+        self, base_sql: str, params: tuple = (), *, limit: int | None = 250, offset: int = 0
+    ) -> list[dict]:
+        """Fetch one page with LIMIT/OFFSET. limit=None/<=0 disables paging."""
+        paged_sql, page_params = self._apply_pagination(base_sql, limit, offset)
+        return self._fetch_all(paged_sql, tuple(params) + tuple(page_params))
 
     def _initialize(self) -> None:
         from skyadmin_pro.db.migrations import run_pending_migrations
@@ -266,6 +359,8 @@ class CoreMixin:
             # Reinitialize with the restored database
             self._wal_enabled = None
             self._close_pooled_conn()
+            self._client_names_cache = None
+            self._service_types_cache = None
             self._initialize()
             self._log.info("Database restored from %s", backup_path)
             return True
@@ -289,14 +384,25 @@ class CoreMixin:
             self._close_pooled_conn()
 
     def _close_pooled_conn(self) -> None:
-        """Close the pooled connection if open."""
-        conn = self._pooled_conn
-        if conn is not None:
+        """Close the pooled connection(s) if open (main + background)."""
+        with self._lock:
+            conn = self._pooled_conn
+            self._pooled_conn = None
+            bg = list(self._bg_conns)
+            self._bg_conns.clear()
+            self._bundle_conn = None
+            self._bundle_owner = None
+            self._bundle_depth = 0
+        for c in ([conn] if conn is not None else []) + bg:
             try:
-                conn.close()
+                c.close()
             except Exception:
                 pass
-            self._pooled_conn = None
+        for attr in ("conn", "bundle_conn", "bundle_depth"):
+            try:
+                delattr(self._local, attr)
+            except AttributeError:
+                pass
 
     @staticmethod
     def _drop_clients_fts_triggers(conn: sqlite3.Connection) -> None:

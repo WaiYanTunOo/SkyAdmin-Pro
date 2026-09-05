@@ -120,31 +120,74 @@ class SupplierPaymentsTab:
         self.pay_tree.show_column_menu(x, y)
 
     def refresh(self, suppliers: list[dict] | None = None) -> None:
-        self.pay_tree.apply_theme()
-        if suppliers is None:
-            suppliers = self.app.db.list_suppliers()
-        fill_combo(self.pay_supplier, [s["name"] for s in suppliers], self.pay_supplier.get())
-        fill_combo(self.pay_client, self.app.db.list_client_names(), self.pay_client.get())
+        from skyadmin_pro.ui.async_ui import run_background
 
-        payments = self.app.db.list_supplier_payments()
-        rows: list[tuple] = []
-        iids: list[str] = []
-        tags: list[list[str]] = []
-        for payment in payments:
-            rows.append(
-                (
-                    payment.get("supplier_name") or "?",
-                    payment.get("client_name") or "—",
-                    format_thousands(payment.get("amount")) if payment.get("amount") else "—",
-                    payment.get("due_date") or "—",
-                    "Yes" if payment.get("paid") else "No",
-                    payment.get("paid_date") or "—",
-                    payment.get("notes") or "—",
+        self.pay_tree.apply_theme()
+        try:
+            cur_supplier = self.pay_supplier.get()
+        except Exception:
+            cur_supplier = ""
+        try:
+            cur_client = self.pay_client.get()
+        except Exception:
+            cur_client = ""
+        preset = suppliers
+        if not hasattr(self, "_refresh_seq"):
+            self._refresh_seq = 0
+        self._refresh_seq += 1
+        seq = self._refresh_seq
+        db = self.app.db
+        host = self.host
+
+        def work():
+            sups = preset if preset is not None else db.list_suppliers()
+            return {
+                "suppliers": sups,
+                "names": db.list_client_names(),
+                "payments": db.list_supplier_payments(),
+                "cur_supplier": cur_supplier,
+                "cur_client": cur_client,
+            }
+
+        def on_success(payload) -> None:
+            if seq != self._refresh_seq:
+                return
+            try:
+                exists = host.winfo_exists()
+            except Exception:
+                return
+            if not exists:
+                return
+            fill_combo(self.pay_supplier, [s["name"] for s in payload["suppliers"]], payload["cur_supplier"])
+            fill_combo(self.pay_client, payload["names"], payload["cur_client"])
+            rows: list[tuple] = []
+            iids: list[str] = []
+            tags: list[list[str]] = []
+            for payment in payload["payments"]:
+                rows.append(
+                    (
+                        payment.get("supplier_name") or "?",
+                        payment.get("client_name") or "—",
+                        format_thousands(payment.get("amount")) if payment.get("amount") else "—",
+                        payment.get("due_date") or "—",
+                        "Yes" if payment.get("paid") else "No",
+                        payment.get("paid_date") or "—",
+                        payment.get("notes") or "—",
+                    )
                 )
-            )
-            iids.append(str(payment["id"]))
-            tags.append(["completed"] if payment.get("paid") else [])
-        self.pay_tree.set_rows(rows, iids=iids, tags=tags, empty_message="No supplier payments recorded.")
+                iids.append(str(payment["id"]))
+                tags.append(["completed"] if payment.get("paid") else [])
+            self.pay_tree.set_rows(rows, iids=iids, tags=tags, empty_message="No supplier payments recorded.")
+
+        def on_error(msg: str) -> None:
+            if seq != self._refresh_seq:
+                return
+            try:
+                self.feedback.error(f"Payments failed to load: {msg}")
+            except Exception:
+                pass
+
+        run_background(host, work=work, on_success=on_success, on_error=on_error)
 
     def _format_pay_amount(self) -> None:
         value = format_thousands(self.pay_amount.get())

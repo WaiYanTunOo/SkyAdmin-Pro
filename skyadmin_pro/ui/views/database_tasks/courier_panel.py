@@ -23,6 +23,10 @@ class CourierPanel(ctk.CTkFrame):
         super().__init__(master, fg_color="transparent")
         self.app = app
         self.feedback = feedback
+        self._refresh_seq = 0
+        self._page = 0
+        self._page_size = 250
+        self._has_more = False
         self.grid_columnconfigure(0, weight=1)
         self.grid_columnconfigure(1, weight=0, minsize=FORM_SIDEBAR_MIN_WIDTH)
         self.grid_rowconfigure(0, weight=1)
@@ -50,7 +54,27 @@ class CourierPanel(ctk.CTkFrame):
             table_id="courier",
             db=self.app.db,
         )
-        self.tree.grid(row=1, column=0, sticky="nsew", padx=12, pady=(0, 12))
+        self.tree.grid(row=1, column=0, sticky="nsew", padx=12, pady=(0, 4))
+
+        pager = ctk.CTkFrame(tree_card, fg_color="transparent")
+        pager.grid(row=2, column=0, sticky="ew", padx=12, pady=(0, 10))
+        self.prev_btn = ctk.CTkButton(
+            pager, text="◀ Prev", width=80, fg_color="transparent", border_width=1,
+            command=self._prev_page,
+        )
+        self.prev_btn.pack(side="left")
+        self.page_label = ctk.CTkLabel(pager, text="Page 1", text_color="gray")
+        self.page_label.pack(side="left", padx=10)
+        self.next_btn = ctk.CTkButton(
+            pager, text="Next ▶", width=80, fg_color="transparent", border_width=1,
+            command=self._next_page,
+        )
+        self.next_btn.pack(side="left")
+        self.page_size_menu = ctk.CTkOptionMenu(
+            pager, values=["100", "250", "500", "1000"], width=90, command=self._on_page_size,
+        )
+        self.page_size_menu.set("250")
+        self.page_size_menu.pack(side="right")
 
         form = themed_scrollable_frame(self, corner_radius=12, width=FORM_SIDEBAR_MIN_WIDTH)
         form.grid(row=0, column=1, sticky="nsew")
@@ -126,30 +150,99 @@ class CourierPanel(ctk.CTkFrame):
         self._task_lookup: dict[str, int] = {}
 
     def refresh(self) -> None:
-        self.tree.apply_theme()
-        fill_combo(self.client_box, self.app.db.list_client_names(), self.client_box.get())
-        pending = self.app.db.list_tasks(status=TASK_STATUS_PENDING)
-        self._task_lookup = {f"#{item['id']}  {item['title']}": int(item["id"]) for item in pending}
-        values = [NONE_TASK, *self._task_lookup.keys()]
-        current = self.task_menu.get()
-        self.task_menu.configure(values=values)
-        self.task_menu.set(current if current in values else NONE_TASK)
+        from skyadmin_pro.ui.async_ui import run_background
 
-        logs = self.app.db.list_courier_logs()
-        self.tree.set_rows(
-            [
-                (
-                    item.get("date_sent") or "—",
-                    item.get("client_name") or "—",
-                    item.get("tracking_number") or "",
-                    item.get("driver_name") or "—",
-                    item.get("destination") or "—",
-                    item.get("task_title") or "—",
-                )
-                for item in logs
-            ],
-            iids=[str(item["id"]) for item in logs],
-        )
+        self.tree.apply_theme()
+        try:
+            current_client = self.client_box.get()
+        except Exception:
+            current_client = ""
+        try:
+            current_task = self.task_menu.get()
+        except Exception:
+            current_task = NONE_TASK
+
+        self._refresh_seq += 1
+        seq = self._refresh_seq
+        db = self.app.db
+        page, page_size = self._page, self._page_size
+        self.feedback.info("Loading courier deliveries…")
+
+        def work():
+            return {
+                "names": db.list_client_names(),
+                "pending": db.list_tasks(status=TASK_STATUS_PENDING),
+                "logs": db.list_courier_logs(limit=page_size + 1, offset=page * page_size),
+                "current_client": current_client,
+                "current_task": current_task,
+            }
+
+        def on_success(payload) -> None:
+            if seq != self._refresh_seq or not self.winfo_exists():
+                return
+            fill_combo(self.client_box, payload["names"], payload["current_client"])
+            self._task_lookup = {
+                f"#{item['id']}  {item['title']}": int(item["id"]) for item in payload["pending"]
+            }
+            values = [NONE_TASK, *self._task_lookup.keys()]
+            cur = payload["current_task"]
+            self.task_menu.configure(values=values)
+            self.task_menu.set(cur if cur in values else NONE_TASK)
+            fetched = payload["logs"]
+            self._has_more = len(fetched) > self._page_size
+            logs = fetched[: self._page_size]
+            self.tree.set_rows(
+                [
+                    (
+                        item.get("date_sent") or "—",
+                        item.get("client_name") or "—",
+                        item.get("tracking_number") or "",
+                        item.get("driver_name") or "—",
+                        item.get("destination") or "—",
+                        item.get("task_title") or "—",
+                    )
+                    for item in logs
+                ],
+                iids=[str(item["id"]) for item in logs],
+            )
+            self._update_pager(len(logs))
+            self.feedback.clear()
+
+        def on_error(msg: str) -> None:
+            if seq != self._refresh_seq or not self.winfo_exists():
+                return
+            self.feedback.error(f"Courier log failed to load: {msg}")
+
+        run_background(self, work=work, on_success=on_success, on_error=on_error)
+
+    def _update_pager(self, shown: int) -> None:
+        label = f"Page {self._page + 1} · {shown} shown"
+        if self._has_more:
+            label += " · more…"
+        try:
+            self.page_label.configure(text=label)
+            self.prev_btn.configure(state="normal" if self._page > 0 else "disabled")
+            self.next_btn.configure(state="normal" if self._has_more else "disabled")
+        except Exception:
+            pass
+
+    def _prev_page(self) -> None:
+        if self._page > 0:
+            self._page -= 1
+            self.refresh()
+
+    def _next_page(self) -> None:
+        if self._has_more:
+            self._page += 1
+            self.refresh()
+
+    def _on_page_size(self, value: str) -> None:
+        try:
+            self._page_size = max(50, int(value))
+        except ValueError:
+            self._page_size = 250
+        self._page = 0
+        self.refresh()
 
     def _log(self) -> None:
         tracking = self.tracking_var.get().strip()

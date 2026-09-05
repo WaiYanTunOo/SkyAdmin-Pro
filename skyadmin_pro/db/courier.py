@@ -38,9 +38,8 @@ class CourierMixin:
             )
             return int(cursor.lastrowid)
 
-    def list_courier_logs(self) -> list[dict]:
-        return self._fetch_all(
-            """
+    def list_courier_logs(self, *, limit: int | None = None, offset: int = 0) -> list[dict]:
+        base = """
             SELECT cl.id, cl.client_id, cl.task_id, cl.tracking_number, cl.driver_name,
                    cl.date_sent, cl.destination, cl.notes, cl.created_at,
                    c.name AS client_name, t.title AS task_title
@@ -49,7 +48,9 @@ class CourierMixin:
             LEFT JOIN tasks t ON t.id = cl.task_id
             ORDER BY cl.date_sent DESC, cl.id DESC
             """
-        )
+        if limit is not None and int(limit) > 0:
+            return self._fetch_page(base, (), limit=limit, offset=offset)
+        return self._fetch_all(base)
 
     def delete_courier_log(self, log_id: int) -> None:
         with self.connection() as conn:

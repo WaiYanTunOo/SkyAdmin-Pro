@@ -28,16 +28,17 @@ class PipelineMixin:
         self.sync_pipeline_tasks(item_id)
         return item_id
 
-    def list_pipeline_items(self) -> list[dict]:
-        return self._fetch_all(
-            """
+    def list_pipeline_items(self, *, limit: int | None = None, offset: int = 0) -> list[dict]:
+        base = """
             SELECT p.id, p.client_id, p.service, p.step, p.step_date, p.notes,
                    p.created_at, p.updated_at, c.name AS client_name
             FROM pipeline_items p
             LEFT JOIN clients c ON c.id = p.client_id
             ORDER BY p.step ASC, p.updated_at DESC
             """
-        )
+        if limit is not None and int(limit) > 0:
+            return self._fetch_page(base, (), limit=limit, offset=offset)
+        return self._fetch_all(base)
 
     def get_pipeline_item(self, item_id: int) -> dict | None:
         return self._fetch_one("SELECT * FROM pipeline_items WHERE id = ?", (item_id,))

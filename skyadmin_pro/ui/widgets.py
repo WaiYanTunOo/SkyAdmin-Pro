@@ -422,6 +422,7 @@ class MonthStatusPanel(ctk.CTkFrame):
     ) -> None:
         super().__init__(master, corner_radius=12, **kwargs)
         self.app = app
+        self._refresh_seq = 0
         today = date.today()
         self._year = today.year
         self._month = today.month
@@ -478,28 +479,52 @@ class MonthStatusPanel(ctk.CTkFrame):
         self.refresh()
 
     def refresh(self) -> None:
-        month_key = self._month_key()
-        self.month_label.configure(text=f"{calendar.month_name[self._month]} {self._year}")
-        clients = self.app.db.list_monthly_tax_clients()
-        client_ids = [int(client["id"]) for client in clients]
-        summary = self.app.db.month_close_summary(month_key, client_ids=client_ids)
-        self.summary.configure(
-            text=(f"{summary['closed']}/{summary['clients']} closed · {summary['in_progress']} in progress")
-        )
+        """Non-blocking month grid: snapshot off thread, Treeview on thread."""
+        from skyadmin_pro.ui.async_ui import run_background
 
+        month_key = self._month_key()
+        try:
+            self.month_label.configure(text=f"{calendar.month_name[self._month]} {self._year}")
+        except Exception:
+            pass
         self.tree.apply_theme()
-        statuses = self.app.db.list_client_month_status(month_key)
-        rows, iids, tags = [], [], []
-        for client in clients:
-            client_id = int(client["id"])
-            record = statuses.get(client_id)
-            status = record["status"] if record else MONTH_STATUS_OPEN
-            updated = (record.get("updated_at") or "")[:16] if record else "—"
-            rows.append((client.get("name") or "—", _STATUS_LABEL[status], updated))
-            iids.append(str(client_id))
-            tag = _STATUS_TAG[status]
-            tags.append((tag,) if tag else ())
-        self.tree.set_rows(rows, iids=iids, tags=tags)
+
+        self._refresh_seq += 1
+        seq = self._refresh_seq
+        db = self.app.db
+
+        def work():
+            clients = db.list_monthly_tax_clients()
+            client_ids = [int(c["id"]) for c in clients]
+            return {
+                "clients": clients,
+                "summary": db.month_close_summary(month_key, client_ids=client_ids),
+                "statuses": db.list_client_month_status(month_key),
+            }
+
+        def on_success(payload) -> None:
+            if seq != self._refresh_seq or not self.winfo_exists():
+                return
+            summary = payload["summary"]
+            try:
+                self.summary.configure(
+                    text=(f"{summary['closed']}/{summary['clients']} closed · {summary['in_progress']} in progress")
+                )
+            except Exception:
+                pass
+            rows, iids, tags = [], [], []
+            for client in payload["clients"]:
+                client_id = int(client["id"])
+                record = payload["statuses"].get(client_id)
+                status = record["status"] if record else MONTH_STATUS_OPEN
+                updated = (record.get("updated_at") or "")[:16] if record else "—"
+                rows.append((client.get("name") or "—", _STATUS_LABEL[status], updated))
+                iids.append(str(client_id))
+                tag = _STATUS_TAG[status]
+                tags.append((tag,) if tag else ())
+            self.tree.set_rows(rows, iids=iids, tags=tags)
+
+        run_background(self, work=work, on_success=on_success)
 
     def _selected_client_id(self) -> int | None:
         iid = self.tree.selected_iid()
