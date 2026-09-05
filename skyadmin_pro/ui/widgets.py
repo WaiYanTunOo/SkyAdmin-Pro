@@ -566,6 +566,7 @@ class DatePickerField(ctk.CTkFrame):
         self.var = var if var is not None else ctk.StringVar()
         self._calendar_top: ctk.CTkToplevel | None = None
         self._dismiss_bind_id: str | None = None
+        self._escape_bind_id: str | None = None
         self._entry = ctk.CTkEntry(self, textvariable=self.var, placeholder_text="YYYY-MM-DD", **entry_style_kwargs())
         self._entry.grid(row=0, column=0, sticky="ew")
         ctk.CTkButton(
@@ -615,6 +616,12 @@ class DatePickerField(ctk.CTkFrame):
             except Exception:
                 pass
             self._dismiss_bind_id = None
+        if self._escape_bind_id is not None:
+            try:
+                root.unbind("<Escape>", self._escape_bind_id)
+            except Exception:
+                pass
+            self._escape_bind_id = None
         if top is not None and top.winfo_exists():
             try:
                 top.grab_release()
@@ -651,9 +658,16 @@ class DatePickerField(ctk.CTkFrame):
             self._close_calendar()
 
         self._dismiss_bind_id = root.bind("<Button-1>", _on_click, add="+")
-        # Also dismiss on Escape from root
+        # Also dismiss on Escape from root (unbound in _close_calendar to avoid buildup)
+        if self._escape_bind_id is not None:
+            try:
+                root.unbind("<Escape>", self._escape_bind_id)
+            except Exception:
+                pass
         top.bind("<Escape>", lambda _e: self._close_calendar())
-        root.bind("<Escape>", lambda _e: self._close_calendar() if self._calendar_top else None, add="+")
+        self._escape_bind_id = root.bind(
+            "<Escape>", lambda _e: self._close_calendar() if self._calendar_top else None, add="+"
+        )
 
     def _place_calendar_popup(self, top: ctk.CTkToplevel, width: int, height: int) -> None:
         top.update_idletasks()

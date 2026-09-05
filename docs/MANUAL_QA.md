@@ -168,7 +168,7 @@ Copy `dist\SkyAdminPro-Setup-<version>.exe` to the VM (USB or shared folder).
 | G.4 | No console window flash; activation dialog appears on first run | ☐ |
 | G.5 | Uninstall from Settings → Apps removes Program Files; `%USERPROFILE%\.skyadmin_pro` remains | ☐ |
 
-**Without a cert (dev only):** `release_check.py --require-signature` correctly **blocks** with `NotSigned` — expected until Phase 11.2 cert is configured in CI or locally.
+**With a cert (ship path):** `release_check.py --require-signature` must print **RELEASE OK** on the signed exe + installer. Without a cert (dev only) it correctly **blocks** with `NotSigned`.
 
 ---
 
@@ -185,6 +185,7 @@ One-page view of what blocks “perfect on Windows” vs polish already in code.
 | A.3 | Clean VM install smoke (§3 + §6.2 G.1–G.5) | VM | ☐ |
 | A.4 | Manual UI spot-check (§6.1 F.1–F.7) at 125%/150% DPI | Clean PC | ☐ |
 | A.5 | Monthly incentive export matches your Excel (`SkyAdmin_Export_YYYYMM01.xlsx`, Pipeline sheet) | You | ☐ Verify one real month |
+| A.6 | Status PDF export (Dashboard → Export PDF) opens in Reader; sections present; no secret columns | Clean PC | ☐ |
 
 ### Bucket B — polish (mostly done in code; verify, don’t rebuild)
 
@@ -196,8 +197,10 @@ One-page view of what blocks “perfect on Windows” vs polish already in code.
 | B.4 | High-DPI bootstrap (`ui/display.py`) | ✅ | §6.1 F.5 date picker not clipped |
 | B.5 | DB migrations numbered (`db/migrations/`) | ✅ | Fresh install + upgrade from old DB |
 | B.6 | **`admin.ts` split** (Worker maintainability) | ✅ | See `docs/WORKER_ADMIN.md` |
+| B.7 | Client undo (Ctrl+Z / Undo button) | ✅ | Delete a test client → Ctrl+Z → row + document links back |
+| B.8 | Auto-backup retention + banner | ✅ | `AutoBackups/` caps at 7; Settings banner green after auto-run |
 
-**Ship when:** A.1–A.5 checked. B.1–B.5 are regression checks during A.4.
+**Ship when:** A.1–A.6 checked. B.1–B.8 are regression checks during A.4.
 
 ---
 

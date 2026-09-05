@@ -238,7 +238,8 @@ def check_version_alignment() -> list[str]:
 def check_installer(installer: Path) -> list[str]:
     errors: list[str] = []
     if not installer.is_file():
-        _ok(f"Installer not found (optional): {installer.name}")
+        # Installer-first ship path: missing installer blocks release.
+        errors.append(_fail(f"Installer not found (required): {installer}"))
         return errors
     size = installer.stat().st_size
     if size < 5 * 1024 * 1024:
@@ -276,8 +277,6 @@ def run_pytest() -> list[str]:
         "-m",
         "pytest",
         "-q",
-        "-m",
-        "release or walkthrough",
         "--tb=short",
     ]
     print(f"\nRunning: {' '.join(cmd)}")
@@ -287,9 +286,9 @@ def run_pytest() -> list[str]:
     if result.returncode != 0:
         if result.stderr:
             print(result.stderr.rstrip())
-        errors.append(_fail(f"pytest release/walkthrough suite failed (exit {result.returncode})"))
+        errors.append(_fail(f"pytest full suite failed (exit {result.returncode})"))
     else:
-        _ok("pytest release + walkthrough markers passed")
+        _ok("pytest full suite passed")
     return errors
 
 
@@ -304,7 +303,7 @@ def main() -> int:
     )
     parser.add_argument("--linux-binary", type=Path, default=None, help="Optional Linux dist/SkyAdminPro path")
     parser.add_argument("--api-url", default="", help="Worker base URL (default: from config.API_BASE_URL)")
-    parser.add_argument("--skip-pytest", action="store_true", help="Skip pytest release/walkthrough suite")
+    parser.add_argument("--skip-pytest", action="store_true", help="Skip full pytest suite")
     parser.add_argument("--skip-worker", action="store_true", help="Skip Worker HTTP checks")
     parser.add_argument(
         "--require-signature",
@@ -319,10 +318,9 @@ def main() -> int:
     failures.extend(check_version_alignment())
     failures.extend(check_embedded_public_key())
     failures.extend(check_exe(args.exe.resolve()))
-    # Installer check (warn if missing, fail only with --require-signature handled below)
+    # Installer-first ship path: installer is required, always checked.
     installer_path = (args.installer or default_installer_path()).resolve()
-    if not args.require_signature:
-        check_installer(installer_path)
+    failures.extend(check_installer(installer_path))
     if args.require_signature:
         failures.extend(check_authenticode_signature(args.exe.resolve(), required=True))
         installer = installer_path

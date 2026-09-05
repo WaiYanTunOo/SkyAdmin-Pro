@@ -174,10 +174,18 @@ class DashboardView(BaseView):
 
         ctk.CTkButton(
             workflow,
-            text="Copy EOD report",
-            width=160,
-            command=self._copy_eod,
-        ).grid(row=0, column=0, padx=(16, 8), pady=14, sticky="w")
+            text="Generate Workspace",
+            width=170,
+            command=self._generate_workspace,
+        ).grid(row=0, column=2, padx=(0, 8), pady=14, sticky="w")
+        ctk.CTkButton(
+            workflow,
+            text="Export PDF",
+            width=110,
+            fg_color="transparent",
+            border_width=1,
+            command=self._export_pdf,
+        ).grid(row=0, column=3, padx=(0, 16), pady=14, sticky="w")
 
         self.onboard_var = ctk.StringVar()
         themed_entry(
@@ -1237,6 +1245,34 @@ class DashboardView(BaseView):
             iids=[row["id_key"] for row in rows],
             empty_message="No new services signed up for this month.",
         )
+
+    def _export_pdf(self) -> None:
+        from pathlib import Path
+
+        from skyadmin_pro.services.pdf_render import render_report
+        from skyadmin_pro.services.reports import build_status_report, default_report_name
+
+        try:
+            model = build_status_report(self.app.db)
+        except Exception as exc:
+            self.workflow_feedback.error(str(exc))
+            return
+        path = filedialog.asksaveasfilename(
+            parent=self.winfo_toplevel(),
+            defaultextension=".pdf",
+            filetypes=[("PDF document", "*.pdf")],
+            initialfile=default_report_name(),
+            title="Export status report (PDF)",
+        )
+        if not path:
+            return
+        try:
+            render_report(model, Path(path))
+        except Exception as exc:
+            self.workflow_feedback.error(str(exc))
+            return
+        self.workflow_feedback.success(f"PDF report exported: {path}")
+        self.app.set_status("Status report exported to PDF.")
 
     def _export_report(self) -> None:
         year, month = self._selected_report_month()

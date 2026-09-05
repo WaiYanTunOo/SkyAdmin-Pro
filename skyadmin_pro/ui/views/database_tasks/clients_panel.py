@@ -25,6 +25,9 @@ class ClientsExpiryPanel(ctk.CTkFrame):
         super().__init__(master, fg_color="transparent")
         self.app = app
         self.feedback = feedback
+        from skyadmin_pro.services.undo_manager import UndoManager
+
+        self._undo = UndoManager()
         self.grid_columnconfigure(0, weight=1)
         self.grid_rowconfigure(0, weight=1)
         self.grid_rowconfigure(1, weight=0)
@@ -133,6 +136,11 @@ class ClientsExpiryPanel(ctk.CTkFrame):
             batch_row, text="Mark Inactive", width=95,
             fg_color="transparent", border_width=1,
             command=lambda: self._batch_set_status("Inactive"),
+        ).pack(side="left", padx=(0, 4))
+        ctk.CTkButton(
+            batch_row, text="Undo", width=70,
+            fg_color="transparent", border_width=1,
+            command=self._undo_last,
         ).pack(side="left")
 
         right = ctk.CTkFrame(self, corner_radius=CARD_RADIUS)
@@ -332,19 +340,23 @@ class ClientsExpiryPanel(ctk.CTkFrame):
         email = email_var.get().strip()
         status = "active" if status_var.get() == "Active" else "inactive"
         try:
+            from skyadmin_pro.services.client_commands import AddClientCommand, EditClientCommand
+
             if client_id is None:
-                cid = self.app.db.get_or_create_client(name)
-                self.app.db.update_client(cid, contact_name=contact, email=email, status=status)
+                self._undo.execute(
+                    AddClientCommand(
+                        self.app.db, name=name, contact=contact, email=email, status=status
+                    )
+                )
                 view = self.app.get_view("database_tasks")
                 if view is not None and getattr(view, "tasks_panel", None) is not None:
                     view.tasks_panel.refresh()
             else:
-                self.app.db.update_client(
-                    client_id,
-                    name=name,
-                    contact_name=contact,
-                    email=email,
-                    status=status,
+                self._undo.execute(
+                    EditClientCommand(
+                        self.app.db, client_id,
+                        name=name, contact_name=contact, email=email, status=status,
+                    )
                 )
         except ValueError as exc:
             self.feedback.error(str(exc))
@@ -352,6 +364,21 @@ class ClientsExpiryPanel(ctk.CTkFrame):
         top.destroy()
         self.feedback.success(f"Client saved: {name}")
         self.refresh()
+
+    def _undo_last(self) -> None:
+        if not self._undo.can_undo():
+            self.feedback.info("Nothing to undo.")
+            return
+        try:
+            label = self._undo.undo()
+        except Exception as exc:
+            self.feedback.error(str(exc))
+            return
+        self.feedback.success(f"Undid: {label}.")
+        self.refresh()
+
+    def _on_shortcut_undo(self) -> None:
+        self._undo_last()
 
     def _generate_workspace(self) -> None:
         name = self._selected_client_name()
@@ -380,12 +407,14 @@ class ClientsExpiryPanel(ctk.CTkFrame):
             "Delete client",
             "Delete this client? Its pipeline, renewal checklists, and month-close "
             "records are removed. Services, documents, and tasks keep their records "
-            "but lose the client link.",
+            "but lose the client link. You can undo once with Ctrl+Z.",
             parent=self.winfo_toplevel(),
         ):
             return
-        self.app.db.delete_client(int(iid))
-        self.feedback.success("Client deleted.")
+        from skyadmin_pro.services.client_commands import DeleteClientsCommand
+
+        self._undo.execute(DeleteClientsCommand(self.app.db, [int(iid)]))
+        self.feedback.success("Client deleted. (Ctrl+Z to undo)")
         self.refresh()
 
     def _batch_delete(self) -> None:
@@ -395,13 +424,15 @@ class ClientsExpiryPanel(ctk.CTkFrame):
             return
         if not messagebox.askyesno(
             "Batch delete",
-            f"Delete {len(iids)} selected client(s)? This cannot be undone.",
+            f"Delete {len(iids)} selected client(s)? You can undo once with Ctrl+Z.",
             parent=self.winfo_toplevel(),
         ):
             return
+        from skyadmin_pro.services.client_commands import DeleteClientsCommand
+
         ids = [int(iid) for iid in iids]
-        count = self.app.db.batch_delete_clients(ids)
-        self.feedback.success(f"Deleted {count} client(s).")
+        count = self._undo.execute(DeleteClientsCommand(self.app.db, ids))
+        self.feedback.success(f"Deleted {count} client(s). (Ctrl+Z to undo)")
         self.refresh()
 
     def _batch_set_status(self, status: str) -> None:
@@ -409,8 +440,10 @@ class ClientsExpiryPanel(ctk.CTkFrame):
         if not iids:
             self.feedback.error("Select one or more clients first.")
             return
+        from skyadmin_pro.services.client_commands import SetStatusCommand
+
         ids = [int(iid) for iid in iids]
-        count = self.app.db.batch_update_client_status(ids, status)
+        count = self._undo.execute(SetStatusCommand(self.app.db, ids, status))
         self.feedback.success(f"Updated {count} client(s) to {status}.")
         self.refresh()
 

@@ -156,27 +156,28 @@ class TaxMixin:
         }
 
     def dashboard_snapshot(self) -> dict:
-        """Single refresh bundle — avoids duplicate expiring/list queries in the dashboard."""
+        """Single refresh bundle — one pinned connection for all snapshot queries."""
         from datetime import date
 
         today = date.today()
-        expiring = self.list_expiring_documents()
-        supplier_expiring = self.list_expiring_supplier_services()
-        counts = self.dashboard_counts(expiring_total=len(expiring) + len(supplier_expiring))
-        return {
-            "counts": counts,
-            "expiring": expiring,
-            "supplier_expiring": supplier_expiring,
-            "overdue": self.list_overdue_services(),
-            "supplier_due": self.list_pending_supplier_payments(),
-            "pending": self.list_tasks(status="pending"),
-            "ongoing": self.list_ongoing_services(),
-            "renewal_due": self.list_renewal_items_due(),
-            "pending_filings": self.count_pending_filings(),
-            "revenue": self.get_revenue_summary(today.year, today.month),
-            "vo_csh_expiring": self.count_vo_csh_expiring(30),
-            "accounting_clients": self.list_accounting_clients(),
-        }
+        with self.bundle_queries():
+            expiring = self.list_expiring_documents()
+            supplier_expiring = self.list_expiring_supplier_services()
+            counts = self.dashboard_counts(expiring_total=len(expiring) + len(supplier_expiring))
+            return {
+                "counts": counts,
+                "expiring": expiring,
+                "supplier_expiring": supplier_expiring,
+                "overdue": self.list_overdue_services(),
+                "supplier_due": self.list_pending_supplier_payments(),
+                "pending": self.list_tasks(status="pending"),
+                "ongoing": self.list_ongoing_services(),
+                "renewal_due": self.list_renewal_items_due(),
+                "pending_filings": self.count_pending_filings(),
+                "revenue": self.get_revenue_summary(today.year, today.month),
+                "vo_csh_expiring": self.count_vo_csh_expiring(30),
+                "accounting_clients": self.list_accounting_clients(),
+            }
 
     def list_overdue_services(self) -> list[dict]:
         clause, params = _in_clause("d.document_type", tuple(self.list_service_types()))

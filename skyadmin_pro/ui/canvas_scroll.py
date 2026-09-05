@@ -28,6 +28,9 @@ class CanvasScrollFrame(ctk.CTkFrame):
 
         self.content = ctk.CTkFrame(self._canvas, fg_color="transparent")
         self._window_id = self._canvas.create_window((0, 0), window=self.content, anchor="nw")
+        # Tk paths of widgets already wheel-bound; prevents stacking duplicate
+        # handlers on every scrollregion update (paths are pruned when dead).
+        self._wheel_bound: set[str] = set()
         self.content.bind("<Configure>", self._on_content_configure)
         self._canvas.bind("<Configure>", self._on_canvas_configure)
         self._pending_scroll_update: str | None = None
@@ -58,18 +61,30 @@ class CanvasScrollFrame(ctk.CTkFrame):
         self._canvas.itemconfig(self._window_id, width=event.width)
 
     def _bind_wheel_recursive(self, widget) -> None:
-        # Bind wheel to widget and all current descendants; called on content changes
+        # Bind wheel to widget and all current descendants; called on content changes.
+        # Iterative (no recursion-depth risk) with a bound-path set so repeated
+        # passes don't stack duplicate handlers on the same widget.
         try:
-            for child in widget.winfo_children():
+            for dead in [p for p in self._wheel_bound]:
                 try:
+                    self.nametowidget(dead)
+                except Exception:
+                    self._wheel_bound.discard(dead)
+            stack = list(widget.winfo_children())
+        except Exception:
+            return
+        while stack:
+            child = stack.pop()
+            try:
+                path = str(child)
+                if path not in self._wheel_bound:
                     child.bind("<MouseWheel>", self._on_mousewheel, add="+")
                     child.bind("<Button-4>", self._on_mousewheel_linux, add="+")
                     child.bind("<Button-5>", self._on_mousewheel_linux, add="+")
-                    self._bind_wheel_recursive(child)
-                except Exception:
-                    pass
-        except Exception:
-            pass
+                    self._wheel_bound.add(path)
+                stack.extend(child.winfo_children())
+            except Exception:
+                pass
 
     def _bind_mousewheel(self, widget) -> None:
         widget.bind("<MouseWheel>", self._on_mousewheel, add="+")

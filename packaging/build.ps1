@@ -1,4 +1,5 @@
-# Builds the portable SkyAdmin Pro single-file exe.
+# Builds the portable SkyAdmin Pro single-file exe (DEV ONLY — not the ship path).
+# SHIP PATH: .\packaging\build-installer.ps1  (exe + signed Inno Setup installer)
 # Usage:  .\packaging\build.cmd
 #         (or: powershell -ExecutionPolicy Bypass -File .\packaging\build.ps1)
 $ErrorActionPreference = "Stop"

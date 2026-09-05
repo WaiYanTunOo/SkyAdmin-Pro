@@ -37,6 +37,28 @@ jobs:
           "version=$version" | Out-File -FilePath $env:GITHUB_OUTPUT -Append
           Write-Host "Release version: $version"
 
+      - name: Verify tag matches APP_VERSION
+        if: startsWith(github.ref, 'refs/tags/')
+        shell: pwsh
+        run: |
+          $tagVer = "${{ steps.version.outputs.version }}"
+          $appVer = python -c "from skyadmin_pro.config import APP_VERSION; print(APP_VERSION)"
+          if ($tagVer -ne $appVer) {
+            throw "Tag v$tagVer does not match APP_VERSION $appVer — bump pyproject.toml first."
+          }
+          Write-Host "Tag matches APP_VERSION: $tagVer"
+
+      - name: Require signing cert on tags
+        if: startsWith(github.ref, 'refs/tags/')
+        shell: pwsh
+        env:
+          WINDOWS_CERT_PFX: ${{ secrets.WINDOWS_CERT_PFX }}
+        run: |
+          if (-not $env:WINDOWS_CERT_PFX) {
+            throw "WINDOWS_CERT_PFX secret is required for v* releases (installer-first, signed ship path)."
+          }
+          Write-Host "Signing cert present."
+
       - name: Install dependencies
         run: |
           python -m pip install --upgrade pip
@@ -110,6 +132,7 @@ jobs:
             dist/SkyAdminPro.exe
             dist/SkyAdminPro-Setup-*.exe
             dist/RELEASE_NOTES.md
+            dist/SHA256SUMS
           draft: false
           prerelease: false
 

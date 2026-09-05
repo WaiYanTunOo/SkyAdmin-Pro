@@ -13,6 +13,9 @@ SETTING_AUTO_BACKUP_ENABLED = "auto_backup_enabled"
 SETTING_AUTO_BACKUP_INTERVAL = "auto_backup_interval"  # "daily" | "weekly" | "off"
 SETTING_AUTO_BACKUP_LAST_RUN = "auto_backup_last_run"
 
+#: Encrypted auto-backups retained in AutoBackups/ (matches db auto_backup keep).
+AUTO_BACKUP_KEEP = 7
+
 
 def should_run_backup(db, interval: str, last_run: str | None) -> bool:
     """Check if a backup should run based on interval and last run timestamp."""
@@ -33,6 +36,23 @@ def should_run_backup(db, interval: str, last_run: str | None) -> bool:
     return False
 
 
+def prune_old_backups(backup_dir: Path, keep: int = AUTO_BACKUP_KEEP) -> int:
+    """Delete oldest SkyAdminPro_AutoBackup_*.skybackup files, keeping `keep` newest."""
+    try:
+        candidates = sorted(backup_dir.glob("SkyAdminPro_AutoBackup_*.skybackup"))
+    except OSError:
+        logger.warning("Could not list auto-backup dir: %s", backup_dir)
+        return 0
+    removed = 0
+    for old in candidates[:-keep] if len(candidates) > keep else []:
+        try:
+            old.unlink()
+            removed += 1
+        except OSError:
+            logger.warning("Could not delete old auto-backup: %s", old)
+    return removed
+
+
 def run_auto_backup(workspace_root: Path, db_file: Path, backup_dir: Path) -> Path | None:
     """Execute an auto-backup. Returns the backup path on success, None on failure."""
     backup_dir.mkdir(parents=True, exist_ok=True)
@@ -47,6 +67,9 @@ def run_auto_backup(workspace_root: Path, db_file: Path, backup_dir: Path) -> Pa
         from skyadmin_pro.services.crypto import create_encrypted_backup
         create_encrypted_backup(workspace_root, db_file, dest)
         logger.info("Auto-backup created: %s", dest)
+        pruned = prune_old_backups(backup_dir)
+        if pruned:
+            logger.info("Pruned %d old auto-backup(s), keeping %d", pruned, AUTO_BACKUP_KEEP)
         return dest
     except Exception:
         logger.exception("Auto-backup failed")
@@ -93,7 +116,21 @@ class AutoBackupScheduler:
                 backup_dir = self.app.paths.root / "AutoBackups"
                 result = run_auto_backup(self.app.paths.root, db.db_file, backup_dir)
                 if result:
-                    db.set_setting(SETTING_AUTO_BACKUP_LAST_RUN, datetime.now().isoformat())
+                    now = datetime.now()
+                    db.set_setting(SETTING_AUTO_BACKUP_LAST_RUN, now.isoformat())
+                    # Feed the Settings backup banner (same key as manual backups).
+                    try:
+                        from skyadmin_pro.config.tasks import SETTING_LAST_ENCRYPTED_BACKUP
+                        db.set_setting(SETTING_LAST_ENCRYPTED_BACKUP, now.date().isoformat())
+                    except Exception:
+                        logger.warning("Could not update backup banner setting", exc_info=True)
+                    # One status-bar toast per run (scheduler ticks on the main thread).
+                    try:
+                        set_status = getattr(self.app, "set_status", None)
+                        if callable(set_status):
+                            set_status(f"Auto-backup completed: {result.name}")
+                    except Exception:
+                        logger.debug("Could not show auto-backup toast", exc_info=True)
                     logger.info("Auto-backup completed: %s", result)
         except Exception:
             logger.exception("Auto-backup check failed")

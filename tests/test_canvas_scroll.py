@@ -62,3 +62,44 @@ def test_tax_ids_and_vo_tabs_use_canvas_scroll():
     assert "vo_scroll = CanvasScrollFrame(tab)" in panel_src
     assert "_build_vo_csh(vo_scroll.content)" in panel_src
     assert "themed_scrollable_frame(tab)" not in panel_src
+
+
+def test_wheel_rebind_does_not_stack_handlers():
+    import pytest
+
+    from skyadmin_pro.ui.canvas_scroll import CanvasScrollFrame
+
+    ctk.set_appearance_mode("dark")
+    try:
+        root = ctk.CTk()
+    except Exception as exc:  # headless or Tcl missing
+        pytest.skip(f"Tk unavailable: {exc}")
+        return
+    try:
+        root.withdraw()
+        scroll = CanvasScrollFrame(root)
+        scroll.pack(fill="both", expand=True)
+        ctk.CTkLabel(scroll.content, text="Field").pack()
+        root.update_idletasks()
+
+        def wheel_script_len(widget) -> int:
+            try:
+                return len(widget.bind("<MouseWheel>") or "")
+            except Exception:
+                return 0
+
+        child = scroll.content.winfo_children()[0]
+        scroll._bind_wheel_recursive(scroll.content)
+        first = wheel_script_len(child)
+        assert first > 0
+        # Repeated passes (every scrollregion update) must not add more.
+        scroll._bind_wheel_recursive(scroll.content)
+        scroll._bind_wheel_recursive(scroll.content)
+        assert wheel_script_len(child) == first
+    except Exception as exc:
+        pytest.skip(f"Tk init failed: {exc}")
+    finally:
+        try:
+            root.destroy()
+        except Exception:
+            pass

@@ -97,17 +97,21 @@ class MainWindow(dnd_base_class()):
         self.protocol("WM_DELETE_WINDOW", self._on_close)
 
     def _bind_keyboard_shortcuts(self) -> None:
-        """Global keyboard shortcuts — Ctrl+S save, Ctrl+E export, Ctrl+B backup, Ctrl+F find."""
-        self.bind("<Control-s>", lambda _e: self._shortcut_action("save"))
-        self.bind("<Control-S>", lambda _e: self._shortcut_action("save"))
+        """Global keyboard shortcuts — Ctrl+E export, Ctrl+F find, Ctrl+N new, Ctrl+D theme.
+
+        Ctrl+Z undoes the last client change (outside text inputs, where the
+        keystroke stays with the field). No Ctrl+S/Ctrl+B: edits save
+        immediately and backup lives in Settings — dead bindings were removed
+        rather than kept as no-ops.
+        """
         self.bind("<Control-e>", lambda _e: self._shortcut_action("export"))
         self.bind("<Control-E>", lambda _e: self._shortcut_action("export"))
-        self.bind("<Control-b>", lambda _e: self._shortcut_action("backup"))
-        self.bind("<Control-B>", lambda _e: self._shortcut_action("backup"))
         self.bind("<Control-f>", lambda _e: self.open_global_search())
         self.bind("<Control-F>", lambda _e: self.open_global_search())
         self.bind("<Control-n>", lambda _e: self._shortcut_action("new"))
         self.bind("<Control-N>", lambda _e: self._shortcut_action("new"))
+        self.bind("<Control-z>", lambda _e: self._shortcut_action("undo"))
+        self.bind("<Control-Z>", lambda _e: self._shortcut_action("undo"))
         self.bind("<Control-d>", lambda _e: self._toggle_dark_light())
         self.bind("<Control-D>", lambda _e: self._toggle_dark_light())
 
@@ -130,8 +134,31 @@ class MainWindow(dnd_base_class()):
         from skyadmin_pro.ui.views.global_search import GlobalSearchDialog
         GlobalSearchDialog(self)
 
+    def _focus_in_text_input(self) -> bool:
+        """True when keyboard focus sits inside an editable text widget."""
+        try:
+            widget = self.focus_get()
+        except Exception:
+            return False
+        while widget is not None:
+            try:
+                cls = widget.winfo_class()
+            except Exception:
+                return False
+            if cls in ("Entry", "Text", "TCombobox", "CTkEntry", "CTkTextbox", "CTkComboBox"):
+                return True
+            try:
+                widget = widget.master
+            except Exception:
+                return False
+        return False
+
     def _shortcut_action(self, action: str) -> None:
         """Dispatch keyboard shortcut to the active view."""
+        # Never hijack typing: export/new fire only when focus is outside inputs.
+        # (Find + theme stay global — expected everywhere.)
+        if self._focus_in_text_input():
+            return
         if self._active_key is None:
             return
         view = self._views.get(self._active_key)

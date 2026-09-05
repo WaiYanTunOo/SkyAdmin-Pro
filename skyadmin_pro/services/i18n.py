@@ -79,6 +79,8 @@ def available_languages() -> list[str]:
 
 def tr(text: str) -> str:
     """Translate a UI string to the current language."""
-    if _current_lang == "en":
+    with _lang_lock:
+        lang = _current_lang
+    if lang == "en":
         return text
-    return _TRANSLATIONS.get(_current_lang, {}).get(text, text)
+    return _TRANSLATIONS.get(lang, {}).get(text, text)

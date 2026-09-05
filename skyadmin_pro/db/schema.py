@@ -389,12 +389,33 @@ CREATE TABLE IF NOT EXISTS sync_conflicts (
 );
 CREATE INDEX IF NOT EXISTS idx_sync_conflicts_logged ON sync_conflicts(logged_at);
 
--- P2.5: client grouping
+-- P2.5: client grouping (table only; the group_id column + index are owned
+-- by migration m009 because _initialize replays this file BEFORE min_version=2
+-- migrations run — creating the index here would crash legacy DBs that lack
+-- the column: IF NOT EXISTS checks the index, not the column).
 CREATE TABLE IF NOT EXISTS client_groups (
     id          INTEGER PRIMARY KEY AUTOINCREMENT,
     name        TEXT    NOT NULL UNIQUE COLLATE NOCASE,
     color       TEXT,
     created_at  TEXT    NOT NULL DEFAULT (datetime('now', 'localtime'))
 );
-CREATE INDEX IF NOT EXISTS idx_clients_group ON clients(group_id);
+
+-- FTS5 client search (Phase 10.1). Kept in base schema so FRESH installs get
+-- MATCH search immediately; legacy DBs are backfilled by m001.
+-- All statements are IF NOT EXISTS, so replay over migrated DBs is a no-op.
+CREATE VIRTUAL TABLE IF NOT EXISTS clients_fts USING fts5(
+    name, contact_name, email, tokenize='unicode61'
+);
+CREATE TRIGGER IF NOT EXISTS clients_fts_ai AFTER INSERT ON clients BEGIN
+    INSERT INTO clients_fts(rowid, name, contact_name, email)
+    VALUES (new.id, COALESCE(new.name,''), COALESCE(new.contact_name,''), COALESCE(new.email,''));
+END;
+CREATE TRIGGER IF NOT EXISTS clients_fts_ad AFTER DELETE ON clients BEGIN
+    DELETE FROM clients_fts WHERE rowid = old.id;
+END;
+CREATE TRIGGER IF NOT EXISTS clients_fts_au AFTER UPDATE ON clients BEGIN
+    DELETE FROM clients_fts WHERE rowid = old.id;
+    INSERT INTO clients_fts(rowid, name, contact_name, email)
+    VALUES (new.id, COALESCE(new.name,''), COALESCE(new.contact_name,''), COALESCE(new.email,''));
+END;
 """

@@ -9,6 +9,12 @@ import customtkinter as ctk
 from skyadmin_pro.services.export import default_export_name, export_to_excel
 from skyadmin_pro.ui.views.base import BaseView
 from skyadmin_pro.ui.views.company_details import CompanyDetailsPanel
+from skyadmin_pro.ui.views.company_details.panel import (
+    SUBTAB_ACCOUNTING,
+    SUBTAB_TAX_IDS,
+    SUBTAB_VO_CSH,
+    SUBTAB_VO_CSH_SETUP,
+)
 from skyadmin_pro.ui.views.database_tasks.clients_panel import ClientsExpiryPanel
 from skyadmin_pro.ui.views.database_tasks.courier_panel import CourierPanel
 from skyadmin_pro.ui.views.database_tasks.pipeline_panel import ServicePipelinePanel
@@ -17,13 +23,35 @@ from skyadmin_pro.ui.views.database_tasks.suppliers_panel import SuppliersPanel
 from skyadmin_pro.ui.views.database_tasks.task_panel import TaskPanel
 from skyadmin_pro.ui.widgets import FeedbackLabel, MonthStatusPanel, themed_tabview
 
+# Tab names — single source of truth; the tabview, lazy loader, refresh
+# dispatcher, and service-menu map must all use these, never raw strings.
+TAB_TASKS = "Tasks"
+TAB_COURIER = "Courier Tracker"
+TAB_CLIENTS = "Clients & Expiry"
+TAB_MONTH = "Monthly Tax Status"
+TAB_COMPANY = "Company Details"
+TAB_RENEWALS = "Renewals"
+TAB_PIPELINE = "Service Pipeline"
+TAB_SUPPLIERS = "Suppliers & AP"
+
+TAB_NAMES: tuple[str, ...] = (
+    TAB_TASKS,
+    TAB_COURIER,
+    TAB_CLIENTS,
+    TAB_MONTH,
+    TAB_COMPANY,
+    TAB_RENEWALS,
+    TAB_PIPELINE,
+    TAB_SUPPLIERS,
+)
+
 
 def service_menu_panel_key(tab_name: str) -> str | None:
     """Map Database & Tasks tab to the panel that owns a service-type combo, if any."""
     return {
-        "Clients & Expiry": "clients",
-        "Company Details": "company",
-        "Service Pipeline": "pipeline",
+        TAB_CLIENTS: "clients",
+        TAB_COMPANY: "company",
+        TAB_PIPELINE: "pipeline",
     }.get(tab_name)
 
 
@@ -52,16 +80,7 @@ class DatabaseTasksView(BaseView):
 
         self.tabs = themed_tabview(self.body, command=self._on_tab_changed)
         self.tabs.grid(row=1, column=0, sticky="nsew")
-        for name in (
-            "Tasks",
-            "Courier Tracker",
-            "Clients & Expiry",
-            "Monthly Tax Status",
-            "Company Details",
-            "Renewals",
-            "Service Pipeline",
-            "Suppliers & AP",
-        ):
+        for name in TAB_NAMES:
             self.tabs.add(name)
             tab = self.tabs.tab(name)
             tab.grid_columnconfigure(0, weight=1)
@@ -79,42 +98,42 @@ class DatabaseTasksView(BaseView):
     def _ensure_lazy_panel(self, name: str) -> None:
         if name in self._lazy_panels:
             return
-        if name == "Tasks":
-            self.tasks_panel = TaskPanel(self.tabs.tab("Tasks"), self.app, self.feedback)
+        if name == TAB_TASKS:
+            self.tasks_panel = TaskPanel(self.tabs.tab(TAB_TASKS), self.app, self.feedback)
             self.tasks_panel.grid(row=0, column=0, sticky="nsew", padx=8, pady=8)
             self._lazy_panels[name] = self.tasks_panel
-        elif name == "Clients & Expiry":
-            self.clients_panel = ClientsExpiryPanel(self.tabs.tab("Clients & Expiry"), self.app, self.feedback)
+        elif name == TAB_CLIENTS:
+            self.clients_panel = ClientsExpiryPanel(self.tabs.tab(TAB_CLIENTS), self.app, self.feedback)
             self.clients_panel.grid(row=0, column=0, sticky="nsew", padx=8, pady=8)
             self._lazy_panels[name] = self.clients_panel
-        elif name == "Courier Tracker":
-            self.courier_panel = CourierPanel(self.tabs.tab("Courier Tracker"), self.app, self.feedback)
+        elif name == TAB_COURIER:
+            self.courier_panel = CourierPanel(self.tabs.tab(TAB_COURIER), self.app, self.feedback)
             self.courier_panel.grid(row=0, column=0, sticky="nsew", padx=8, pady=8)
             self._lazy_panels[name] = self.courier_panel
-        elif name == "Monthly Tax Status":
+        elif name == TAB_MONTH:
             # MonthStatusPanel is lightweight with its own tree scrollbar; outer scroll not needed
             self.month_panel = MonthStatusPanel(
-                self.tabs.tab("Monthly Tax Status"),
+                self.tabs.tab(TAB_MONTH),
                 self.app,
                 showheight=12,
                 title="Monthly tax status per client",
             )
             self.month_panel.grid(row=0, column=0, sticky="nsew", padx=8, pady=8)
             self._lazy_panels[name] = self.month_panel
-        elif name == "Company Details":
-            self.company_panel = CompanyDetailsPanel(self.tabs.tab("Company Details"), self.app, self.feedback)
+        elif name == TAB_COMPANY:
+            self.company_panel = CompanyDetailsPanel(self.tabs.tab(TAB_COMPANY), self.app, self.feedback)
             self.company_panel.grid(row=0, column=0, sticky="nsew", padx=8, pady=8)
             self._lazy_panels[name] = self.company_panel
-        elif name == "Renewals":
-            self.renewals_panel = RenewalPanel(self.tabs.tab("Renewals"), self.app, self.feedback)
+        elif name == TAB_RENEWALS:
+            self.renewals_panel = RenewalPanel(self.tabs.tab(TAB_RENEWALS), self.app, self.feedback)
             self.renewals_panel.grid(row=0, column=0, sticky="nsew", padx=8, pady=8)
             self._lazy_panels[name] = self.renewals_panel
-        elif name == "Service Pipeline":
-            self.pipeline_panel = ServicePipelinePanel(self.tabs.tab("Service Pipeline"), self.app, self.feedback)
+        elif name == TAB_PIPELINE:
+            self.pipeline_panel = ServicePipelinePanel(self.tabs.tab(TAB_PIPELINE), self.app, self.feedback)
             self.pipeline_panel.grid(row=0, column=0, sticky="nsew", padx=8, pady=8)
             self._lazy_panels[name] = self.pipeline_panel
-        elif name == "Suppliers & AP":
-            self.suppliers_panel = SuppliersPanel(self.tabs.tab("Suppliers & AP"), self.app, self.feedback)
+        elif name == TAB_SUPPLIERS:
+            self.suppliers_panel = SuppliersPanel(self.tabs.tab(TAB_SUPPLIERS), self.app, self.feedback)
             self.suppliers_panel.grid(row=0, column=0, sticky="nsew", padx=8, pady=8)
             self._lazy_panels[name] = self.suppliers_panel
 
@@ -132,30 +151,30 @@ class DatabaseTasksView(BaseView):
             try:
                 tab_name = self.tabs.get()
             except Exception:
-                tab_name = "Tasks"
+                tab_name = TAB_TASKS
         self._refresh_service_menus(tab_name)
-        if tab_name == "Tasks" and self.tasks_panel is not None:
+        if tab_name == TAB_TASKS and self.tasks_panel is not None:
             self.tasks_panel.refresh()
-        elif tab_name == "Courier Tracker" and self.courier_panel is not None:
+        elif tab_name == TAB_COURIER and self.courier_panel is not None:
             self.courier_panel.refresh()
-        elif tab_name == "Clients & Expiry" and self.clients_panel is not None:
+        elif tab_name == TAB_CLIENTS and self.clients_panel is not None:
             self.clients_panel.refresh()
-        elif tab_name == "Monthly Tax Status" and self.month_panel is not None:
+        elif tab_name == TAB_MONTH and self.month_panel is not None:
             self.month_panel.refresh()
-        elif tab_name == "Company Details" and self.company_panel is not None:
+        elif tab_name == TAB_COMPANY and self.company_panel is not None:
             self.company_panel.refresh()
-        elif tab_name == "Renewals" and self.renewals_panel is not None:
+        elif tab_name == TAB_RENEWALS and self.renewals_panel is not None:
             self.renewals_panel.refresh()
-        elif tab_name == "Service Pipeline" and self.pipeline_panel is not None:
+        elif tab_name == TAB_PIPELINE and self.pipeline_panel is not None:
             self.pipeline_panel.refresh()
-        elif tab_name == "Suppliers & AP" and self.suppliers_panel is not None:
+        elif tab_name == TAB_SUPPLIERS and self.suppliers_panel is not None:
             self.suppliers_panel.refresh()
 
     def _refresh_active_tab(self, tab_name: str) -> None:
         self.refresh_active_tab(tab_name)
 
     def _require_company_panel(self) -> CompanyDetailsPanel:
-        self._ensure_lazy_panel("Company Details")
+        self._ensure_lazy_panel(TAB_COMPANY)
         assert self.company_panel is not None
         return self.company_panel
 
@@ -163,58 +182,58 @@ class DatabaseTasksView(BaseView):
         try:
             current = self.tabs.get()
         except Exception:
-            current = "Tasks"
+            current = TAB_TASKS
         self._ensure_lazy_panel(current)
         self.refresh_active_tab(current)
 
     def open_company_details(self, client_name: str) -> None:
-        self.tabs.set("Company Details")
+        self.tabs.set(TAB_COMPANY)
         panel = self._require_company_panel()
         panel.select_client(client_name)
-        self.refresh_active_tab("Company Details")
+        self.refresh_active_tab(TAB_COMPANY)
 
     def open_company_tax_ids(self, client_name: str) -> None:
-        self.tabs.set("Company Details")
+        self.tabs.set(TAB_COMPANY)
         panel = self._require_company_panel()
         panel.select_client(client_name)
-        panel.tabs.set("Tax IDs")
-        self.refresh_active_tab("Company Details")
+        panel.tabs.set(SUBTAB_TAX_IDS)
+        self.refresh_active_tab(TAB_COMPANY)
 
     def open_accounting_setup(self) -> None:
-        self.tabs.set("Company Details")
+        self.tabs.set(TAB_COMPANY)
         panel = self._require_company_panel()
-        panel.tabs.set("Accounting Setup")
-        self.refresh_active_tab("Company Details")
+        panel.tabs.set(SUBTAB_ACCOUNTING)
+        self.refresh_active_tab(TAB_COMPANY)
 
     def open_vo_csh_setup(self) -> None:
-        self.tabs.set("Company Details")
+        self.tabs.set(TAB_COMPANY)
         panel = self._require_company_panel()
-        panel.tabs.set("VO/CSH Setup")
-        self.refresh_active_tab("Company Details")
+        panel.tabs.set(SUBTAB_VO_CSH_SETUP)
+        self.refresh_active_tab(TAB_COMPANY)
 
     def open_company_vo_csh(self, client_name: str) -> None:
-        self.tabs.set("Company Details")
+        self.tabs.set(TAB_COMPANY)
         panel = self._require_company_panel()
         panel.select_client(client_name)
-        panel.tabs.set("VO & CSH")
-        self.refresh_active_tab("Company Details")
+        panel.tabs.set(SUBTAB_VO_CSH)
+        self.refresh_active_tab(TAB_COMPANY)
 
     def open_task(self, task_id: int) -> None:
-        self.tabs.set("Tasks")
-        self._ensure_lazy_panel("Tasks")
+        self.tabs.set(TAB_TASKS)
+        self._ensure_lazy_panel(TAB_TASKS)
         if self.tasks_panel is not None:
             self.tasks_panel.select_task(task_id)
 
     def open_renewal(self, client_name: str) -> None:
-        self._ensure_lazy_panel("Renewals")
-        self.tabs.set("Renewals")
+        self._ensure_lazy_panel(TAB_RENEWALS)
+        self.tabs.set(TAB_RENEWALS)
         assert self.renewals_panel is not None
         self.renewals_panel.select_client(client_name)
         self.renewals_panel.refresh()
 
     def open_pipeline(self) -> None:
-        self._ensure_lazy_panel("Service Pipeline")
-        self.tabs.set("Service Pipeline")
+        self._ensure_lazy_panel(TAB_PIPELINE)
+        self.tabs.set(TAB_PIPELINE)
         if self.pipeline_panel is not None:
             self.pipeline_panel.refresh()
 

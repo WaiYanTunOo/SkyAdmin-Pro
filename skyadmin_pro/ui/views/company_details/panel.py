@@ -41,8 +41,28 @@ from skyadmin_pro.ui.widgets import (
 )
 
 
-class CompanyDetailsPanel(
-    GeneralTabMixin,
+# Sub-tab names — single source of truth for the tab bar, lazy loader,
+# refresh dispatcher, and cross-module callers (database_tasks/view.py).
+SUBTAB_ACCOUNTING = "Accounting Setup"
+SUBTAB_GENERAL = "General"
+SUBTAB_TAX_IDS = "Tax IDs"
+SUBTAB_FILING = "Filing Statuses"
+SUBTAB_VO_CSH_SETUP = "VO/CSH Setup"
+SUBTAB_VO_CSH = "VO & CSH"
+SUBTAB_FINANCIAL_DOCS = "Financial Docs"
+
+SUBTAB_NAMES: tuple[str, ...] = (
+    SUBTAB_ACCOUNTING,
+    SUBTAB_GENERAL,
+    SUBTAB_TAX_IDS,
+    SUBTAB_FILING,
+    SUBTAB_VO_CSH_SETUP,
+    SUBTAB_VO_CSH,
+    SUBTAB_FINANCIAL_DOCS,
+)
+
+
+class CompanyDetailsPanel(    GeneralTabMixin,
     AccountingSetupTabMixin,
     TaxIdsTabMixin,
     FilingTabMixin,
@@ -51,7 +71,14 @@ class CompanyDetailsPanel(
     FinancialDocsTabMixin,
     ctk.CTkFrame,
 ):
-    """Per-company overview: services, documents, tax IDs, filing statuses, VO and CSH."""
+    """Per-company overview: services, documents, tax IDs, filing statuses, VO and CSH.
+
+    MRO (method resolution order) matters: mixins are searched left to right,
+    so GeneralTabMixin wins over later mixins on name clashes. Order mirrors
+    the sub-tab bar: General → Accounting Setup → Tax IDs → Filing Statuses →
+    VO/CSH Setup → VO & CSH → Financial Docs → CTkFrame. Keep this order when
+    adding tabs; put shared refresh dispatch on this class, never in mixins.
+    """
 
     def __init__(self, master, app, feedback: FeedbackLabel) -> None:
         super().__init__(master, fg_color="transparent")
@@ -94,15 +121,7 @@ class CompanyDetailsPanel(
 
         self.tabs = themed_tabview(self, command=self._on_subtab_changed)
         self.tabs.grid(row=1, column=0, sticky="nsew")
-        for name in (
-            "Accounting Setup",
-            "General",
-            "Tax IDs",
-            "Filing Statuses",
-            "VO/CSH Setup",
-            "VO & CSH",
-            "Financial Docs",
-        ):
+        for name in SUBTAB_NAMES:
             self.tabs.add(name)
             tab = self.tabs.tab(name)
             tab.grid_columnconfigure(0, weight=1)
@@ -112,7 +131,7 @@ class CompanyDetailsPanel(
         try:
             return self.tabs.get()
         except Exception:
-            return "Accounting Setup"
+            return SUBTAB_ACCOUNTING
 
     def _on_subtab_changed(self) -> None:
         self._ensure_lazy_tab(self._current_subtab())
@@ -122,7 +141,7 @@ class CompanyDetailsPanel(
         if name in self._lazy_tabs:
             return
         tab = self.tabs.tab(name)
-        if name == "Accounting Setup":
+        if name == SUBTAB_ACCOUNTING:
             tab.grid_columnconfigure(0, weight=1)
             tab.grid_rowconfigure(0, weight=1)
             setup_scroll = CanvasScrollFrame(tab)
@@ -131,7 +150,7 @@ class CompanyDetailsPanel(
             setup_scroll.content.grid_rowconfigure(0, weight=1)
             self._accounting_setup_frame = self._build_accounting_setup(setup_scroll.content)
             self._accounting_setup_frame.grid(row=0, column=0, sticky="nsew")
-        elif name == "General":
+        elif name == SUBTAB_GENERAL:
             tab.grid_columnconfigure(0, weight=1)
             tab.grid_rowconfigure(0, weight=1)
             general_scroll = CanvasScrollFrame(tab)
@@ -145,7 +164,7 @@ class CompanyDetailsPanel(
             self._services_frame.grid(row=1, column=0, sticky="nsew", pady=(0, 8))
             self._docs_frame = self._build_documents(general_scroll.content)
             self._docs_frame.grid(row=2, column=0, sticky="nsew")
-        elif name == "Tax IDs":
+        elif name == SUBTAB_TAX_IDS:
             tab.grid_columnconfigure(0, weight=1)
             tab.grid_rowconfigure(0, weight=1)
             tax_ids_scroll = CanvasScrollFrame(tab)
@@ -153,7 +172,7 @@ class CompanyDetailsPanel(
             tax_ids_scroll.content.grid_columnconfigure(0, weight=1)
             self._tax_ids_frame = self._build_tax_ids(tax_ids_scroll.content)
             self._tax_ids_frame.grid(row=0, column=0, sticky="ew")
-        elif name == "Filing Statuses":
+        elif name == SUBTAB_FILING:
             tab.grid_columnconfigure(0, weight=1)
             tab.grid_rowconfigure(0, weight=1)
             filing_scroll = CanvasScrollFrame(tab)
@@ -163,7 +182,7 @@ class CompanyDetailsPanel(
             self._filing_form_frame.grid(row=0, column=0, sticky="ew")
             self._filing_history_frame = self._build_filing_history(filing_scroll.content)
             self._filing_history_frame.grid(row=1, column=0, sticky="nsew", pady=(8, 0))
-        elif name == "VO/CSH Setup":
+        elif name == SUBTAB_VO_CSH_SETUP:
             tab.grid_columnconfigure(0, weight=1)
             tab.grid_rowconfigure(0, weight=1)
             vo_setup_scroll = CanvasScrollFrame(tab)
@@ -172,7 +191,7 @@ class CompanyDetailsPanel(
             vo_setup_scroll.content.grid_rowconfigure(0, weight=1)
             self._vo_csh_setup_frame = self._build_vo_csh_setup(vo_setup_scroll.content)
             self._vo_csh_setup_frame.grid(row=0, column=0, sticky="nsew")
-        elif name == "VO & CSH":
+        elif name == SUBTAB_VO_CSH:
             tab.grid_columnconfigure(0, weight=1)
             tab.grid_rowconfigure(0, weight=1)
             vo_scroll = CanvasScrollFrame(tab)
@@ -180,8 +199,8 @@ class CompanyDetailsPanel(
             vo_scroll.content.grid_columnconfigure(0, weight=1)
             self._vo_frame = self._build_vo_csh(vo_scroll.content)
             self._vo_frame.grid(row=0, column=0, sticky="ew")
-        elif name == "Financial Docs":
-            fin_tab = self.tabs.tab("Financial Docs")
+        elif name == SUBTAB_FINANCIAL_DOCS:
+            fin_tab = self.tabs.tab(SUBTAB_FINANCIAL_DOCS)
             fin_tab.grid_columnconfigure(0, weight=1)
             fin_tab.grid_rowconfigure(0, weight=1)
             fin_scroll = CanvasScrollFrame(fin_tab)
@@ -244,37 +263,35 @@ class CompanyDetailsPanel(
         client = self.app.db.get_client(client_id) if client_id is not None else None
         self._refresh_subtab(tab, client_id, client)
 
+    def _refresh_after_mutation(self, tab_name: str) -> None:
+        """Single parameterized post-edit refresh: reload one sub-tab, then invalidate dashboard."""
+        client_id = self._selected_client_id()
+        client = self.app.db.get_client(client_id) if client_id is not None else None
+        if tab_name == SUBTAB_GENERAL:
+            services = self.app.db.list_client_services(client_id) if client_id is not None else []
+            documents = self.app.db.list_client_documents(client_id) if client_id is not None else []
+            self._update_company_info_line(
+                client_id,
+                service_count=len(services),
+                document_count=len(documents),
+            )
+            self._refresh_subtab(tab_name, client_id, client, services=services, documents=documents)
+        else:
+            self._refresh_subtab(tab_name, client_id, client)
+        self.app.invalidate_dashboard()
+
     def _refresh_general_mutation(self) -> None:
         """After General-tab service/document edits — refresh trees and header counts only."""
-        client_id = self._selected_client_id()
-        client = self.app.db.get_client(client_id) if client_id is not None else None
-        services = self.app.db.list_client_services(client_id) if client_id is not None else []
-        documents = self.app.db.list_client_documents(client_id) if client_id is not None else []
-        self._update_company_info_line(
-            client_id,
-            service_count=len(services),
-            document_count=len(documents),
-        )
-        self._refresh_general_subtab(client_id, client, services, documents)
-        self.app.invalidate_dashboard()
+        self._refresh_after_mutation(SUBTAB_GENERAL)
 
     def _refresh_filing_mutation(self) -> None:
-        client_id = self._selected_client_id()
-        client = self.app.db.get_client(client_id) if client_id is not None else None
-        self._refresh_filing_subtab(client_id, client)
-        self.app.invalidate_dashboard()
+        self._refresh_after_mutation(SUBTAB_FILING)
 
     def _refresh_tax_ids_mutation(self) -> None:
-        client_id = self._selected_client_id()
-        client = self.app.db.get_client(client_id) if client_id is not None else None
-        self._refresh_tax_ids_subtab(client_id, client)
-        self.app.invalidate_dashboard()
+        self._refresh_after_mutation(SUBTAB_TAX_IDS)
 
     def _refresh_vo_csh_mutation(self) -> None:
-        client_id = self._selected_client_id()
-        client = self.app.db.get_client(client_id) if client_id is not None else None
-        self._refresh_vo_csh_subtab(client)
-        self.app.invalidate_dashboard()
+        self._refresh_after_mutation(SUBTAB_VO_CSH)
 
     def _refresh_subtab(
         self,
@@ -285,23 +302,23 @@ class CompanyDetailsPanel(
         services: list | None = None,
         documents: list | None = None,
     ) -> None:
-        if tab_name == "Accounting Setup":
+        if tab_name == SUBTAB_ACCOUNTING:
             self.refresh_accounting_setup()
-        elif tab_name == "General":
+        elif tab_name == SUBTAB_GENERAL:
             if services is None:
                 services = self.app.db.list_client_services(client_id) if client_id is not None else []
             if documents is None:
                 documents = self.app.db.list_client_documents(client_id) if client_id is not None else []
             self._refresh_general_subtab(client_id, client, services, documents)
-        elif tab_name == "Tax IDs":
+        elif tab_name == SUBTAB_TAX_IDS:
             self._refresh_tax_ids_subtab(client_id, client)
-        elif tab_name == "Filing Statuses":
+        elif tab_name == SUBTAB_FILING:
             self._refresh_filing_subtab(client_id, client)
-        elif tab_name == "VO/CSH Setup":
+        elif tab_name == SUBTAB_VO_CSH_SETUP:
             self.refresh_vo_csh_setup()
-        elif tab_name == "VO & CSH":
+        elif tab_name == SUBTAB_VO_CSH:
             self._refresh_vo_csh_subtab(client)
-        elif tab_name == "Financial Docs":
+        elif tab_name == SUBTAB_FINANCIAL_DOCS:
             self._refresh_financial_docs()
 
     def _refresh_general_subtab(

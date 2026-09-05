@@ -120,8 +120,11 @@ def test_global_search_shortcut_bound(app):
 
 
 def test_keyboard_shortcuts_bound(app):
-    """All keyboard shortcuts are bound."""
+    """Live keyboard shortcuts are bound; dead save/backup bindings are gone."""
     assert app.bind("<Control-f>") is not None
     assert app.bind("<Control-d>") is not None
-    assert app.bind("<Control-s>") is not None
+    assert app.bind("<Control-e>") is not None
     assert app.bind("<Control-n>") is not None
+    assert app.bind("<Control-z>") is not None
+    assert app.bind("<Control-s>") in (None, "")
+    assert app.bind("<Control-b>") in (None, "")

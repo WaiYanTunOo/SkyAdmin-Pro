@@ -118,9 +118,28 @@ def test_dashboard_snapshot_query_budget(populated_tax_db, query_stats):
 
     assert snap["counts"]["clients"] == 500
     assert len(snap["overdue"]) >= 100
-    assert stats["connections"] <= 18
+    # One pinned connection for the whole snapshot (bundle_queries).
+    assert stats["connections"] == 1
     assert stats["statements"] <= 40
     assert elapsed < 2.5
+
+
+def test_bundle_queries_nests_and_rolls_back(populated_db):
+    db = populated_db
+    with db.bundle_queries():
+        db.get_or_create_client("Bundled Co")
+        with db.bundle_queries():
+            assert db.client_id_by_name("Bundled Co") is not None
+    assert db.client_id_by_name("Bundled Co") is not None
+
+    class _Boom(Exception):
+        pass
+
+    with pytest.raises(_Boom):
+        with db.bundle_queries():
+            db.get_or_create_client("Rollback Co")
+            raise _Boom()
+    assert db.client_id_by_name("Rollback Co") is None
 
 
 def test_perf_indexes_exist(populated_tax_db):

@@ -13,6 +13,109 @@ from skyadmin_pro.ui.theme import TABLE_FONT_SIZE, TABLE_HEADER_FONT_SIZE, TABLE
 _VIRTUAL_THRESHOLD = 60
 _INCREMENTAL_THRESHOLD = 20
 
+# Cache key of the last applied shared Sky.* ttk style. The style names are
+# global, so reconfiguring them once per (mode, metrics, colors) is enough —
+# per-treeview apply_theme() calls after the first are per-widget only.
+_SHARED_STYLE_KEY: tuple | None = None
+
+
+def configure_shared_tree_style(
+    *,
+    mode: str,
+    background: str,
+    foreground: str,
+    heading: str,
+    heading_fg: str,
+    field_bg: str,
+    selected: str,
+    scrollbar: str,
+    trough: str,
+    scaled_row: int,
+    scaled_font: int,
+    scaled_head: int,
+) -> bool:
+    """Configure the shared Sky.* ttk styles unless already current.
+
+    Returns True when the styles were (re)configured, False on cache hit.
+    """
+    global _SHARED_STYLE_KEY
+    key = (
+        mode, background, foreground, heading, heading_fg, field_bg,
+        selected, scrollbar, trough, scaled_row, scaled_font, scaled_head,
+    )
+    if key == _SHARED_STYLE_KEY:
+        return False
+    style = ttk.Style()
+    try:
+        if style.theme_use() != "clam":
+            style.theme_use("clam")
+    except ttk.TclError:
+        try:
+            style.theme_use("clam")
+        except ttk.TclError:
+            pass
+    style.configure(
+        "Sky.Treeview",
+        background=background,
+        foreground=foreground,
+        fieldbackground=field_bg,
+        rowheight=scaled_row,
+        borderwidth=0,
+        font=("Segoe UI", scaled_font)
+        if sys.platform == "win32"
+        else ("SF Pro Text", scaled_font)
+        if sys.platform == "darwin"
+        else ("Ubuntu", scaled_font),
+    )
+    style.configure(
+        "Sky.Treeview.Heading",
+        background=heading,
+        foreground=heading_fg,
+        fieldbackground=heading,
+        relief="flat",
+        borderwidth=0,
+        font=("Segoe UI", scaled_head, "bold")
+        if sys.platform == "win32"
+        else ("SF Pro Text", scaled_head, "bold")
+        if sys.platform == "darwin"
+        else ("Ubuntu", scaled_head, "bold"),
+    )
+    style.map(
+        "Sky.Treeview",
+        background=[("selected", selected)],
+        foreground=[("selected", "#ffffff")],
+    )
+    style.map(
+        "Sky.Treeview.Heading",
+        background=[("active", heading), ("!active", heading)],
+        foreground=[("active", heading_fg), ("!active", heading_fg)],
+        relief=[("active", "flat"), ("!active", "flat")],
+    )
+    style.configure(
+        "Sky.Vertical.TScrollbar",
+        background=scrollbar,
+        troughcolor=trough,
+        borderwidth=0,
+        arrowcolor=foreground,
+    )
+    style.configure(
+        "Sky.Horizontal.TScrollbar",
+        background=scrollbar,
+        troughcolor=trough,
+        borderwidth=0,
+        arrowcolor=foreground,
+    )
+    style.map(
+        "Sky.Vertical.TScrollbar",
+        background=[("active", scrollbar), ("!active", scrollbar)],
+    )
+    style.map(
+        "Sky.Horizontal.TScrollbar",
+        background=[("active", scrollbar), ("!active", scrollbar)],
+    )
+    _SHARED_STYLE_KEY = key
+    return True
+
 
 class ThemedTreeview(ctk.CTkFrame):
     def __init__(
@@ -104,15 +207,6 @@ class ThemedTreeview(ctk.CTkFrame):
 
         self.configure(fg_color=background)
 
-        style = ttk.Style()
-        try:
-            if style.theme_use() != "clam":
-                style.theme_use("clam")
-        except ttk.TclError:
-            try:
-                style.theme_use("clam")
-            except ttk.TclError:
-                pass
         # Scale rowheight/font for Windows high-DPI (ctk scaling)
         try:
             scale = float(self.tk.call("tk", "scaling"))
@@ -124,64 +218,20 @@ class ThemedTreeview(ctk.CTkFrame):
         scaled_font = int(TABLE_FONT_SIZE * scale)
         scaled_head = int(TABLE_HEADER_FONT_SIZE * scale)
 
-        style.configure(
-            "Sky.Treeview",
+        # Shared Sky.* styles are global — reconfigured only when mode/metrics/colors change.
+        configure_shared_tree_style(
+            mode=mode,
             background=background,
             foreground=foreground,
-            fieldbackground=field_bg,
-            rowheight=scaled_row,
-            borderwidth=0,
-            font=("Segoe UI", scaled_font)
-            if sys.platform == "win32"
-            else ("SF Pro Text", scaled_font)
-            if sys.platform == "darwin"
-            else ("Ubuntu", scaled_font),
-        )
-        style.configure(
-            "Sky.Treeview.Heading",
-            background=heading,
-            foreground=heading_fg,
-            fieldbackground=heading,
-            relief="flat",
-            borderwidth=0,
-            font=("Segoe UI", scaled_head, "bold")
-            if sys.platform == "win32"
-            else ("SF Pro Text", scaled_head, "bold")
-            if sys.platform == "darwin"
-            else ("Ubuntu", scaled_head, "bold"),
-        )
-        style.map(
-            "Sky.Treeview",
-            background=[("selected", selected)],
-            foreground=[("selected", "#ffffff")],
-        )
-        style.map(
-            "Sky.Treeview.Heading",
-            background=[("active", heading), ("!active", heading)],
-            foreground=[("active", heading_fg), ("!active", heading_fg)],
-            relief=[("active", "flat"), ("!active", "flat")],
-        )
-        style.configure(
-            "Sky.Vertical.TScrollbar",
-            background=scrollbar,
-            troughcolor=trough,
-            borderwidth=0,
-            arrowcolor=foreground,
-        )
-        style.configure(
-            "Sky.Horizontal.TScrollbar",
-            background=scrollbar,
-            troughcolor=trough,
-            borderwidth=0,
-            arrowcolor=foreground,
-        )
-        style.map(
-            "Sky.Vertical.TScrollbar",
-            background=[("active", scrollbar), ("!active", scrollbar)],
-        )
-        style.map(
-            "Sky.Horizontal.TScrollbar",
-            background=[("active", scrollbar), ("!active", scrollbar)],
+            heading=heading,
+            heading_fg=heading_fg,
+            field_bg=field_bg,
+            selected=selected,
+            scrollbar=scrollbar,
+            trough=trough,
+            scaled_row=scaled_row,
+            scaled_font=scaled_font,
+            scaled_head=scaled_head,
         )
         self.tree.configure(style="Sky.Treeview")
         self.tree.tag_configure("odd", background=odd)
