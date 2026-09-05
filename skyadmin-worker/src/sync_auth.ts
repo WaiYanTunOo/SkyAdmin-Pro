@@ -1,4 +1,11 @@
-/** Device-scoped sync authentication (separate from owner API_TOKEN). */
+/** Device-scoped sync authentication (separate from owner API_TOKEN).
+ *
+ * Rotation policy (deliberate): tokens rotate on re-register and expire
+ * after 30 days of inactivity with a sliding refresh on each use. There is
+ * intentionally NO per-request rotation — it would double D1 writes on the
+ * hot pull/push path and complicate offline retries for zero security gain
+ * while TTL + sliding refresh bound the exposure window.
+ */
 
 import { Context, Next } from "hono";
 import { Env } from "./db";

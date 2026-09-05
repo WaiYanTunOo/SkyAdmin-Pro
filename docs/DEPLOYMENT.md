@@ -93,33 +93,34 @@ python -c "from cryptography.hazmat.primitives.asymmetric.ed25519 import Ed25519
 
 ## 4. First-time Setup
 
-1. **D1 migration**: Run `npx wrangler d1 execute skyadmin-db --remote --file=schema.sql` from `skyadmin-worker/`.
+1. **D1 migration**: Run `npx wrangler d1 migrations apply skyadmin-db --remote` from `skyadmin-worker/` (versioned `migrations/`; legacy `schema.sql` replay only for archaeology).
 2. **Admin account**: Set `ADMIN_PASS` in environment variables. Access admin panel at `/{ADMIN_PATH}`.
-3. **Desktop DB**: SQLite schema auto-applies on first app launch via `skyadmin_pro/db/schema.py`.
+3. **Desktop DB**: SQLite schema auto-applies on first app launch via `skyadmin_pro/db/schema.py` + versioned `skyadmin_pro/db/migrations/`.
 
 ## 5. Updates
 
 ### Version Bump
 
-Update version in `skyadmin_pro/config.py` (`APP_VERSION`).
+Single source of truth: `pyproject.toml` (`project.version`). `APP_VERSION` in `skyadmin_pro/config/` reads it at runtime — do not hardcode versions elsewhere. CI fails the release when a `v*` tag disagrees (`release.yml` tag gate).
 
 ### Pre-ship Gate
 
 ```bash
 python scripts/release_check.py
-# Checks: pytest, exe size, forbidden strings, version consistency, Worker endpoint
-# Options: --skip-pytest, --exe path/to/SkyAdminPro.exe
+# Checks: full pytest, signed exe + installer (installer-first ship path),
+# forbidden strings, version consistency, Worker endpoints, SHA256SUMS
+# Options: --skip-pytest, --skip-worker, --exe PATH, --require-signature
 ```
 
 ### Publish Release
 
 ```bash
 # Local publish (release_check + release notes)
-python scripts/publish_release.py --version 0.3.1 --exe dist/SkyAdminPro.exe
+python scripts/publish_release.py --version 0.3.2 --exe dist/SkyAdminPro-Setup-0.3.2.exe
 
 # With GitHub release
-python scripts/publish_release.py --version 0.3.1 --exe dist/SkyAdminPro.exe --github
+python scripts/publish_release.py --version 0.3.2 --exe dist/SkyAdminPro-Setup-0.3.2.exe --github
 
 # Worker-only update line (no GitHub release)
-python scripts/publish_release.py --version 0.3.1 --url https://github.com/.../releases/...
+python scripts/publish_release.py --version 0.3.2 --url https://github.com/.../releases/...
 ```

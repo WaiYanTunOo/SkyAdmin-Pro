@@ -2,7 +2,7 @@
 
 import { Context } from "hono";
 import { Env, bumpVersion } from "../db";
-import { isRateLimited } from "../rate_limit";
+import { isRateLimited, purgeStaleRateLimits } from "../rate_limit";
 import { resignActivatedLicense } from "../signing";
 import { parseActivationClaim } from "../verification";
 import { checkActivationEligibility } from "../sync_eligibility";
@@ -109,9 +109,7 @@ export async function claimHandler(c: Context<{ Bindings: Env }>) {
   await bumpVersion(c.env.DB);
 
   // Periodic cleanup of stale rate_limits entries (older than 1 hour)
-  await c.env.DB.prepare(
-    "DELETE FROM rate_limits WHERE window_start < datetime('now', '-1 hour')",
-  ).run();
+  await purgeStaleRateLimits(c.env.DB);
 
   return c.json({
     ok: true,

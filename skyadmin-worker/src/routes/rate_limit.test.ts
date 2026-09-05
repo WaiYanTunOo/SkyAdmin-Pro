@@ -3,6 +3,7 @@
 import { describe, expect, it } from "vitest";
 import app from "../index";
 import type { Env } from "../db";
+import { purgeStaleRateLimits } from "../rate_limit";
 
 function mockEnv(overrides: Partial<Env> = {}): Env {
   return {
@@ -79,6 +80,24 @@ describe("claim rate limiting", () => {
     const body = await res.json() as { ok: boolean; error: string };
     expect(body.ok).toBe(false);
     expect(body.error).toContain("Too many claim attempts");
+  });
+});
+
+describe("purgeStaleRateLimits", () => {
+  it("issues the hourly-window DELETE", async () => {
+    const seen: string[] = [];
+    const db = {
+      prepare: (sql: string) => ({
+        run: async () => {
+          seen.push(sql);
+          return { success: true };
+        },
+      }),
+    } as unknown as D1Database;
+    await purgeStaleRateLimits(db);
+    expect(seen).toHaveLength(1);
+    expect(seen[0]).toContain("DELETE FROM rate_limits");
+    expect(seen[0]).toContain("-1 hour");
   });
 });
 

@@ -36,3 +36,13 @@ export async function isRateLimited(
   const count = row?.count ?? 1;
   return count > max;
 }
+
+/**
+ * Delete rate-limit windows older than 1 hour. Call on mutation success
+ * paths (claim, sync register) so the table stays small. Idempotent.
+ */
+export async function purgeStaleRateLimits(db: D1Database): Promise<void> {
+  await db
+    .prepare("DELETE FROM rate_limits WHERE window_start < datetime('now', '-1 hour')")
+    .run();
+}

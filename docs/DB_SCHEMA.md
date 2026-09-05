@@ -13,11 +13,17 @@ Schema defined in `skyadmin_pro/db/schema.py`.
 | Table | Purpose |
 |-------|---------|
 | `clients` | Central entity — all other business tables link here. |
+| `client_groups` | Named client categories (migration m009). |
+| `clients_fts` | FTS5 full-text index over client name/contact/email (Phase 10.1). |
 | `tasks` | Per-client tasks (pending/completed), linked to pipeline steps. |
 | `documents` | Client documents with expiry dates, payment tracking. |
 | `courier_logs` | Physical courier shipments per client/task. |
 
-**Key columns — `clients`:** `id`, `name` (UNIQUE), `global_id` (sync key), `status`, `service_type`, `payment_status`, `tax_id`, `deleted_at`, `created_at`, `updated_at`.
+**Key columns — `clients`:** `id`, `name` (UNIQUE), `global_id` (sync key), `group_id` FK→`client_groups` (m009), `status`, `service_type`, `payment_status`, `tax_id`, `deleted_at`, `created_at`, `updated_at`.
+
+**Key columns — `client_groups`:** `id`, `name` (UNIQUE, case-insensitive), `color`, `created_at`. Deleting a group NULLs members' `group_id` (no cascade).
+
+**`clients_fts`:** virtual table `USING fts5(name, contact_name, email)` with `clients_fts_ai/ad/au` triggers. Lives in base `schema.py` so fresh installs search via MATCH immediately; legacy DBs are backfilled by migration m001. `search_clients()` falls back to LIKE if FTS is unavailable.
 
 **Key columns — `tasks`:** `id`, `client_id` FK, `title`, `status` (pending|completed), `category`, `due_date`, `pipeline_item_id`, `pipeline_step`, `source_document_id`, `global_id`.
 
@@ -110,6 +116,7 @@ Schema defined in `skyadmin_pro/db/schema.py`.
 - `idx_documents_ongoing_service` — partial index for ongoing service docs
 - `idx_supplier_payments_unpaid_due` — partial index for unpaid supplier payments
 - `idx_tasks_pipeline` — fast pipeline step lookup
+- `idx_clients_group` — client group filter (owned by migration m009, not base schema replay)
 
 ---
 
@@ -173,6 +180,8 @@ clients ──┬── tasks ────────── pipeline_items
           ├── supplier_payments ── suppliers
           ├── financial_documents
           ├── tax_cycle_log
+          ├── client_groups (group_id, SET NULL on delete)
+          ├── clients_fts (FTS5 mirror via triggers, not a FK)
           └── tasks ────────── service_renewals (task_id)
 
 suppliers ──┬── supplier_payments

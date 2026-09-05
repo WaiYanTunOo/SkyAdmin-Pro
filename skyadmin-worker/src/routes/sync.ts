@@ -2,6 +2,7 @@
 
 import { Context } from "hono";
 import { Env } from "../db";
+import { purgeStaleRateLimits } from "../rate_limit";
 import { parseActivationClaim } from "../verification";
 import { checkActivationEligibility } from "../sync_eligibility";
 import { newSyncToken, syncAuthMiddleware } from "../sync_auth";
@@ -90,6 +91,8 @@ export async function syncRegisterHandler(c: Context<{ Bindings: Env }>) {
   }
 
   const token = await upsertSyncDevice(c.env.DB, claim.mid);
+  // Periodic cleanup of stale rate_limits entries (mirrors claim path).
+  await purgeStaleRateLimits(c.env.DB);
   return c.json({
     ok: true,
     machine_id: claim.mid,
