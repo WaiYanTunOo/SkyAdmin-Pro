@@ -1,17 +1,27 @@
-/** Auth middleware — Bearer token required for protected /api/* routes. */
+/** Auth middleware — Bearer token or admin session cookie for /api/* routes. */
 
 import { describe, expect, it } from "vitest";
 import app from "./index";
 import type { Env } from "./db";
+import { hmacSign } from "./signing";
+
+const ADMIN = "admin-test";
+const PASS = "admin-pass";
+const SALT = "test-license-secret";
 
 function mockEnv(): Env {
   return {
     DB: {} as D1Database,
-    LICENSE_SECRET: "test-license-secret",
+    LICENSE_SECRET: SALT,
     API_TOKEN: "test-api-token",
-    ADMIN_PATH: "admin-test",
-    ADMIN_PASS: "admin-pass",
+    ADMIN_PATH: ADMIN,
+    ADMIN_PASS: PASS,
   };
+}
+
+async function sessionCookie(): Promise<string> {
+  const token = await hmacSign(PASS, ADMIN + ":session");
+  return `skyadm_${SALT.slice(0, 8)}=${token}`;
 }
 
 describe("authMiddleware", () => {
@@ -58,17 +68,58 @@ describe("authMiddleware", () => {
     expect(body.ok).toBe(true);
   });
 
-  it("rejects session cookie without Bearer token on protected route", async () => {
+  it("rejects invalid session cookie without Bearer token", async () => {
     const res = await app.request(
       "http://localhost/api/records",
       {
         method: "GET",
         headers: {
-          Cookie: "skyadm_deadbeef=fake-session-token",
+          Cookie: "skyadm_test=fake-session-token",
         },
       },
       mockEnv(),
     );
     expect(res.status).toBe(401);
+  });
+
+  it("accepts valid admin session cookie without Bearer token", async () => {
+    const db = {
+      prepare: () => ({
+        bind: () => ({
+          all: async () => ({ results: [] }),
+        }),
+        first: async () => ({ total: 0 }),
+      }),
+    } as unknown as D1Database;
+
+    const res = await app.request(
+      "http://localhost/api/records",
+      {
+        method: "GET",
+        headers: {
+          Cookie: await sessionCookie(),
+        },
+      },
+      { ...mockEnv(), DB: db },
+    );
+    expect(res.status).toBe(200);
+    const body = await res.json();
+    expect(body.ok).toBe(true);
+  });
+
+  it("admin dashboard HTML never embeds the API token", async () => {
+    const res = await app.request(
+      `http://localhost/${ADMIN}/`,
+      {
+        headers: {
+          Cookie: await sessionCookie(),
+        },
+      },
+      mockEnv(),
+    );
+    expect(res.status).toBe(200);
+    const html = await res.text();
+    expect(html).not.toContain("test-api-token");
+    expect(html).not.toContain("API_TOKEN=");
   });
 });

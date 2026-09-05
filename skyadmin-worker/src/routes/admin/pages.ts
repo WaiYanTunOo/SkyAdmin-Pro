@@ -37,7 +37,7 @@ button:active{background:#1d4ed8}
 </div></body></html>`;
 }
 
-export function buildAdminPage(adminPath: string, apiToken: string): string {
+export function buildAdminPage(adminPath: string): string {
   return `<!DOCTYPE html>
 <html lang="en"><head><meta charset="UTF-8"><meta name="viewport" content="width=device-width,initial-scale=1">
 <title>SkyAdmin Pro</title>
@@ -185,7 +185,6 @@ button.sm{width:auto;padding:7px 12px;font-size:12px;border-radius:8px;margin-to
 <div id="purgeResult" class="hint"></div>
 
 <script>
-var API_TOKEN=${JSON.stringify(apiToken)};
 var _recs=[];
 var _machines=[];
 var _bans=[];
@@ -200,7 +199,9 @@ function showStatus(m){
 }
 
 function api(method,path,body){
-  var init={method:method,headers:{'Content-Type':'application/json','Authorization':'Bearer '+API_TOKEN}};
+  // Session-cookie auth (HttpOnly, SameSite=Lax): the browser sends it
+  // automatically same-origin. The master API_TOKEN never touches the DOM.
+  var init={method:method,headers:{'Content-Type':'application/json'},credentials:'same-origin'};
   if(body)init.body=JSON.stringify(body);
   return fetch(path,init).then(function(r){
     if(!r.ok)return r.json().then(function(d){throw new Error(d.error||'API error '+r.status);});
@@ -364,7 +365,7 @@ function addPackageRow(pkg){
 }
 
 function loadPricing(showToast){
-  return fetch('/api/pricing',{headers:{'Authorization':'Bearer '+API_TOKEN}})
+  return fetch('/api/pricing',{credentials:'same-origin'})
     .then(function(r){
       if(!r.ok) throw new Error('pricing HTTP '+r.status);
       return r.json();
@@ -407,7 +408,7 @@ function priceForDays(days){
 }
 
 function checkSigningKey(){
-  fetch('/api/signing/public-key',{headers:{'Authorization':'Bearer '+API_TOKEN}}).then(function(r){return r.json();}).then(function(d){
+  fetch('/api/signing/public-key',{credentials:'same-origin'}).then(function(r){return r.json();}).then(function(d){
     if(!d.ok) return;
     var el=document.getElementById('keyBanner');
     if(!d.matches_desktop){
@@ -642,7 +643,7 @@ function doUnrevoke(nonce){
 }
 
 function loadUpdateInfo(){
-  return fetch('/api/update',{headers:{'Authorization':'Bearer '+API_TOKEN}}).then(function(r){return r.json();}).then(function(d){
+  return fetch('/api/update',{credentials:'same-origin'}).then(function(r){return r.json();}).then(function(d){
     if(!d.ok)return;
     if(d.version)document.getElementById('updVer').value=d.version;
     if(d.url)document.getElementById('updUrl').value=d.url;

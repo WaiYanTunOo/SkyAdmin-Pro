@@ -41,6 +41,7 @@ a = Analysis(
         "pyperclip",
         "tkinterdnd2",
         "pypdf",
+        "fpdf",
     ],
     hookspath=[],
     hooksconfig={},

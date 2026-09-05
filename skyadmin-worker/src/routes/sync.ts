@@ -116,7 +116,8 @@ export async function syncPullHandler(c: Context<{ Bindings: Env }>) {
   const machineId = (c.req.header("X-Machine-Id") || "").trim().toUpperCase();
   const since = (c.req.query("since") || "").trim();
   const tablesParam = (c.req.query("tables") || "").trim();
-  const limit = Math.min(500, Math.max(1, parseInt(c.req.query("limit") || "500", 10)));
+  const parsedLimit = parseInt(c.req.query("limit") || "500", 10);
+  const limit = Math.min(500, Math.max(1, Number.isNaN(parsedLimit) ? 500 : parsedLimit));
   const tables = tablesParam
     ? tablesParam.split(",").map((t) => t.trim()).filter(isSyncTable)
     : [...SYNC_TABLES];
@@ -130,13 +131,13 @@ export async function syncPullHandler(c: Context<{ Bindings: Env }>) {
     ? `SELECT table_name, global_id, row_json, updated_at, deleted_at
         FROM sync_rows
         WHERE machine_id = ? AND table_name IN (${placeholders}) AND updated_at > ?
-        ORDER BY updated_at ASC LIMIT ${limit}`
+        ORDER BY updated_at ASC LIMIT ?`
     : `SELECT table_name, global_id, row_json, updated_at, deleted_at
         FROM sync_rows
         WHERE machine_id = ? AND table_name IN (${placeholders})
-        ORDER BY updated_at ASC LIMIT ${limit}`;
+        ORDER BY updated_at ASC LIMIT ?`;
 
-  const binds = since ? [machineId, ...tables, since] : [machineId, ...tables];
+  const binds = since ? [machineId, ...tables, since, limit] : [machineId, ...tables, limit];
   const { results } = await c.env.DB.prepare(sql).bind(...binds).all<{
     table_name: string;
     global_id: string;

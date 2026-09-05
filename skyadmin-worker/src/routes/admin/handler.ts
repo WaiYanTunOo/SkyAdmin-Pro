@@ -93,5 +93,5 @@ export async function adminHandler(c: Context<{ Bindings: Env }>): Promise<Respo
   }
 
   c.header("Content-Security-Policy", ADMIN_CSP);
-  return c.html(buildAdminPage(adminPath, c.env.API_TOKEN));
+  return c.html(buildAdminPage(adminPath));
 }
