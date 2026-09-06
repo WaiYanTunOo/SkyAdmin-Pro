@@ -5,6 +5,8 @@ from __future__ import annotations
 import sys
 from unittest.mock import patch
 
+import pytest
+
 from skyadmin_pro.ui.display import _windows_widget_scale, apply_high_dpi_scaling
 
 
@@ -19,8 +21,6 @@ def test_apply_high_dpi_scaling_skips_non_windows():
     with patch.object(sys, "platform", "darwin"):
         assert apply_high_dpi_scaling() == 1.0
 
-
-import pytest
 
 @pytest.mark.skipif(sys.platform != "win32", reason="requires Windows ctypes")
 def test_apply_high_dpi_scaling_sets_ctk_on_windows():
