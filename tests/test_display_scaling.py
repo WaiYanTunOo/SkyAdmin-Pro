@@ -20,6 +20,9 @@ def test_apply_high_dpi_scaling_skips_non_windows():
         assert apply_high_dpi_scaling() == 1.0
 
 
+import pytest
+
+@pytest.mark.skipif(sys.platform != "win32", reason="requires Windows ctypes")
 def test_apply_high_dpi_scaling_sets_ctk_on_windows():
     import ctypes
 
