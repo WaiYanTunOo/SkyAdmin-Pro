@@ -6,7 +6,7 @@ import getpass
 import json
 import logging
 import os
-import sqlite3
+import re
 import sys
 import urllib.error
 import urllib.parse
@@ -15,7 +15,9 @@ from pathlib import Path
 from typing import TYPE_CHECKING, Any
 
 from skyadmin_pro.config import API_BASE_URL, SETTING_DATA_SYNC_ENABLED, SETTING_SYNC_LAST_PULL, SETTING_SYNC_LAST_PUSH
+from skyadmin_pro.db.cipher import INTEGRITY_ERRORS
 from skyadmin_pro.services.license import find_license_file, get_machine_id
+from skyadmin_pro.services.sync_hlc import hlc_now, legacy_hlc, note_remote_hlc, parse_hlc
 from skyadmin_pro.services.sync_schema import (
     FK_CLIENT_COLUMN,
     FK_GROUP_COLUMN,
@@ -24,6 +26,7 @@ from skyadmin_pro.services.sync_schema import (
     SYNC_PULL_MAX_PAGES,
     SYNC_PULL_PAGE_SIZE,
     SYNC_PUSH_ORDER,
+    SYNC_PUSH_PAGE_SIZE,
     SYNC_SCHEMA_VERSION,
     SYNC_TABLES,
 )
@@ -32,6 +35,8 @@ if TYPE_CHECKING:
     from skyadmin_pro.database import Database
 
 logger = logging.getLogger(__name__)
+
+_SYNC_IDENT_RE = re.compile(r"[A-Za-z_][A-Za-z0-9_]*\Z")
 
 # Re-export schema constants for callers/tests that import from data_sync.
 __all__ = [
@@ -42,6 +47,7 @@ __all__ = [
     "SYNC_PULL_MAX_PAGES",
     "SYNC_PULL_PAGE_SIZE",
     "SYNC_PUSH_ORDER",
+    "SYNC_PUSH_PAGE_SIZE",
     "SYNC_SCHEMA_VERSION",
     "SYNC_TABLES",
     "apply_remote_changes",
@@ -110,8 +116,8 @@ def save_sync_credentials(machine_id: str, sync_token: str) -> None:
     path.write_text(encrypt_secret(payload), encoding="utf-8")
     try:
         path.chmod(0o600)
-    except Exception:
-        pass
+    except OSError as exc:
+        logger.warning("Could not chmod %s: %s", path, exc)
     # Windows NTFS: chmod is no-op — restrict ACL to current user via icacls
     if sys.platform == "win32":
         try:
@@ -128,8 +134,8 @@ def save_sync_credentials(machine_id: str, sync_token: str) -> None:
                 capture_output=True,
                 timeout=5,
             )
-        except Exception:
-            pass
+        except (OSError, subprocess.SubprocessError, ValueError) as exc:
+            logger.warning("Could not restrict ACL on %s: %s", path, exc)
 
 
 def _license_code() -> str | None:
@@ -316,25 +322,47 @@ def _filter_sync_row(table: str, row: dict[str, Any]) -> dict[str, Any]:
     return {k: v for k, v in row.items() if k in allowed}
 
 
+def _sync_ident(name: str) -> str:
+    """Quote a table/column identifier for sync SQL.
+
+    Trust assumption: every identifier passed here is an allowlisted constant —
+    table names are validated against SYNC_TABLES and column names originate
+    from SYNC_ALLOWED_COLUMNS (plus the internal remaps ``global_id``,
+    ``updated_at``, ``client_id``, ``group_id``). Remote payload keys are
+    filtered through _filter_sync_row before reaching SQL. Quoting is
+    defense-in-depth; anything outside ``[A-Za-z_][A-Za-z0-9_]*`` raises.
+    """
+    text = str(name or "")
+    if not _SYNC_IDENT_RE.match(text):
+        raise ValueError(f"Refusing sync SQL identifier: {name!r}")
+    return f'"{text}"'
+
+
 def _parse_updated_at(value: str) -> float:
+    """Parse an `updated_at` value to a UTC epoch for last-write-wins.
+
+    Fleet convention: desktop writers stamp local-naive
+    ``YYYY-MM-DD HH:MM:SS`` (``Database._now()`` / ``datetime('now',
+    'localtime')``). Naive values are treated as UTC so ordering stays
+    consistent across rows sharing the convention; values carrying an
+    explicit zone (``Z`` or ``±HH:MM``) are honored exactly.
+    Unparseable input returns 0.0 (loses LWW) instead of raising.
+    """
+    from datetime import datetime, timezone
+
     text = str(value or "").strip()
     if not text:
         return 0.0
-    from datetime import datetime, timezone
-
     normalized = text.replace(" ", "T")
-    # Treat DB timestamps as UTC if no explicit zone (SQLite datetime('now') is UTC)
-    if not normalized.endswith("Z") and "+" not in normalized and normalized.count("-") <= 2:
-        # No timezone info — assume UTC
-        if "T" in normalized and normalized[-3] != ":" and normalized[-6] != "+" or "T" not in normalized:
-            normalized = f"{normalized}Z"
-    else:
-        if not normalized.endswith("Z") and "+" not in normalized:
-            normalized = f"{normalized}Z"
     try:
-        dt = datetime.fromisoformat(normalized.replace("Z", "+00:00"))
-        if dt.tzinfo is None:
-            dt = dt.replace(tzinfo=timezone.utc)
+        if normalized.endswith(("Z", "z")):
+            dt = datetime.fromisoformat(normalized[:-1] + "+00:00")
+        elif len(normalized) >= 6 and normalized[-3] == ":" and normalized[-6] in "+-":
+            dt = datetime.fromisoformat(normalized)
+        else:
+            dt = datetime.fromisoformat(normalized)
+            if dt.tzinfo is None:
+                dt = dt.replace(tzinfo=timezone.utc)
         return dt.astimezone(timezone.utc).timestamp()
     except ValueError:
         return 0.0
@@ -374,6 +402,8 @@ def log_sync_conflict(
     direction: str,
     local_updated_at: str | None,
     remote_updated_at: str | None,
+    hlc_winner: str | None = None,
+    hlc_loser: str | None = None,
 ) -> None:
     with db.connection() as conn:
         existing = conn.execute(
@@ -388,15 +418,18 @@ def log_sync_conflict(
             return
         conn.execute(
             """
-            INSERT INTO sync_conflicts (table_name, global_id, direction, local_updated_at, remote_updated_at)
-            VALUES (?, ?, ?, ?, ?)
+            INSERT INTO sync_conflicts (table_name, global_id, direction, local_updated_at, remote_updated_at,
+                                        hlc_winner, hlc_loser)
+            VALUES (?, ?, ?, ?, ?, ?, ?)
             """,
-            (table, global_id, direction, local_updated_at, remote_updated_at),
+            (table, global_id, direction, local_updated_at, remote_updated_at, hlc_winner, hlc_loser),
         )
 
 
-def collect_local_changes(db: Database, *, since: str = "", limit: int = 500) -> list[dict[str, Any]]:
-    """Collect active rows and soft-delete tombstones for push (bounded)."""
+def collect_local_changes(db: Database, *, since: str = "", limit: int | None = None) -> list[dict[str, Any]]:
+    """Collect active rows and soft-delete tombstones for push (bounded globally)."""
+    if limit is None:
+        limit = SYNC_PUSH_PAGE_SIZE
     changes: list[dict[str, Any]] = []
     since = (since or "").strip()
     # Batch client / group global_id lookups for FK remapping
@@ -415,10 +448,11 @@ def collect_local_changes(db: Database, *, since: str = "", limit: int = 500) ->
         logger.warning("Batch group GID lookup failed, using per-row fallback", exc_info=True)
         group_gid_map = {}
     for table in SYNC_PUSH_ORDER:
+        t = _sync_ident(table)
         if since:
             rows = db._fetch_all(
                 f"""
-                SELECT * FROM {table}
+                SELECT * FROM {t}
                 WHERE global_id IS NOT NULL AND TRIM(global_id) != ''
                   AND updated_at > ?
                 ORDER BY updated_at ASC LIMIT ?
@@ -427,7 +461,7 @@ def collect_local_changes(db: Database, *, since: str = "", limit: int = 500) ->
             )
         else:
             rows = db._fetch_all(
-                f"SELECT * FROM {table} WHERE global_id IS NOT NULL AND TRIM(global_id) != '' ORDER BY updated_at ASC LIMIT ?",
+                f"SELECT * FROM {t} WHERE global_id IS NOT NULL AND TRIM(global_id) != '' ORDER BY updated_at ASC LIMIT ?",
                 (limit,),
             )
         for row in rows:
@@ -458,6 +492,7 @@ def collect_local_changes(db: Database, *, since: str = "", limit: int = 500) ->
                         "created_at",
                         "updated_at",
                         "deleted_at",
+                        "hlc",
                         FK_CLIENT_COLUMN,
                         FK_GROUP_COLUMN,
                     )
@@ -472,24 +507,47 @@ def collect_local_changes(db: Database, *, since: str = "", limit: int = 500) ->
                     "row": row_payload,
                     "updated_at": str(row.get("updated_at") or row.get("created_at") or ""),
                     "deleted_at": deleted_at,
+                    # Phase 2: HLC stamped in updated_at order (see sync_hlc).
+                    "hlc": hlc_now(db),
+                    "proto": 2,
                 }
             )
-    return changes
+
+    # Sort globally by (updated_at, hlc) and strictly truncate to global limit
+    changes.sort(key=lambda c: (c["updated_at"], c.get("hlc") or ""))
+    return changes[:limit]
 
 
 def _apply_remote_change(db: Database, change: dict[str, Any]) -> str:
-    """Apply one remote change. Returns 'applied', 'skipped', or 'invalid'."""
+    """Apply one remote change. Returns 'applied', 'skipped', or 'invalid'.
+
+    Phase 2 merge: when both sides carry a valid HLC the clocks decide
+    (total order — ties impossible); otherwise the legacy updated_at
+    comparison applies. Either way the incoming HLC, when valid, is stored
+    and the local clock fast-forwards past it.
+    """
     table = str(change.get("table") or "")
     global_id = str(change.get("global_id") or "").strip()
     updated_at = str(change.get("updated_at") or "").strip()
     if table not in SYNC_TABLES or not global_id or not updated_at:
         return "invalid"
 
+    remote_hlc = parse_hlc(change.get("hlc"))
     local = db._fetch_one(
-        f"SELECT id, updated_at FROM {table} WHERE global_id = ?",
+        f"SELECT id, updated_at, hlc FROM {_sync_ident(table)} WHERE global_id = ?",
         (global_id,),
     )
-    if local and _parse_updated_at(str(local.get("updated_at") or "")) >= _parse_updated_at(updated_at):
+    local_hlc = None
+    if local:
+        local_hlc = parse_hlc(local.get("hlc")) or legacy_hlc(str(local.get("updated_at") or ""))
+    if local and (
+        (remote_hlc is not None and local_hlc is not None and remote_hlc <= local_hlc)
+        or (
+            (remote_hlc is None or local_hlc is None)
+            and _parse_updated_at(str(local.get("updated_at") or "")) >= _parse_updated_at(updated_at)
+        )
+    ):
+        local_hlc_str = local.get("hlc") if isinstance(local.get("hlc"), str) else None
         log_sync_conflict(
             db,
             table=table,
@@ -497,16 +555,29 @@ def _apply_remote_change(db: Database, change: dict[str, Any]) -> str:
             direction="pull",
             local_updated_at=str(local.get("updated_at") or ""),
             remote_updated_at=updated_at,
+            hlc_winner=local_hlc_str,
+            hlc_loser=str(change.get("hlc") or ""),
         )
+        if remote_hlc is not None:
+            note_remote_hlc(db, change.get("hlc"))
         return "skipped"
+    if remote_hlc is not None:
+        note_remote_hlc(db, change.get("hlc"))
 
     if change.get("deleted_at"):
         if local:
+            t = _sync_ident(table)
             with db.connection() as conn:
-                conn.execute(
-                    f"UPDATE {table} SET deleted_at = ?, updated_at = ? WHERE global_id = ?",
-                    (change.get("deleted_at"), updated_at, global_id),
-                )
+                if remote_hlc is not None:
+                    conn.execute(
+                        f"UPDATE {t} SET deleted_at = ?, updated_at = ?, hlc = ? WHERE global_id = ?",
+                        (change.get("deleted_at"), updated_at, str(change.get("hlc")), global_id),
+                    )
+                else:
+                    conn.execute(
+                        f"UPDATE {t} SET deleted_at = ?, updated_at = ? WHERE global_id = ?",
+                        (change.get("deleted_at"), updated_at, global_id),
+                    )
             if table == "client_groups":
                 local_id = int(local["id"])
                 with db.connection() as conn:
@@ -520,6 +591,8 @@ def _apply_remote_change(db: Database, change: dict[str, Any]) -> str:
     row["global_id"] = global_id
     row["updated_at"] = updated_at
     row.pop("deleted_at", None)
+    if remote_hlc is not None:
+        row["hlc"] = str(change.get("hlc"))
 
     if table in ("tasks", "office_contacts", "notebook_entries"):
         client_gid = row.pop(FK_CLIENT_COLUMN, None) or row.pop("client_global_id", None)
@@ -540,27 +613,28 @@ def _apply_remote_change(db: Database, change: dict[str, Any]) -> str:
         cols = [k for k in row if k != "global_id"]
         if not cols:
             return "invalid"
-        assignments = ", ".join(f"{col} = ?" for col in cols)
+        assignments = ", ".join(f"{_sync_ident(col)} = ?" for col in cols)
         values = [row[col] for col in cols] + [global_id]
         with db.connection() as conn:
-            conn.execute(f"UPDATE {table} SET {assignments} WHERE global_id = ?", values)
+            conn.execute(f"UPDATE {_sync_ident(table)} SET {assignments} WHERE global_id = ?", values)
         return "applied"
 
     cols = list(row.keys())
+    col_list = ", ".join(_sync_ident(c) for c in cols)
     placeholders = ", ".join("?" for _ in cols)
     try:
         with db.connection() as conn:
             conn.execute(
-                f"INSERT INTO {table} ({', '.join(cols)}) VALUES ({placeholders})",
+                f"INSERT INTO {_sync_ident(table)} ({col_list}) VALUES ({placeholders})",
                 [row[col] for col in cols],
             )
-    except sqlite3.IntegrityError:
+    except INTEGRITY_ERRORS:
         if table != "client_groups" or "name" not in row:
             raise
         row["name"] = _unique_group_name(db, f"{row.get('name')}*", global_id)
         with db.connection() as conn:
             conn.execute(
-                f"INSERT INTO {table} ({', '.join(cols)}) VALUES ({placeholders})",
+                f"INSERT INTO {_sync_ident(table)} ({col_list}) VALUES ({placeholders})",
                 [row[col] for col in cols],
             )
     return "applied"
@@ -578,12 +652,17 @@ def apply_remote_changes(db: Database, changes: list[dict[str, Any]]) -> tuple[i
     upserts_ordered = sorted(
         upserts, key=lambda c: SYNC_PUSH_ORDER.index(c["table"]) if c.get("table") in SYNC_PUSH_ORDER else 99
     )
-    for change in deletes_ordered + upserts_ordered:
-        result = _apply_remote_change(db, change)
-        if result == "applied":
-            applied += 1
-        elif result == "skipped":
-            conflicts += 1
+    # One transaction per pull page: bundle_queries() pins a single connection
+    # so inner connection() checkouts reuse it with one commit on clean exit
+    # (rollback on error) instead of one connection/commit per row.
+    opener = getattr(db, "bundle_queries", None) or db.connection
+    with opener():
+        for change in deletes_ordered + upserts_ordered:
+            result = _apply_remote_change(db, change)
+            if result == "applied":
+                applied += 1
+            elif result == "skipped":
+                conflicts += 1
     return applied, conflicts
 
 
@@ -593,10 +672,11 @@ def ensure_sync_ids(db: Database) -> None:
 
     with db.connection() as conn:
         for table in SYNC_TABLES:
-            rows = conn.execute(f"SELECT id FROM {table} WHERE global_id IS NULL OR TRIM(global_id) = ''").fetchall()
+            t = _sync_ident(table)
+            rows = conn.execute(f"SELECT id FROM {t} WHERE global_id IS NULL OR TRIM(global_id) = ''").fetchall()
             for row in rows:
                 conn.execute(
-                    f"UPDATE {table} SET global_id = ? WHERE id = ?",
+                    f"UPDATE {t} SET global_id = ? WHERE id = ?",
                     (uuid.uuid4().hex, int(row["id"])),
                 )
 
@@ -660,30 +740,56 @@ def sync_data(db: Database, *, timeout: float = 25.0) -> tuple[bool, str]:
             break
         since = last_ua
 
-    local_changes = collect_local_changes(db, since=db.get_setting(SETTING_SYNC_LAST_PUSH) or "")
-    push_ok, push_result = _sync_request(
-        "POST",
-        "/api/sync/push",
-        machine_id=machine_id,
-        token=token,
-        body={"changes": local_changes},
-        timeout=timeout,
-    )
-    if not push_ok:
-        return False, f"Push failed: {push_result}"
+    push_pages = 0
+    total_applied = 0
+    push_conflicts = 0
+    push_since = db.get_setting(SETTING_SYNC_LAST_PUSH) or ""
+    # Pull watermark stays on Worker server_time; push cursor tracks local updated_at.
+    last_server_time = str(pull_data.get("server_time") or "")
 
-    push_data = push_result if isinstance(push_result, dict) else {}
-    server_time = str(pull_data.get("server_time") or push_data.get("server_time") or "")
-    if server_time:
-        db.set_setting(SETTING_SYNC_LAST_PULL, server_time)
-        # Always advance push cursor on successful push (avoid infinite re-push of rejected changes)
-        db.set_setting(SETTING_SYNC_LAST_PUSH, server_time)
+    while push_pages < SYNC_PULL_MAX_PAGES:
+        local_changes = collect_local_changes(db, since=push_since, limit=SYNC_PUSH_PAGE_SIZE)
+        if not local_changes:
+            break
 
-    applied = int(push_data.get("applied") or 0)
-    push_conflicts = int(push_data.get("conflicts") or 0)
+        push_pages += 1
+        push_ok, push_result = _sync_request(
+            "POST",
+            "/api/sync/push",
+            machine_id=machine_id,
+            token=token,
+            body={"changes": local_changes},
+            timeout=timeout,
+        )
+        if not push_ok:
+            return False, f"Push failed: {push_result}"
+
+        push_data = push_result if isinstance(push_result, dict) else {}
+        server_time = str(push_data.get("server_time") or "")
+        if server_time:
+            last_server_time = server_time
+
+        last_pushed_ua = str(local_changes[-1].get("updated_at") or "").strip()
+        if not last_pushed_ua or last_pushed_ua == push_since:
+            break
+
+        # Persist local updated_at so the next sync/page continues without skipping.
+        push_since = last_pushed_ua
+        db.set_setting(SETTING_SYNC_LAST_PUSH, push_since)
+
+        total_applied += int(push_data.get("applied") or 0)
+        push_conflicts += int(push_data.get("conflicts") or 0)
+
+        if len(local_changes) < SYNC_PUSH_PAGE_SIZE:
+            break
+
+    if last_server_time:
+        db.set_setting(SETTING_SYNC_LAST_PULL, last_server_time)
+
     conflicts = pull_conflicts + push_conflicts
     page_note = f" ({pages} pull page{'s' if pages != 1 else ''})" if pages > 1 else ""
-    msg = f"Data sync OK — pulled {pulled}, pushed {applied}{page_note}."
+    push_note = f" ({push_pages} push page{'s' if push_pages != 1 else ''})" if push_pages > 1 else ""
+    msg = f"Data sync OK — pulled {pulled}{page_note}, pushed {total_applied}{push_note}."
     if conflicts:
         msg += f" {conflicts} conflict(s) logged."
     return True, msg

@@ -2,7 +2,7 @@
 
 from __future__ import annotations
 
-SYNC_SCHEMA_VERSION = 2
+SYNC_SCHEMA_VERSION = 3
 
 # Parent groups first so clients can remap group_global_id on apply.
 SYNC_TABLES: tuple[str, ...] = (
@@ -15,6 +15,8 @@ SYNC_TABLES: tuple[str, ...] = (
 SYNC_PUSH_ORDER: tuple[str, ...] = SYNC_TABLES
 SYNC_PULL_PAGE_SIZE = 500
 SYNC_PULL_MAX_PAGES = 100
+# Global push batch cap (across all tables) — keeps Worker request bodies bounded.
+SYNC_PUSH_PAGE_SIZE = 200
 
 FK_CLIENT_COLUMN = "client_global_id"
 FK_GROUP_COLUMN = "group_global_id"
@@ -37,6 +39,7 @@ SYNC_ALLOWED_COLUMNS: dict[str, frozenset[str]] = {
             "created_at",
             "updated_at",
             "deleted_at",
+            "hlc",
         }
     ),
     "clients": frozenset(
@@ -79,6 +82,7 @@ SYNC_ALLOWED_COLUMNS: dict[str, frozenset[str]] = {
             "created_at",
             "updated_at",
             "deleted_at",
+            "hlc",
             FK_GROUP_COLUMN,
         }
     ),
@@ -97,6 +101,7 @@ SYNC_ALLOWED_COLUMNS: dict[str, frozenset[str]] = {
             "created_at",
             "updated_at",
             "deleted_at",
+            "hlc",
             FK_CLIENT_COLUMN,
         }
     ),
@@ -116,6 +121,7 @@ SYNC_ALLOWED_COLUMNS: dict[str, frozenset[str]] = {
             "created_at",
             "updated_at",
             "deleted_at",
+            "hlc",
             FK_CLIENT_COLUMN,
         }
     ),
@@ -132,6 +138,7 @@ SYNC_ALLOWED_COLUMNS: dict[str, frozenset[str]] = {
             "created_at",
             "updated_at",
             "deleted_at",
+            "hlc",
             FK_CLIENT_COLUMN,
         }
     ),

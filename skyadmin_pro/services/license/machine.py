@@ -113,10 +113,23 @@ def get_machine_id() -> str:
 
     computed = _legacy_machine_id() if has_existing_license else (_windows_stable_id() or _legacy_machine_id())
     try:
+        import os
+        import tempfile
+
         from skyadmin_pro.paths import app_data_dir
 
         base = Path(app_data_dir())
-        (base / HARDWARE_ID_FILENAME).write_text(computed, encoding="utf-8")
+        # Atomic freeze: concurrent first-starts must not interleave partial writes.
+        fd, tmp_name = tempfile.mkstemp(dir=str(base), prefix=".hardware_", suffix=".tmp")
+        try:
+            with os.fdopen(fd, "w", encoding="utf-8") as fh:
+                fh.write(computed)
+            os.replace(tmp_name, base / HARDWARE_ID_FILENAME)
+        finally:
+            try:
+                Path(tmp_name).unlink(missing_ok=True)
+            except OSError:
+                pass
         shadow = base / "backups" / (HARDWARE_ID_FILENAME + ".shadow")
         shadow.parent.mkdir(parents=True, exist_ok=True)
         shadow.write_text(computed, encoding="utf-8")

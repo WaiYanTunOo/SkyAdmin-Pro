@@ -61,7 +61,8 @@ SUBTAB_NAMES: tuple[str, ...] = (
 )
 
 
-class CompanyDetailsPanel(    GeneralTabMixin,
+class CompanyDetailsPanel(
+    GeneralTabMixin,
     AccountingSetupTabMixin,
     TaxIdsTabMixin,
     FilingTabMixin,
@@ -650,7 +651,6 @@ class CompanyDetailsPanel(    GeneralTabMixin,
         top.title("Renew / extend service")
         top.geometry("500x400")
         top.transient(self.winfo_toplevel())
-        top.attributes("-topmost", True)
         make_modal(top)
         top.grid_columnconfigure(0, weight=1)
 
@@ -752,7 +752,6 @@ class CompanyDetailsPanel(    GeneralTabMixin,
         top.title("Renewal history")
         top.geometry("720x400")
         top.transient(self.winfo_toplevel())
-        top.attributes("-topmost", True)
         make_modal(top)
         top.grid_columnconfigure(0, weight=1)
         top.grid_rowconfigure(1, weight=1)

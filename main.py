@@ -8,6 +8,7 @@ Run from the project root:
 from __future__ import annotations
 
 import logging
+import os
 import sys
 from pathlib import Path
 from typing import TYPE_CHECKING
@@ -506,6 +507,40 @@ def main() -> None:
     try:
         import customtkinter as ctk  # noqa: F401  (theme set inside bootstrap)
 
+        # Phase 3: optional Qt6 shell (CustomTkinter stays the default).
+        # License checks above already passed; the Qt shell reuses them.
+        if os.environ.get("SKYADMIN_UI", "").strip().lower() == "qt6":
+            from skyadmin_pro.ui.qt import available as _qt_available
+            from skyadmin_pro.ui.qt import launch as _qt_launch
+
+            if not _qt_available():
+                raise SystemExit("Qt6 shell requested (SKYADMIN_UI=qt6) but PySide6 is not installed.")
+            from skyadmin_pro.config import SETTING_WORKSPACE_ROOT
+            from skyadmin_pro.database import Database
+            from skyadmin_pro.paths import WorkspacePaths, default_workspace_root
+
+            _migrate_legacy_portable()
+            qt_db = Database()
+            _normalize_workspace(qt_db)
+            qt_workspace = qt_db.get_setting(SETTING_WORKSPACE_ROOT) or str(default_workspace_root())
+            qt_paths = WorkspacePaths(qt_workspace)
+            try:
+                qt_paths.ensure()
+            except OSError as exc:
+                _fatal_error(
+                    "SkyAdmin Pro — workspace error",
+                    f"Cannot create the workspace folder:\n{qt_paths.root}\n\n{exc}\n\n",
+                )
+                raise SystemExit(1) from exc
+            try:
+                raise SystemExit(_qt_launch(qt_db, qt_paths))
+            finally:
+                try:
+                    qt_db.shutdown()
+                except Exception:
+                    pass
+            return
+
         app = bootstrap()
 
         # Periodic license enforcement — re-check every 5 minutes + daily online.
@@ -588,4 +623,7 @@ def main() -> None:
 
 
 if __name__ == "__main__":
+    import multiprocessing
+
+    multiprocessing.freeze_support()
     main()

@@ -9,6 +9,7 @@ from __future__ import annotations
 import base64
 import hashlib
 import logging
+import sqlite3
 import tempfile
 import zipfile
 from dataclasses import dataclass
@@ -41,6 +42,78 @@ class RestoreSummary:
     database_bytes: int
     workspace_files_restored: int
     workspace_bytes: int
+
+
+def _snapshot_db_for_backup(db_file: Path, staging_dir: Path) -> Path:
+    """Online-safe snapshot of the live DB (includes WAL content).
+
+    Uses the backup API so a backup taken while the app holds the DB open
+    is not torn. The live DB is SQLCipher-encrypted (Phase 1), so the
+    snapshot goes through a keyed connection and stays encrypted inside
+    the Fernet envelope. Falls back to a raw copy when the source is not
+    a real database (e.g. unit tests with dummy bytes).
+    """
+    from skyadmin_pro.db.cipher import DB_ERRORS
+    from skyadmin_pro.db.cipher import connect as cipher_connect
+
+    snapshot = staging_dir / "skyadmin_pro.db"
+    try:
+        src = cipher_connect(str(db_file))
+    except (OSError, DB_ERRORS, RuntimeError):
+        snapshot.write_bytes(Path(db_file).read_bytes())
+        return snapshot
+    try:
+        try:
+            out = cipher_connect(str(snapshot))
+        except (OSError, DB_ERRORS, RuntimeError):
+            return snapshot if snapshot.exists() else _copy_fallback(db_file, snapshot)
+        try:
+            src.backup(out)
+        finally:
+            out.close()
+    finally:
+        src.close()
+    if not snapshot.exists():
+        return _copy_fallback(db_file, snapshot)
+    return snapshot
+
+
+def _copy_fallback(db_file: Path, snapshot: Path) -> Path:
+    snapshot.write_bytes(Path(db_file).read_bytes())
+    return snapshot
+
+
+def _looks_like_sqlite(payload: bytes) -> bool:
+    return payload[:16] == b"SQLite format 3\x00"
+
+
+def _verify_sqlite_payload(tmp_db: Path) -> None:
+    """Fail-closed integrity check for a restored DB payload.
+
+    Phase 1: payloads may be SQLCipher-encrypted (current backups) or
+    legacy plaintext (old backups) — verified with the matching backend.
+    Non-database bytes (unit-test fixtures) skip verification.
+    """
+
+    payload = Path(tmp_db).read_bytes()
+    if _looks_like_sqlite(payload):
+        conn = sqlite3.connect(str(tmp_db))
+        try:
+            row = conn.execute("PRAGMA quick_check").fetchone()
+        finally:
+            conn.close()
+    elif len(payload) >= 16:
+        from skyadmin_pro.db.cipher import connect as cipher_connect
+
+        conn = cipher_connect(str(tmp_db))
+        try:
+            row = conn.execute("PRAGMA quick_check").fetchone()
+        finally:
+            conn.close()
+    else:
+        return
+    if not row or row[0] != "ok":
+        raise ValueError("Backup database failed integrity check — restore aborted.")
 
 
 def format_byte_size(num_bytes: int) -> str:
@@ -137,7 +210,7 @@ def encrypt_file(path: Path, machine_id: str) -> bool:
             with os.fdopen(tmp_fd, "wb") as handle:
                 handle.write(encrypted)
             os.replace(tmp_name, path)
-        except Exception:
+        except OSError:
             try:
                 os.unlink(tmp_name)
             except OSError:
@@ -147,7 +220,7 @@ def encrypt_file(path: Path, machine_id: str) -> bool:
     except OSError as exc:
         logger.warning("encrypt_file failed for %s: %s", path, exc)
         return False
-    except Exception:
+    except (ValueError, TypeError):
         logger.exception("encrypt_file failed for %s", path)
         return False
 
@@ -185,7 +258,7 @@ def decrypt_file(path: Path, machine_id: str) -> bool:
             with os.fdopen(tmp_fd, "wb") as handle:
                 handle.write(data)
             os.replace(tmp_name, path)
-        except Exception:
+        except OSError:
             try:
                 os.unlink(tmp_name)
             except OSError:
@@ -272,19 +345,34 @@ def create_encrypted_backup(workspace_root: Path, db_file: Path, dest: Path) -> 
     with tempfile.NamedTemporaryFile(delete=False, suffix=".zip") as tmp:
         tmp_path = Path(tmp.name)
     try:
-        with zipfile.ZipFile(tmp_path, "w", zipfile.ZIP_DEFLATED) as archive:
+        with tempfile.TemporaryDirectory(prefix="skybackup_db_") as staging:
+            db_snapshot: Path | None = None
             if db_file.exists():
-                archive.write(db_file, arcname="skyadmin_pro.db")
-            ws = Path(workspace_root)
-            if ws.exists():
-                for file_path in ws.rglob("*"):
-                    if not file_path.is_file():
-                        continue
-                    try:
-                        arc = file_path.relative_to(ws)
-                    except ValueError:
-                        continue
-                    archive.write(file_path, arcname=f"{WORKSPACE_PREFIX}{arc.as_posix()}")
+                from skyadmin_pro.db.cipher import DB_ERRORS as _DB_ERRORS
+
+                try:
+                    db_snapshot = _snapshot_db_for_backup(Path(db_file), Path(staging))
+                except (OSError, ValueError) + _DB_ERRORS:
+                    logger.warning("DB snapshot failed; falling back to raw copy", exc_info=True)
+                    db_snapshot = None
+            with zipfile.ZipFile(tmp_path, "w", zipfile.ZIP_DEFLATED) as archive:
+                if db_snapshot is not None and db_snapshot.exists():
+                    archive.write(db_snapshot, arcname="skyadmin_pro.db")
+                elif db_file.exists():
+                    archive.write(db_file, arcname="skyadmin_pro.db")
+                ws = Path(workspace_root)
+                if ws.exists():
+                    for file_path in ws.rglob("*"):
+                        if not file_path.is_file():
+                            continue
+                        try:
+                            arc = file_path.relative_to(ws)
+                        except ValueError:
+                            continue
+                        # Don't recurse backups into themselves.
+                        if arc.parts and arc.parts[0] in {"AutoBackups", "backups"}:
+                            continue
+                        archive.write(file_path, arcname=f"{WORKSPACE_PREFIX}{arc.as_posix()}")
         dest.write_bytes(MAGIC + fernet.encrypt(tmp_path.read_bytes()))
         return dest
     finally:
@@ -322,9 +410,23 @@ def restore_encrypted_backup(archive: Path, workspace_root: Path, db_file: Path)
                     workspace_bytes += info.file_size
 
             db_info = archive_zip.getinfo("skyadmin_pro.db")
+            db_payload = archive_zip.read("skyadmin_pro.db")
             db_file = Path(db_file)
             db_file.parent.mkdir(parents=True, exist_ok=True)
-            db_file.write_bytes(archive_zip.read("skyadmin_pro.db"))
+            # Atomic DB swap: stage to temp, verify, then replace live file.
+            import os
+
+            staged_db = db_file.with_suffix(db_file.suffix + ".new")
+            staged_db.write_bytes(db_payload)
+            try:
+                if _looks_like_sqlite(db_payload):
+                    _verify_sqlite_payload(staged_db)
+                os.replace(staged_db, db_file)
+            finally:
+                try:
+                    staged_db.unlink(missing_ok=True)
+                except OSError:
+                    pass
             remove_sqlite_sidecars(db_file)
 
             restored_files = 0
@@ -334,7 +436,11 @@ def restore_encrypted_backup(archive: Path, workspace_root: Path, db_file: Path)
                     target.mkdir(parents=True, exist_ok=True)
                     continue
                 target.parent.mkdir(parents=True, exist_ok=True)
-                target.write_bytes(archive_zip.read(info.filename))
+                staged = target.with_name(target.name + ".new")
+                staged.write_bytes(archive_zip.read(info.filename))
+                import os as _os
+
+                _os.replace(staged, target)
                 restored_files += 1
         return RestoreSummary(
             database_bytes=db_info.file_size,

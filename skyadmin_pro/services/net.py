@@ -31,9 +31,7 @@ def require_https_api_url(api_url: str) -> str:
     host = (parts.hostname or "").lower()
     if scheme == "https":
         return url
-    if scheme == "http" and (
-        host in _LOCAL_HOSTS or os.environ.get(_ALLOW_HTTP_ENV) == "1"
-    ):
+    if scheme == "http" and (host in _LOCAL_HOSTS or os.environ.get(_ALLOW_HTTP_ENV) == "1"):
         return url
     raise RuntimeError(
         f"Refusing insecure API URL ({scheme or '?'}://{host or '?'}). "

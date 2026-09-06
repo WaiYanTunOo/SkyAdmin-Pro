@@ -44,8 +44,11 @@ class TaskPanel(ctk.CTkFrame):
         self.filter.set("Pending")
         self.filter.pack(side="left")
         self.columns_btn = ctk.CTkButton(
-            top, text="⋮ Columns", width=90,
-            fg_color="transparent", border_width=1,
+            top,
+            text="⋮ Columns",
+            width=90,
+            fg_color="transparent",
+            border_width=1,
             command=self._show_columns_menu,
         )
         self.columns_btn.pack(side="right")
@@ -79,20 +82,30 @@ class TaskPanel(ctk.CTkFrame):
         pager = ctk.CTkFrame(tree_card, fg_color="transparent")
         pager.grid(row=2, column=0, sticky="ew", padx=12, pady=(0, 10))
         self.prev_btn = ctk.CTkButton(
-            pager, text="◀ Prev", width=80, fg_color="transparent", border_width=1,
+            pager,
+            text="◀ Prev",
+            width=80,
+            fg_color="transparent",
+            border_width=1,
             command=self._prev_page,
         )
         self.prev_btn.pack(side="left")
         self.page_label = ctk.CTkLabel(pager, text="Page 1", text_color=TEXT_MUTED)
         self.page_label.pack(side="left", padx=10)
         self.next_btn = ctk.CTkButton(
-            pager, text="Next ▶", width=80, fg_color="transparent", border_width=1,
+            pager,
+            text="Next ▶",
+            width=80,
+            fg_color="transparent",
+            border_width=1,
             command=self._next_page,
         )
         self.next_btn.pack(side="left")
         self.page_size_menu = ctk.CTkOptionMenu(
-            pager, values=["100", "250", "500", "1000"],
-            width=90, command=self._on_page_size,
+            pager,
+            values=["100", "250", "500", "1000"],
+            width=90,
+            command=self._on_page_size,
         )
         self.page_size_menu.set("250")
         self.page_size_menu.pack(side="right")

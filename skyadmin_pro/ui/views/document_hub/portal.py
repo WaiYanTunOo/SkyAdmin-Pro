@@ -74,6 +74,10 @@ class PortalUploadPanel(ctk.CTkFrame):
     def refresh(self) -> None:
         folder = self.app.paths.ready_to_upload
         files, signature = file_ops.list_files_with_signature(folder)
+        self.render_files(files, signature)
+
+    def render_files(self, files, signature) -> None:
+        """Apply a background-scanned file list on the main thread."""
         if signature == self._signature:
             return
         self._signature = signature

@@ -28,7 +28,12 @@ def direction_codes(label: str) -> tuple[str, str]:
 
 
 def _translate_once(translator, text: str) -> str:
-    """Run one blocking translate call with a timeout (daemon thread + join)."""
+    """Run one blocking translate call with a timeout (daemon thread + join).
+
+    The worker is daemonic so a timed-out call never outlives the process;
+    callers must already be off the UI thread (utilities view uses
+    ``run_background``) since join + the single retry sleep block.
+    """
     import threading
 
     box: dict[str, object] = {}
@@ -68,6 +73,7 @@ def translate_text(text: str, source: str, target: str) -> str:
             last_exc = exc
             if attempt == 0:
                 import time
+
                 time.sleep(1.0)
     else:
         raise RuntimeError("Translation failed. Check the internet connection and try again.") from last_exc

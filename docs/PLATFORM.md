@@ -2,7 +2,7 @@
 
 SkyAdmin Pro is designed so **one SQLite database** remains the source of truth on desktop today, while mobile and additional desktop OS targets can share the same data model later through the existing Cloudflare Worker API (`skyadmin-worker/`).
 
-## Current status (v0.3.2)
+## Current status (v0.3.3)
 
 | Platform | Status | Notes |
 |---|---|---|
@@ -25,6 +25,21 @@ New in **Office Hub** (sidebar):
 - **Contacts** — government, bank, vendor, senior, client liaison directory
 - **Password Vault** — encrypted credentials linked to clients/contacts
 - **Notebook** — daily/weekly reports, customer instructions, senior notes
+
+### Qt6 shell (Phase 3, optional)
+
+An opt-in Qt6 shell lives in `skyadmin_pro/ui/qt/` (nav + lazy stacked
+pages + QThread async bridge + theme bridge over `ui/theme.py` tokens).
+CustomTkinter stays the default and only ship path.
+
+```powershell
+pip install -r requirements-qt6.txt   # PySide6 (LGPL)
+$env:SKYADMIN_UI = "qt6"; python main.py
+```
+
+PySide6 is preferred over PyQt6 (LGPL dynamic-link OK for proprietary
+builds; PyQt6 needs a commercial license). Per-view ports land behind the
+same lazy seam; the Phase 4 walkthrough suite is the acceptance bar.
 
 ## Cross-platform strategy (later)
 

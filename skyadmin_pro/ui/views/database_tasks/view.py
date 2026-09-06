@@ -299,18 +299,33 @@ class DatabaseTasksView(BaseView):
             )
             if not target:
                 return
-            try:
-                path = export_to_excel(
-                    self.app.db, target,
-                    date_from=date_from, date_to=date_to, status=status,
-                    visible_only=self._visible_sheet_columns() if visible_only else None,
+            from pathlib import Path
+
+            from skyadmin_pro.ui.async_ui import run_background
+
+            visible = self._visible_sheet_columns() if visible_only else None
+            self.feedback.info("Exporting…")
+
+            def work():
+                return export_to_excel(
+                    self.app.db,
+                    Path(target),
+                    date_from=date_from,
+                    date_to=date_to,
+                    status=status,
+                    visible_only=visible,
+                    offload=True,
                 )
-            except Exception as exc:
-                self.feedback.error(f"Export failed: {exc}")
-                messagebox.showerror("Export failed", str(exc), parent=self.winfo_toplevel())
-                return
-            self.feedback.success(f"Exported to {path.name}")
-            self.app.set_status(f"Exported database to {path}")
+
+            def on_success(path):
+                self.feedback.success(f"Exported to {path.name}")
+                self.app.set_status(f"Exported database to {path}")
+
+            def on_error(msg: str):
+                self.feedback.error(f"Export failed: {msg}")
+                messagebox.showerror("Export failed", msg, parent=self.winfo_toplevel())
+
+            run_background(self, work=work, on_success=on_success, on_error=on_error)
 
         ExportFilterDialog(self.winfo_toplevel(), on_export=_do_export)
 
@@ -323,18 +338,50 @@ class DatabaseTasksView(BaseView):
         """
         # (panel attr, tree attr, sheet name, {ui col id: db field})
         specs = (
-            ("clients_panel", "client_tree", "Clients",
-             {"company": "name", "contact": "contact_name", "email": "email", "status": "status"}),
-            ("clients_panel", "doc_tree", "Documents",
-             {"client": "client_name", "type": "document_type", "expiry": "expiry_date"}),
-            ("tasks_panel", "tree", "Tasks",
-             {"client": "client_name", "title": "title", "category": "category",
-              "status": "status", "due": "due_date", "completed": "completed_at"}),
-            ("courier_panel", "tree", "Courier",
-             {"sent": "date_sent", "client": "client_name", "tracking": "tracking_number",
-              "driver": "driver_name", "destination": "destination", "task": "task_title"}),
-            ("pipeline_panel", "pipe_tree", "Pipeline",
-             {"client": "client_name", "service": "service", "step": "step", "status": "status"}),
+            (
+                "clients_panel",
+                "client_tree",
+                "Clients",
+                {"company": "name", "contact": "contact_name", "email": "email", "status": "status"},
+            ),
+            (
+                "clients_panel",
+                "doc_tree",
+                "Documents",
+                {"client": "client_name", "type": "document_type", "expiry": "expiry_date"},
+            ),
+            (
+                "tasks_panel",
+                "tree",
+                "Tasks",
+                {
+                    "client": "client_name",
+                    "title": "title",
+                    "category": "category",
+                    "status": "status",
+                    "due": "due_date",
+                    "completed": "completed_at",
+                },
+            ),
+            (
+                "courier_panel",
+                "tree",
+                "Courier",
+                {
+                    "sent": "date_sent",
+                    "client": "client_name",
+                    "tracking": "tracking_number",
+                    "driver": "driver_name",
+                    "destination": "destination",
+                    "task": "task_title",
+                },
+            ),
+            (
+                "pipeline_panel",
+                "pipe_tree",
+                "Pipeline",
+                {"client": "client_name", "service": "service", "step": "step", "status": "status"},
+            ),
         )
         result: dict[str, list[str]] = {}
         for panel_attr, tree_attr, sheet, id_map in specs:
@@ -353,14 +400,32 @@ class DatabaseTasksView(BaseView):
         suppliers = getattr(self, "suppliers_panel", None)
         if suppliers is not None:
             for tab_attr, tree_attr, sheet, id_map in (
-                ("directory", "supplier_tree", "Suppliers",
-                 {"name": "name", "company": "company_name", "contact": "contact", "notes": "notes"}),
-                ("payments", "pay_tree", "Supplier Payments",
-                 {"supplier": "supplier_name", "client": "client_name", "amount": "amount",
-                  "due": "due_date", "paid": "paid", "paid_date": "paid_date", "notes": "notes"}),
-                ("services", "supplier_svc_tree", "Supplier Services",
-                 {"company": "company_name", "service": "service_type",
-                  "expiry": "expiry_date", "notes": "notes"}),
+                (
+                    "directory",
+                    "supplier_tree",
+                    "Suppliers",
+                    {"name": "name", "company": "company_name", "contact": "contact", "notes": "notes"},
+                ),
+                (
+                    "payments",
+                    "pay_tree",
+                    "Supplier Payments",
+                    {
+                        "supplier": "supplier_name",
+                        "client": "client_name",
+                        "amount": "amount",
+                        "due": "due_date",
+                        "paid": "paid",
+                        "paid_date": "paid_date",
+                        "notes": "notes",
+                    },
+                ),
+                (
+                    "services",
+                    "supplier_svc_tree",
+                    "Supplier Services",
+                    {"company": "company_name", "service": "service_type", "expiry": "expiry_date", "notes": "notes"},
+                ),
             ):
                 tab = getattr(suppliers, tab_attr, None)
                 tree = getattr(tab, tree_attr, None) if tab is not None else None

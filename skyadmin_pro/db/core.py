@@ -3,7 +3,6 @@
 from __future__ import annotations
 
 import logging
-import sqlite3
 import threading
 from collections.abc import Generator
 from contextlib import contextmanager
@@ -23,6 +22,14 @@ from skyadmin_pro.config import (
     SETTING_WINDOW_GEOMETRY,
     SETTING_WORKSPACE_ROOT,
 )
+from skyadmin_pro.db.cipher import (
+    DB_ERRORS,
+    OPERATIONAL_ERRORS,
+    CipherError,
+    CipherRow,
+    DBConnection,
+    migrate_plaintext_to_cipher,
+)
 from skyadmin_pro.db.schema import SCHEMA_SQL
 from skyadmin_pro.paths import database_path, default_workspace_root, remove_sqlite_sidecars
 
@@ -37,8 +44,8 @@ class CoreMixin:
         self._department_list_cache: list[str] | None = None
         self._client_names_cache: list[str] | None = None
         self._wal_enabled: bool | None = None
-        self._pooled_conn: sqlite3.Connection | None = None
-        self._bundle_conn: sqlite3.Connection | None = None
+        self._pooled_conn: DBConnection | None = None
+        self._bundle_conn: DBConnection | None = None
         self._bundle_owner: int | None = None
         self._bundle_depth: int = 0
         # Thread-safety: one SQLite handle per thread. SQLite connections
@@ -48,12 +55,33 @@ class CoreMixin:
         self._local = threading.local()
         self._lock = threading.RLock()
         self._main_ident = threading.get_ident()
-        self._bg_conns: list[sqlite3.Connection] = []
+        self._bg_conns: list[DBConnection] = []
+        # Generation epoch: bumped (under _lock) by _close_pooled_conn so a
+        # background thread holding a pre-close handle discards it instead of
+        # re-adding a stale connection after the close copied the list.
+        self._pool_epoch: int = 0
+        # Phase 1 (SQLCipher): upgrade a legacy plaintext DB in place before
+        # anything opens it. Fail-closed: a broken migration raises with the
+        # original file untouched (restore from ~/.skyadmin_pro/backups).
+        migrate_plaintext_to_cipher(self.db_file)
         self._initialize()
 
-    def _connect(self) -> sqlite3.Connection:
-        conn = sqlite3.connect(self.db_file, timeout=10)
-        conn.row_factory = sqlite3.Row
+    def _connect(self) -> DBConnection:
+        from skyadmin_pro.db import cipher as _cipher
+
+        conn = _cipher.connect(self.db_file, timeout=10)
+        conn.row_factory = CipherRow
+        try:
+            # Fail-closed key check: PRAGMA key alone never verifies, so the
+            # first read proves the key (wrong key / corrupt file raises here,
+            # not pages later inside a transaction).
+            conn.execute("SELECT count(*) FROM sqlite_master").fetchone()
+        except CipherError as exc:
+            conn.close()
+            raise RuntimeError(
+                "Database key mismatch or corrupt file — restore from "
+                f"{self.db_file.parent / 'backups'} if data looks wrong."
+            ) from exc
         conn.execute("PRAGMA foreign_keys = ON")
         conn.execute("PRAGMA synchronous = NORMAL")
         conn.execute("PRAGMA temp_store = MEMORY")
@@ -68,27 +96,39 @@ class CoreMixin:
                 self._wal_enabled = False
             else:
                 self._wal_enabled = True
-        except sqlite3.Error:
+        except DB_ERRORS:
             self._log.warning("WAL mode unavailable; staying in rollback-journal mode")
             self._wal_enabled = False
         return conn
 
-    def _validate_conn(self, conn: sqlite3.Connection) -> bool:
+    def _validate_conn(self, conn: DBConnection) -> bool:
         try:
             conn.execute("SELECT 1")
             return True
-        except (sqlite3.ProgrammingError, sqlite3.OperationalError):
+        except OPERATIONAL_ERRORS:
             return False
 
-    def _track_bg_conn(self, conn: sqlite3.Connection) -> None:
+    def _track_bg_conn(self, conn: DBConnection) -> None:
         with self._lock:
+            if getattr(self._local, "conn_epoch", None) != self._pool_epoch:
+                # Handle created before a close/restore — drop it instead of
+                # re-adding a stale connection to the fresh pool.
+                if getattr(self._local, "conn", None) is conn:
+                    self._local.conn = None
+                try:
+                    conn.close()
+                except Exception:
+                    pass
+                return
             if conn not in self._bg_conns:
                 self._bg_conns.append(conn)
 
-    def _get_bg_conn(self) -> sqlite3.Connection:
+    def _get_bg_conn(self) -> DBConnection:
         """Per-background-thread pooled handle (never shares main's handle)."""
         conn = getattr(self._local, "conn", None)
-        if conn is not None and self._validate_conn(conn):
+        with self._lock:
+            epoch = self._pool_epoch
+        if conn is not None and getattr(self._local, "conn_epoch", None) == epoch and self._validate_conn(conn):
             return conn
         if conn is not None:
             try:
@@ -103,10 +143,15 @@ class CoreMixin:
             self._local.conn = None
         conn = self._connect()
         self._local.conn = conn
+        with self._lock:
+            self._local.conn_epoch = self._pool_epoch
         self._track_bg_conn(conn)
+        if getattr(self._local, "conn", None) is not conn:
+            # Lost a race with _close_pooled_conn (epoch moved) — retry.
+            return self._get_bg_conn()
         return conn
 
-    def _get_pooled_conn(self) -> sqlite3.Connection:
+    def _get_pooled_conn(self) -> DBConnection:
         """Return the reused connection for the calling thread.
 
         Main thread uses the historic ``_pooled_conn``; any other thread
@@ -134,7 +179,7 @@ class CoreMixin:
             return True
         return self._bundle_conn is not None and self._bundle_owner == threading.get_ident()
 
-    def _bundle_conn_for_thread(self) -> sqlite3.Connection | None:
+    def _bundle_conn_for_thread(self) -> DBConnection | None:
         conn = getattr(self._local, "bundle_conn", None)
         if conn is not None:
             return conn
@@ -143,7 +188,7 @@ class CoreMixin:
         return None
 
     @contextmanager
-    def connection(self) -> Generator[sqlite3.Connection, None, None]:
+    def connection(self) -> Generator[DBConnection, None, None]:
         # Inside a bundle_queries() block on this thread, reuse the pinned
         # handle with no per-checkout validation or intermediate commits.
         pinned = self._bundle_conn_for_thread()
@@ -159,7 +204,30 @@ class CoreMixin:
             raise
 
     @contextmanager
-    def bundle_queries(self) -> Generator[sqlite3.Connection, None, None]:
+    def read_connection(self) -> Generator[DBConnection, None, None]:
+        """Pooled checkout for reads — yields a connection WITHOUT committing.
+
+        Inside a bundle_queries() block the pinned handle is reused (the
+        bundle owns the commit). Otherwise a pooled handle is yielded with no
+        commit on exit (rollback only to reset after an error), avoiding WAL
+        write churn from pure SELECTs.
+        """
+        pinned = self._bundle_conn_for_thread()
+        if pinned is not None:
+            yield pinned
+            return
+        conn = self._get_pooled_conn()
+        try:
+            yield conn
+        except Exception:
+            try:
+                conn.rollback()
+            except Exception:
+                pass
+            raise
+
+    @contextmanager
+    def bundle_queries(self) -> Generator[DBConnection, None, None]:
         """Pin one pooled connection for a batch of queries (e.g. dashboard snapshot).
 
         Nest-safe per thread: nested connection() checkouts on the same
@@ -208,12 +276,12 @@ class CoreMixin:
                     self._bundle_depth = 0
 
     def _fetch_all(self, sql: str, params: tuple = ()) -> list[dict]:
-        with self.connection() as conn:
+        with self.read_connection() as conn:
             rows = conn.execute(sql, params).fetchall()
         return [dict(row) for row in rows]
 
     def _fetch_one(self, sql: str, params: tuple = ()) -> dict | None:
-        with self.connection() as conn:
+        with self.read_connection() as conn:
             row = conn.execute(sql, params).fetchone()
         return dict(row) if row is not None else None
 
@@ -236,9 +304,7 @@ class CoreMixin:
             return sql, ()
         return f"{sql} {' '.join(extra)}", tuple(extra_params)
 
-    def _fetch_page(
-        self, base_sql: str, params: tuple = (), *, limit: int | None = 250, offset: int = 0
-    ) -> list[dict]:
+    def _fetch_page(self, base_sql: str, params: tuple = (), *, limit: int | None = 250, offset: int = 0) -> list[dict]:
         """Fetch one page with LIMIT/OFFSET. limit=None/<=0 disables paging."""
         paged_sql, page_params = self._apply_pagination(base_sql, limit, offset)
         return self._fetch_all(paged_sql, tuple(params) + tuple(page_params))
@@ -292,11 +358,13 @@ class CoreMixin:
 
     def backup_to(self, dest: Path) -> Path:
         """Online-safe snapshot of the live database (includes WAL content)."""
+        from skyadmin_pro.db import cipher as _cipher
+
         dest = Path(dest)
         dest.parent.mkdir(parents=True, exist_ok=True)
-        src = sqlite3.connect(str(self.db_file))
+        src = _cipher.connect(str(self.db_file))
         try:
-            out = sqlite3.connect(str(dest))
+            out = _cipher.connect(str(dest))
             try:
                 src.backup(out)
             finally:
@@ -340,8 +408,11 @@ class CoreMixin:
             self._log.warning("Could not create safety backup", exc_info=True)
 
         try:
-            # Verify backup integrity before restoring
-            conn = sqlite3.connect(str(backup_path))
+            # Verify backup integrity before restoring (keyed open: a backup
+            # encrypted with a different key fails here, not after the swap).
+            from skyadmin_pro.db import cipher as _cipher
+
+            conn = _cipher.connect(str(backup_path))
             try:
                 result = conn.execute("PRAGMA quick_check").fetchone()
                 if result[0] != "ok":
@@ -355,10 +426,12 @@ class CoreMixin:
             self._close_pooled_conn()
             self._wal_enabled = None
 
-            # Copy backup to current database location
+            # Copy backup to current database location, then upgrade legacy
+            # plaintext backups so the live file is always cipher.
             import shutil
 
             shutil.copy2(str(backup_path), str(self.db_file))
+            migrate_plaintext_to_cipher(self.db_file)
             remove_sqlite_sidecars(self.db_file)
 
             # Reinitialize with the restored database
@@ -396,11 +469,16 @@ class CoreMixin:
             self._bundle_conn = None
             self._bundle_owner = None
             self._bundle_depth = 0
-        for c in ([conn] if conn is not None else []) + bg:
-            try:
-                c.close()
-            except Exception:
-                pass
+            self._pool_epoch += 1
+            # Close while holding the lock so a background thread cannot
+            # _track_bg_conn() a pre-close handle back into the fresh pool.
+            # (Stale thread-local handles are additionally rejected by the
+            # epoch check in _track_bg_conn/_get_bg_conn.)
+            for c in ([conn] if conn is not None else []) + bg:
+                try:
+                    c.close()
+                except Exception:
+                    pass
         for attr in ("conn", "bundle_conn", "bundle_depth"):
             try:
                 delattr(self._local, attr)
@@ -408,12 +486,12 @@ class CoreMixin:
                 pass
 
     @staticmethod
-    def _drop_clients_fts_triggers(conn: sqlite3.Connection) -> None:
+    def _drop_clients_fts_triggers(conn: DBConnection) -> None:
         for name in ("clients_fts_ai", "clients_fts_ad", "clients_fts_au"):
             conn.execute(f"DROP TRIGGER IF EXISTS {name}")
 
     @staticmethod
-    def _ensure_clients_fts_triggers(conn: sqlite3.Connection) -> None:
+    def _ensure_clients_fts_triggers(conn: DBConnection) -> None:
         CoreMixin._drop_clients_fts_triggers(conn)
         conn.execute(
             """

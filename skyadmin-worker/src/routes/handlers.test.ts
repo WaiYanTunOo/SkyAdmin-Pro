@@ -183,4 +183,76 @@ describe("admin-write rate limiting", () => {
     }, mockEnv({ DB: db }));
     expect(res.status).toBe(429);
   });
+
+  it("rejects records when over limit", async () => {
+    const db = {
+      prepare: (sql: string) => ({
+        bind: () => ({
+          first: async () => {
+            if (sql.includes("rate_limits")) return { count: 31 };
+            return null;
+          },
+          all: async () => ({ results: [] }),
+          run: async () => ({ success: true }),
+        }),
+      }),
+    } as unknown as D1Database;
+    const res = await app.request("http://localhost/api/records", {
+      headers: AUTH,
+    }, mockEnv({ DB: db }));
+    expect(res.status).toBe(429);
+  });
+
+  it("rejects bans list when over limit", async () => {
+    const db = {
+      prepare: (sql: string) => ({
+        bind: () => ({
+          first: async () => {
+            if (sql.includes("rate_limits")) return { count: 31 };
+            return null;
+          },
+          all: async () => ({ results: [] }),
+          run: async () => ({ success: true }),
+        }),
+      }),
+    } as unknown as D1Database;
+    const res = await app.request("http://localhost/api/bans", {
+      headers: AUTH,
+    }, mockEnv({ DB: db }));
+    expect(res.status).toBe(429);
+  });
+});
+
+describe("invalid json bodies", () => {
+  const bad = "{not valid json";
+  const jsonHeaders = { "Content-Type": "application/json", ...AUTH };
+  it.each([
+    ["revoke", "http://localhost/api/revoke"],
+    ["unrevoke", "http://localhost/api/unrevoke"],
+    ["ban", "http://localhost/api/ban"],
+    ["unban", "http://localhost/api/unban"],
+    ["used", "http://localhost/api/used"],
+    ["revoke-pc", "http://localhost/api/revoke-pc"],
+  ])("returns 400 invalid json for %s", async (_name, url) => {
+    const res = await app.request(url, {
+      method: "POST", headers: jsonHeaders, body: bad,
+    }, mockEnv());
+    expect(res.status).toBe(400);
+    const body = await res.json() as { ok: boolean; error: string };
+    expect(body.ok).toBe(false);
+    expect(body.error).toContain("invalid json");
+  });
+});
+
+describe("records pagination guards", () => {
+  it("falls back to defaults on non-numeric page/limit/summary_limit", async () => {
+    const res = await app.request("http://localhost/api/records?page=abc&limit=xyz&summary_limit=oops", {
+      headers: AUTH,
+    }, mockEnv());
+    expect(res.status).toBe(200);
+    const body = await res.json() as { ok: boolean; pagination: { page: number; limit: number; total: number; pages: number } };
+    expect(body.ok).toBe(true);
+    expect(body.pagination.page).toBe(1);
+    expect(body.pagination.limit).toBe(50);
+  });
 });

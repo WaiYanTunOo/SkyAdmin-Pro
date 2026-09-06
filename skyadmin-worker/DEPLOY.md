@@ -39,7 +39,8 @@ Set these on the Worker (production uses `wrangler secret put`):
 | `API_TOKEN` | Bearer token for owner tools (`LicenseGenerator_iPhone.html`, CLI) |
 | `ADMIN_PATH` | Random path segment for hidden admin UI |
 | `ADMIN_PASS` | Admin login password |
-| `LICENSE_SECRET` | Legacy name — admin session cookie salt (or use `ADMIN_SESSION_SECRET`) |
+| `ADMIN_SESSION_SECRET` | **Preferred** — admin session cookie salt (fail-closed when set) |
+| `LICENSE_SECRET` | Legacy alias for the session salt (used only when `ADMIN_SESSION_SECRET` is unset) |
 
 Generate an Ed25519 keypair (must match `skyadmin_pro/services/license_public.py`):
 
@@ -81,6 +82,20 @@ If the Worker was deployed before newer migrations, apply pending files:
 ```bash
 npm run db:migrate
 ```
+
+## Staging
+
+`wrangler.jsonc` ships a `staging` env whose `database_id` is the literal
+`REPLACE_WITH_STAGING_DB_ID`. Before `wrangler deploy --env staging`:
+
+```bash
+npx wrangler d1 create skyadmin-db-staging   # copy the returned database_id
+# paste it into wrangler.jsonc env.staging, then:
+npx wrangler d1 migrations apply skyadmin-db-staging --remote
+```
+
+Until then, deploy production only (CI `deploy.yml` gates it behind
+`environment: production`).
 
 ## Desktop app configuration
 

@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import logging
 from datetime import datetime
 from pathlib import Path
 
@@ -12,6 +13,8 @@ from skyadmin_pro.services.license._constants import (
     MAX_OFFLINE_SECONDS,
 )
 from skyadmin_pro.services.license.machine import get_machine_id
+
+logger = logging.getLogger(__name__)
 
 
 def _last_sync_path() -> Path | None:
@@ -110,6 +113,7 @@ def _attempt_path() -> Path | None:
 
 
 def _is_rate_limited() -> bool:
+    p: Path | None = None
     try:
         p = _attempt_path()
         if p is None or not p.exists():
@@ -119,8 +123,18 @@ def _is_rate_limited() -> bool:
         recent = [float(x) for x in lines if x.strip()]
         recent = [t for t in recent if now - t < _ATTEMPT_WINDOW]
         return len(recent) >= _MAX_ATTEMPTS
-    except Exception:
-        return True
+    except (OSError, ValueError) as exc:
+        # Corrupt/unreadable counter: quarantine it and fail OPEN (not locked)
+        # so a damaged file can never permanently lock out activation.
+        try:
+            if p is not None and p.exists():
+                quarantine = p.with_name(p.name + ".corrupt")
+                if not quarantine.exists():
+                    p.rename(quarantine)
+        except OSError:
+            logger.debug("Could not quarantine corrupt attempts file", exc_info=True)
+        logger.warning("Activation attempts file unreadable; quarantined, failing open: %s", exc)
+        return False
 
 
 def _record_attempt(success: bool) -> None:

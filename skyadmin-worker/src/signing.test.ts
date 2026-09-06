@@ -1,4 +1,6 @@
 import { describe, expect, it } from "vitest";
+import app from "./index";
+import type { Env } from "./db";
 import {
   isBlockedAttemptCount,
   loginBlockCutoffIso,
@@ -9,6 +11,27 @@ import { generatePasscode, hmacSign, PASSCODE_PREFIX } from "./signing";
 
 const DEV_ED25519_KEY_B64 =
   "LS0tLS1CRUdJTiBQUklWQVRFIEtFWS0tLS0tCk1DNENBUUF3QlFZREsyVndCQ0lFSUxVUFV2UlpLendzR1MvU0l6N0VIK2hiamd6VjFzT1I3ZFdGbmh5SWkxdlgKLS0tLS1FTkQgUFJJVkFURSBLRVktLS0tLQo=";
+
+function mockEnv(count: number): Env {
+  return {
+    DB: {
+      prepare: (sql: string) => ({
+        bind: () => ({
+          first: async () => {
+            if (sql.includes("rate_limits")) return { count };
+            return null;
+          },
+          run: async () => ({ success: true }),
+        }),
+      }),
+    } as unknown as D1Database,
+    LICENSE_SECRET: "test-license-secret",
+    API_TOKEN: "test-api-token",
+    ADMIN_PATH: "admin-test",
+    ADMIN_PASS: "admin-pass",
+    LICENSE_ED25519_PRIVATE_KEY_B64: DEV_ED25519_KEY_B64,
+  } as Env;
+}
 
 describe("admin_security", () => {
   it("blocks at the configured attempt threshold", () => {
@@ -40,5 +63,22 @@ describe("signing", () => {
     expect(first.startsWith(PASSCODE_PREFIX)).toBe(true);
     expect(second.startsWith(PASSCODE_PREFIX)).toBe(true);
     expect(first).not.toBe(second);
+  });
+});
+
+describe("signing public key rate limiting", () => {
+  it("rejects /api/signing/public-key when over limit", async () => {
+    const res = await app.request("http://localhost/api/signing/public-key", {}, mockEnv(11));
+    expect(res.status).toBe(429);
+    const body = (await res.json()) as { ok: boolean };
+    expect(body.ok).toBe(false);
+  });
+
+  it("returns the public key under the limit", async () => {
+    const res = await app.request("http://localhost/api/signing/public-key", {}, mockEnv(1));
+    expect(res.status).toBe(200);
+    const body = (await res.json()) as { ok: boolean; public_key_hex: string };
+    expect(body.ok).toBe(true);
+    expect(body.public_key_hex).toMatch(/^[0-9a-f]{64}$/);
   });
 });

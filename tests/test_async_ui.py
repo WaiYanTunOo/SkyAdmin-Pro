@@ -23,6 +23,8 @@ def test_run_on_main_surfaces_callback_errors():
 def test_run_background_reports_worker_errors(monkeypatch):
     widget = MagicMock()
     widget.winfo_exists.return_value = True
+    # Real widgets have no pump scheduled until the first run_background call.
+    widget._async_pump_after = None
     errors: list[str] = []
 
     class _ImmediateThread:

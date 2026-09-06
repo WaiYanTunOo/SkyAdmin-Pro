@@ -49,7 +49,7 @@ Open your admin URL (`https://<worker>/<ADMIN_PATH>`).
 Optional CLI publish (point URL at your hosted **installer** or exe):
 
 ```bash
-python scripts/publish_update.py --version 0.3.2 --url https://your-cdn/SkyAdminPro-Setup-0.3.2.exe --token YOUR_API_TOKEN
+python scripts/publish_update.py --version 0.3.3 --url https://your-cdn/SkyAdminPro-Setup-0.3.3.exe --token YOUR_API_TOKEN
 ```
 
 ---
@@ -153,7 +153,7 @@ python scripts\release_check.py --skip-pytest --require-signature
 
 ```powershell
 Get-AuthenticodeSignature dist\SkyAdminPro.exe
-Get-AuthenticodeSignature dist\SkyAdminPro-Setup-0.3.2.exe
+Get-AuthenticodeSignature dist\SkyAdminPro-Setup-0.3.3.exe
 ```
 
 Both should show `Status: Valid`.
@@ -222,15 +222,19 @@ One-page view of what blocks “perfect on Windows” vs polish already in code.
 
 | Field | Value |
 |-------|-------|
-| Build version | |
-| Installer SHA / date | |
-| Worker deploy date | |
-| Tester | |
-| Machine (clean PC name) | |
-| Date | |
-| Result | ☐ Ship  ☐ Block |
+| Build version | 0.3.3 (`pyproject` + `APP_VERSION` + macOS spec aligned; `release_check` RELEASE OK) |
+| Installer SHA / date | `1a2743f9…c96a1` (`dist/SHA256SUMS`, 55.0 MB, built 2026-09-06 11:24 UTC from current tree via `build-installer.cmd`; exe 54.3 MB with sqlcipher3 bundled; **unsigned** — no cert) |
+| Worker deploy date | Live at `skyadmin-worker.skyadmin-pro.workers.dev` (verified 2026-09-06: ping OK, signing key `matches_desktop`, pricing 4 pkgs, update channel `published: none`) |
+| Tester | (automated gates: agent) + human sign-off still required for §2-auth, §3–§6 |
+| Machine (clean PC name) | dev PC only — clean-PC/VM pass still open |
+| Date | 2026-09-06 |
+| Result | ☐ Ship  ☐ Block — **partial**: §1 + unauthenticated §2/§4/§7 API checks green; credential-gated (A.2–A.6, C.1, D, E-mutations) and VM-gated (B, F, G) steps open — see Blockers |
 
 **Blockers** (if any):
+
+*Needs human with secrets + VM (2026-09-06):*
+- `ADMIN_PASS`/`API_TOKEN` required: A.2 (pricing edit persist), A.3 (records chips), A.4 (machines), A.5–A.6 (publish/generate), C.1–C.5 (auto-update round-trip), D.1–D.3 (Sync Now/conflicts vs live Worker), E.1–E.5 (iPhone generator mutations + viewer sync data). Unauthenticated surface verified green 7/7 (login page + CSP, no token in DOM, records 401 gate, signing match, pricing read, update API, viewer + CSP).
+- Clean VM required: B.1–B.9 install/activation, F.1–F.7 (125%/150% DPI), G.1–G.5 signed-installer smoke, A.1 cert path (`SKYADMIN_SIGN_*` unset — current installer **unsigned**, `--require-signature` correctly blocks).
 
 ---
 

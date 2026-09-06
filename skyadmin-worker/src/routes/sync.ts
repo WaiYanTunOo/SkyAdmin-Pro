@@ -10,6 +10,7 @@ import { withSyncDevicesExpiresAt } from "../sync_devices_schema";
 import {
   MAX_PUSH_CHANGES,
   fetchExistingUpdatedAt,
+  isMissingHlcColumn,
   partitionPushChanges,
   preparePushChanges,
   writePushBatch,
@@ -97,6 +98,8 @@ export async function syncRegisterHandler(c: Context<{ Bindings: Env }>) {
 
 /** GET /api/sync/schema */
 export async function syncSchemaHandler(c: Context<{ Bindings: Env }>) {
+  const limited = await checkRateLimit(c, "schema", { windowSeconds: 60, max: 30 });
+  if (limited) return limited;
   return c.json({
     ok: true,
     version: SYNC_SCHEMA_VERSION,
@@ -105,6 +108,8 @@ export async function syncSchemaHandler(c: Context<{ Bindings: Env }>) {
       excluded_columns: [...SYNC_EXCLUDED_COLUMNS[name]],
     })),
     conflict: "last-write-wins",
+    proto: 2,
+    hlc: true,
   });
 }
 
@@ -127,24 +132,38 @@ export async function syncPullHandler(c: Context<{ Bindings: Env }>) {
   }
 
   const placeholders = tables.map(() => "?").join(", ");
-  const sql = since
-    ? `SELECT table_name, global_id, row_json, updated_at, deleted_at
+  const buildPullSql = (columns: string) =>
+    since
+      ? `SELECT ${columns}
         FROM sync_rows
         WHERE machine_id = ? AND table_name IN (${placeholders}) AND updated_at > ?
         ORDER BY updated_at ASC LIMIT ?`
-    : `SELECT table_name, global_id, row_json, updated_at, deleted_at
+      : `SELECT ${columns}
         FROM sync_rows
         WHERE machine_id = ? AND table_name IN (${placeholders})
         ORDER BY updated_at ASC LIMIT ?`;
 
   const binds = since ? [machineId, ...tables, since, limit] : [machineId, ...tables, limit];
-  const { results } = await c.env.DB.prepare(sql).bind(...binds).all<{
+  type PullRow = {
     table_name: string;
     global_id: string;
     row_json: string;
     updated_at: string;
     deleted_at: string | null;
-  }>();
+    hlc?: string | null;
+  };
+  let results: PullRow[] | undefined;
+  try {
+    ({ results } = await c.env.DB.prepare(buildPullSql(
+      "table_name, global_id, row_json, updated_at, deleted_at, hlc",
+    )).bind(...binds).all<PullRow>());
+  } catch (err) {
+    // Pre-0006 D1 without sync_rows.hlc: fall back to the v1 select.
+    if (!isMissingHlcColumn(err)) throw err;
+    ({ results } = await c.env.DB.prepare(buildPullSql(
+      "table_name, global_id, row_json, updated_at, deleted_at",
+    )).bind(...binds).all<PullRow>());
+  }
 
   const changes = (results || []).flatMap((row) => {
     try {
@@ -154,6 +173,7 @@ export async function syncPullHandler(c: Context<{ Bindings: Env }>) {
         row: JSON.parse(row.row_json),
         updated_at: row.updated_at,
         deleted_at: row.deleted_at,
+        hlc: typeof row.hlc === "string" ? row.hlc : null,
       }];
     } catch {
       return [];

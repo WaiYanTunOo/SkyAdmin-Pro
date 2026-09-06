@@ -77,6 +77,7 @@ def run_auto_backup(workspace_root: Path, db_file: Path, backup_dir: Path) -> Pa
         counter += 1
     try:
         from skyadmin_pro.services.crypto import create_encrypted_backup
+
         create_encrypted_backup(workspace_root, db_file, dest)
         logger.info("Auto-backup created: %s", dest)
         pruned = prune_old_backups(backup_dir)
@@ -141,6 +142,7 @@ class AutoBackupScheduler:
                     # Feed the Settings backup banner (same key as manual backups).
                     try:
                         from skyadmin_pro.config.tasks import SETTING_LAST_ENCRYPTED_BACKUP
+
                         db.set_setting(SETTING_LAST_ENCRYPTED_BACKUP, now.date().isoformat())
                     except Exception:
                         logger.warning("Could not update backup banner setting", exc_info=True)

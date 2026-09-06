@@ -59,19 +59,30 @@ class CourierPanel(ctk.CTkFrame):
         pager = ctk.CTkFrame(tree_card, fg_color="transparent")
         pager.grid(row=2, column=0, sticky="ew", padx=12, pady=(0, 10))
         self.prev_btn = ctk.CTkButton(
-            pager, text="◀ Prev", width=80, fg_color="transparent", border_width=1,
+            pager,
+            text="◀ Prev",
+            width=80,
+            fg_color="transparent",
+            border_width=1,
             command=self._prev_page,
         )
         self.prev_btn.pack(side="left")
         self.page_label = ctk.CTkLabel(pager, text="Page 1", text_color="gray")
         self.page_label.pack(side="left", padx=10)
         self.next_btn = ctk.CTkButton(
-            pager, text="Next ▶", width=80, fg_color="transparent", border_width=1,
+            pager,
+            text="Next ▶",
+            width=80,
+            fg_color="transparent",
+            border_width=1,
             command=self._next_page,
         )
         self.next_btn.pack(side="left")
         self.page_size_menu = ctk.CTkOptionMenu(
-            pager, values=["100", "250", "500", "1000"], width=90, command=self._on_page_size,
+            pager,
+            values=["100", "250", "500", "1000"],
+            width=90,
+            command=self._on_page_size,
         )
         self.page_size_menu.set("250")
         self.page_size_menu.pack(side="right")
@@ -181,9 +192,7 @@ class CourierPanel(ctk.CTkFrame):
             if seq != self._refresh_seq or not self.winfo_exists():
                 return
             fill_combo(self.client_box, payload["names"], payload["current_client"])
-            self._task_lookup = {
-                f"#{item['id']}  {item['title']}": int(item["id"]) for item in payload["pending"]
-            }
+            self._task_lookup = {f"#{item['id']}  {item['title']}": int(item["id"]) for item in payload["pending"]}
             values = [NONE_TASK, *self._task_lookup.keys()]
             cur = payload["current_task"]
             self.task_menu.configure(values=values)

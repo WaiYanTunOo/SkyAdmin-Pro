@@ -77,6 +77,7 @@ try:
         QVBoxLayout,
         QWidget,
     )
+
     QT_BINDING = "PySide6"
 except ImportError:
     try:
@@ -131,21 +132,19 @@ except ImportError:
             QVBoxLayout,
             QWidget,
         )
+
         QT_BINDING = "PyQt6"
     except ImportError:
-        print(
-            "ERROR: Neither PySide6 nor PyQt6 is installed.\n"
-            "Please run: pip install PySide6\n"
-        )
+        print("ERROR: Neither PySide6 nor PyQt6 is installed.\nPlease run: pip install PySide6\n")
         sys.exit(1)
 
 # ---------------------------------------------------------------------------
 # Constants & Dataset Configuration
 # ---------------------------------------------------------------------------
 TOTAL_ROWS = 1_000_000
-CHUNK_SIZE = 100               # Fetch granularity from SQLite
-MAX_CACHED_CHUNKS = 400        # 400 * 100 = 40,000 active rows in LRU RAM (~5-8 MB)
-PREFETCH_MARGIN = 2            # Prefetch ±2 chunks ahead of visible viewport bounds
+CHUNK_SIZE = 100  # Fetch granularity from SQLite
+MAX_CACHED_CHUNKS = 400  # 400 * 100 = 40,000 active rows in LRU RAM (~5-8 MB)
+PREFETCH_MARGIN = 2  # Prefetch ±2 chunks ahead of visible viewport bounds
 DB_NAME = "anti_gravity_1m.db"
 
 # Columns Definition: (Key, Header Title, Width, Alignment)
@@ -233,13 +232,13 @@ def ensure_mock_database(db_path: Path, target_rows: int = TOTAL_ROWS) -> Path:
                 batch_data = []
                 for row_id in range(start_id, end_id):
                     # Deterministic but authentic accounting numbers
-                    day_offset = (row_id % 730)
+                    day_offset = row_id % 730
                     tx_date = f"2025-{(day_offset // 30) % 12 + 1:02d}-{(day_offset % 28) + 1:02d}"
                     ref = f"JE-2025-{row_id:07d}"
                     acc = accounts[row_id % len(accounts)]
                     memo = f"{memos[row_id % len(memos)]} (#{row_id})"
 
-                    is_debit = (row_id % 2 == 0)
+                    is_debit = row_id % 2 == 0
                     amt = round((row_id % 9500) * 1.45 + 25.50, 2)
                     debit = amt if is_debit else 0.0
                     credit = 0.0 if is_debit else amt
@@ -248,10 +247,7 @@ def ensure_mock_database(db_path: Path, target_rows: int = TOTAL_ROWS) -> Path:
 
                     batch_data.append((row_id, tx_date, ref, acc, memo, debit, credit, balance, status))
 
-                cur.executemany(
-                    "INSERT INTO ledger_entries VALUES (?,?,?,?,?,?,?,?,?)",
-                    batch_data
-                )
+                cur.executemany("INSERT INTO ledger_entries VALUES (?,?,?,?,?,?,?,?,?)", batch_data)
             conn.commit()
             conn.execute("PRAGMA synchronous=NORMAL")
             print(f"[+] Seeded {target_rows:,} records in {time.time() - start_time:.2f}s.")
@@ -275,9 +271,9 @@ class AsyncDbWorker(QObject):
     - Simulated latency slider allows testing under arbitrary network/disk speeds.
     """
 
-    chunkReady = Signal(int, list)     # chunk_index, list_of_row_tuples
-    chunkFailed = Signal(int, str)     # chunk_index, error_message
-    busyStateChanged = Signal(bool)    # True when queries are active
+    chunkReady = Signal(int, list)  # chunk_index, list_of_row_tuples
+    chunkFailed = Signal(int, str)  # chunk_index, error_message
+    busyStateChanged = Signal(bool)  # True when queries are active
 
     def __init__(self, db_path: Path) -> None:
         super().__init__()
@@ -395,8 +391,8 @@ class LedgerDataStore(QObject):
                   -> View renders updated cell.
     """
 
-    cellCommitted = Signal(int, int, object)       # row, col, new_value
-    persistRequested = Signal(int, int, object)    # row_id, col_idx, value
+    cellCommitted = Signal(int, int, object)  # row, col, new_value
+    persistRequested = Signal(int, int, object)  # row_id, col_idx, value
 
     def __init__(self, parent: QObject | None = None) -> None:
         super().__init__(parent)
@@ -507,9 +503,7 @@ class VirtualChunkTableModel(QAbstractTableModel):
 
         return None
 
-    def headerData(
-        self, section: int, orientation: Qt.Orientation, role: int = Qt.DisplayRole
-    ) -> Any:
+    def headerData(self, section: int, orientation: Qt.Orientation, role: int = Qt.DisplayRole) -> Any:
         if orientation == Qt.Horizontal and role == Qt.DisplayRole:
             return COLUMNS[section][1]
         if orientation == Qt.Vertical and role == Qt.DisplayRole:
@@ -600,9 +594,7 @@ class AccountingItemDelegate(QStyledItemDelegate):
     def setShimmerPhase(self, phase: float) -> None:
         self._shimmer_phase = phase
 
-    def paint(
-        self, painter: QPainter, option: QStyleOptionViewItem, index: QModelIndex
-    ) -> None:
+    def paint(self, painter: QPainter, option: QStyleOptionViewItem, index: QModelIndex) -> None:
         painter.save()
         painter.setRenderHint(QPainter.Antialiasing, True)
         painter.setRenderHint(QPainter.TextAntialiasing, True)
@@ -703,12 +695,7 @@ class AccountingItemDelegate(QStyledItemDelegate):
         skeleton_rect = QRectF(x, y, bar_width, bar_height)
 
         # Shimmer Linear Gradient based on phase
-        grad = QLinearGradient(
-            skeleton_rect.left(),
-            0,
-            skeleton_rect.right(),
-            0
-        )
+        grad = QLinearGradient(skeleton_rect.left(), 0, skeleton_rect.right(), 0)
         p2 = self._shimmer_phase
 
         base_gray = QColor("#e2e8f0")
@@ -730,9 +717,7 @@ class AccountingItemDelegate(QStyledItemDelegate):
             "Pending": (QColor("#fef9c3"), QColor("#854d0e"), QColor("#fde047")),
             "Flagged": (QColor("#fee2e2"), QColor("#991b1b"), QColor("#fca5a5")),
         }
-        bg, fg, border = badge_styles.get(
-            status, (QColor("#f1f5f9"), QColor("#475569"), QColor("#cbd5e1"))
-        )
+        bg, fg, border = badge_styles.get(status, (QColor("#f1f5f9"), QColor("#475569"), QColor("#cbd5e1")))
 
         badge_w, badge_h = 92, 22
         badge_rect = QRectF(
@@ -759,24 +744,18 @@ class AccountingItemDelegate(QStyledItemDelegate):
         return QSize(base_size.width(), 34)
 
     # ---------------- Inline Editing Controls ----------------
-    def createEditor(
-        self, parent: QWidget, option: QStyleOptionViewItem, index: QModelIndex
-    ) -> QWidget:
+    def createEditor(self, parent: QWidget, option: QStyleOptionViewItem, index: QModelIndex) -> QWidget:
         col = index.column()
         if col in (5, 6, 7):
             editor = QDoubleSpinBox(parent)
             editor.setRange(-999_999_999.00, 999_999_999.00)
             editor.setDecimals(2)
             editor.setPrefix("$ ")
-            editor.setStyleSheet(
-                "QDoubleSpinBox { border: 2px solid #0284c7; border-radius: 4px; padding: 2px 8px; }"
-            )
+            editor.setStyleSheet("QDoubleSpinBox { border: 2px solid #0284c7; border-radius: 4px; padding: 2px 8px; }")
             return editor
 
         editor = QLineEdit(parent)
-        editor.setStyleSheet(
-            "QLineEdit { border: 2px solid #0284c7; border-radius: 4px; padding: 2px 8px; }"
-        )
+        editor.setStyleSheet("QLineEdit { border: 2px solid #0284c7; border-radius: 4px; padding: 2px 8px; }")
         return editor
 
     def setEditorData(self, editor: QWidget, index: QModelIndex) -> None:
@@ -789,9 +768,7 @@ class AccountingItemDelegate(QStyledItemDelegate):
         elif isinstance(editor, QLineEdit):
             editor.setText(str(val or ""))
 
-    def setModelData(
-        self, editor: QWidget, model: QAbstractTableModel, index: QModelIndex
-    ) -> None:
+    def setModelData(self, editor: QWidget, model: QAbstractTableModel, index: QModelIndex) -> None:
         if isinstance(editor, QDoubleSpinBox):
             model.setData(index, round(editor.value(), 2), Qt.EditRole)
         elif isinstance(editor, QLineEdit):
@@ -815,9 +792,7 @@ class ExcelTableView(QTableView):
         self.setSelectionMode(QAbstractItemView.SingleSelection)
         self.setSelectionBehavior(QAbstractItemView.SelectItems)
         self.setEditTriggers(
-            QAbstractItemView.DoubleClicked
-            | QAbstractItemView.EditKeyPressed
-            | QAbstractItemView.AnyKeyPressed
+            QAbstractItemView.DoubleClicked | QAbstractItemView.EditKeyPressed | QAbstractItemView.AnyKeyPressed
         )
         self.setVerticalScrollMode(QAbstractItemView.ScrollPerItem)
         self.setHorizontalScrollMode(QAbstractItemView.ScrollPerPixel)
@@ -1077,9 +1052,7 @@ class AntiGravitySandboxView(QMainWindow):
     def _update_metrics(self) -> None:
         cached_count = len(self._model._cache)
         active_rows = cached_count * CHUNK_SIZE
-        self.cache_metric.setText(
-            f"LRU Chunks: {cached_count}/{MAX_CACHED_CHUNKS} ({active_rows:,} rows in RAM)"
-        )
+        self.cache_metric.setText(f"LRU Chunks: {cached_count}/{MAX_CACHED_CHUNKS} ({active_rows:,} rows in RAM)")
 
     def _apply_ubuntu_inter_styling(self) -> None:
         """Accounting-Grade High-DPI typography & modern Ubuntu styling."""

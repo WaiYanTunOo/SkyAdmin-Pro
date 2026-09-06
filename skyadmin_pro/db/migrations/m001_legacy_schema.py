@@ -9,8 +9,10 @@ and manual BEGIN/COMMIT instead of db.connection().
 
 from __future__ import annotations
 
-import sqlite3
 from typing import TYPE_CHECKING
+
+from skyadmin_pro.db.cipher import CipherError, CipherRow
+from skyadmin_pro.db.cipher import connect as cipher_connect
 
 VERSION = 1
 NAME = "legacy_schema"
@@ -24,8 +26,8 @@ def upgrade(db: CoreMixin) -> None:
     # top-level import would be circular. Only needed for FTS triggers.
     from skyadmin_pro.db.core import CoreMixin
 
-    conn = sqlite3.connect(str(db.db_file), timeout=10)
-    conn.row_factory = sqlite3.Row
+    conn = cipher_connect(str(db.db_file), timeout=10)
+    conn.row_factory = CipherRow
     try:
         conn.execute("PRAGMA foreign_keys = OFF")
         conn.isolation_level = None  # manual transaction control
@@ -178,17 +180,24 @@ def upgrade(db: CoreMixin) -> None:
                 "SELECT name FROM sqlite_master WHERE type='table' AND name='clients_fts'"
             ).fetchone()
             if not fts_row:
-                conn.executescript(
+                # NOTE: executescript() implicitly commits on the SQLCipher
+                # driver, which would break this migration's single
+                # transaction — run the statements discretely instead.
+                conn.execute(
                     """
                     CREATE VIRTUAL TABLE clients_fts USING fts5(
                         name, contact_name, email, tokenize='unicode61'
-                    );
+                    )
+                    """
+                )
+                conn.execute(
+                    """
                     INSERT INTO clients_fts(rowid, name, contact_name, email)
                     SELECT id,
                            COALESCE(name, ''),
                            COALESCE(contact_name, ''),
                            COALESCE(email, '')
-                    FROM clients;
+                    FROM clients
                     """
                 )
                 CoreMixin._ensure_clients_fts_triggers(conn)
@@ -198,7 +207,7 @@ def upgrade(db: CoreMixin) -> None:
     except Exception:
         try:
             conn.execute("ROLLBACK")
-        except sqlite3.Error:
+        except CipherError:
             pass
         raise
     finally:

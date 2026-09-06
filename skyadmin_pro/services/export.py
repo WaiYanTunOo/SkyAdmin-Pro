@@ -5,12 +5,12 @@ from __future__ import annotations
 import os
 from datetime import date
 from pathlib import Path
-from typing import TYPE_CHECKING
+from typing import TYPE_CHECKING, Any
 
 if TYPE_CHECKING:
     import pandas as pd
 
-from skyadmin_pro.database import Database
+    from skyadmin_pro.database import Database
 
 
 def _assert_export_columns_safe(columns) -> None:
@@ -50,37 +50,48 @@ def _atomic_excel_write(writer_builder, dest: Path) -> Path:
     return dest
 
 
-def export_to_excel(
+def _plain_rows(rows: list[Any]) -> list[dict[str, Any]]:
+    """Normalize DB rows to picklable dicts (no sqlite Row objects)."""
+    out: list[dict[str, Any]] = []
+    for row in rows:
+        if isinstance(row, dict):
+            out.append(dict(row))
+        else:
+            out.append({k: row[k] for k in row})
+    return out
+
+
+def collect_export_payload(
     db: Database,
-    dest: Path,
     *,
     date_from: str | None = None,
     date_to: str | None = None,
     status: str | None = None,
     client_ids: list[int] | None = None,
     visible_only: dict[str, list[str]] | None = None,
-) -> Path:
-    """Export all sheets to Excel.
+) -> dict[str, Any]:
+    """Gather export sheet data as plain dicts (safe to pickle across processes).
 
-    visible_only maps sheet name → DB field names to keep (from the opt-in
-    "visible columns only" checkbox). Sheets absent from the map, or whose
-    filter would empty them, export complete — a sheet is never silently
-    emptied. FORBIDDEN_EXPORT_COLUMNS never export regardless.
+    NOTE (S2): SQL-side filtering/pagination deliberately deferred here. The
+    filters below are case-insensitive (status), relational across tables
+    (client_ids resolved via client_name joins), and applied to heterogeneous
+    date-string columns, while the underlying list_* methods only expose
+    per-table exact-match filters — pushing down would change export
+    semantics. Pagination would not lower peak memory either (the workbook
+    itself holds every row). Revisit only with per-method filter support plus
+    a semantics audit.
     """
-    import pandas as pd
+    tasks = _plain_rows(db.list_tasks())
+    clients = _plain_rows(db.list_clients())
+    documents = _plain_rows(db.list_documents())
+    courier = _plain_rows(db.list_courier_logs())
+    suppliers = _plain_rows(db.list_suppliers())
+    supplier_payments = _plain_rows(db.list_supplier_payments())
+    supplier_services = _plain_rows(db.list_all_supplier_services())
+    pipeline = _plain_rows(db.list_pipeline_items())
+    renewals = _plain_rows(db.all_service_renewals())
+    financial_docs = _plain_rows(db.all_financial_documents())
 
-    tasks = db.list_tasks()
-    clients = db.list_clients()
-    documents = db.list_documents()
-    courier = db.list_courier_logs()
-    suppliers = db.list_suppliers()
-    supplier_payments = db.list_supplier_payments()
-    supplier_services = db.list_all_supplier_services()
-    pipeline = db.list_pipeline_items()
-    renewals = db.all_service_renewals()
-    financial_docs = db.all_financial_documents()
-
-    # Apply client_id filter if provided
     if client_ids:
         id_set = set(client_ids)
         clients = [c for c in clients if c.get("id") in id_set]
@@ -88,19 +99,48 @@ def export_to_excel(
         documents = [d for d in documents if d.get("client_name") in client_name_set]
         tasks = [t for t in tasks if t.get("client_name") in client_name_set]
 
-    # Apply status filter
     if status:
         s = status.strip().lower()
         tasks = [t for t in tasks if (t.get("status") or "").lower() == s]
         clients = [c for c in clients if (c.get("status") or "").lower() == s]
 
-    # Apply date range filter (on created_at / due_date / expiry_date)
     if date_from:
         tasks = [t for t in tasks if (t.get("created_at") or "") >= date_from]
         documents = [d for d in documents if (d.get("expiry_date") or "") >= date_from]
     if date_to:
         tasks = [t for t in tasks if (t.get("created_at") or "") <= date_to]
         documents = [d for d in documents if (d.get("expiry_date") or "") <= date_to]
+
+    return {
+        "tasks": tasks,
+        "clients": clients,
+        "documents": documents,
+        "courier": courier,
+        "suppliers": suppliers,
+        "supplier_payments": supplier_payments,
+        "supplier_services": supplier_services,
+        "pipeline": pipeline,
+        "renewals": renewals,
+        "financial_docs": financial_docs,
+        "visible_only": visible_only,
+    }
+
+
+def write_excel_from_payload(payload: dict[str, Any], dest: str | Path) -> str:
+    """Build the Excel workbook from a picklable payload. Returns dest as str."""
+    import pandas as pd
+
+    tasks = payload.get("tasks") or []
+    clients = payload.get("clients") or []
+    documents = payload.get("documents") or []
+    courier = payload.get("courier") or []
+    suppliers = payload.get("suppliers") or []
+    supplier_payments = payload.get("supplier_payments") or []
+    supplier_services = payload.get("supplier_services") or []
+    pipeline = payload.get("pipeline") or []
+    renewals = payload.get("renewals") or []
+    financial_docs = payload.get("financial_docs") or []
+    visible_only = payload.get("visible_only")
 
     def build(target: Path) -> None:
         payments_frame = pd.DataFrame(supplier_payments)
@@ -134,7 +174,43 @@ def export_to_excel(
                     writer, sheet_name=sheet_name[:31], index=False
                 )
 
-    return _atomic_excel_write(build, Path(dest))
+    return str(_atomic_excel_write(build, Path(dest)))
+
+
+def export_to_excel(
+    db: Database,
+    dest: Path,
+    *,
+    date_from: str | None = None,
+    date_to: str | None = None,
+    status: str | None = None,
+    client_ids: list[int] | None = None,
+    visible_only: dict[str, list[str]] | None = None,
+    offload: bool = False,
+) -> Path:
+    """Export all sheets to Excel.
+
+    visible_only maps sheet name → DB field names to keep (from the opt-in
+    "visible columns only" checkbox). Sheets absent from the map, or whose
+    filter would empty them, export complete — a sheet is never silently
+    emptied. FORBIDDEN_EXPORT_COLUMNS never export regardless.
+
+    When *offload* is True, pandas/openpyxl run in a child process after DB
+    queries complete in the parent (connections are never pickled).
+    """
+    payload = collect_export_payload(
+        db,
+        date_from=date_from,
+        date_to=date_to,
+        status=status,
+        client_ids=client_ids,
+        visible_only=visible_only,
+    )
+    if offload:
+        from skyadmin_pro.services.process_jobs import run_in_process
+
+        return Path(run_in_process(write_excel_from_payload, payload, str(dest)))
+    return Path(write_excel_from_payload(payload, dest))
 
 
 _TASK_COLUMNS = {
@@ -264,11 +340,9 @@ _ALL_EXPORT_COLUMN_MAPS = (
 )
 
 
-def export_monthly_report(db: Database, year: int, month: int, dest: Path) -> Path:
-    """Export the monthly incentive report (new signups) to Excel."""
-    import pandas as pd
-
-    rows = db.list_incentive_services(year, month)
+def collect_monthly_report_payload(db: Database, year: int, month: int) -> dict[str, Any]:
+    """Gather monthly incentive rows as a picklable payload."""
+    rows = _plain_rows(db.list_incentive_services(year, month))
     columns = ["No.", "Date", "Client", "Service", "Amount"]
     records = []
     for index, row in enumerate(rows, start=1):
@@ -282,13 +356,32 @@ def export_monthly_report(db: Database, year: int, month: int, dest: Path) -> Pa
                 "Amount": row.get("amount") if row.get("amount") not in (None, "") else None,
             }
         )
+    return {"columns": columns, "records": records}
+
+
+def write_monthly_report_from_payload(payload: dict[str, Any], dest: str | Path) -> str:
+    """Write monthly incentive Excel from a picklable payload."""
+    import pandas as pd
+
+    columns = payload.get("columns") or ["No.", "Date", "Client", "Service", "Amount"]
+    records = payload.get("records") or []
 
     def build(target: Path) -> None:
         df = pd.DataFrame(records, columns=columns)
         with pd.ExcelWriter(target, engine="openpyxl") as writer:
             df.to_excel(writer, sheet_name="Pipeline", index=False)
 
-    return _atomic_excel_write(build, Path(dest))
+    return str(_atomic_excel_write(build, Path(dest)))
+
+
+def export_monthly_report(db: Database, year: int, month: int, dest: Path, *, offload: bool = False) -> Path:
+    """Export the monthly incentive report (new signups) to Excel."""
+    payload = collect_monthly_report_payload(db, year, month)
+    if offload:
+        from skyadmin_pro.services.process_jobs import run_in_process
+
+        return Path(run_in_process(write_monthly_report_from_payload, payload, str(dest)))
+    return Path(write_monthly_report_from_payload(payload, dest))
 
 
 def default_export_name() -> str:

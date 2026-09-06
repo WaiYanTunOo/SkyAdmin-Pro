@@ -89,26 +89,17 @@ def build_status_report(db: Database) -> dict:
     add_section(
         "Expiring documents",
         ["Client", "Type", "Expiry"],
-        [
-            _project(r, ("client_name", "document_type", "expiry_date"))
-            for r in snap.get("expiring", [])
-        ],
+        [_project(r, ("client_name", "document_type", "expiry_date")) for r in snap.get("expiring", [])],
     )
     add_section(
         "Overdue services",
         ["Client", "Type", "Payment due"],
-        [
-            _project(r, ("client_name", "document_type", "payment_date"))
-            for r in snap.get("overdue", [])
-        ],
+        [_project(r, ("client_name", "document_type", "payment_date")) for r in snap.get("overdue", [])],
     )
     add_section(
         "Pending tasks",
         ["Title", "Client", "Category", "Due"],
-        [
-            _project(r, ("title", "client_name", "category", "due_date"))
-            for r in snap.get("pending", [])
-        ],
+        [_project(r, ("title", "client_name", "category", "due_date")) for r in snap.get("pending", [])],
     )
     add_section(
         "Renewals due",
@@ -121,10 +112,7 @@ def build_status_report(db: Database) -> dict:
     add_section(
         "Tax filing overview",
         ["Client", "FS", "PND53", "PP30", "PND51", "PND50", "Audit", "Payment"],
-        [
-            _project(r, _TAX_OVERVIEW_KEYS)
-            for r in snap.get("accounting_clients", [])
-        ],
+        [_project(r, _TAX_OVERVIEW_KEYS) for r in snap.get("accounting_clients", [])],
     )
     clients = db.search_clients("")
     add_section(
@@ -144,11 +132,14 @@ def build_status_report(db: Database) -> dict:
     return model
 
 
-def write_status_report_pdf(db: Database, dest: Path) -> Path:
+def write_status_report_pdf(db: Database, dest: Path, *, offload: bool = False) -> Path:
     """Build a redacted status report and render it to ``dest`` (atomic write)."""
-    from skyadmin_pro.services.pdf_render import render_report
+    from skyadmin_pro.services.pdf_render import render_report, render_report_offloaded
 
-    return render_report(build_status_report(db), Path(dest))
+    model = build_status_report(db)
+    if offload:
+        return render_report_offloaded(model, Path(dest))
+    return render_report(model, Path(dest))
 
 
 def default_report_name() -> str:

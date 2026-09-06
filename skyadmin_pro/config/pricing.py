@@ -16,9 +16,7 @@ ACCOUNTING_PRICING_SERVICES: tuple[str, ...] = (
     "Annual Audit",
 )
 
-TRANSACTION_RANGE_PRICING_SERVICES: frozenset[str] = frozenset(
-    {PRICING_DEFAULT_SERVICE, *ACCOUNTING_PRICING_SERVICES}
-)
+TRANSACTION_RANGE_PRICING_SERVICES: frozenset[str] = frozenset({PRICING_DEFAULT_SERVICE, *ACCOUNTING_PRICING_SERVICES})
 
 DEFAULT_SERVICE_CHARGE_LINES: dict[str, tuple[tuple[str, int, int, int, int, str], ...]] = {
     "Company Setup Basic Package": (

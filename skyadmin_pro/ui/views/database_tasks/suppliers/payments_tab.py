@@ -40,8 +40,11 @@ class SupplierPaymentsTab:
             font=ctk.CTkFont(size=CARD_TITLE_SIZE, weight="bold"),
         ).grid(row=0, column=0, sticky="w", padx=16, pady=(14, 8))
         self.columns_btn = ctk.CTkButton(
-            pay_card, text="⋮ Columns", width=90,
-            fg_color="transparent", border_width=1,
+            pay_card,
+            text="⋮ Columns",
+            width=90,
+            fg_color="transparent",
+            border_width=1,
             command=self._show_columns_menu,
         )
         self.columns_btn.grid(row=0, column=1, sticky="e", padx=(0, 16), pady=(14, 8))

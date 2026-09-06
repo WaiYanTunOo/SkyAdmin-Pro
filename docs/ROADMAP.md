@@ -2,7 +2,7 @@
 
 Living plan after **Phase 5** (release gates, sync conflicts, auto-update, packaging, viewer PWA, Inno Setup).
 
-**Current version:** `0.3.2` · **Primary platform:** Windows desktop
+**Current version:** `0.3.3` · **Primary platform:** Windows desktop
 
 ---
 
@@ -10,7 +10,7 @@ Living plan after **Phase 5** (release gates, sync conflicts, auto-update, packa
 
 | Area | Status |
 |------|--------|
-| Windows portable exe + installer | ✅ `build.ps1`, `build-installer.ps1`, `dist\SkyAdminPro-Setup-0.3.2.exe` |
+| Windows portable exe + installer | ✅ `build.ps1`, `build-installer.ps1`, `dist\SkyAdminPro-Setup-0.3.3.exe` |
 | License / activation | ✅ Ed25519, claim burn, control list SKYCTRL2 |
 | Worker API | ✅ Generate, revoke, sync, pricing, update, admin, viewer PWA |
 | UI theme (Phases 0–4) | ✅ Form tokens, themed entries, walkthrough tests |

@@ -15,19 +15,24 @@ def db_path(tmp_path):
 def test_fresh_database_records_all_migrations(db_path):
     db = Database(db_path)
     rows = db._fetch_all("SELECT version, name FROM schema_migrations ORDER BY version")
-    assert [int(row["version"]) for row in rows] == [1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11]
+    assert [int(row["version"]) for row in rows] == [1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12]
     assert rows[0]["name"] == "legacy_schema"
-    assert rows[-1]["name"] == "client_groups_sync"
+    assert rows[-1]["name"] == "sync_hlc"
     # m009 owns the group index (kept out of SCHEMA_SQL replay) — fresh DBs get it via migration.
     idx = db._fetch_all("SELECT name FROM sqlite_master WHERE type = 'index' AND name = 'idx_clients_group'")
     assert len(idx) == 1
+    # m012 owns the HLC clocks (kept out of SCHEMA_SQL replay).
+    cols = {row["name"] for row in db._fetch_all("PRAGMA table_info(clients)")}
+    assert "hlc" in cols
+    log_cols = {row["name"] for row in db._fetch_all("PRAGMA table_info(sync_conflicts)")}
+    assert {"hlc_winner", "hlc_loser"} <= log_cols
 
 
 def test_migrations_are_idempotent_on_reopen(db_path):
     Database(db_path)
     db = Database(db_path)
     count = db._fetch_one("SELECT COUNT(*) AS n FROM schema_migrations")["n"]
-    assert count == 11
+    assert count == 12
 
 
 def test_new_migration_file_pattern(db_path):
@@ -100,9 +105,7 @@ def test_m011_adds_client_groups_sync_columns(db_path):
     reopened = Database(db_path)
     with reopened.connection() as conn:
         cols = {row[1] for row in conn.execute("PRAGMA table_info(client_groups)")}
-        row = conn.execute(
-            "SELECT global_id, updated_at FROM client_groups WHERE name = 'Legacy Group'"
-        ).fetchone()
+        row = conn.execute("SELECT global_id, updated_at FROM client_groups WHERE name = 'Legacy Group'").fetchone()
     assert {"global_id", "updated_at", "deleted_at"} <= cols
     assert row["global_id"]
     assert row["updated_at"]
@@ -115,10 +118,7 @@ def test_m011_adds_client_groups_sync_columns(db_path):
 def test_fresh_db_search_uses_fts_match(db_path):
     """Fresh installs get clients_fts from base schema — MATCH path, not LIKE fallback."""
     db = Database(db_path)
-    tables = {
-        row["name"]
-        for row in db._fetch_all("SELECT name FROM sqlite_master WHERE type = 'table'")
-    }
+    tables = {row["name"] for row in db._fetch_all("SELECT name FROM sqlite_master WHERE type = 'table'")}
     assert "clients_fts" in tables
     client_id = db.get_or_create_client("FTS Probe Company")
     hits = db._fetch_all("SELECT rowid AS id FROM clients_fts WHERE clients_fts MATCH 'probe*'")

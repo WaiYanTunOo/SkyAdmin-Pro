@@ -14,6 +14,7 @@ from skyadmin_pro.db.migrations import (
     m009_client_groups,
     m010_fts_rebuild,
     m011_client_groups_sync,
+    m012_sync_hlc,
 )
 from skyadmin_pro.db.migrations.runner import register_migrations, run_pending_migrations
 
@@ -45,6 +46,11 @@ register_migrations(
             m011_client_groups_sync.VERSION,
             m011_client_groups_sync.NAME,
             m011_client_groups_sync.upgrade,
+        ),
+        (
+            m012_sync_hlc.VERSION,
+            m012_sync_hlc.NAME,
+            m012_sync_hlc.upgrade,
         ),
     ]
 )

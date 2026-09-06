@@ -24,6 +24,7 @@ def apply_high_dpi_scaling() -> float:
     # If Tk already exists, this is a no-op but harmless.
     try:
         import ctypes
+
         # Per-monitor v2 — avoids blurry Tk on 125%/150% displays.
         try:
             ctypes.windll.shcore.SetProcessDpiAwareness(2)

@@ -183,7 +183,10 @@ def check_version_alignment() -> list[str]:
     try:
         import re
 
-        import tomllib
+        try:
+            import tomllib
+        except ImportError:
+            import tomli as tomllib
 
         from skyadmin_pro.config import APP_VERSION
 
@@ -204,9 +207,7 @@ def check_version_alignment() -> list[str]:
         if not pkg_ver:
             errors.append(_fail("skyadmin_pro.__version__ is missing"))
         elif pkg_ver != APP_VERSION:
-            errors.append(
-                _fail(f"Version mismatch: skyadmin_pro.__version__={pkg_ver} APP_VERSION={APP_VERSION}")
-            )
+            errors.append(_fail(f"Version mismatch: skyadmin_pro.__version__={pkg_ver} APP_VERSION={APP_VERSION}"))
         else:
             _ok(f"Package __version__ aligned at {pkg_ver}")
 
@@ -260,6 +261,61 @@ def check_installer(installer: Path) -> list[str]:
         errors.append(_fail(f"Installer too small ({size:,} bytes)"))
     else:
         _ok(f"Installer size {size / (1024 * 1024):.1f} MB ({installer.name})")
+    return errors
+
+
+def check_db_cipher() -> list[str]:
+    """Phase 1 gate: live DB must be SQLCipher-encrypted (round-trip proof)."""
+    import sqlite3
+    import tempfile
+
+    errors: list[str] = []
+    try:
+        from skyadmin_pro.db import cipher as cipher_mod
+        from skyadmin_pro.db.cipher import SQLITE_MAGIC, db_state
+    except ImportError as exc:
+        errors.append(_fail(f"cipher module import failed: {exc}"))
+        return errors
+    try:
+        drv = cipher_mod.driver()
+        probe = drv.connect(":memory:")
+        try:
+            version = probe.execute("PRAGMA cipher_version").fetchone()[0]
+        finally:
+            probe.close()
+    except RuntimeError as exc:
+        errors.append(_fail(str(exc)))
+        return errors
+    _ok(f"SQLCipher driver ({version})")
+    try:
+        with tempfile.TemporaryDirectory(prefix="skyadmin_cipher_gate_") as staging:
+            legacy = Path(staging) / "legacy.db"
+            conn = sqlite3.connect(str(legacy))
+            try:
+                conn.execute("CREATE TABLE t (id INTEGER PRIMARY KEY, v TEXT)")
+                conn.execute("INSERT INTO t (v) VALUES ('gate')")
+                conn.commit()
+            finally:
+                conn.close()
+            assert db_state(legacy) == "plaintext"
+            from skyadmin_pro.database import Database
+
+            db = Database(legacy)
+            try:
+                assert db_state(legacy) == "cipher", "live DB not encrypted after open"
+                assert legacy.read_bytes()[:16] != SQLITE_MAGIC, "cipher header missing"
+                assert cipher_mod.verify_cipher_db(legacy) is True, "quick_check failed"
+                db.get_or_create_client("Gate Check Co")
+                assert db.count_clients() == 1, "write/read after migration failed"
+            finally:
+                # Release pooled handles or Windows cannot delete the temp dir.
+                try:
+                    db.shutdown()
+                except Exception:
+                    pass
+            _ok("Live database encrypts + migrates legacy plaintext (round-trip)")
+    except Exception as exc:
+        errors.append(_fail(f"DB cipher round-trip failed: {exc}"))
     return errors
 
 
@@ -336,6 +392,7 @@ def main() -> int:
     failures: list[str] = []
     failures.extend(check_version_alignment())
     failures.extend(check_embedded_public_key())
+    failures.extend(check_db_cipher())
     failures.extend(check_exe(args.exe.resolve()))
     installer_path = (args.installer or default_installer_path()).resolve()
     if args.skip_installer:

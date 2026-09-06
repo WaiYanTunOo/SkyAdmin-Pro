@@ -22,10 +22,14 @@ fi
 "$VENV_PY" -m PyInstaller "$ROOT/packaging/SkyAdminPro-macos.spec" --noconfirm --log-level WARN
 
 APP="$ROOT/dist/SkyAdminPro.app"
+MACOS_BIN="$APP/Contents/MacOS/SkyAdminPro"
 if [[ -d "$APP" ]]; then
     echo ""
     echo "Built: $APP"
     echo "Run:   open \"$APP\""
+    echo ""
+    echo "Running release checks..."
+    "$VENV_PY" "$ROOT/scripts/release_check.py" --skip-pytest --exe "$MACOS_BIN" --skip-installer
 else
     echo "Build failed — dist/SkyAdminPro.app not found." >&2
     exit 1

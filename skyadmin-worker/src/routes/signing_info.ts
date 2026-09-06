@@ -2,9 +2,13 @@
 
 import { Context } from "hono";
 import { Env } from "../db";
+import { checkRateLimit } from "../rate_limit";
 import { ED25519_PUBLIC_KEY_HEX, ed25519PublicKeyHex } from "../signing";
 
 export async function signingPublicKeyHandler(c: Context<{ Bindings: Env }>) {
+  // Ed25519 PKCS#8 import + JWK export per call is CPU-expensive — strict per-IP budget.
+  const limited = await checkRateLimit(c, "signing-key", { windowSeconds: 60, max: 10 });
+  if (limited) return limited;
   const privateKey = (c.env.LICENSE_ED25519_PRIVATE_KEY_B64 || "").trim();
   if (!privateKey) {
     return c.json({ ok: false, error: "LICENSE_ED25519_PRIVATE_KEY_B64 is not configured." }, 503);

@@ -27,7 +27,8 @@ class ExportFilterDialog(ctk.CTkToplevel):
 
         # ── Title ─────────────────────────────────────────────────────
         ctk.CTkLabel(
-            self, text="Export to Excel",
+            self,
+            text="Export to Excel",
             font=ctk.CTkFont(size=16, weight="bold"),
         ).grid(row=0, column=0, padx=CONTENT_PAD, pady=(CONTENT_PAD, 12), sticky="w")
 
@@ -82,7 +83,8 @@ class ExportFilterDialog(ctk.CTkToplevel):
         columns_frame.grid(row=3, column=0, sticky="ew", padx=CONTENT_PAD, pady=(0, 8))
         self.visible_only_var = ctk.BooleanVar(value=False)
         ctk.CTkCheckBox(
-            columns_frame, text="Export visible columns only",
+            columns_frame,
+            text="Export visible columns only",
             variable=self.visible_only_var,
             font=ctk.CTkFont(size=11),
         ).grid(row=0, column=0, padx=12, pady=8, sticky="w")
@@ -90,8 +92,10 @@ class ExportFilterDialog(ctk.CTkToplevel):
             columns_frame,
             text="Off = every sheet exports all columns (auditable). "
             "On = sheets follow hidden columns in Database & Tasks tables.",
-            font=ctk.CTkFont(size=10), text_color=TEXT_MUTED,
-            wraplength=360, justify="left",
+            font=ctk.CTkFont(size=10),
+            text_color=TEXT_MUTED,
+            wraplength=360,
+            justify="left",
         ).grid(row=1, column=0, padx=12, pady=(0, 8), sticky="w")
 
         # ── Buttons ─────────────────────────────────────────────────────
@@ -99,13 +103,18 @@ class ExportFilterDialog(ctk.CTkToplevel):
         btn_frame.grid(row=4, column=0, sticky="ew", padx=CONTENT_PAD, pady=(12, CONTENT_PAD))
 
         ctk.CTkButton(
-            btn_frame, text="Export All (No Filters)", width=160,
-            fg_color="transparent", border_width=1,
+            btn_frame,
+            text="Export All (No Filters)",
+            width=160,
+            fg_color="transparent",
+            border_width=1,
             command=self._export_all,
         ).pack(side="left")
 
         ctk.CTkButton(
-            btn_frame, text="Export with Filters", width=140,
+            btn_frame,
+            text="Export with Filters",
+            width=140,
             command=self._export_filtered,
         ).pack(side="right")
 

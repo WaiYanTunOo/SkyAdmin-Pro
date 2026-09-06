@@ -30,7 +30,8 @@ class AuditLogDialog(ctk.CTkToplevel):
         header.grid_columnconfigure(1, weight=1)
 
         ctk.CTkLabel(
-            header, text="Audit Log",
+            header,
+            text="Audit Log",
             font=ctk.CTkFont(size=16, weight="bold"),
         ).grid(row=0, column=0, sticky="w")
 
@@ -43,8 +44,12 @@ class AuditLogDialog(ctk.CTkToplevel):
         self._filter = ctk.StringVar(value="all")
         for label, val in [("All", "all"), ("Tax Changes", "tax_change"), ("Sync Conflicts", "sync_conflict")]:
             ctk.CTkRadioButton(
-                btn_frame, text=label, variable=self._filter, value=val,
-                command=self._load_log, font=ctk.CTkFont(size=12),
+                btn_frame,
+                text=label,
+                variable=self._filter,
+                value=val,
+                command=self._load_log,
+                font=ctk.CTkFont(size=12),
             ).pack(side="left", padx=(0, 10))
 
         # Tree
@@ -66,13 +71,18 @@ class AuditLogDialog(ctk.CTkToplevel):
 
         # Footer
         ctk.CTkButton(
-            self, text="Clear All Logs", width=120,
-            fg_color=("#dc2626", "#b91c1c"), hover_color="#b91c1c",
+            self,
+            text="Clear All Logs",
+            width=120,
+            fg_color=("#dc2626", "#b91c1c"),
+            hover_color="#b91c1c",
             command=self._clear_logs,
         ).grid(row=3, column=0, sticky="w", padx=CONTENT_PAD, pady=(0, CONTENT_PAD))
 
         ctk.CTkButton(
-            self, text="Close", width=80,
+            self,
+            text="Close",
+            width=80,
             command=self.destroy,
         ).grid(row=3, column=0, sticky="e", padx=CONTENT_PAD, pady=(0, CONTENT_PAD))
 
@@ -90,23 +100,27 @@ class AuditLogDialog(ctk.CTkToplevel):
         for entry in logs:
             entry_type = entry.get("log_type", "")
             if entry_type == "tax_change":
-                rows.append((
-                    "Tax Change",
-                    entry.get("client_name", "") or "—",
-                    entry.get("field", "") or "—",
-                    entry.get("old_value", "") or "—",
-                    entry.get("new_value", "") or "—",
-                    entry.get("timestamp", "") or "—",
-                ))
+                rows.append(
+                    (
+                        "Tax Change",
+                        entry.get("client_name", "") or "—",
+                        entry.get("field", "") or "—",
+                        entry.get("old_value", "") or "—",
+                        entry.get("new_value", "") or "—",
+                        entry.get("timestamp", "") or "—",
+                    )
+                )
             else:
-                rows.append((
-                    "Sync Conflict",
-                    entry.get("table_name", "") or "—",
-                    entry.get("global_id", "") or "—",
-                    entry.get("direction", "") or "—",
-                    "—",
-                    entry.get("timestamp", "") or entry.get("logged_at", "") or "—",
-                ))
+                rows.append(
+                    (
+                        "Sync Conflict",
+                        entry.get("table_name", "") or "—",
+                        entry.get("global_id", "") or "—",
+                        entry.get("direction", "") or "—",
+                        "—",
+                        entry.get("timestamp", "") or entry.get("logged_at", "") or "—",
+                    )
+                )
         # set_rows owns empty state + virtual rendering (500 rows → virtual).
         self.tree.set_rows(
             rows,
@@ -118,6 +132,7 @@ class AuditLogDialog(ctk.CTkToplevel):
 
     def _clear_logs(self) -> None:
         from tkinter import messagebox
+
         if not messagebox.askyesno("Clear Logs", "Clear all sync conflict logs?", parent=self):
             return
         count = self.app.db.clear_sync_conflicts()

@@ -124,6 +124,7 @@ class MainWindow(dnd_base_class()):
         import customtkinter as _ctk
 
         from skyadmin_pro.config import SETTING_APPEARANCE_MODE
+
         current = _ctk.get_appearance_mode()
         new_mode = "light" if current == "Dark" else "dark"
         _ctk.set_appearance_mode(new_mode)
@@ -137,6 +138,7 @@ class MainWindow(dnd_base_class()):
     def open_global_search(self) -> None:
         """Open the global search dialog (Ctrl+F)."""
         from skyadmin_pro.ui.views.global_search import GlobalSearchDialog
+
         GlobalSearchDialog(self)
 
     def _shortcut_new(self) -> None:
@@ -202,6 +204,7 @@ class MainWindow(dnd_base_class()):
     def _start_auto_backup(self) -> None:
         try:
             from skyadmin_pro.services.auto_backup import AutoBackupScheduler
+
             self._auto_backup = AutoBackupScheduler(self)
             self._auto_backup.start()
         except Exception:
@@ -397,7 +400,10 @@ class MainWindow(dnd_base_class()):
         on_show = getattr(view, "on_show", None)
         if callable(on_show):
             on_show()
-        self.apply_app_theme(view)
+        from skyadmin_pro.ui.widgets import should_apply_theme
+
+        if should_apply_theme():
+            self.apply_app_theme(view)
 
     def apply_app_theme(self, root: ctk.Misc | None = None) -> None:
         """Re-apply form input and table styling after appearance changes."""

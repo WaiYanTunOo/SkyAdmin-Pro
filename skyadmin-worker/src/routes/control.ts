@@ -1,7 +1,7 @@
 /** GET /api/control — Return the SKYCTRL2-signed control list. */
 
 import { Context } from "hono";
-import { Env, listRevocations, listBans, listUsedNonces, listRevokedPasscodes, getMeta } from "../db";
+import { Env, CONTROL_LIST_CAP, listRevocations, listBans, listUsedNonces, listRevokedPasscodes, getMeta } from "../db";
 import { checkRateLimit } from "../rate_limit";
 import { buildControlEnvelopeV2 } from "../signing";
 
@@ -20,10 +20,11 @@ export async function controlHandler(c: Context<{ Bindings: Env }>) {
     return new Response("Ed25519 signing key not configured.", { status: 503 });
   }
 
-  const revocations = await listRevocations(db);
-  const bans = await listBans(db);
-  const usedNonces = await listUsedNonces(db);
-  const revokedPasscodes = await listRevokedPasscodes(db);
+  // Defense in depth: db helpers already LIMIT, but never emit unbounded rows here.
+  const revocations = (await listRevocations(db)).slice(-CONTROL_LIST_CAP);
+  const bans = (await listBans(db)).slice(-CONTROL_LIST_CAP);
+  const usedNonces = (await listUsedNonces(db)).slice(-CONTROL_LIST_CAP);
+  const revokedPasscodes = (await listRevokedPasscodes(db)).slice(-CONTROL_LIST_CAP);
   const latestVersion = await getMeta(db, "latest_version");
   const latestUrl = await getMeta(db, "latest_url");
   const version = await getMeta(db, "control_version");

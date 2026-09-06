@@ -2,12 +2,12 @@
 
 from __future__ import annotations
 
-import sqlite3
 from datetime import date, datetime, timedelta
 
 from skyadmin_pro.config import (
     NEW_CUSTOMER_QUOTATION_TASKS,
 )
+from skyadmin_pro.db.cipher import INTEGRITY_ERRORS
 from skyadmin_pro.db.sql_helpers import (
     _escape_like,
     _in_clause,
@@ -21,8 +21,7 @@ class ClientsMixin:
             return list(cached)
         with self.connection() as conn:
             rows = conn.execute(
-                "SELECT name FROM clients WHERE deleted_at IS NULL "
-                "ORDER BY name COLLATE NOCASE"
+                "SELECT name FROM clients WHERE deleted_at IS NULL ORDER BY name COLLATE NOCASE"
             ).fetchall()
         names = [row["name"] for row in rows]
         self._client_names_cache = names
@@ -59,7 +58,7 @@ class ClientsMixin:
                     (cleaned,),
                 )
                 new_id = int(cursor.lastrowid)
-            except sqlite3.IntegrityError:
+            except INTEGRITY_ERRORS:
                 row = conn.execute(
                     "SELECT id FROM clients WHERE name = ? COLLATE NOCASE AND deleted_at IS NULL",
                     (cleaned,),
@@ -367,9 +366,7 @@ class ClientsMixin:
     def count_clients(self, query: str = "") -> int:
         q = (query or "").strip()
         if not q:
-            row = self._fetch_one(
-                "SELECT COUNT(*) AS n FROM clients WHERE deleted_at IS NULL"
-            )
+            row = self._fetch_one("SELECT COUNT(*) AS n FROM clients WHERE deleted_at IS NULL")
             return int(row["n"]) if row else 0
         # LIKE fallback count (FTS count would need MATCH sync; LIKE is safe).
         from skyadmin_pro.db.sql_helpers import _escape_like as _esc
@@ -391,9 +388,7 @@ class ClientsMixin:
         )
         return self._prepare_client_record(row)
 
-    def search_clients(
-        self, query: str = "", *, limit: int | None = None, offset: int = 0
-    ) -> list[dict]:
+    def search_clients(self, query: str = "", *, limit: int | None = None, offset: int = 0) -> list[dict]:
         """Company-list rows: match name / contact / email, sorted by name."""
         base_select = """
             SELECT id, name, company_name, contact_name, email, status, notes,
@@ -430,10 +425,8 @@ class ClientsMixin:
             self._log.debug("FTS search failed, falling back to LIKE", exc_info=True)
         like = f"%{_escape_like(q)}%"
         base = (
-            base_select
-            + " AND (name LIKE ? ESCAPE '\\' OR contact_name LIKE ? ESCAPE '\\'"
-            " OR email LIKE ? ESCAPE '\\')"
-            + " ORDER BY name COLLATE NOCASE"
+            base_select + " AND (name LIKE ? ESCAPE '\\' OR contact_name LIKE ? ESCAPE '\\'"
+            " OR email LIKE ? ESCAPE '\\')" + " ORDER BY name COLLATE NOCASE"
         )
         if limit is not None and int(limit) > 0:
             return self._fetch_page(base, (like, like, like), limit=limit, offset=offset)
@@ -488,11 +481,7 @@ class ClientsMixin:
             "business_objectives": (
                 business_objectives if business_objectives is not None else current["business_objectives"]
             ),
-            "group_id": (
-                None
-                if clear_group
-                else (group_id if group_id is not None else current.get("group_id"))
-            ),
+            "group_id": (None if clear_group else (group_id if group_id is not None else current.get("group_id"))),
         }
         with self.connection() as conn:
             try:
@@ -526,7 +515,7 @@ class ClientsMixin:
                         client_id,
                     ),
                 )
-            except sqlite3.IntegrityError:
+            except INTEGRITY_ERRORS:
                 raise ValueError("A client with that name already exists.") from None
         self._client_names_cache = None
 
@@ -567,17 +556,14 @@ class ClientsMixin:
         placeholders = ",".join("?" for _ in client_ids)
         with self.connection() as conn:
             cursor = conn.execute(
-                f"UPDATE clients SET status = ?, updated_at = ?"
-                f" WHERE id IN ({placeholders}) AND deleted_at IS NULL",
+                f"UPDATE clients SET status = ?, updated_at = ? WHERE id IN ({placeholders}) AND deleted_at IS NULL",
                 [normalized, self._now(), *client_ids],
             )
             count = cursor.rowcount
         self._client_names_cache = None
         return count
 
-    def batch_assign_client_group(
-        self, client_ids: list[int], group_id: int | None
-    ) -> int:
+    def batch_assign_client_group(self, client_ids: list[int], group_id: int | None) -> int:
         """Assign (or clear) local group for multiple clients. Returns count updated.
 
         ``group_id`` is local-only and is never synced.
@@ -585,16 +571,13 @@ class ClientsMixin:
         if not client_ids:
             return 0
         if group_id is not None:
-            group = self._fetch_one(
-                "SELECT id FROM client_groups WHERE id = ?", (group_id,)
-            )
+            group = self._fetch_one("SELECT id FROM client_groups WHERE id = ?", (group_id,))
             if group is None:
                 raise ValueError("Group not found.")
         placeholders = ",".join("?" for _ in client_ids)
         with self.connection() as conn:
             cursor = conn.execute(
-                f"UPDATE clients SET group_id = ?, updated_at = ?"
-                f" WHERE id IN ({placeholders}) AND deleted_at IS NULL",
+                f"UPDATE clients SET group_id = ?, updated_at = ? WHERE id IN ({placeholders}) AND deleted_at IS NULL",
                 [group_id, self._now(), *client_ids],
             )
             count = cursor.rowcount
@@ -660,7 +643,7 @@ class ClientsMixin:
                     """,
                     (cleaned, color, uuid.uuid4().hex),
                 )
-            except sqlite3.IntegrityError:
+            except INTEGRITY_ERRORS:
                 raise ValueError("A group with that name already exists.") from None
         return int(cur.lastrowid)
 
@@ -678,7 +661,7 @@ class ClientsMixin:
                     """,
                     (cleaned, color, group_id),
                 )
-            except sqlite3.IntegrityError:
+            except INTEGRITY_ERRORS:
                 raise ValueError("A group with that name already exists.") from None
         return cur.rowcount
 

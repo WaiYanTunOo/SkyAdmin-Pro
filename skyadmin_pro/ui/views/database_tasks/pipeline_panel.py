@@ -75,19 +75,30 @@ class ServicePipelinePanel(ctk.CTkFrame):
         pager = ctk.CTkFrame(pipeline_card, fg_color="transparent")
         pager.grid(row=3, column=0, sticky="ew", padx=12, pady=(0, 10))
         self.prev_btn = ctk.CTkButton(
-            pager, text="◀ Prev", width=80, fg_color="transparent", border_width=1,
+            pager,
+            text="◀ Prev",
+            width=80,
+            fg_color="transparent",
+            border_width=1,
             command=self._prev_page,
         )
         self.prev_btn.pack(side="left")
         self.page_label = ctk.CTkLabel(pager, text="Page 1", text_color=TEXT_MUTED)
         self.page_label.pack(side="left", padx=10)
         self.next_btn = ctk.CTkButton(
-            pager, text="Next ▶", width=80, fg_color="transparent", border_width=1,
+            pager,
+            text="Next ▶",
+            width=80,
+            fg_color="transparent",
+            border_width=1,
             command=self._next_page,
         )
         self.next_btn.pack(side="left")
         self.page_size_menu = ctk.CTkOptionMenu(
-            pager, values=["100", "250", "500", "1000"], width=90, command=self._on_page_size,
+            pager,
+            values=["100", "250", "500", "1000"],
+            width=90,
+            command=self._on_page_size,
         )
         self.page_size_menu.set("250")
         self.page_size_menu.pack(side="right")
@@ -176,9 +187,7 @@ class ServicePipelinePanel(ctk.CTkFrame):
                 tags.append([tag] if tag else [])
             self.pipe_tree.set_rows(rows, iids=iids, tags=tags, empty_message="No pipeline items yet.")
             summary = payload["summary"]
-            self.summary.configure(
-                text=f"{summary['total']} engagement(s) tracked — {summary['completed']} completed."
-            )
+            self.summary.configure(text=f"{summary['total']} engagement(s) tracked — {summary['completed']} completed.")
             self._update_pager(len(shown))
             self.feedback.clear()
 

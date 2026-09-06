@@ -168,10 +168,7 @@ def large_tax_db(tmp_path) -> Database:
     with db.connection() as conn:
         conn.executemany(
             "INSERT INTO documents (client_id, document_type, payment_date, paid, progress) VALUES (?, ?, ?, ?, ?)",
-            [
-                (i + 1, service_type, overdue if i % 3 == 0 else current, 0, "Ongoing")
-                for i in range(5000)
-            ],
+            [(i + 1, service_type, overdue if i % 3 == 0 else current, 0, "Ongoing") for i in range(5000)],
         )
     return db
 

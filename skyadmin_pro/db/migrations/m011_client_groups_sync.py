@@ -29,9 +29,7 @@ def upgrade(db: CoreMixin) -> None:
             )
         if "deleted_at" not in cols:
             conn.execute("ALTER TABLE client_groups ADD COLUMN deleted_at TEXT")
-        rows = conn.execute(
-            "SELECT id FROM client_groups WHERE global_id IS NULL OR TRIM(global_id) = ''"
-        ).fetchall()
+        rows = conn.execute("SELECT id FROM client_groups WHERE global_id IS NULL OR TRIM(global_id) = ''").fetchall()
         for row in rows:
             conn.execute(
                 "UPDATE client_groups SET global_id = ? WHERE id = ?",

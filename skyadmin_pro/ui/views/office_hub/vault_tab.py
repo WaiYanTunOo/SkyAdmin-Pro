@@ -43,7 +43,8 @@ class VaultTabMixin:
         themed_entry(
             toolbar, textvariable=self.client_cred_search_var, placeholder_text="Search client, DBD/RD no…"
         ).grid(row=0, column=0, sticky="ew", padx=(0, 8))
-        self.client_cred_search_var.trace_add("write", debounced_after(self, self._refresh_client_credentials))
+        self._client_cred_search_scheduler = debounced_after(self, self._refresh_client_credentials)
+        self.client_cred_search_var.trace_add("write", self._client_cred_search_scheduler)
         self.client_cred_type_menu = ctk.CTkOptionMenu(
             toolbar,
             values=["All"] + list(CLIENT_CREDENTIAL_TYPES),
@@ -144,7 +145,8 @@ class VaultTabMixin:
         themed_entry(
             toolbar, textvariable=self.office_cred_search_var, placeholder_text="Search office accounts…"
         ).grid(row=0, column=0, sticky="ew", padx=(0, 8))
-        self.office_cred_search_var.trace_add("write", debounced_after(self, self._refresh_office_credentials))
+        self._office_cred_search_scheduler = debounced_after(self, self._refresh_office_credentials)
+        self.office_cred_search_var.trace_add("write", self._office_cred_search_scheduler)
         self.office_cred_type_menu = ctk.CTkOptionMenu(
             toolbar,
             values=["All"] + list(OFFICE_SYSTEM_TYPES),

@@ -84,6 +84,10 @@ class ArchivePanel(ctk.CTkFrame):
     def refresh(self) -> None:
         ready, ready_sig = file_ops.list_files_with_signature(self.app.paths.ready_to_upload)
         staging, staging_sig = file_ops.list_files_with_signature(self.app.paths.staging)
+        self.render_counts(ready, ready_sig, staging, staging_sig)
+
+    def render_counts(self, ready, ready_sig, staging, staging_sig) -> None:
+        """Apply a background-scanned file list on the main thread."""
         signature = (ready_sig, staging_sig)
         if signature == self._archive_signature:
             return

@@ -1,5 +1,6 @@
 """Shared fixtures: sandboxed app-data dir so tests never touch real data."""
 
+import os
 import sys
 from pathlib import Path
 
@@ -7,6 +8,11 @@ import pytest
 
 ROOT = Path(__file__).resolve().parents[1]
 sys.path.insert(0, str(ROOT))
+
+# Phase 1 (SQLCipher): the suite uses throwaway DB files, so pin a constant
+# test-only cipher salt. Production never sets this and derives the salt
+# from the machine ID instead (see skyadmin_pro/db/cipher.py).
+os.environ.setdefault("SKYADMIN_CIPHER_SALT", "SkyAdminTestCipherSalt-v1")
 
 from skyadmin_pro.database import Database  # noqa: E402
 

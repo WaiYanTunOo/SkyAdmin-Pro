@@ -32,6 +32,7 @@ def app(tmp_path_factory):
 def test_sidebar_has_all_nav_buttons(app):
     """Sidebar has a button for each navigation item."""
     from skyadmin_pro.config import NAV_ITEMS
+
     assert len(app._nav_buttons) == len(NAV_ITEMS)
     for key, _label in NAV_ITEMS:
         assert key in app._nav_buttons
@@ -52,6 +53,7 @@ def test_sidebar_toggle_changes_width(app):
 def test_all_views_registered(app):
     """All navigation views are lazily loaded — only dashboard is eager."""
     from skyadmin_pro.config import NAV_ITEMS
+
     # Dashboard is loaded eagerly on startup
     assert "dashboard" in app._views
     # Other views load lazily on first show
@@ -101,6 +103,7 @@ def test_status_bar_exists(app):
 def test_theme_toggle_switches_mode(app):
     """Ctrl+D toggles between dark and light mode."""
     import customtkinter as ctk
+
     original = ctk.get_appearance_mode()
     app._toggle_dark_light()
     app.update()

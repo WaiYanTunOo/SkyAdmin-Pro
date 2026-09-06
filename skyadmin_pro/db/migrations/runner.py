@@ -2,10 +2,11 @@
 
 from __future__ import annotations
 
-import sqlite3
 from collections.abc import Callable, Sequence
 from datetime import datetime, timezone
 from typing import TYPE_CHECKING
+
+from skyadmin_pro.db.cipher import DBConnection
 
 if TYPE_CHECKING:
     from skyadmin_pro.db.core import CoreMixin
@@ -20,7 +21,7 @@ def register_migrations(items: Sequence[tuple[int, str, MigrationFn]]) -> None:
     MIGRATIONS = tuple(sorted(items, key=lambda item: item[0]))
 
 
-def _ensure_table(conn: sqlite3.Connection) -> None:
+def _ensure_table(conn: DBConnection) -> None:
     conn.execute(
         """
         CREATE TABLE IF NOT EXISTS schema_migrations (
@@ -32,13 +33,13 @@ def _ensure_table(conn: sqlite3.Connection) -> None:
     )
 
 
-def _applied_versions(conn: sqlite3.Connection) -> set[int]:
+def _applied_versions(conn: DBConnection) -> set[int]:
     _ensure_table(conn)
     rows = conn.execute("SELECT version FROM schema_migrations").fetchall()
     return {int(row[0]) for row in rows}
 
 
-def _record(conn: sqlite3.Connection, version: int, name: str) -> None:
+def _record(conn: DBConnection, version: int, name: str) -> None:
     conn.execute(
         "INSERT OR IGNORE INTO schema_migrations (version, name, applied_at) VALUES (?, ?, ?)",
         (version, name, datetime.now(timezone.utc).isoformat(timespec="seconds")),

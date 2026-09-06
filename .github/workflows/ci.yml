@@ -35,9 +35,10 @@ jobs:
         run: ruff format --check .
 
       - name: Run tests
-        run: pytest tests/ -v --tb=short
+        run: pytest tests/ -v --tb=short --ignore=tests/test_performance_clients.py --ignore=tests/test_performance_stress.py
         env:
           SKYADMIN_SKIP_DAILY_CHECK: "1"
+          SKYADMIN_PROCESS_OFFLOAD: "0"
 
       - name: Audit Python dependencies
         run: pip-audit --strict

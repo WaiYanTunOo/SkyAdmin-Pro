@@ -59,7 +59,14 @@ def main() -> int:
         return 1
 
     if not args.skip_release_check:
-        check_cmd = [sys.executable, "scripts/release_check.py", "--skip-pytest", "--exe", str(exe)]
+        portable_exe = (ROOT / "dist" / "SkyAdminPro.exe").resolve()
+        check_cmd = [sys.executable, "scripts/release_check.py", "--skip-pytest"]
+        # Scan the real portable exe for embedded authoring code; the Inno
+        # Setup wrapper would never contain those strings.
+        if portable_exe.is_file():
+            check_cmd.extend(["--exe", str(portable_exe), "--installer", str(exe)])
+        else:
+            check_cmd.extend(["--exe", str(exe)])
         if args.require_signature:
             check_cmd.append("--require-signature")
         _run(check_cmd)

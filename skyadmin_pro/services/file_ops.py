@@ -199,9 +199,28 @@ def copy_file(source: Path, dest_dir: Path, new_name: str | None = None) -> Path
 #: code on click (os.startfile/xdg-open dispatch by association).
 _BLOCKED_OPEN_SUFFIXES = frozenset(
     {
-        ".exe", ".bat", ".cmd", ".com", ".msi", ".ps1", ".vbs", ".vbe",
-        ".js", ".jse", ".wsf", ".wsh", ".hta", ".lnk", ".scr", ".pif",
-        ".jar", ".msc", ".reg", ".cpl", ".gadget", ".inf",
+        ".exe",
+        ".bat",
+        ".cmd",
+        ".com",
+        ".msi",
+        ".ps1",
+        ".vbs",
+        ".vbe",
+        ".js",
+        ".jse",
+        ".wsf",
+        ".wsh",
+        ".hta",
+        ".lnk",
+        ".scr",
+        ".pif",
+        ".jar",
+        ".msc",
+        ".reg",
+        ".cpl",
+        ".gadget",
+        ".inf",
     }
 )
 

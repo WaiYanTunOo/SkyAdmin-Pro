@@ -2,9 +2,9 @@
 
 from __future__ import annotations
 
-import sqlite3
-
 from skyadmin_pro.database import Database
+from skyadmin_pro.db.cipher import CipherRow
+from skyadmin_pro.db.cipher import connect as cipher_connect
 from skyadmin_pro.services.secret_fields import is_encrypted_secret
 from skyadmin_pro.services.vault import decrypt_vault_secret, encrypt_vault_secret
 
@@ -38,8 +38,8 @@ def test_vault_write_stores_ciphertext_and_decrypts(tmp_path, fake_app_dir, monk
         password="vault-plain-secret",
     )
 
-    with sqlite3.connect(db.db_file) as conn:
-        conn.row_factory = sqlite3.Row
+    with cipher_connect(db.db_file) as conn:
+        conn.row_factory = CipherRow
         row = conn.execute(
             "SELECT secret_value FROM client_credentials WHERE id = ?",
             (entry_id,),

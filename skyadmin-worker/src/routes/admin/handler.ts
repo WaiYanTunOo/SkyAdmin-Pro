@@ -4,28 +4,28 @@ import { Context } from "hono";
 import { Env } from "../../db";
 import { randomCspNonce, withScriptNonce } from "../../csp";
 import { adminSessionSalt } from "../../env_secrets";
-import { hmacSign } from "../../signing";
 import { timingSafeEqual } from "../../timing_safe";
 import { buildAdminPage, loginPage, ADMIN_CSP } from "./pages";
 import {
   SESSION_TTL,
   bumpSessionEpoch,
   generateCsrfToken,
+  generateSessionToken,
   getSessionEpoch,
   isIpBlocked,
   isValidSession,
   recordLoginAttempt,
   sessionKey,
-  sessionMessage,
   validateCsrfToken,
 } from "./session";
 import { auditLog, purgeOldAuditLogs } from "../../admin_security";
+import { getClientIp } from "../../rate_limit";
 
 export async function adminHandler(c: Context<{ Bindings: Env }>): Promise<Response> {
   const url = new URL(c.req.url);
   const path = url.pathname;
   const adminPath = "/" + c.env.ADMIN_PATH;
-  const ip = c.req.header("cf-connecting-ip") || "unknown";
+  const ip = getClientIp(c);
 
   // Login POST — form-encoded password
   if (path.endsWith("/login") && c.req.method === "POST") {
@@ -59,7 +59,7 @@ export async function adminHandler(c: Context<{ Bindings: Env }>): Promise<Respo
           return c.html(loginPage(adminPath, "Server misconfigured: session secret missing"), 500);
         }
         const cookieName = sessionKey(salt);
-        const token = await hmacSign(c.env.ADMIN_PASS, sessionMessage(c.env.ADMIN_PATH, epoch));
+        const token = await generateSessionToken(c.env.ADMIN_PASS, c.env.ADMIN_PATH, epoch);
         return new Response(null, {
           status: 303,
           headers: {

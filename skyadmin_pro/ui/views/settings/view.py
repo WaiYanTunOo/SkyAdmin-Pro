@@ -771,6 +771,7 @@ class SettingsView(BackupMixin, ChecklistMixin, LicenseMixin, PricingMixin, Work
             SETTING_AUTO_BACKUP_INTERVAL,
             retention_help_text,
         )
+
         self._auto_backup_enabled_var = ctk.StringVar(
             value="1" if self.app.db.get_setting(SETTING_AUTO_BACKUP_ENABLED) == "1" else "0"
         )
@@ -778,12 +779,18 @@ class SettingsView(BackupMixin, ChecklistMixin, LicenseMixin, PricingMixin, Work
             value=self.app.db.get_setting(SETTING_AUTO_BACKUP_INTERVAL) or "daily"
         )
         ctk.CTkSwitch(
-            auto_frame, text="Auto-backup", variable=self._auto_backup_enabled_var,
-            onvalue="1", offvalue="0", command=self._toggle_auto_backup,
+            auto_frame,
+            text="Auto-backup",
+            variable=self._auto_backup_enabled_var,
+            onvalue="1",
+            offvalue="0",
+            command=self._toggle_auto_backup,
         ).pack(side="left", padx=(0, 12))
         ctk.CTkOptionMenu(
-            auto_frame, variable=self._auto_backup_interval_var,
-            values=["daily", "weekly", "off"], width=100,
+            auto_frame,
+            variable=self._auto_backup_interval_var,
+            values=["daily", "weekly", "off"],
+            width=100,
             command=lambda _: self._toggle_auto_backup(),
         ).pack(side="left", padx=(0, 12))
         ctk.CTkButton(
@@ -817,10 +824,7 @@ class SettingsView(BackupMixin, ChecklistMixin, LicenseMixin, PricingMixin, Work
                 self.color_theme_menu.set(theme)
             except Exception:
                 pass
-            self.tagline_var.set(
-                self.app.db.get_setting("app_tagline")
-                or APP_TAGLINE
-            )
+            self.tagline_var.set(self.app.db.get_setting("app_tagline") or APP_TAGLINE)
             saved_lang = (self.app.db.get_setting("ui_language") or "en").upper()
             try:
                 self.lang_menu.set(saved_lang)
@@ -831,9 +835,7 @@ class SettingsView(BackupMixin, ChecklistMixin, LicenseMixin, PricingMixin, Work
                 self.zoom_menu.set(saved_zoom)
             except Exception:
                 pass
-            self.portal_var.set(
-                self.app.db.get_setting(SETTING_PORTAL_URL, DEFAULT_PORTAL_URL) or DEFAULT_PORTAL_URL
-            )
+            self.portal_var.set(self.app.db.get_setting(SETTING_PORTAL_URL, DEFAULT_PORTAL_URL) or DEFAULT_PORTAL_URL)
             self._refresh_update_banner()
 
             self.workspace_var.set(str(self.app.paths.root))
@@ -845,9 +847,7 @@ class SettingsView(BackupMixin, ChecklistMixin, LicenseMixin, PricingMixin, Work
             self._refresh_license_label()
             from skyadmin_pro.config import SETTING_DATA_SYNC_ENABLED
 
-            self.data_sync_var.set(
-                (self.app.db.get_setting(SETTING_DATA_SYNC_ENABLED) or "0").strip() == "1"
-            )
+            self.data_sync_var.set((self.app.db.get_setting(SETTING_DATA_SYNC_ENABLED) or "0").strip() == "1")
 
         if "Business" in self._lazy_tabs:
             self.services_text.delete("1.0", "end")
@@ -875,4 +875,5 @@ class SettingsView(BackupMixin, ChecklistMixin, LicenseMixin, PricingMixin, Work
 
     def _open_audit_log(self) -> None:
         from skyadmin_pro.ui.views.audit_log import AuditLogDialog
+
         AuditLogDialog(self.app)

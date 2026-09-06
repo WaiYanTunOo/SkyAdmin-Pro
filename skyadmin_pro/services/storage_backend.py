@@ -66,11 +66,7 @@ class LocalStorageBackend:
             return []
         if base.is_file():
             return [base.relative_to(self._root).as_posix()]
-        return sorted(
-            p.relative_to(self._root).as_posix()
-            for p in base.rglob("*")
-            if p.is_file()
-        )
+        return sorted(p.relative_to(self._root).as_posix() for p in base.rglob("*") if p.is_file())
 
 
 def get_storage_backend(root: Path | str | None = None) -> LocalStorageBackend:

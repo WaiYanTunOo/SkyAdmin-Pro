@@ -16,6 +16,7 @@ concurrency:
 jobs:
   deploy:
     runs-on: ubuntu-latest
+    environment: production
     # Tip: add `environment: production` here after creating a protected
     # GitHub Environment (required reviewers / wait timer) in repo settings.
     defaults:
@@ -53,5 +54,4 @@ jobs:
 
       - name: Smoke test against deployed worker
         run: |
-          sleep 5
-          curl --fail https://skyadmin-worker.skyadmin-pro.workers.dev/api/ping
+          curl --fail --retry 5 --retry-delay 10 --retry-all-errors --max-time 15 https://skyadmin-worker.skyadmin-pro.workers.dev/api/ping

@@ -74,7 +74,6 @@ def generate_passcode(*_args: object, **_kwargs: object) -> str:
     )
 
 
-
 def _license_paths() -> list[Path]:
     # Portable mode disabled — only app data dir. Keep portable check only for
     # backward compat if an old license.key was left next to the exe.
@@ -869,7 +868,7 @@ def verify_key_text(text: str) -> tuple[bool, str]:
             extra.append(f"{pkg}-day package")
         suffix = f" ({', '.join(extra)})" if extra else ""
         return True, f"Licensed to {mid} (expires: {exp or 'never'}){suffix}."
-    except Exception as exc:
+    except (ValueError, TypeError, KeyError, AttributeError) as exc:
         return False, f"Could not read the key ({exc}). Paste a current license key or SKYPASS1 passcode."
 
 

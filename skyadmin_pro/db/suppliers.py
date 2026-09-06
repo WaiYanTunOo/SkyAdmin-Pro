@@ -2,11 +2,10 @@
 
 from __future__ import annotations
 
-import sqlite3
-
 from skyadmin_pro.config import (
     EXPIRY_ALERT_DAYS,
 )
+from skyadmin_pro.db.cipher import INTEGRITY_ERRORS
 from skyadmin_pro.services.tracking import days_until
 
 
@@ -35,7 +34,7 @@ class SuppliersMixin:
                     (cleaned, now, now),
                 )
                 return int(cursor.lastrowid)
-            except sqlite3.IntegrityError:
+            except INTEGRITY_ERRORS:
                 # Lost a UNIQUE race — fetch the winner instead of failing.
                 row = conn.execute(
                     "SELECT id FROM suppliers WHERE name = ? COLLATE NOCASE",

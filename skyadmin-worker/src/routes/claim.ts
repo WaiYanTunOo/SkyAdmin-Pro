@@ -58,13 +58,13 @@ export async function claimHandler(c: Context<{ Bindings: Env }>) {
     .first<{ nonce: string }>();
 
   if (existing) {
+    // Idempotent replay: confirm the burn but never re-disclose the license
+    // key — anyone presenting the (used) code must not learn the secret.
     return c.json({
       ok: true,
       message: "Activation code was already claimed.",
       nonce: claim.nonce,
       already_used: true,
-      license_key: row?.license_key || null,
-      expires_at: row?.expires_at || null,
     });
   }
 

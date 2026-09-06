@@ -97,6 +97,15 @@ class OfficeHubView(SetupTabMixin, ContactsTabMixin, VaultTabMixin, NotebookTabM
                 name, cred_type, cred_id = pending
                 self.focus_client_credentials(name, credential_type=cred_type, credential_id=cred_id)
 
+    def on_hide(self) -> None:
+        for attr in ("_client_cred_search_scheduler", "_office_cred_search_scheduler"):
+            cancel = getattr(getattr(self, attr, None), "cancel", None)
+            if callable(cancel):
+                try:
+                    cancel()
+                except Exception:
+                    pass
+
     def focus_client_credentials(
         self,
         client_name: str,

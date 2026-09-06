@@ -50,6 +50,7 @@ def _drain_queue() -> None:
 
 def _pump(widget) -> None:
     """Main-thread pump: drain queue, reschedule while workers remain."""
+    widget._async_pump_after = None
     try:
         _drain_queue()
     except Exception:
@@ -62,9 +63,30 @@ def _pump(widget) -> None:
         pending = False
     if active or pending:
         try:
-            widget.after(50, lambda: _pump(widget))
+            exists = widget.winfo_exists()
         except Exception:
-            pass
+            return
+        if not exists:
+            return
+        try:
+            widget._async_pump_after = widget.after(50, lambda: _pump(widget))
+        except Exception:
+            widget._async_pump_after = None
+
+
+def cancel_pump(widget) -> None:
+    """Cancel a pending pump scheduled by :func:`run_background`."""
+    after_id = getattr(widget, "_async_pump_after", None)
+    if after_id is None:
+        return
+    try:
+        widget._async_pump_after = None
+    except Exception:
+        pass
+    try:
+        widget.after_cancel(after_id)
+    except Exception:
+        pass
 
 
 def run_on_main(widget, fn: Callable[[], None], *, feedback=None) -> None:
@@ -171,10 +193,16 @@ def run_background(
         global _ACTIVE
         _ACTIVE += 1
     # Scheduled on the calling (main) thread — safe even under app.update().
+    # Reuse an already-pending pump instead of stacking one per call.
     try:
-        widget.after(0, lambda: _pump(widget))
+        if getattr(widget, "_async_pump_after", None) is None:
+            widget._async_pump_after = widget.after(0, lambda: _pump(widget))
     except Exception:
         _log.exception("Failed to schedule UI pump")
+        try:
+            widget._async_pump_after = None
+        except Exception:
+            pass
         with _ACTIVE_LOCK:
             _ACTIVE -= 1
         return

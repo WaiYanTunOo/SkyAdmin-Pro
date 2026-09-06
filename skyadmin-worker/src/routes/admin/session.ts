@@ -45,8 +45,10 @@ export async function bumpSessionEpoch(db: D1Database): Promise<void> {
   }
 }
 
-export function sessionMessage(adminPath: string, epoch: string): string {
-  return `${adminPath}:session:${epoch}`;
+export function sessionMessage(adminPath: string, epoch: string, ts?: string): string {
+  return ts === undefined
+    ? `${adminPath}:session:${epoch}`
+    : `${adminPath}:session:${epoch}:${ts}`;
 }
 
 export function sessionKey(secret: string): string {
@@ -83,8 +85,26 @@ export async function isValidSession(c: Context<{ Bindings: Env }>): Promise<boo
   const token = getCookie(c, cookieName);
   if (!token) return false;
   const epoch = await getSessionEpoch(c.env.DB);
-  const expected = await hmacSign(c.env.ADMIN_PASS, sessionMessage(c.env.ADMIN_PATH, epoch));
-  return timingSafeEqual(token, expected);
+  return validateSessionToken(token, c.env.ADMIN_PASS, c.env.ADMIN_PATH, epoch);
+}
+
+export async function generateSessionToken(adminPass: string, adminPath: string, epoch: string): Promise<string> {
+  const ts = Math.floor(Date.now() / 1000).toString();
+  const sig = await hmacSign(adminPass, sessionMessage(adminPath, epoch, ts));
+  return ts + "." + sig;
+}
+
+export async function validateSessionToken(token: string, adminPass: string, adminPath: string, epoch: string): Promise<boolean> {
+  const parts = token.split(".");
+  if (parts.length !== 2) return false;
+  const [ts, sig] = parts;
+  const tsNum = parseInt(ts, 10);
+  if (isNaN(tsNum)) return false;
+  const now = Math.floor(Date.now() / 1000);
+  if (now - tsNum > SESSION_TTL) return false;
+  if (tsNum > now + 300) return false;
+  const expected = await hmacSign(adminPass, sessionMessage(adminPath, epoch, ts));
+  return timingSafeEqual(sig, expected);
 }
 
 export async function isIpBlocked(c: Context<{ Bindings: Env }>, ip: string): Promise<boolean> {

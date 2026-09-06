@@ -667,8 +667,7 @@ class DashboardView(BaseView):
         canvas.configure(bg=bg)
         width = canvas.winfo_width()
         if width < 10:
-            canvas.update_idletasks()
-            width = max(canvas.winfo_width(), 600)
+            return
         height = int(canvas.cget("height"))
 
         if snap is not None:
@@ -745,6 +744,12 @@ class DashboardView(BaseView):
 
     def on_hide(self) -> None:
         self._visible = False
+        try:
+            from skyadmin_pro.ui.async_ui import cancel_pump
+
+            cancel_pump(self)
+        except Exception:
+            pass
         self._snap_seq = int(getattr(self, "_snap_seq", 0)) + 1
         had_pending = bool(self._tree_refresh_after or self._detail_trees_after or self._timeline_after)
         self._cancel_deferred_refresh()
@@ -839,7 +844,8 @@ class DashboardView(BaseView):
         self._trees_ready = False
         if self._detail_built:
             self._refresh_report()
-        self._tree_refresh_after = self.after(100, lambda s=snap: self._refresh_priority_trees(s))
+        seq = int(getattr(self, "_snap_seq", 0))
+        self._tree_refresh_after = self.after(100, lambda s=snap, q=seq: self._refresh_priority_trees(s, _seq=q))
 
     def _apply_stat_cards(self, snap: dict) -> None:
         counts = snap["counts"]
@@ -883,8 +889,10 @@ class DashboardView(BaseView):
         else:
             self.card_vo_csh.configure(text_color=("gray10", "gray90"))
 
-    def _refresh_priority_trees(self, snap: dict) -> None:
+    def _refresh_priority_trees(self, snap: dict, _seq: int | None = None) -> None:
         self._tree_refresh_after = None
+        if _seq is not None and _seq != getattr(self, "_snap_seq", 0):
+            return
         if not self._visible or not self.winfo_exists():
             return
         if not getattr(self, "_header_extras_built", False):
@@ -904,10 +912,13 @@ class DashboardView(BaseView):
         )
         if not self._visible:
             return
-        self._detail_trees_after = self.after(80, lambda s=snap: self._refresh_detail_trees(s))
+        seq = int(getattr(self, "_snap_seq", 0))
+        self._detail_trees_after = self.after(80, lambda s=snap, q=seq: self._refresh_detail_trees(s, _seq=q))
 
-    def _refresh_detail_trees(self, snap: dict) -> None:
+    def _refresh_detail_trees(self, snap: dict, _seq: int | None = None) -> None:
         self._detail_trees_after = None
+        if _seq is not None and _seq != getattr(self, "_snap_seq", 0):
+            return
         if not self._visible or not self.winfo_exists():
             return
         if not self._detail_built:
@@ -1058,10 +1069,13 @@ class DashboardView(BaseView):
 
         if not self._visible:
             return
-        self._timeline_after = self.after(120, lambda s=snap: self._draw_timeline_deferred(s))
+        seq = int(getattr(self, "_snap_seq", 0))
+        self._timeline_after = self.after(120, lambda s=snap, q=seq: self._draw_timeline_deferred(s, _seq=q))
 
-    def _draw_timeline_deferred(self, snap: dict) -> None:
+    def _draw_timeline_deferred(self, snap: dict, _seq: int | None = None) -> None:
         self._timeline_after = None
+        if _seq is not None and _seq != getattr(self, "_snap_seq", 0):
+            return
         if not self._visible or not self.winfo_exists():
             return
         self._draw_timeline(snap)
@@ -1388,6 +1402,7 @@ class DashboardView(BaseView):
         from pathlib import Path
 
         from skyadmin_pro.services.reports import default_report_name, write_status_report_pdf
+        from skyadmin_pro.ui.async_ui import run_background
 
         path = filedialog.asksaveasfilename(
             parent=self.winfo_toplevel(),
@@ -1398,13 +1413,19 @@ class DashboardView(BaseView):
         )
         if not path:
             return
-        try:
-            write_status_report_pdf(self.app.db, Path(path))
-        except Exception as exc:
-            self.workflow_feedback.error(str(exc))
-            return
-        self.workflow_feedback.success(f"PDF report exported: {path}")
-        self.app.set_status("Status report exported to PDF.")
+        self.workflow_feedback.info("Exporting PDF…")
+
+        def work():
+            return write_status_report_pdf(self.app.db, Path(path), offload=True)
+
+        def on_success(_result):
+            self.workflow_feedback.success(f"PDF report exported: {path}")
+            self.app.set_status("Status report exported to PDF.")
+
+        def on_error(msg: str):
+            self.workflow_feedback.error(msg)
+
+        run_background(self, work=work, on_success=on_success, on_error=on_error)
 
     def _export_report(self) -> None:
         year, month = self._selected_report_month()
@@ -1413,6 +1434,7 @@ class DashboardView(BaseView):
             self.workflow_feedback.info("No completed services for this month.")
             return
         from skyadmin_pro.services.export import export_monthly_report
+        from skyadmin_pro.ui.async_ui import run_background
 
         default_name = f"SkyAdmin_Export_{year}{month:02d}01.xlsx"
         path = filedialog.asksaveasfilename(
@@ -1424,14 +1446,20 @@ class DashboardView(BaseView):
         )
         if not path:
             return
-        try:
+        self.workflow_feedback.info("Exporting…")
+
+        def work():
             from pathlib import Path
 
-            export_monthly_report(self.app.db, year, month, Path(path))
-        except Exception as exc:
-            self.workflow_feedback.error(str(exc))
-            return
-        self.workflow_feedback.success(f"Report exported: {path}")
+            return export_monthly_report(self.app.db, year, month, Path(path), offload=True)
+
+        def on_success(_result):
+            self.workflow_feedback.success(f"Report exported: {path}")
+
+        def on_error(msg: str):
+            self.workflow_feedback.error(msg)
+
+        run_background(self, work=work, on_success=on_success, on_error=on_error)
 
     def _open_accounting_setup(self) -> None:
         open_setup = getattr(self.app, "open_accounting_setup", None)

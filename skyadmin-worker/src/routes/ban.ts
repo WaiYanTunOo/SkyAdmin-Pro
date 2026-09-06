@@ -7,7 +7,13 @@ import { checkRateLimit } from "../rate_limit";
 export async function banHandler(c: Context<{ Bindings: Env }>) {
   const limited = await checkRateLimit(c, "admin-write", { windowSeconds: 60, max: 30 });
   if (limited) return limited;
-  const { mid, reason } = await c.req.json<{ mid?: string; reason?: string }>();
+  let body: { mid?: string; reason?: string };
+  try {
+    body = await c.req.json<{ mid?: string; reason?: string }>();
+  } catch {
+    return c.json({ ok: false, error: "invalid json" }, 400);
+  }
+  const { mid, reason } = body;
   if (!mid?.trim()) return c.json({ ok: false, error: "mid required" }, 400);
 
   await c.env.DB.prepare(
@@ -21,7 +27,13 @@ export async function banHandler(c: Context<{ Bindings: Env }>) {
 export async function unbanHandler(c: Context<{ Bindings: Env }>) {
   const limited = await checkRateLimit(c, "admin-write", { windowSeconds: 60, max: 30 });
   if (limited) return limited;
-  const { mid } = await c.req.json<{ mid?: string }>();
+  let body: { mid?: string };
+  try {
+    body = await c.req.json<{ mid?: string }>();
+  } catch {
+    return c.json({ ok: false, error: "invalid json" }, 400);
+  }
+  const { mid } = body;
   if (!mid?.trim()) return c.json({ ok: false, error: "mid required" }, 400);
 
   await c.env.DB.prepare(
@@ -34,6 +46,8 @@ export async function unbanHandler(c: Context<{ Bindings: Env }>) {
 
 /** GET /api/bans — List all banned machine IDs. */
 export async function listBansHandler(c: Context<{ Bindings: Env }>) {
+  const limited = await checkRateLimit(c, "bans", { windowSeconds: 60, max: 30 });
+  if (limited) return limited;
   const { results } = await c.env.DB.prepare(
     "SELECT machine_id, reason, banned_at FROM bans ORDER BY id DESC"
   ).all<{ machine_id: string; reason: string; banned_at: string }>();

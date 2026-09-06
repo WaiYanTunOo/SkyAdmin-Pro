@@ -1,10 +1,10 @@
 """Office Hub: separate client and office credential tables."""
 
-import sqlite3
-
 import pytest
 
 from skyadmin_pro.database import Database
+from skyadmin_pro.db.cipher import CipherRow
+from skyadmin_pro.db.cipher import connect as cipher_connect
 from skyadmin_pro.services.secret_fields import is_encrypted_secret
 
 
@@ -46,8 +46,8 @@ def test_client_credential_dbd_rd_encrypted(db, monkeypatch):
     assert loaded["password"] == "dbd-secret"
     assert loaded["registration_number"] == "0105560123456"
 
-    with sqlite3.connect(db.db_file) as conn:
-        conn.row_factory = sqlite3.Row
+    with cipher_connect(db.db_file) as conn:
+        conn.row_factory = CipherRow
         raw = conn.execute("SELECT secret_value FROM client_credentials WHERE id = ?", (entry_id,)).fetchone()[
             "secret_value"
         ]

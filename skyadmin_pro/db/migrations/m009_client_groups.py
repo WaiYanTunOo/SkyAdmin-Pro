@@ -26,7 +26,6 @@ def upgrade(db: CoreMixin) -> None:
         cols = {row[1] for row in conn.execute("PRAGMA table_info(clients)").fetchall()}
         if "group_id" not in cols:
             conn.execute(
-                "ALTER TABLE clients ADD COLUMN group_id "
-                "INTEGER REFERENCES client_groups(id) ON DELETE SET NULL;"
+                "ALTER TABLE clients ADD COLUMN group_id INTEGER REFERENCES client_groups(id) ON DELETE SET NULL;"
             )
         conn.execute("CREATE INDEX IF NOT EXISTS idx_clients_group ON clients(group_id);")

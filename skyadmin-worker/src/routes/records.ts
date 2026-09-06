@@ -2,11 +2,16 @@
 
 import { Context } from "hono";
 import { Env } from "../db";
+import { checkRateLimit } from "../rate_limit";
 import { describeLicenseExpiry, summarizeMachines } from "../license_status";
 
 export async function recordsHandler(c: Context<{ Bindings: Env }>) {
-  const page = Math.max(1, parseInt(c.req.query("page") || "1", 10));
-  const limit = Math.min(500, Math.max(1, parseInt(c.req.query("limit") || "50", 10)));
+  const limited = await checkRateLimit(c, "records", { windowSeconds: 60, max: 30 });
+  if (limited) return limited;
+  const parsedPage = parseInt(c.req.query("page") || "1", 10);
+  const parsedLimit = parseInt(c.req.query("limit") || "50", 10);
+  const page = Math.max(1, Number.isNaN(parsedPage) ? 1 : parsedPage);
+  const limit = Math.min(500, Math.max(1, Number.isNaN(parsedLimit) ? 50 : parsedLimit));
   const offset = (page - 1) * limit;
 
   // Get total count
@@ -67,7 +72,8 @@ export async function recordsHandler(c: Context<{ Bindings: Env }>) {
   });
 
   // Machine summary — scan recent rows for machine aggregation
-  const summaryLimit = Math.min(5000, Math.max(100, parseInt(c.req.query("summary_limit") || "2000", 10)));
+  const parsedSummary = parseInt(c.req.query("summary_limit") || "1000", 10);
+  const summaryLimit = Math.min(1000, Math.max(100, Number.isNaN(parsedSummary) ? 1000 : parsedSummary));
   const allRows = await c.env.DB.prepare(
     `SELECT l.machine_id, l.expires_at, l.issued_at, l.package_days, l.nonce,
             (r.target IS NOT NULL OR r2.target IS NOT NULL) AS revoked,

@@ -126,6 +126,12 @@ class DocumentHubView(BaseView):
     def on_hide(self) -> None:
         self._polling = False
         self._cancel_poll()
+        try:
+            from skyadmin_pro.ui.async_ui import cancel_pump
+
+            cancel_pump(self)
+        except Exception:
+            pass
 
     def _cancel_poll(self) -> None:
         if self._poll_after is not None:
@@ -148,17 +154,101 @@ class DocumentHubView(BaseView):
         try:
             current = self._current_tab()
             if current == "Smart Renamer" and self.renamer is not None:
-                self.renamer.refresh(files_only=True)
+                self._poll_folder(
+                    self.app.paths.staging,
+                    known=lambda: self.renamer.file_list._signature,
+                    apply=self._apply_renamer_files,
+                )
             elif current == "Portal Upload" and self.portal is not None:
-                self.portal.refresh()
+                self._poll_folder(
+                    self.app.paths.ready_to_upload,
+                    known=lambda: self.portal._signature,
+                    apply=self._apply_portal_files,
+                )
             elif current == "Archive & Clean" and self.archive is not None:
-                self.archive.refresh()
+                self._poll_archive_counts()
         except Exception as exc:
             feedback = self._active_feedback()
             if feedback is not None:
                 feedback.error(f"Document Hub refresh failed: {exc}")
         if self._polling and self.winfo_exists():
             self._poll_after = self.after(3000, self._poll)
+
+    def _poll_folder(self, folder, *, known, apply) -> None:
+        """Scan one folder off the main thread; apply rows on it only."""
+        from skyadmin_pro.services import file_ops
+        from skyadmin_pro.ui.async_ui import run_background
+
+        try:
+            known_sig = known()
+        except Exception:
+            known_sig = None
+
+        def work():
+            return file_ops.list_files_with_signature(folder)
+
+        def on_success(result) -> None:
+            if not self._polling or not self.winfo_exists():
+                return
+            try:
+                files, signature = result
+            except Exception:
+                return
+            if signature == known_sig:
+                return
+            try:
+                apply(files, signature)
+            except Exception:
+                pass
+
+        run_background(self, work=work, on_success=on_success)
+
+    def _poll_archive_counts(self) -> None:
+        """Scan both archive folders off the main thread."""
+        from skyadmin_pro.services import file_ops
+        from skyadmin_pro.ui.async_ui import run_background
+
+        panel = self.archive
+        try:
+            known_sig = panel._archive_signature
+        except Exception:
+            known_sig = None
+        ready_folder = self.app.paths.ready_to_upload
+        staging_folder = self.app.paths.staging
+
+        def work():
+            ready, ready_sig = file_ops.list_files_with_signature(ready_folder)
+            staging, staging_sig = file_ops.list_files_with_signature(staging_folder)
+            return ready, ready_sig, staging, staging_sig
+
+        def on_success(result) -> None:
+            if not self._polling or not self.winfo_exists():
+                return
+            try:
+                ready, ready_sig, staging, staging_sig = result
+            except Exception:
+                return
+            if (ready_sig, staging_sig) == known_sig:
+                return
+            try:
+                panel.render_counts(ready, ready_sig, staging, staging_sig)
+            except Exception:
+                pass
+
+        run_background(self, work=work, on_success=on_success)
+
+    def _apply_renamer_files(self, files, signature) -> None:
+        panel = self.renamer
+        if panel is None:
+            return
+        panel.file_list.set_files(files, signature=signature)
+        panel._update_preview()
+
+    def _apply_portal_files(self, files, signature) -> None:
+        panel = self.portal
+        if panel is None:
+            return
+        panel.render_files(files, signature)
 
     def mark_stale(self) -> None:
         """Force next refresh to reload even if signature unchanged."""

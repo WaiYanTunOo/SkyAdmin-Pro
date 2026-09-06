@@ -22,4 +22,13 @@ def debounced_after(widget, callback: Callable[[], None], delay_ms: int = 300) -
         if widget.winfo_exists():
             callback()
 
+    def cancel() -> None:
+        if after_id[0] is not None:
+            try:
+                widget.after_cancel(after_id[0])
+            except Exception:
+                pass
+            after_id[0] = None
+
+    schedule.cancel = cancel  # type: ignore[attr-defined]
     return schedule

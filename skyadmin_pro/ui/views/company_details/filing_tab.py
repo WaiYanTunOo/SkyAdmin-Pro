@@ -213,7 +213,6 @@ class FilingTabMixin:
         dialog = ctk.CTkToplevel(self)
         dialog.title(f"Edit {label}")
         dialog.resizable(False, False)
-        dialog.attributes("-topmost", True)
         dialog.transient(self.winfo_toplevel())
         make_modal(dialog)
         ctk.CTkLabel(dialog, text=f"Status for {label}:").grid(row=0, column=0, padx=16, pady=(12, 4), sticky="w")

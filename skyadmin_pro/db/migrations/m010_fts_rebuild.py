@@ -22,9 +22,7 @@ def upgrade(db: CoreMixin) -> None:
     from skyadmin_pro.db.core import CoreMixin
 
     with db.connection() as conn:
-        has_fts = conn.execute(
-            "SELECT 1 FROM sqlite_master WHERE type = 'table' AND name = 'clients_fts'"
-        ).fetchone()
+        has_fts = conn.execute("SELECT 1 FROM sqlite_master WHERE type = 'table' AND name = 'clients_fts'").fetchone()
         if not has_fts:
             return
         CoreMixin._drop_clients_fts_triggers(conn)

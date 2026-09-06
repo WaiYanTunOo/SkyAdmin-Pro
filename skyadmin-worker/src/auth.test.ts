@@ -3,8 +3,7 @@
 import { describe, expect, it } from "vitest";
 import app from "./index";
 import type { Env } from "./db";
-import { hmacSign } from "./signing";
-import { generateCsrfToken, sessionMessage } from "./routes/admin/session";
+import { generateCsrfToken, generateSessionToken } from "./routes/admin/session";
 
 const ADMIN = "admin-test";
 const PASS = "admin-pass";
@@ -32,7 +31,7 @@ function mockEnv(): Env {
 
 async function sessionCookie(): Promise<string> {
   // Stub DB has no epoch row → epoch "0".
-  const token = await hmacSign(PASS, sessionMessage(ADMIN, "0"));
+  const token = await generateSessionToken(PASS, ADMIN, "0");
   return `skyadm_${SALT.slice(0, 8)}=${token}`;
 }
 
@@ -99,6 +98,7 @@ describe("authMiddleware", () => {
       prepare: () => ({
         bind: () => ({
           all: async () => ({ results: [] }),
+          first: async () => null,
         }),
         first: async () => ({ total: 0 }),
       }),

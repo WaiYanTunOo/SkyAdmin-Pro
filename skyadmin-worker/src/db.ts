@@ -33,22 +33,25 @@ export async function bumpVersion(db: D1Database): Promise<number> {
   return isNaN(val) ? 1 : val;
 }
 
+/** Max rows emitted per control-list section — used_nonces grows forever. */
+export const CONTROL_LIST_CAP = 5000;
+
 export async function listRevocations(db: D1Database): Promise<string[]> {
-  const { results } = await db.prepare("SELECT target FROM revocations").all<{ target: string }>();
+  const { results } = await db.prepare(`SELECT target FROM revocations ORDER BY id DESC LIMIT ${CONTROL_LIST_CAP}`).all<{ target: string }>();
   return (results || []).map(r => r.target);
 }
 
 export async function listBans(db: D1Database): Promise<string[]> {
-  const { results } = await db.prepare("SELECT machine_id FROM bans").all<{ machine_id: string }>();
+  const { results } = await db.prepare(`SELECT machine_id FROM bans ORDER BY id DESC LIMIT ${CONTROL_LIST_CAP}`).all<{ machine_id: string }>();
   return (results || []).map(r => r.machine_id);
 }
 
 export async function listUsedNonces(db: D1Database): Promise<string[]> {
-  const { results } = await db.prepare("SELECT nonce FROM used_nonces").all<{ nonce: string }>();
+  const { results } = await db.prepare(`SELECT nonce FROM used_nonces ORDER BY id DESC LIMIT ${CONTROL_LIST_CAP}`).all<{ nonce: string }>();
   return (results || []).map(r => r.nonce);
 }
 
 export async function listRevokedPasscodes(db: D1Database): Promise<string[]> {
-  const { results } = await db.prepare("SELECT passcode FROM revoked_passcodes").all<{ passcode: string }>();
+  const { results } = await db.prepare(`SELECT passcode FROM revoked_passcodes ORDER BY id DESC LIMIT ${CONTROL_LIST_CAP}`).all<{ passcode: string }>();
   return (results || []).map(r => r.passcode);
 }

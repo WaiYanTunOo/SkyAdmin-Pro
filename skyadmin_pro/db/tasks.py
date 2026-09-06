@@ -17,9 +17,7 @@ from skyadmin_pro.services.tracking import days_until, effective_expiry_date
 
 
 class TasksMixin:
-    def list_tasks(
-        self, status: str | None = None, *, limit: int | None = None, offset: int = 0
-    ) -> list[dict]:
+    def list_tasks(self, status: str | None = None, *, limit: int | None = None, offset: int = 0) -> list[dict]:
         sql = """
             SELECT t.id, t.client_id, t.title, t.description, t.status, t.category,
                    t.due_date, t.completed_at, t.created_at, t.updated_at,
@@ -219,17 +217,14 @@ class TasksMixin:
             """
         )
 
-    def list_documents(
-        self, *, expiring_only: bool = False, limit: int | None = None, offset: int = 0
-    ) -> list[dict]:
+    def list_documents(self, *, expiring_only: bool = False, limit: int | None = None, offset: int = 0) -> list[dict]:
         where = ""
         if expiring_only:
             # Lets idx_documents_expiry drive the filter instead of loading
             # the whole table and discarding rows in Python. Orphaned records
             # (client deleted) are excluded — they have nobody to alert.
             where = "WHERE d.expiry_date IS NOT NULL AND trim(d.expiry_date) != '' AND d.client_id IS NOT NULL"
-        base = (
-            f"""
+        base = f"""
             SELECT d.id, d.client_id, d.document_type, d.expiry_date, d.amount,
                    d.payment_date, d.start_date, d.file_name, d.file_path, d.created_at,
                    c.name AS client_name
@@ -238,7 +233,6 @@ class TasksMixin:
             {where}
             ORDER BY d.expiry_date IS NULL, d.expiry_date, d.id DESC
             """
-        )
         if limit is not None and int(limit) > 0:
             return self._fetch_page(base, (), limit=limit, offset=offset)
         return self._fetch_all(base)

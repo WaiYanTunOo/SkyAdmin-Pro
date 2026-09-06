@@ -14,4 +14,4 @@ def test_settings_lazy_tabs_pattern():
     assert "_build_license_tab(self.tabs.tab" not in src
     assert "_build_business_tab(self.tabs.tab" not in src
     assert "_build_data_tab(self.tabs.tab" not in src
-    assert 'command=self._on_tab_changed' in src
+    assert "command=self._on_tab_changed" in src

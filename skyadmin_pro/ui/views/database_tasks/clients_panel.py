@@ -60,8 +60,11 @@ class ClientsExpiryPanel(ctk.CTkFrame):
         ).grid(row=0, column=1, sticky="ew", padx=(12, 8))
         self._group_filter_var = ctk.StringVar(value="All")
         self.group_filter_menu = ctk.CTkOptionMenu(
-            title_row, variable=self._group_filter_var,
-            values=["All"], width=120, command=lambda _: self._refresh_clients(),
+            title_row,
+            variable=self._group_filter_var,
+            values=["All"],
+            width=120,
+            command=lambda _: self._refresh_clients(),
         )
         self.group_filter_menu.grid(row=0, column=2, padx=(0, 4))
         ctk.CTkLabel(
@@ -95,19 +98,29 @@ class ClientsExpiryPanel(ctk.CTkFrame):
         client_pager = ctk.CTkFrame(left, fg_color="transparent")
         client_pager.grid(row=2, column=0, sticky="ew", padx=12, pady=(0, 4))
         self.client_prev = ctk.CTkButton(
-            client_pager, text="◀ Prev", width=80, fg_color="transparent", border_width=1,
+            client_pager,
+            text="◀ Prev",
+            width=80,
+            fg_color="transparent",
+            border_width=1,
             command=self._client_prev_page,
         )
         self.client_prev.pack(side="left")
         self.client_page_label = ctk.CTkLabel(client_pager, text="Page 1", text_color=TEXT_MUTED)
         self.client_page_label.pack(side="left", padx=10)
         self.client_next = ctk.CTkButton(
-            client_pager, text="Next ▶", width=80, fg_color="transparent", border_width=1,
+            client_pager,
+            text="Next ▶",
+            width=80,
+            fg_color="transparent",
+            border_width=1,
             command=self._client_next_page,
         )
         self.client_next.pack(side="left")
         self.client_page_size = ctk.CTkOptionMenu(
-            client_pager, values=["100", "250", "500", "1000"], width=90,
+            client_pager,
+            values=["100", "250", "500", "1000"],
+            width=90,
             command=self._on_client_page_size,
         )
         self.client_page_size.set("250")
@@ -166,7 +179,8 @@ class ClientsExpiryPanel(ctk.CTkFrame):
         batch_row = ctk.CTkFrame(left, fg_color="transparent")
         batch_row.grid(row=4, column=0, sticky="ew", padx=12, pady=(0, 8))
         ctk.CTkLabel(
-            batch_row, text="Batch:",
+            batch_row,
+            text="Batch:",
             font=ctk.CTkFont(size=11, weight="bold"),
             text_color=TEXT_MUTED,
         ).pack(side="left", padx=(0, 6))
@@ -178,33 +192,51 @@ class ClientsExpiryPanel(ctk.CTkFrame):
         )
         self._batch_selection_label.pack(side="left", padx=(0, 8))
         ctk.CTkButton(
-            batch_row, text="Archive selected", width=120,
-            fg_color="transparent", border_width=1,
+            batch_row,
+            text="Archive selected",
+            width=120,
+            fg_color="transparent",
+            border_width=1,
             command=self._batch_archive,
         ).pack(side="left", padx=(0, 4))
         ctk.CTkButton(
-            batch_row, text="Delete selected", width=110,
-            fg_color="#dc2626", hover_color="#b91c1c",
+            batch_row,
+            text="Delete selected",
+            width=110,
+            fg_color="#dc2626",
+            hover_color="#b91c1c",
             command=self._batch_delete,
         ).pack(side="left", padx=(0, 4))
         ctk.CTkButton(
-            batch_row, text="Mark Active", width=95,
-            fg_color="transparent", border_width=1,
+            batch_row,
+            text="Mark Active",
+            width=95,
+            fg_color="transparent",
+            border_width=1,
             command=lambda: self._batch_set_status("active"),
         ).pack(side="left", padx=(0, 4))
         ctk.CTkButton(
-            batch_row, text="Mark Inactive", width=95,
-            fg_color="transparent", border_width=1,
+            batch_row,
+            text="Mark Inactive",
+            width=95,
+            fg_color="transparent",
+            border_width=1,
             command=lambda: self._batch_set_status("inactive"),
         ).pack(side="left", padx=(0, 4))
         ctk.CTkButton(
-            batch_row, text="Assign group…", width=110,
-            fg_color="transparent", border_width=1,
+            batch_row,
+            text="Assign group…",
+            width=110,
+            fg_color="transparent",
+            border_width=1,
             command=self._batch_assign_group,
         ).pack(side="left", padx=(0, 4))
         ctk.CTkButton(
-            batch_row, text="Undo", width=70,
-            fg_color="transparent", border_width=1,
+            batch_row,
+            text="Undo",
+            width=70,
+            fg_color="transparent",
+            border_width=1,
             command=self._undo_last,
         ).pack(side="left")
 
@@ -313,9 +345,7 @@ class ClientsExpiryPanel(ctk.CTkFrame):
                 )
                 iids.append(str(item["id"]))
                 tags.append((tag,) if left is not None else ())
-            self.doc_tree.set_rows(
-                rows, iids=iids, tags=tags, empty_message="No expiring documents match this filter."
-            )
+            self.doc_tree.set_rows(rows, iids=iids, tags=tags, empty_message="No expiring documents match this filter.")
             self._scroll._on_content_configure()
             self.feedback.clear()
 
@@ -543,11 +573,19 @@ class ClientsExpiryPanel(ctk.CTkFrame):
         btns.grid(row=5, column=0, sticky="ew", pady=(6, 0))
         ctk.CTkButton(btns, text="Add", width=80, command=add_group).pack(side="left")
         ctk.CTkButton(
-            btns, text="Rename", width=80, fg_color="transparent", border_width=1,
+            btns,
+            text="Rename",
+            width=80,
+            fg_color="transparent",
+            border_width=1,
             command=rename_group,
         ).pack(side="left", padx=(8, 0))
         ctk.CTkButton(
-            btns, text="Delete", width=80, fg_color="transparent", border_width=1,
+            btns,
+            text="Delete",
+            width=80,
+            fg_color="transparent",
+            border_width=1,
             command=delete_group,
         ).pack(side="left", padx=(8, 0))
         ctk.CTkButton(btns, text="Close", width=80, command=top.destroy).pack(side="right")
@@ -616,8 +654,14 @@ class ClientsExpiryPanel(ctk.CTkFrame):
             text="Save",
             width=100,
             command=lambda: self._save_client_dialog(
-                top, client_id, name_var, contact_var, email_var, status_var,
-                group_var, {g["name"]: g["id"] for g in groups},
+                top,
+                client_id,
+                name_var,
+                contact_var,
+                email_var,
+                status_var,
+                group_var,
+                {g["name"]: g["id"] for g in groups},
             ),
         ).pack(side="right")
         ctk.CTkButton(
@@ -629,8 +673,17 @@ class ClientsExpiryPanel(ctk.CTkFrame):
             command=top.destroy,
         ).pack(side="right", padx=(0, 8))
 
-    def _save_client_dialog(self, top, client_id: int | None, name_var, contact_var, email_var,
-                            status_var, group_var=None, group_map: dict | None = None) -> None:
+    def _save_client_dialog(
+        self,
+        top,
+        client_id: int | None,
+        name_var,
+        contact_var,
+        email_var,
+        status_var,
+        group_var=None,
+        group_map: dict | None = None,
+    ) -> None:
         name = name_var.get().strip()
         if not name:
             self.feedback.error("Enter a company name.")
@@ -647,8 +700,13 @@ class ClientsExpiryPanel(ctk.CTkFrame):
             if client_id is None:
                 self._undo.execute(
                     AddClientCommand(
-                        self.app.db, name=name, contact=contact, email=email, status=status,
-                        group_id=group_id, clear_group=clear_group,
+                        self.app.db,
+                        name=name,
+                        contact=contact,
+                        email=email,
+                        status=status,
+                        group_id=group_id,
+                        clear_group=clear_group,
                     )
                 )
                 view = self.app.get_view("database_tasks")
@@ -657,9 +715,14 @@ class ClientsExpiryPanel(ctk.CTkFrame):
             else:
                 self._undo.execute(
                     EditClientCommand(
-                        self.app.db, client_id,
-                        name=name, contact_name=contact, email=email, status=status,
-                        group_id=group_id, clear_group=clear_group,
+                        self.app.db,
+                        client_id,
+                        name=name,
+                        contact_name=contact,
+                        email=email,
+                        status=status,
+                        group_id=group_id,
+                        clear_group=clear_group,
                     )
                 )
         except ValueError as exc:
@@ -852,7 +915,11 @@ class ClientsExpiryPanel(ctk.CTkFrame):
         btns.grid(row=3, column=0, sticky="ew")
         ctk.CTkButton(btns, text="Assign", width=100, command=apply).pack(side="right")
         ctk.CTkButton(
-            btns, text="Cancel", width=90, fg_color="transparent", border_width=1,
+            btns,
+            text="Cancel",
+            width=90,
+            fg_color="transparent",
+            border_width=1,
             command=top.destroy,
         ).pack(side="right", padx=(0, 8))
 

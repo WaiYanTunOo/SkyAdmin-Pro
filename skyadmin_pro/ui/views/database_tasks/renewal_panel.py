@@ -165,16 +165,18 @@ class RenewalPanel(ctk.CTkFrame):
             client_id = db.client_id_by_name(company_key) if company_key else None
             if client_id is None:
                 return {
-                    "names": names, "client_id": None, "client": company_key,
-                    "services": [], "labels": [], "items": [], "template": self._template,
-                    "cur_company": cur_company, "cur_service": cur_service,
+                    "names": names,
+                    "client_id": None,
+                    "client": company_key,
+                    "services": [],
+                    "labels": [],
+                    "items": [],
+                    "template": self._template,
+                    "cur_company": cur_company,
+                    "cur_service": cur_service,
                 }
-            services = [
-                item for item in db.list_client_services(client_id) if item.get("expiry_date")
-            ]
-            services.sort(
-                key=lambda s: effective_expiry_date(s.get("expiry_date"), s.get("document_type")) or ""
-            )
+            services = [item for item in db.list_client_services(client_id) if item.get("expiry_date")]
+            services.sort(key=lambda s: effective_expiry_date(s.get("expiry_date"), s.get("document_type")) or "")
             labels: list[str] = []
             seen: set[str] = set()
             by_value: dict[str, dict] = {}
@@ -195,10 +197,17 @@ class RenewalPanel(ctk.CTkFrame):
                 db.ensure_renewal_checklist(client_id, template)
                 items = db.list_renewal_checklist(client_id, template)
             return {
-                "names": names, "client_id": client_id, "client": company_key,
-                "services": services, "labels": labels, "by_value": by_value,
-                "service": service, "items": items, "template": template,
-                "cur_company": cur_company, "cur_service": cur_service,
+                "names": names,
+                "client_id": client_id,
+                "client": company_key,
+                "services": services,
+                "labels": labels,
+                "by_value": by_value,
+                "service": service,
+                "items": items,
+                "template": template,
+                "cur_company": cur_company,
+                "cur_service": cur_service,
             }
 
         def on_success(payload) -> None:
@@ -235,9 +244,7 @@ class RenewalPanel(ctk.CTkFrame):
             service = payload.get("service")
             if service is None:
                 return
-            left = days_until(
-                effective_expiry_date(service.get("expiry_date"), service.get("document_type"))
-            )
+            left = days_until(effective_expiry_date(service.get("expiry_date"), service.get("document_type")))
             if left is None:
                 self.countdown.configure(
                     text="No renewal expiry date set for this service.",
@@ -262,9 +269,7 @@ class RenewalPanel(ctk.CTkFrame):
             }.get(tag, ("gray10", "gray90"))
             self.countdown.configure(text=f"{document_type} — {detail}", text_color=tag_color)
             try:
-                self.app.set_status(
-                    f"Renewal for {payload.get('client')}: {document_type} — {detail} ({template})."
-                )
+                self.app.set_status(f"Renewal for {payload.get('client')}: {document_type} — {detail} ({template}).")
             except Exception:
                 pass
             self.checklist_title.configure(text=f"{template} checklist — {payload.get('client')}")

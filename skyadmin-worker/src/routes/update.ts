@@ -2,9 +2,11 @@
 
 import { Context } from "hono";
 import { Env, bumpVersion, getMeta, setMeta } from "../db";
-import { isRateLimited } from "../rate_limit";
+import { checkRateLimit, getClientIp, isRateLimited } from "../rate_limit";
 
 export async function updateGetHandler(c: Context<{ Bindings: Env }>) {
+  const limited = await checkRateLimit(c, "update-read", { windowSeconds: 60, max: 60 });
+  if (limited) return limited;
   const version = (await getMeta(c.env.DB, "latest_version")) || "";
   const url = (await getMeta(c.env.DB, "latest_url")) || "";
   return c.json({
@@ -15,7 +17,7 @@ export async function updateGetHandler(c: Context<{ Bindings: Env }>) {
 }
 
 export async function updatePostHandler(c: Context<{ Bindings: Env }>) {
-  const ip = c.req.header("cf-connecting-ip") || "unknown";
+  const ip = getClientIp(c);
   if (await isRateLimited(c.env.DB, `update:${ip}`, { windowSeconds: 60, max: 10 })) {
     return c.json({ ok: false, error: "rate limited" }, 429);
   }

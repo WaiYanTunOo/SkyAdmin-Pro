@@ -35,6 +35,7 @@ a = Analysis(
         "openpyxl",
         "PIL",
         "cryptography",
+        "sqlcipher3",
         "cryptography.hazmat.primitives.ciphers",
         "cryptography.hazmat.primitives.kdf.pbkdf2",
         "deep_translator",

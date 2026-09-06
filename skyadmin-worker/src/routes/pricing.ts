@@ -2,7 +2,7 @@
 
 import { Context } from "hono";
 import { Env, getMeta, setMeta } from "../db";
-import { isRateLimited } from "../rate_limit";
+import { checkRateLimit, getClientIp, isRateLimited } from "../rate_limit";
 import {
   DEFAULT_OVER_YEAR_TEXT,
   DEFAULT_PRICING_PACKAGES,
@@ -19,6 +19,8 @@ export async function loadPricingPackages(db: D1Database): Promise<PricingPackag
 }
 
 export async function pricingGetHandler(c: Context<{ Bindings: Env }>) {
+  const limited = await checkRateLimit(c, "pricing-read", { windowSeconds: 60, max: 60 });
+  if (limited) return limited;
   const packages = await loadPricingPackages(c.env.DB);
   const overYear = (await getMeta(c.env.DB, PRICING_OVER_YEAR_KEY)) || DEFAULT_OVER_YEAR_TEXT;
   return c.json({
@@ -29,7 +31,7 @@ export async function pricingGetHandler(c: Context<{ Bindings: Env }>) {
 }
 
 export async function pricingPostHandler(c: Context<{ Bindings: Env }>) {
-  const ip = c.req.header("cf-connecting-ip") || "unknown";
+  const ip = getClientIp(c);
   if (await isRateLimited(c.env.DB, `pricing:${ip}`, { windowSeconds: 60, max: 10 })) {
     return c.json({ ok: false, error: "rate limited" }, 429);
   }

@@ -14,6 +14,33 @@ export interface RateLimitOpts {
 }
 
 /**
+ * Best-effort client IP for rate-limit bucketing. Prefers the
+ * Cloudflare-provided header, falls back to the first X-Forwarded-For
+ * entry (local dev / non-CF fronting), else "unknown".
+ */
+export function getClientIp(c: Context): string {
+  const direct = (c.req.header("cf-connecting-ip") || "").trim();
+  if (direct) return direct;
+  const forwarded = (c.req.header("x-forwarded-for") || "").trim();
+  if (forwarded) {
+    const first = forwarded.split(",")[0].trim();
+    if (first) return first;
+  }
+  return "unknown";
+}
+
+/**
+ * Floor and clamp a caller-supplied window before it is interpolated
+ * into datetime('now', '-N seconds'). Non-numeric input falls back to
+ * the default; range is clamped to 1s–1h.
+ */
+export function sanitizeWindowSeconds(windowSeconds?: number): number {
+  const floored = Math.floor(windowSeconds ?? DEFAULT_WINDOW_SECONDS);
+  if (!Number.isFinite(floored)) return DEFAULT_WINDOW_SECONDS;
+  return Math.min(3600, Math.max(1, floored));
+}
+
+/**
  * Check and increment a rate-limit counter for `key`.
  * Returns `true` if the request should be rejected (over limit).
  */
@@ -22,7 +49,7 @@ export async function isRateLimited(
   key: string,
   opts: RateLimitOpts = {},
 ): Promise<boolean> {
-  const windowSeconds = opts.windowSeconds ?? DEFAULT_WINDOW_SECONDS;
+  const windowSeconds = sanitizeWindowSeconds(opts.windowSeconds);
   const max = opts.max ?? DEFAULT_MAX;
 
   const row = await db
@@ -60,7 +87,7 @@ export async function checkRateLimit(
   opts: RateLimitOpts = {},
   message = "Too many requests — try again shortly.",
 ): Promise<Response | null> {
-  const ip = c.req.header("cf-connecting-ip") || "unknown";
+  const ip = getClientIp(c);
   if (await isRateLimited(c.env.DB, `${name}:${ip}`, opts)) {
     return c.json({ ok: false, error: message }, 429);
   }

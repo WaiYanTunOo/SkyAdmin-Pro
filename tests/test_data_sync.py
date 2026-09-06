@@ -3,7 +3,7 @@
 import json
 import uuid
 
-from skyadmin_pro.config import SETTING_DATA_SYNC_ENABLED, SETTING_SYNC_LAST_PULL
+from skyadmin_pro.config import SETTING_DATA_SYNC_ENABLED, SETTING_SYNC_LAST_PULL, SETTING_SYNC_LAST_PUSH
 from skyadmin_pro.services import data_sync as sync
 
 
@@ -398,6 +398,7 @@ def test_sync_pull_paginates_until_short_page(db, monkeypatch):
     assert "limit=2" in calls[0]
     assert "since=" in calls[1]
 
+
 def test_rotate_sync_credentials_after_license_change(monkeypatch, fake_app_dir):
     import urllib.request
 
@@ -497,5 +498,88 @@ def test_sync_data_pull_push_updates_cursor(db, monkeypatch, fake_app_dir):
     ok, msg = sync.sync_data(db)
     assert ok, msg
     assert db.get_setting(SETTING_SYNC_LAST_PULL) == "2026-04-01T09:00:00Z"
+    assert db.get_setting(SETTING_SYNC_LAST_PUSH) == "2026-04-01 08:00:00"
     assert any("/api/sync/pull" in u for u in calls)
     assert any("/api/sync/push" in u for u in calls)
+
+
+def test_collect_local_changes_global_limit(db):
+    """Global batch size truncates across tables, not 500-per-table."""
+    with db.connection() as conn:
+        for i in range(5):
+            conn.execute(
+                "INSERT INTO clients (name, global_id, updated_at) VALUES (?, ?, ?)",
+                (f"C{i}", uuid.uuid4().hex, f"2026-07-01 10:00:0{i}"),
+            )
+            conn.execute(
+                """
+                INSERT INTO tasks (title, status, global_id, updated_at)
+                VALUES (?, 'pending', ?, ?)
+                """,
+                (f"T{i}", uuid.uuid4().hex, f"2026-07-01 11:00:0{i}"),
+            )
+    changes = sync.collect_local_changes(db, limit=3)
+    assert len(changes) == 3
+    assert [c["updated_at"] for c in changes] == sorted(c["updated_at"] for c in changes)
+
+
+def test_sync_push_paginates_until_drained(db, monkeypatch, fake_app_dir):
+    """Large local change sets push in multiple HTTP batches."""
+    import json
+    import urllib.request
+
+    import skyadmin_pro.config as config
+    import skyadmin_pro.paths as paths_mod
+
+    monkeypatch.setattr(paths_mod, "app_data_dir", lambda: fake_app_dir)
+    monkeypatch.setattr(config, "API_BASE_URL", "https://worker.test")
+    monkeypatch.setattr(sync, "SYNC_PUSH_PAGE_SIZE", 2)
+    sync.save_sync_credentials("TESTMACHINE00001", "tok")
+    monkeypatch.setattr(sync, "get_machine_id", lambda: "TESTMACHINE00001")
+
+    with db.connection() as conn:
+        for i in range(5):
+            conn.execute(
+                "INSERT INTO clients (name, global_id, updated_at) VALUES (?, ?, ?)",
+                (f"Push {i}", uuid.uuid4().hex, f"2026-08-01 12:00:0{i}"),
+            )
+
+    push_bodies: list[list] = []
+
+    def fake_urlopen(req, timeout=0):
+        if "/api/sync/pull" in req.full_url:
+            body = json.dumps({"ok": True, "server_time": "2026-08-01T13:00:00Z", "changes": []}).encode()
+        else:
+            raw = req.data or b"{}"
+            payload = json.loads(raw.decode() if isinstance(raw, (bytes, bytearray)) else raw)
+            push_bodies.append(payload.get("changes") or [])
+            body = json.dumps(
+                {
+                    "ok": True,
+                    "applied": len(payload.get("changes") or []),
+                    "conflicts": 0,
+                    "server_time": "2026-08-01T13:00:00Z",
+                }
+            ).encode()
+
+        class R:
+            def read(self, n=-1):
+                return body
+
+            def __enter__(self):
+                return self
+
+            def __exit__(self, *a):
+                return False
+
+        return R()
+
+    monkeypatch.setattr(urllib.request, "urlopen", fake_urlopen)
+    db.set_setting(SETTING_DATA_SYNC_ENABLED, "1")
+    ok, msg = sync.sync_data(db)
+    assert ok, msg
+    assert "3 push pages" in msg
+    assert len(push_bodies) == 3
+    assert [len(b) for b in push_bodies] == [2, 2, 1]
+    assert db.get_setting(SETTING_SYNC_LAST_PUSH) == "2026-08-01 12:00:04"
+    assert db.get_setting(SETTING_SYNC_LAST_PULL) == "2026-08-01T13:00:00Z"

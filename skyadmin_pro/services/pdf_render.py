@@ -115,3 +115,15 @@ def render_report(model: dict, dest: Path, *, fonts: ReportFonts = FONTS) -> Pat
             pass
         raise
     return dest
+
+
+def _render_report_worker(model: dict, dest: str) -> str:
+    """Picklable worker entry for process offload."""
+    return str(render_report(model, Path(dest)))
+
+
+def render_report_offloaded(model: dict, dest: Path) -> Path:
+    """Render PDF in a child process (model must be picklable plain data)."""
+    from skyadmin_pro.services.process_jobs import run_in_process
+
+    return Path(run_in_process(_render_report_worker, model, str(dest)))

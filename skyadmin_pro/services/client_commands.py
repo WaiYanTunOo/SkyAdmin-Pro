@@ -39,9 +39,7 @@ def _linked_tables(db: Database) -> list[str]:
     """All tables carrying a client_id column (delete-undo snapshot scope)."""
     tables = [
         row["name"]
-        for row in db._fetch_all(
-            "SELECT name FROM sqlite_master WHERE type = 'table' AND name NOT LIKE 'sqlite_%'"
-        )
+        for row in db._fetch_all("SELECT name FROM sqlite_master WHERE type = 'table' AND name NOT LIKE 'sqlite_%'")
     ]
     linked = []
     with db.connection() as conn:
@@ -61,8 +59,15 @@ class AddClientCommand(Command):
     label = "add client"
 
     def __init__(
-        self, db: Database, *, name: str, contact: str, email: str, status: str,
-        group_id: int | None = None, clear_group: bool = False,
+        self,
+        db: Database,
+        *,
+        name: str,
+        contact: str,
+        email: str,
+        status: str,
+        group_id: int | None = None,
+        clear_group: bool = False,
     ) -> None:
         self._db = db
         self._name = name
@@ -80,8 +85,12 @@ class AddClientCommand(Command):
             self._existed_before = self._db.get_client(existing)
         self._client_id = self._db.get_or_create_client(self._name)
         self._db.update_client(
-            self._client_id, contact_name=self._contact, email=self._email, status=self._status,
-            group_id=self._group_id, clear_group=self._clear_group,
+            self._client_id,
+            contact_name=self._contact,
+            email=self._email,
+            status=self._status,
+            group_id=self._group_id,
+            clear_group=self._clear_group,
         )
         return self._client_id
 
@@ -216,9 +225,7 @@ class DeleteClientsCommand(Command):
         with db.connection() as conn:
             for cid in self._ids:
                 try:
-                    secret = conn.execute(
-                        "SELECT ird_password FROM clients WHERE id = ?", (cid,)
-                    ).fetchone()
+                    secret = conn.execute("SELECT ird_password FROM clients WHERE id = ?", (cid,)).fetchone()
                 except Exception:
                     continue
                 if secret is not None:
@@ -254,9 +261,7 @@ class DeleteClientsCommand(Command):
                 sync_key = row.get("global_id")
                 if sync_key:
                     try:
-                        hit = conn.execute(
-                            "SELECT id FROM clients WHERE global_id = ?", (sync_key,)
-                        ).fetchone()
+                        hit = conn.execute("SELECT id FROM clients WHERE global_id = ?", (sync_key,)).fetchone()
                     except Exception:
                         continue
                     if hit is not None and int(hit["id"]) != int(row["id"]):
@@ -273,8 +278,7 @@ class DeleteClientsCommand(Command):
             for row in self._client_rows:
                 cols = [c for c in row if c != "id"]
                 conn.execute(
-                    f'{verb} INTO clients (id, {", ".join(cols)}) '
-                    f'VALUES (?, {", ".join("?" for _ in cols)})',
+                    f"{verb} INTO clients (id, {', '.join(cols)}) VALUES (?, {', '.join('?' for _ in cols)})",
                     (row["id"], *[row[c] for c in cols]),
                 )
                 # Restore ciphertext exactly — get_client() snapshots decrypt.
@@ -286,9 +290,7 @@ class DeleteClientsCommand(Command):
             for table, rows in self._dependents.items():
                 for saved in rows:
                     rowid = saved.pop("_rowid")
-                    exists = conn.execute(
-                        f'SELECT 1 FROM "{table}" WHERE rowid = ?', (rowid,)
-                    ).fetchone()
+                    exists = conn.execute(f'SELECT 1 FROM "{table}" WHERE rowid = ?', (rowid,)).fetchone()
                     if exists is not None:
                         # SET NULL case: row survived, just re-point the link.
                         conn.execute(
@@ -299,7 +301,7 @@ class DeleteClientsCommand(Command):
                         cols = list(saved.keys())
                         conn.execute(
                             f'INSERT INTO "{table}" (rowid, {", ".join(cols)}) '
-                            f'VALUES (?, {", ".join("?" for _ in cols)})',
+                            f"VALUES (?, {', '.join('?' for _ in cols)})",
                             (rowid, *[saved[c] for c in cols]),
                         )
             # Repair AUTOINCREMENT watermarks so future inserts never collide.

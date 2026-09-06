@@ -123,8 +123,11 @@ class GeneralTabMixin:
             font=ctk.CTkFont(size=CARD_TITLE_SIZE, weight="bold"),
         ).grid(row=0, column=0, sticky="w", padx=16, pady=(14, 8))
         self.svc_columns_btn = ctk.CTkButton(
-            frame, text="⋮ Columns", width=90,
-            fg_color="transparent", border_width=1,
+            frame,
+            text="⋮ Columns",
+            width=90,
+            fg_color="transparent",
+            border_width=1,
             command=self._show_service_columns_menu,
         )
         self.svc_columns_btn.grid(row=0, column=1, sticky="e", padx=(0, 16), pady=(14, 8))

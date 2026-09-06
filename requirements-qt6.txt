@@ -1,0 +1,6 @@
+# Optional Qt6 shell (Phase 3) — kept out of requirements.txt so the
+# CustomTkinter build stays lean. Install with:
+#   pip install -r requirements-qt6.txt
+# Run with:
+#   SKYADMIN_UI=qt6 python main.py
+PySide6>=6.8.0

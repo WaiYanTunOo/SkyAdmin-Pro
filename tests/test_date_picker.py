@@ -62,8 +62,11 @@ def test_datepicker_class_tracks_open_fields():
     assert hasattr(DatePickerField, "_close_all_open")
     assert hasattr(DatePickerField, "_widget_alive")
     class_src = (
-        Path(__file__).resolve().parents[1] / "skyadmin_pro" / "ui" / "widgets.py"
-    ).read_text(encoding="utf-8").split("class DatePickerField")[1].split("class FeedbackLabel")[0]
+        (Path(__file__).resolve().parents[1] / "skyadmin_pro" / "ui" / "widgets.py")
+        .read_text(encoding="utf-8")
+        .split("class DatePickerField")[1]
+        .split("class FeedbackLabel")[0]
+    )
     assert "-topmost" not in class_src
     assert "grab_set" in class_src
     assert "transient" in class_src

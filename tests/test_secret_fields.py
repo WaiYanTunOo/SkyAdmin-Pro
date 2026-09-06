@@ -1,8 +1,8 @@
 """Secret field encryption — fail-closed reads and migration helpers."""
 
-import sqlite3
-
 from skyadmin_pro.database import Database
+from skyadmin_pro.db.cipher import CipherRow
+from skyadmin_pro.db.cipher import connect as cipher_connect
 from skyadmin_pro.services.secret_fields import (
     decrypt_secret,
     encrypt_secret,
@@ -64,8 +64,8 @@ def test_database_encrypts_and_decrypts_ird_password(tmp_path, fake_app_dir, mon
     client_id = db.get_or_create_client("Acme Co")
     db.update_client_fields(client_id, ird_password="portal-pass-123")
 
-    with sqlite3.connect(db.db_file) as conn:
-        conn.row_factory = sqlite3.Row
+    with cipher_connect(db.db_file) as conn:
+        conn.row_factory = CipherRow
         row = conn.execute("SELECT ird_password FROM clients WHERE id = ?", (client_id,)).fetchone()
     stored = row["ird_password"]
     assert is_encrypted_secret(stored)
@@ -84,7 +84,7 @@ def test_plaintext_ird_password_migrated_on_startup(tmp_path, fake_app_dir, monk
     )
     db = Database(tmp_path / "legacy.db")
     client_id = db.get_or_create_client("Legacy Ltd")
-    with sqlite3.connect(db.db_file) as conn:
+    with cipher_connect(db.db_file) as conn:
         conn.execute(
             "UPDATE clients SET ird_password = ? WHERE id = ?",
             ("plain-old-pass", client_id),
@@ -98,7 +98,7 @@ def test_plaintext_ird_password_migrated_on_startup(tmp_path, fake_app_dir, monk
     assert client is not None
     assert client["ird_password"] == "plain-old-pass"
 
-    with sqlite3.connect(db.db_file) as conn:
-        conn.row_factory = sqlite3.Row
+    with cipher_connect(db.db_file) as conn:
+        conn.row_factory = CipherRow
         row = conn.execute("SELECT ird_password FROM clients WHERE id = ?", (client_id,)).fetchone()
     assert is_encrypted_secret(row["ird_password"])

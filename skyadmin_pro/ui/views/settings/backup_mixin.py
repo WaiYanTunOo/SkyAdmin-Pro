@@ -42,6 +42,7 @@ class BackupMixin:
             SETTING_AUTO_BACKUP_ENABLED,
             SETTING_AUTO_BACKUP_INTERVAL,
         )
+
         enabled = self._auto_backup_enabled_var.get()
         interval = self._auto_backup_interval_var.get()
         self.app.db.set_setting(SETTING_AUTO_BACKUP_ENABLED, enabled)

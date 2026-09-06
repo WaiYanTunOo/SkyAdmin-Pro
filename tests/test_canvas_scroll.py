@@ -50,7 +50,7 @@ def test_filing_history_outside_form_scroll():
     assert "_build_filing_history(filing_scroll.content)" not in panel_src
     assert "filing_scroll.grid(row=0" in panel_src
     assert "_filing_history_frame.grid(row=1" in panel_src
-    assert 'tab.grid_rowconfigure(1, weight=1)' in panel_src
+    assert "tab.grid_rowconfigure(1, weight=1)" in panel_src
     assert 'sticky="nsew", pady=(8, 0)' in panel_src or 'sticky="nsew"' in panel_src
 
 

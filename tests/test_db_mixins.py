@@ -425,12 +425,8 @@ class TestFinancialMixin:
 
     def test_financial_doc_summary(self, db):
         cid = db.get_or_create_client("Acme Corp")
-        db.add_financial_document(
-            client_id=cid, category="receipt", file_name="r.pdf", file_path="/docs/r.pdf"
-        )
-        db.add_financial_document(
-            client_id=cid, category="invoice", file_name="i.pdf", file_path="/docs/i.pdf"
-        )
+        db.add_financial_document(client_id=cid, category="receipt", file_name="r.pdf", file_path="/docs/r.pdf")
+        db.add_financial_document(client_id=cid, category="invoice", file_name="i.pdf", file_path="/docs/i.pdf")
         summary = db.financial_doc_summary(cid)
         assert summary["receipt"] >= 1
         assert summary["invoice"] >= 1

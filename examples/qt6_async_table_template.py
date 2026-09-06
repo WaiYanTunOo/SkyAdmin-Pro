@@ -85,18 +85,17 @@ def ensure_demo_db(path: Path, n_rows: int = DEMO_ROWS) -> Path:
         for i in range(have, n_rows):
             nm = f"{random.choice(first)} {random.choice(last)} {i}"
             cp = random.choice(comp)
-            batch.append((nm, cp, f"user{i}@example.com", random.choice(stat),
-                          random.randint(100, 50000), "2025-01-01"))
+            batch.append(
+                (nm, cp, f"user{i}@example.com", random.choice(stat), random.randint(100, 50000), "2025-01-01")
+            )
             if len(batch) >= 5000:
                 conn.executemany(
-                    "INSERT INTO clients(name,company,email,status,amount,created)"
-                    " VALUES(?,?,?,?,?,?)", batch)
+                    "INSERT INTO clients(name,company,email,status,amount,created) VALUES(?,?,?,?,?,?)", batch
+                )
                 conn.commit()
                 batch.clear()
         if batch:
-            conn.executemany(
-                "INSERT INTO clients(name,company,email,status,amount,created)"
-                " VALUES(?,?,?,?,?,?)", batch)
+            conn.executemany("INSERT INTO clients(name,company,email,status,amount,created) VALUES(?,?,?,?,?,?)", batch)
             conn.commit()
     finally:
         conn.close()
@@ -116,8 +115,9 @@ class DbWorker(QObject):
         self._db_path = str(db_path)
 
     @Slot(int, int, int, str, int, int)
-    def query_page(self, request_id: int, offset: int, limit: int,
-                   filter_text: str, sort_col: int, sort_order: int) -> None:
+    def query_page(
+        self, request_id: int, offset: int, limit: int, filter_text: str, sort_col: int, sort_order: int
+    ) -> None:
         self.loadingStarted.emit()
         try:
             conn = sqlite3.connect(self._db_path, timeout=10)
@@ -132,12 +132,13 @@ class DbWorker(QObject):
                     where = "WHERE name LIKE ? OR company LIKE ? OR email LIKE ?"
                     like = f"%{filter_text}%"
                     params = [like, like, like]
-                total = conn.execute(
-                    f"SELECT COUNT(*) FROM clients {where}", params).fetchone()[0]
+                total = conn.execute(f"SELECT COUNT(*) FROM clients {where}", params).fetchone()[0]
                 cur = conn.execute(
                     f"""SELECT {",".join(COLUMNS)} FROM clients
                         {where} ORDER BY {order_col} {direction}
-                        LIMIT ? OFFSET ?""", [*params, limit, offset])
+                        LIMIT ? OFFSET ?""",
+                    [*params, limit, offset],
+                )
                 rows = [tuple(r[c] for c in COLUMNS) for r in cur.fetchall()]
                 self.pageReady.emit(request_id, offset, rows, int(total))
             finally:
@@ -172,8 +173,7 @@ class PageModel(QAbstractTableModel):
             return None
         return str(self._rows[index.row()][index.column()])
 
-    def headerData(self, section: int, orientation: Qt.Orientation,
-                   role: int = Qt.DisplayRole):
+    def headerData(self, section: int, orientation: Qt.Orientation, role: int = Qt.DisplayRole):
         if role == Qt.DisplayRole and orientation == Qt.Horizontal:
             return self._headers[section]
         return None
@@ -259,16 +259,21 @@ class MainWindow(QMainWindow):
         pages = max(1, (self._total + self._page_size - 1) // self._page_size) if self._total else 1
         self._page = max(0, min(page, pages - 1))
         self._req_id += 1
-        self.requestPage.emit(self._req_id, self._page * self._page_size,
-                              self._page_size, self.search.text().strip(),
-                              self._sort_col, self._sort_order)
+        self.requestPage.emit(
+            self._req_id,
+            self._page * self._page_size,
+            self._page_size,
+            self.search.text().strip(),
+            self._sort_col,
+            self._sort_order,
+        )
 
     @Slot(int)
     def on_sort_clicked(self, col: int) -> None:
         if col == self._sort_col:
-            self._sort_order = (int(Qt.DescendingOrder)
-                                if self._sort_order == int(Qt.AscendingOrder)
-                                else int(Qt.AscendingOrder))
+            self._sort_order = (
+                int(Qt.DescendingOrder) if self._sort_order == int(Qt.AscendingOrder) else int(Qt.AscendingOrder)
+            )
         else:
             self._sort_col, self._sort_order = col, int(Qt.AscendingOrder)
         self.load_page(0)

@@ -2,10 +2,23 @@
 
 from __future__ import annotations
 
+import http.client
 import json
+import logging
+import urllib.error
 import urllib.request
 
 from skyadmin_pro.config import API_BASE_URL, PRICING_OVER_YEAR_TEXT, PRICING_TIERS
+
+logger = logging.getLogger(__name__)
+
+_NETWORK_ERRORS = (
+    urllib.error.URLError,
+    http.client.HTTPException,
+    OSError,
+    TimeoutError,
+    ValueError,
+)
 
 
 def fetch_pricing_tiers(timeout: float = 4.0) -> tuple[tuple[tuple[str, int, int], ...], str]:
@@ -22,7 +35,8 @@ def fetch_pricing_tiers(timeout: float = 4.0) -> tuple[tuple[tuple[str, int, int
     try:
         with urllib.request.urlopen(req, timeout=timeout) as resp:
             data = json.loads(resp.read(32 * 1024).decode("utf-8", errors="replace"))
-    except Exception:
+    except _NETWORK_ERRORS as exc:
+        logger.warning("Pricing fetch failed, using embedded defaults: %s", exc)
         return PRICING_TIERS, PRICING_OVER_YEAR_TEXT
 
     if not isinstance(data, dict) or not data.get("ok"):
@@ -70,7 +84,8 @@ def fetch_signing_key_status(timeout: float = 4.0) -> tuple[bool, str]:
     try:
         with urllib.request.urlopen(req, timeout=timeout) as resp:
             data = json.loads(resp.read(16 * 1024).decode("utf-8", errors="replace"))
-    except Exception:
+    except _NETWORK_ERRORS as exc:
+        logger.debug("Signing-key status check failed (treated as match): %s", exc)
         return True, ""
 
     if not isinstance(data, dict) or not data.get("ok"):

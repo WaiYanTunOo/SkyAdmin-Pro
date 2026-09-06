@@ -41,8 +41,18 @@ def configure_shared_tree_style(
     """
     global _SHARED_STYLE_KEY
     key = (
-        mode, background, foreground, heading, heading_fg, field_bg,
-        selected, scrollbar, trough, scaled_row, scaled_font, scaled_head,
+        mode,
+        background,
+        foreground,
+        heading,
+        heading_fg,
+        field_bg,
+        selected,
+        scrollbar,
+        trough,
+        scaled_row,
+        scaled_font,
+        scaled_head,
     )
     if key == _SHARED_STYLE_KEY:
         return False
@@ -180,8 +190,8 @@ class ThemedTreeview(ctk.CTkFrame):
         self.tree.bind("<Shift-MouseWheel>", self._on_shift_mousewheel)
         self.tree.bind("<Button-4>", lambda _e: self._scroll_vertical(-1))
         self.tree.bind("<Button-5>", lambda _e: self._scroll_vertical(1))
-        self.tree.bind("<Shift-Button-4>", lambda _e: self.tree.xview_scroll(-1, "units"))
-        self.tree.bind("<Shift-Button-5>", lambda _e: self.tree.xview_scroll(1, "units"))
+        self.tree.bind("<Shift-Button-4>", lambda _e: self._scroll_horizontal(-1))
+        self.tree.bind("<Shift-Button-5>", lambda _e: self._scroll_horizontal(1))
 
         self._sort_col: str | None = None
         self._sort_reverse = False
@@ -189,7 +199,7 @@ class ThemedTreeview(ctk.CTkFrame):
         for i, (column_id, heading, width) in enumerate(columns):
             # Only the last column stretches to fill extra width; preceding columns
             # keep their readable width so horizontal scrolling activates when needed.
-            is_last = (i == num_cols - 1)
+            is_last = i == num_cols - 1
             self.tree.heading(
                 column_id,
                 text=heading,
@@ -317,9 +327,7 @@ class ThemedTreeview(ctk.CTkFrame):
             from skyadmin_pro.services.column_state import save_hidden_columns
 
             visible = set(self.get_visible_columns())
-            save_hidden_columns(
-                self._db, self._table_id, [c for c in self._column_ids if c not in visible]
-            )
+            save_hidden_columns(self._db, self._table_id, [c for c in self._column_ids if c not in visible])
         except Exception:
             pass
 
@@ -603,6 +611,10 @@ class ThemedTreeview(ctk.CTkFrame):
             self._virtual_scroll_by_units(delta, "units")
         else:
             self.tree.yview_scroll(delta, "units")
+        return "break"
+
+    def _scroll_horizontal(self, delta: int) -> str:
+        self.tree.xview_scroll(delta, "units")
         return "break"
 
     # Excel-like helpers

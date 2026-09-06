@@ -290,6 +290,109 @@ describe("POST /api/sync/register", () => {
   });
 });
 
+describe("GET /api/sync/pull HLC", () => {
+  async function authedEnv(syncRows: unknown[]) {
+    const token = "test-sync-token";
+    const tokenHash = Array.from(new Uint8Array(await crypto.subtle.digest("SHA-256", new TextEncoder().encode(token))))
+      .map((b) => b.toString(16).padStart(2, "0"))
+      .join("");
+    const future = new Date(Date.now() + 30 * 86400000).toISOString().slice(0, 19);
+
+    const db = {
+      prepare: (sql: string) => {
+        const sqlLower = sql.toLowerCase();
+        return {
+          bind: (..._args: unknown[]) => ({
+            first: async () => {
+              if (sqlLower.includes("from sync_devices")) {
+                return { machine_id: MID, token_hash: tokenHash, expires_at: future };
+              }
+              if (sqlLower.includes("returning count")) {
+                return { count: 1 };
+              }
+              return null;
+            },
+            all: async () => {
+              if (sqlLower.includes("from sync_rows")) {
+                return { results: syncRows };
+              }
+              return { results: [] };
+            },
+            run: async () => ({ success: true }),
+          }),
+        };
+      },
+      batch: async () => [],
+    } as unknown as D1Database;
+
+    const env = mockEnv();
+    env.DB = db;
+    return { env, token };
+  }
+
+  it("includes hlc on pulled changes (null for legacy rows)", async () => {
+    const { env, token } = await authedEnv([
+      {
+        table_name: "clients",
+        global_id: "gid-1",
+        row_json: JSON.stringify({ name: "Acme" }),
+        updated_at: "2026-09-02T10:00:00Z",
+        deleted_at: null,
+        hlc: "0000000000100-0001-NODEA",
+      },
+      {
+        table_name: "clients",
+        global_id: "gid-2",
+        row_json: JSON.stringify({ name: "Legacy" }),
+        updated_at: "2026-09-02T10:00:00Z",
+        deleted_at: null,
+      },
+    ]);
+
+    const res = await app.request(
+      "http://localhost/api/sync/pull?tables=clients",
+      {
+        method: "GET",
+        headers: {
+          "X-Machine-Id": MID,
+          Authorization: `Bearer ${token}`,
+        },
+      },
+      env,
+    );
+
+    expect(res.status).toBe(200);
+    const body = await res.json();
+    expect(body.ok).toBe(true);
+    expect(body.changes).toHaveLength(2);
+    expect(body.changes[0].hlc).toBe("0000000000100-0001-NODEA");
+    expect(body.changes[1].hlc).toBeNull();
+  });
+
+  it("schema advertises proto 2 + hlc without a version bump", async () => {
+    const { env, token } = await authedEnv([]);
+
+    const res = await app.request(
+      "http://localhost/api/sync/schema",
+      {
+        method: "GET",
+        headers: {
+          "X-Machine-Id": MID,
+          Authorization: `Bearer ${token}`,
+        },
+      },
+      env,
+    );
+
+    expect(res.status).toBe(200);
+    const body = await res.json();
+    expect(body.ok).toBe(true);
+    expect(body.version).toBe(2);
+    expect(body.proto).toBe(2);
+    expect(body.hlc).toBe(true);
+  });
+});
+
 describe("POST /api/sync/push LWW", () => {
   it("returns conflicts when client updated_at is older than server", async () => {
     const token = "test-sync-token";

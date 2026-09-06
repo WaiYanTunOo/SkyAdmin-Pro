@@ -14,6 +14,9 @@ else:
     tkdnd_platform = "linux-x64"
 
 datas = []
+_pyproject = os.path.join(ROOT, "pyproject.toml")
+if os.path.isfile(_pyproject):
+    datas.append((_pyproject, "."))
 tkdnd_root = os.path.join(os.path.dirname(tkinterdnd2.__file__), "tkdnd", tkdnd_platform)
 if os.path.isdir(tkdnd_root):
     for dirpath, _dirnames, filenames in os.walk(tkdnd_root):
@@ -33,12 +36,14 @@ a = Analysis(
         "openpyxl",
         "PIL",
         "cryptography",
+        "sqlcipher3",
         "cryptography.hazmat.primitives.ciphers",
         "cryptography.hazmat.primitives.kdf.pbkdf2",
         "deep_translator",
         "pyperclip",
         "tkinterdnd2",
         "pypdf",
+        "fpdf",
     ],
     hookspath=[],
     hooksconfig={},

@@ -119,12 +119,32 @@ def bind_wrap_label(label: ctk.CTkLabel, parent: ctk.Misc, *, pad: int = 32) -> 
     """Keep label wraplength in sync with parent width."""
 
     def _resize(event=None) -> None:
-        width = event.width if event is not None else parent.winfo_width()
+        try:
+            width = event.width if event is not None else parent.winfo_width()
+        except Exception:
+            return
         if width > 1:
-            label.configure(wraplength=max(120, width - pad))
+            try:
+                label.configure(wraplength=max(120, width - pad))
+            except Exception:
+                pass
 
-    parent.bind("<Configure>", _resize, add="+")
-    parent.after(50, _resize)
+    bind_id = parent.bind("<Configure>", _resize, add="+")
+    after_id = parent.after(50, _resize)
+    label._wrap_bind_id = bind_id
+    label._wrap_after_id = after_id
+
+    def _cleanup(_event=None) -> None:
+        try:
+            parent.unbind("<Configure>", bind_id)
+        except Exception:
+            pass
+        try:
+            parent.after_cancel(after_id)
+        except Exception:
+            pass
+
+    label.bind("<Destroy>", _cleanup, add="+")
 
 
 def _apply_input_theme(widget: ctk.CTkBaseClass) -> None:
@@ -376,17 +396,16 @@ def make_modal(top) -> None:
 
     def _grab() -> None:
         try:
-            top.grab_set()
+            if top.grab_current() in (None, top):
+                top.grab_set()
         except Exception:
             pass
 
-    _grab()
-    # If the window wasn't mapped yet, grab fails silently — retry shortly.
     try:
-        if not top.grab_current():
-            top.after(80, _grab)
+        top.wait_visibility()
     except Exception:
         pass
+    _grab()
     bind_escape(top)
 
 
@@ -704,11 +723,7 @@ class DatePickerField(ctk.CTkFrame):
     @classmethod
     def _release_root_binds_if_idle(cls, root) -> None:
         try:
-            if any(
-                True
-                for field in cls._open_fields
-                if cls._widget_alive(field) and field.winfo_toplevel() is root
-            ):
+            if any(True for field in cls._open_fields if cls._widget_alive(field) and field.winfo_toplevel() is root):
                 return
         except tk.TclError:
             pass

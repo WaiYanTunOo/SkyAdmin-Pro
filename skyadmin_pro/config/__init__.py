@@ -30,6 +30,12 @@ def _resolve_app_version() -> str:
                 return str(version)
     except Exception:
         pass
+    try:
+        from importlib.metadata import version as _pkg_version
+
+        return _pkg_version("skyadmin-pro")
+    except Exception:
+        pass
     return "0.3.3"
 
 

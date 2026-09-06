@@ -8,8 +8,21 @@ function isExpired(exp: string | null | undefined, now: Date = new Date()): bool
   if (!exp || exp === "never") return false;
   const text = String(exp).trim();
   if (!text) return false;
-  const dt = new Date(text.endsWith("Z") ? text : `${text}Z`);
-  if (Number.isNaN(dt.getTime())) return false;
+  // Fail closed: only well-formed timestamps can prove "not expired".
+  // license_policy always issues ISO-with-Z; desktop-naive local times are
+  // interpreted as UTC (fleet convention, see data_sync._parse_updated_at).
+  let candidate = text;
+  if (!/[Zz]$/.test(candidate)) {
+    if (/[+-]\d{2}:?\d{2}$/.test(candidate)) {
+      // Explicit offset — use as-is.
+    } else if (/^\d{4}-\d{2}-\d{2}[T ]\d{2}:\d{2}(:\d{2}(\.\d+)?)?$/.test(candidate)) {
+      candidate = `${candidate.replace(" ", "T")}Z`;
+    } else {
+      return true;
+    }
+  }
+  const dt = new Date(candidate);
+  if (Number.isNaN(dt.getTime())) return true;
   return dt.getTime() <= now.getTime();
 }
 

@@ -31,6 +31,8 @@ jobs:
       - run: npm test
 
   windows-release:
+    # Short-circuit before the expensive Windows build when Worker Vitest fails.
+    needs: [worker]
     runs-on: windows-latest
     outputs:
       version: ${{ steps.version.outputs.version }}
@@ -42,6 +44,8 @@ jobs:
       - uses: actions/setup-python@v5
         with:
           python-version: "3.12"
+
+      - uses: ilammy/msvc-dev-cmd@v1
 
       - name: Resolve version
         id: version
@@ -82,10 +86,24 @@ jobs:
           python -m pip install --upgrade pip
           pip install -r requirements.txt -r requirements-dev.txt
 
+      - name: Build native license extensions (Cython)
+        shell: pwsh
+        run: |
+          python setup.py build_ext --inplace
+          $crypto = Get-ChildItem -Path skyadmin_pro\services -Filter "license_crypto*.pyd" -ErrorAction SilentlyContinue
+          $machine = Get-ChildItem -Path skyadmin_pro\services\license -Filter "machine*.pyd" -ErrorAction SilentlyContinue
+          if (-not $crypto -or -not $machine) {
+            throw "Cython build did not produce license_crypto*.pyd and license/machine*.pyd"
+          }
+          Write-Host "Native extensions:"
+          $crypto | ForEach-Object { Write-Host " - $($_.FullName)" }
+          $machine | ForEach-Object { Write-Host " - $($_.FullName)" }
+
       - name: Run tests
         run: pytest tests/ -q --tb=short
         env:
           SKYADMIN_SKIP_DAILY_CHECK: "1"
+          SKYADMIN_PROCESS_OFFLOAD: "0"
 
       - name: Build portable exe
         run: |

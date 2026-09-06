@@ -76,6 +76,13 @@ class CanvasScrollFrame(ctk.CTkFrame):
         while stack:
             child = stack.pop()
             try:
+                if "ThemedTreeview" in [c.__name__ for c in type(child).__mro__]:
+                    continue
+                try:
+                    if child.winfo_class() == "Treeview":
+                        continue
+                except Exception:
+                    pass
                 path = str(child)
                 if path not in self._wheel_bound:
                     child.bind("<MouseWheel>", self._on_mousewheel, add="+")
@@ -90,8 +97,6 @@ class CanvasScrollFrame(ctk.CTkFrame):
         widget.bind("<MouseWheel>", self._on_mousewheel, add="+")
         widget.bind("<Button-4>", self._on_mousewheel_linux, add="+")
         widget.bind("<Button-5>", self._on_mousewheel_linux, add="+")
-        # Bind for children recursively on enter
-        widget.bind("<Enter>", lambda _e: widget.focus_set() if widget.winfo_exists() else None, add="+")
 
     def _on_mousewheel(self, event) -> None:
         # Let inner Treeview handle wheel if pointer is over a tree
@@ -113,6 +118,17 @@ class CanvasScrollFrame(ctk.CTkFrame):
             return "break"
 
     def _on_mousewheel_linux(self, event) -> None:
+        try:
+            w = event.widget
+            while w is not None:
+                if w.winfo_class() == "Treeview":
+                    return
+                try:
+                    w = w.master  # type: ignore[attr-defined]
+                except Exception:
+                    break
+        except Exception:
+            pass
         if event.num == 4:
             self._canvas.yview_scroll(-1, "units")
         elif event.num == 5:

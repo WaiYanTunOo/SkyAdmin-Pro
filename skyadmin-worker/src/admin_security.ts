@@ -46,3 +46,24 @@ export async function purgeOldAuditLogs(db: D1Database): Promise<void> {
     throw err;
   }
 }
+
+/**
+ * Purge sync_conflicts rows older than 90 days (idempotent).
+ * sync_conflicts is append-only on LWW push conflicts, so without this
+ * the table grows forever. Invoked from the purge-licenses maintenance
+ * endpoint (this module's audit-log purge already runs on the login and
+ * dashboard paths, which are too hot for an extra write on every hit).
+ */
+export async function purgeOldSyncConflicts(db: D1Database): Promise<void> {
+  try {
+    await db
+      .prepare("DELETE FROM sync_conflicts WHERE logged_at < datetime('now', '-90 days')")
+      .run();
+  } catch (err) {
+    const msg = String(err instanceof Error ? err.message : err).toLowerCase();
+    if (msg.includes("no such table") || msg.includes("sync_conflicts")) {
+      return;
+    }
+    throw err;
+  }
+}

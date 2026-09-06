@@ -241,7 +241,6 @@ class UtilitiesView(BaseView):
         top.title("Customize messages")
         top.geometry("820x680")
         top.transient(self.winfo_toplevel())
-        top.attributes("-topmost", True)
         make_modal(top)
 
         scope = (section,) if section else tuple(key for key, _title, _hint in _SECTION_TITLES)
