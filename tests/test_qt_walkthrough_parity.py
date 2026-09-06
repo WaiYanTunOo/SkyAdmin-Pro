@@ -11,6 +11,9 @@ import os
 
 os.environ.setdefault("QT_QPA_PLATFORM", "offscreen")
 
+import pytest
+pytest.importorskip("PySide6")
+
 from skyadmin_pro.config import NAV_ITEMS  # noqa: E402
 from skyadmin_pro.ui.qt.views import dashboard as qt_dashboard  # noqa: E402
 

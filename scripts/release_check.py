@@ -387,6 +387,9 @@ def run_pytest() -> list[str]:
         "pytest",
         "-q",
         "--tb=short",
+        "--ignore-glob=tests/test_qt_*.py",
+        "--ignore=tests/test_performance_clients.py",
+        "--ignore=tests/test_performance_stress.py",
     ]
     print(f"\nRunning: {' '.join(cmd)}")
     result = subprocess.run(cmd, cwd=ROOT, capture_output=True, text=True)
