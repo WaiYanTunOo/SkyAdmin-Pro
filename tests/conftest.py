@@ -59,3 +59,19 @@ def _license_test_sandbox(request, tmp_path, monkeypatch):
 @pytest.fixture
 def db(tmp_path) -> Database:
     return Database(tmp_path / "test.db")
+
+
+@pytest.fixture(autouse=True)
+def _qt_worker_drain():
+    """Let Qt background workers finish before teardown (no-op without Qt).
+
+    Abandoned QThreads racing window destruction abort the process
+    (STATUS_STACK_BUFFER_OVERRUN); draining first keeps the suite green.
+    """
+    yield
+    try:
+        from skyadmin_pro.ui.qt.async_bridge import drain_workers
+
+        drain_workers(timeout_s=15.0)
+    except Exception:
+        pass

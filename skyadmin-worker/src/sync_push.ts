@@ -101,8 +101,10 @@ export function changeKey(table: string, globalId: string): string {
 export function preparePushChanges(changes: PushChange[]): {
   prepared: PreparedPushChange[];
   skipped: number;
+  legacy: number;
 } {
   let skipped = 0;
+  let legacy = 0;
   const prepared: PreparedPushChange[] = [];
 
   for (const change of changes) {
@@ -131,6 +133,12 @@ export function preparePushChanges(changes: PushChange[]): {
 
     const rawHlc = typeof change.hlc === "string" ? change.hlc.trim() : "";
     const hlc = rawHlc && HLC_RE.test(rawHlc) ? rawHlc : null;
+    // Proto retirement (Phase 4): only proto:2 changes with a valid HLC
+    // merge. Legacy senders are rejected at the handler (upgrade-required),
+    // counted here so the response can report how many were refused.
+    if (change.proto !== 2 || hlc === null) {
+      legacy += 1;
+    }
 
     prepared.push({
       table,
@@ -142,7 +150,7 @@ export function preparePushChanges(changes: PushChange[]): {
     });
   }
 
-  return { prepared, skipped };
+  return { prepared, skipped, legacy };
 }
 
 export function partitionPushChanges(

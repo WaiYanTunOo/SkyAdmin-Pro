@@ -207,7 +207,16 @@ export async function syncPushHandler(c: Context<{ Bindings: Env }>) {
     return c.json({ ok: false, error: `Too many changes (max ${MAX_PUSH_CHANGES})` }, 413);
   }
 
-  const { prepared, skipped: invalidSkipped } = preparePushChanges(changes);
+  const { prepared, skipped: invalidSkipped, legacy } = preparePushChanges(changes);
+  if (legacy > 0) {
+    // Proto:1 retired (Phase 4): every change must be proto:2 with a valid
+    // HLC. Partial applies would split merge semantics, so the whole batch
+    // is refused — the desktop shows an upgrade prompt (see data_sync).
+    return c.json(
+      { ok: false, error: "upgrade-required", legacy, detail: "Sync protocol v1 is retired — update the desktop app." },
+      400,
+    );
+  }
   const existing = await fetchExistingUpdatedAt(c.env.DB, machineId, prepared);
   const partition = partitionPushChanges(prepared, existing);
   await writePushBatch(c.env.DB, machineId, partition, existing);

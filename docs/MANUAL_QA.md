@@ -232,9 +232,23 @@ One-page view of what blocks “perfect on Windows” vs polish already in code.
 
 **Blockers** (if any):
 
-*Needs human with secrets + VM (2026-09-06):*
-- `ADMIN_PASS`/`API_TOKEN` required: A.2 (pricing edit persist), A.3 (records chips), A.4 (machines), A.5–A.6 (publish/generate), C.1–C.5 (auto-update round-trip), D.1–D.3 (Sync Now/conflicts vs live Worker), E.1–E.5 (iPhone generator mutations + viewer sync data). Unauthenticated surface verified green 7/7 (login page + CSP, no token in DOM, records 401 gate, signing match, pricing read, update API, viewer + CSP).
-- Clean VM required: B.1–B.9 install/activation, F.1–F.7 (125%/150% DPI), G.1–G.5 signed-installer smoke, A.1 cert path (`SKYADMIN_SIGN_*` unset — current installer **unsigned**, `--require-signature` correctly blocks).
+*Needs human with secrets + VM (2026-09-06; authenticated pass done 8/8, see below):*
+- DONE 2026-09-06 via script (prod-safe, no mutations): login+session+CSRF;
+  A.1 signing `matches_desktop` + banner; A.2 pricing no-op re-save (4 pkgs,
+  persist verified); A.3 records (13 licenses, 3 machines) + filter JS;
+  A.4 machines/bans section; A.5/A.6 endpoint validation only (published
+  version untouched at `none`, nothing minted).
+- `ADMIN_PASS` verified working; `API_TOKEN` is NOT exposed in the admin DOM
+  (good — S5 holds): fetch it from wrangler/Cloudflare secrets for CLI steps.
+- Deliberately NOT run on prod (owner decision each): A.5 real publish
+  (would banner all desktops), A.6 real generate (pollutes Records),
+  A.2 edited-price save (changes live prices), D Sync Now against prod
+  (needs device activation = consumes a license).
+- Clean VM required: B.1–B.9 install/activation, F.1–F.7 (125%/150% DPI),
+  G.1–G.5 signed-installer smoke, C.2–C.5 desktop update-banner flow
+  (needs a published version first).
+- Current installer **unsigned** (`SKYADMIN_SIGN_*` unset);
+  `--require-signature` correctly blocks.
 
 ---
 

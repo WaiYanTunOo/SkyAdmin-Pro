@@ -583,3 +583,49 @@ def test_sync_push_paginates_until_drained(db, monkeypatch, fake_app_dir):
     assert [len(b) for b in push_bodies] == [2, 2, 1]
     assert db.get_setting(SETTING_SYNC_LAST_PUSH) == "2026-08-01 12:00:04"
     assert db.get_setting(SETTING_SYNC_LAST_PULL) == "2026-08-01T13:00:00Z"
+
+
+def test_sync_data_push_upgrade_required_prompts_update(db, monkeypatch, fake_app_dir):
+    import io
+    import urllib.error
+    import urllib.request
+
+    import skyadmin_pro.config as config
+    import skyadmin_pro.paths as paths_mod
+
+    monkeypatch.setattr(paths_mod, "app_data_dir", lambda: fake_app_dir)
+    monkeypatch.setattr(config, "API_BASE_URL", "https://worker.test")
+    sync.save_sync_credentials("TESTMACHINE00001", "tok")
+    monkeypatch.setattr(sync, "get_machine_id", lambda: "TESTMACHINE00001")
+
+    gid = uuid.uuid4().hex
+    with db.connection() as conn:
+        conn.execute(
+            "INSERT INTO clients (name, global_id, updated_at) VALUES (?, ?, ?)",
+            ("Push Me", gid, "2026-04-01 08:00:00"),
+        )
+
+    def fake_urlopen(req, timeout=0):
+        if "/api/sync/pull" in req.full_url:
+            body = json.dumps({"ok": True, "server_time": "2026-04-01T09:00:00Z", "changes": []}).encode()
+        else:
+            err_body = json.dumps({"ok": False, "error": "upgrade-required", "legacy": 1}).encode()
+            raise urllib.error.HTTPError(req.full_url, 400, "Bad Request", {}, io.BytesIO(err_body))
+
+        class R:
+            def read(self, n=-1):
+                return body
+
+            def __enter__(self):
+                return self
+
+            def __exit__(self, *a):
+                return False
+
+        return R()
+
+    monkeypatch.setattr(urllib.request, "urlopen", fake_urlopen)
+    db.set_setting(SETTING_DATA_SYNC_ENABLED, "1")
+    ok, msg = sync.sync_data(db)
+    assert not ok
+    assert "latest" in msg

@@ -762,6 +762,11 @@ def sync_data(db: Database, *, timeout: float = 25.0) -> tuple[bool, str]:
             timeout=timeout,
         )
         if not push_ok:
+            if "upgrade-required" in str(push_result):
+                return (
+                    False,
+                    "Sync protocol retired — install the latest SkyAdmin Pro build, then Sync Now again.",
+                )
             return False, f"Push failed: {push_result}"
 
         push_data = push_result if isinstance(push_result, dict) else {}

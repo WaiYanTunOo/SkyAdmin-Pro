@@ -9,6 +9,7 @@ the process-pool offload in ``services.process_jobs`` stays untouched
 
 from __future__ import annotations
 
+import atexit
 import logging
 import traceback
 from collections.abc import Callable
@@ -19,8 +20,80 @@ log = logging.getLogger(__name__)
 # Fire-and-forget workers must survive until their thread finishes: the
 # returned object is routinely discarded at the call site, and PySide will
 # garbage-collect the wrapper mid-flight. The registry holds them; the
-# thread-finished handler releases them (deleteLater handles the C++ side).
+# finished handler releases them (deleteLater handles the C++ side).
 _LIVE_WORKERS: set = set()
+
+
+def _is_valid(obj: object) -> bool:
+    """Shiboken validity probe — never raises, even on dead wrappers."""
+    try:
+        import shiboken6
+
+        return bool(shiboken6.isValid(obj))
+    except Exception:
+        return False
+
+
+def _shutdown_workers(timeout_ms: int = 5000) -> None:
+    """Join outstanding workers at app/pytest teardown.
+
+    Call while Qt is still alive (QApplication.aboutToQuit, or test
+    teardown). Late interpreter-exit calls are best-effort only: wrappers
+    whose C++ side is already gone are discarded untouched — probing them
+    would segfault (no Python exception to catch).
+    """
+    for worker in list(_LIVE_WORKERS):
+        _LIVE_WORKERS.discard(worker)
+        try:
+            thread = getattr(worker, "_thread", None)
+            if thread is None or not _is_valid(thread):
+                continue
+            try:
+                if thread.isRunning():
+                    thread.quit()
+            except Exception:
+                pass
+            try:
+                thread.wait(timeout_ms)
+            except Exception:
+                pass
+        except Exception:
+            pass
+
+
+def drain_workers(timeout_s: float = 15.0) -> bool:
+    """Pump the GUI event loop until live workers finish. Returns True if empty.
+
+    Test teardown (and orderly app shutdown) should drain rather than
+    abandon workers: callbacks land on live widgets instead of racing
+    window destruction. Stragglers are quit + joined by _shutdown_workers.
+    """
+    import time
+
+    try:
+        from PySide6.QtWidgets import QApplication
+    except ImportError:
+        return not _LIVE_WORKERS
+    deadline = time.time() + max(0.0, float(timeout_s))
+    app = QApplication.instance()
+    while _LIVE_WORKERS and time.time() < deadline:
+        try:
+            if app is not None:
+                app.processEvents()
+        except Exception:
+            pass
+        time.sleep(0.02)
+    try:
+        if app is not None:
+            app.processEvents()
+    except Exception:
+        pass
+    if _LIVE_WORKERS:
+        _shutdown_workers()
+    return not _LIVE_WORKERS
+
+
+atexit.register(_shutdown_workers)
 
 
 def run_background_q(

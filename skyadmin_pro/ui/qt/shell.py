@@ -29,6 +29,18 @@ def _view_title(view_id: str) -> str:
     return view_id
 
 
+#: Phase 3 ports register here; unknown ids fall back to the placeholder
+#: so the shell stays shippable mid-migration.
+VIEW_MODULES: dict[str, str] = {
+    "dashboard": "skyadmin_pro.ui.qt.views.dashboard",
+    "database_tasks": "skyadmin_pro.ui.qt.views.database_tasks",
+    "document_hub": "skyadmin_pro.ui.qt.views.document_hub",
+    "office_hub": "skyadmin_pro.ui.qt.views.office_hub",
+    "utilities": "skyadmin_pro.ui.qt.views.utilities",
+    "settings": "skyadmin_pro.ui.qt.views.settings",
+}
+
+
 class QtMainWindow:
     """QMainWindow subclass created lazily (keeps module import Qt-free)."""
 
@@ -93,15 +105,17 @@ class QtMainWindow:
                 self.show_view(str(item.data(0x0100)))
 
             def _build_page(self, view_id: str):
-                if view_id == "dashboard":
+                module_name = VIEW_MODULES.get(view_id)
+                if module_name is not None:
                     try:
-                        from skyadmin_pro.ui.qt.views import dashboard as dashboard_view
+                        import importlib
 
-                        return dashboard_view.build_page(self.db, self.paths)
+                        module = importlib.import_module(module_name)
+                        return module.build_page(self.db, self.paths)
                     except Exception:
                         import logging
 
-                        logging.getLogger(__name__).exception("Qt dashboard build failed; using placeholder")
+                        logging.getLogger(__name__).exception("Qt %s build failed; using placeholder", view_id)
                 from PySide6.QtWidgets import QLabel, QVBoxLayout, QWidget
 
                 page = QWidget()
@@ -158,6 +172,12 @@ def run(db=None, paths: str | Path | None = None) -> int:
 
     os.environ.setdefault("QT_AUTO_SCREEN_SCALE_FACTOR", "1")
     app = QApplication.instance() or QApplication(sys.argv[:1])
+    try:
+        from skyadmin_pro.ui.qt.async_bridge import _shutdown_workers
+
+        app.aboutToQuit.connect(lambda: _shutdown_workers())
+    except Exception:
+        pass
     appearance = DEFAULT_APPEARANCE_MODE
     if db is not None:
         try:

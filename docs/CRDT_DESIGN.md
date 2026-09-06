@@ -92,11 +92,15 @@ themselves"). Retention stays 90 days.
 1. Desktop `m012` + `hlc_now()` + v2 send, v1+v2 pull accept (ships first,
    harmless: Worker ignores unknown `hlc` until its own migration).
 2. Worker `0006` + v2 merge + HLC compare; v1 path kept.
-3. After fleet update: Worker rejects `proto: 1` pushes with
-   `upgrade-required`; desktop drops v1 send; dialog mandatory path deleted.
-4. Tests: convergence matrices (A-edit-then-B-edit, delete-vs-update both
-   orders, clock-skew ±hours, legacy-mixed pages) in `tests/test_data_sync.py`
-   + `sync_push.test.ts` + a cross-compat v1/v2 Vitest.
+3. ~~After fleet update: Worker rejects `proto: 1` pushes~~ — **DONE
+   (Phase 4)**: `preparePushChanges` counts legacy (non-`proto: 2` or
+   invalid HLC) and the push handler refuses the whole batch with
+   `400 upgrade-required`; desktop maps it to an update prompt. The v1
+   *ordering* fallback stays for legacy rows already stored (not the wire).
+4. ~~Desktop drops v1 send; dialog mandatory path deleted~~ — desktop send
+   is v2-only since Phase 2 (`proto: 2` stamped in `collect_local_changes`);
+   the conflicts dialog was already viewer-only (manual audit + clear, sync
+   auto-resolves), so no dialog change was needed.
 
 ## 7. Non-goals
 

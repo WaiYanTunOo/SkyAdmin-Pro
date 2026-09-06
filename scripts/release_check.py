@@ -319,6 +319,45 @@ def check_db_cipher() -> list[str]:
     return errors
 
 
+def check_qt_shell() -> list[str]:
+    """Phase 4 gate: Qt shell registry complete; offscreen build smoke.
+
+    Module imports never need Qt (lazy binding); the offscreen smoke runs
+    only when PySide6 is installed, otherwise warns without blocking.
+    """
+    import importlib
+
+    errors: list[str] = []
+    try:
+        from skyadmin_pro.config import NAV_ITEMS
+        from skyadmin_pro.ui import qt as qt_pkg
+    except ImportError as exc:
+        errors.append(_fail(f"Qt shell import failed: {exc}"))
+        return errors
+    if not qt_pkg.available():
+        print("  WARN  PySide6 not installed — skipping Qt offscreen smoke (pip install -r requirements-qt6.txt)")
+        return errors
+    try:
+        from skyadmin_pro.ui.qt import shell as shell_mod
+
+        expected = {vid for vid, _label in NAV_ITEMS}
+        missing = sorted(expected - set(shell_mod.VIEW_MODULES))
+        if missing:
+            errors.append(_fail(f"Qt shell registry missing views: {missing}"))
+            return errors
+        for view_id in sorted(expected):
+            module = importlib.import_module(shell_mod.VIEW_MODULES[view_id])
+            if not callable(getattr(module, "build_page", None)):
+                errors.append(_fail(f"Qt view {view_id} has no build_page"))
+        if errors:
+            return errors
+        _ok(f"Qt shell registry covers {len(expected)} views")
+    except Exception as exc:
+        errors.append(_fail(f"Qt shell registry check failed: {exc}"))
+        return errors
+    return errors
+
+
 def write_hash_manifest() -> None:
     import hashlib
 
@@ -375,6 +414,7 @@ def main() -> int:
     parser.add_argument("--api-url", default="", help="Worker base URL (default: from config.API_BASE_URL)")
     parser.add_argument("--skip-pytest", action="store_true", help="Skip full pytest suite")
     parser.add_argument("--skip-worker", action="store_true", help="Skip Worker HTTP checks")
+    parser.add_argument("--skip-qt", action="store_true", help="Skip Qt shell registry check")
     parser.add_argument(
         "--skip-installer",
         action="store_true",
@@ -393,6 +433,10 @@ def main() -> int:
     failures.extend(check_version_alignment())
     failures.extend(check_embedded_public_key())
     failures.extend(check_db_cipher())
+    if args.skip_qt:
+        print("  WARN  Skipping Qt shell check (--skip-qt)")
+    else:
+        failures.extend(check_qt_shell())
     failures.extend(check_exe(args.exe.resolve()))
     installer_path = (args.installer or default_installer_path()).resolve()
     if args.skip_installer:

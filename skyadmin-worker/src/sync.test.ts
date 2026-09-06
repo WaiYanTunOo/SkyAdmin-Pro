@@ -454,12 +454,16 @@ describe("POST /api/sync/push LWW", () => {
               table: "clients",
               global_id: "gid-1",
               updated_at: "2026-09-02T09:00:00Z",
+              hlc: "0000000000100-0000-NODEA",
+              proto: 2,
               row: { name: "Stale" },
             },
             {
               table: "clients",
               global_id: "gid-2",
               updated_at: "2026-09-02T11:00:00Z",
+              hlc: "0000000000200-0000-NODEA",
+              proto: 2,
               row: { name: "Fresh" },
             },
           ],
@@ -474,5 +478,64 @@ describe("POST /api/sync/push LWW", () => {
     expect(body.conflicts).toBe(1);
     expect(body.applied).toBe(1);
     expect(body.skipped).toBe(1);
+  });
+
+  it("rejects proto:1 batches with upgrade-required (Phase 4 retirement)", async () => {
+    const token = "test-sync-token";
+    const tokenHash = Array.from(new Uint8Array(await crypto.subtle.digest("SHA-256", new TextEncoder().encode(token))))
+      .map((b) => b.toString(16).padStart(2, "0"))
+      .join("");
+    const future = new Date(Date.now() + 30 * 86400000).toISOString().slice(0, 19);
+
+    const db = {
+      prepare: (sql: string) => {
+        const sqlLower = sql.toLowerCase();
+        return {
+          bind: (..._args: unknown[]) => ({
+            first: async () => {
+              if (sqlLower.includes("from sync_devices")) {
+                return { machine_id: MID, token_hash: tokenHash, expires_at: future };
+              }
+              return null;
+            },
+            all: async () => ({ results: [] }),
+            run: async () => ({ success: true }),
+          }),
+        };
+      },
+      batch: async () => [],
+    } as unknown as D1Database;
+
+    const env = mockEnv();
+    env.DB = db;
+
+    const res = await app.request(
+      "http://localhost/api/sync/push",
+      {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+          "X-Machine-Id": MID,
+          Authorization: `Bearer ${token}`,
+        },
+        body: JSON.stringify({
+          changes: [
+            {
+              table: "clients",
+              global_id: "gid-legacy",
+              updated_at: "2026-09-02T11:00:00Z",
+              row: { name: "Legacy client without HLC" },
+            },
+          ],
+        }),
+      },
+      env,
+    );
+
+    expect(res.status).toBe(400);
+    const body = await res.json();
+    expect(body.ok).toBe(false);
+    expect(body.error).toBe("upgrade-required");
+    expect(body.legacy).toBe(1);
   });
 });

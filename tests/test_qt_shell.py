@@ -57,6 +57,8 @@ def test_shell_builds_and_switches_all_views(tmp_path):
             window.show_view(view_id)
             assert window.current_view() == view_id
             assert view_id in window._pages
+            # All 6 views are ported — no placeholder fallback allowed.
+            assert window._pages[view_id].property("qt_view_id") == view_id
         # Lazy: one page per view, no more.
         assert len(window._pages) == len(NAV_ITEMS)
         window.set_status("hello")
