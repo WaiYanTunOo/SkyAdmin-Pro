@@ -120,7 +120,8 @@ class MainWindow(dnd_base_class()):
         self.title(APP_NAME)
         self._set_window_icon()
         geometry = self.db.get_setting(SETTING_WINDOW_GEOMETRY, DEFAULT_WINDOW_GEOMETRY)
-        self.geometry(geometry or DEFAULT_WINDOW_GEOMETRY)
+        geometry = self._safe_geometry(geometry or DEFAULT_WINDOW_GEOMETRY)
+        self.geometry(geometry)
         self.minsize(*MIN_WINDOW_SIZE)
 
         self.grid_columnconfigure(1, weight=1)
@@ -380,6 +381,42 @@ class MainWindow(dnd_base_class()):
             return float(self.tk.call("tk", "scaling"))
         except Exception:
             return 1.0
+
+    def _safe_geometry(self, geometry: str) -> str:
+        """Clamp a saved geometry string so the window always lands on-screen.
+
+        Restored databases carry the previous machine's window_geometry
+        (e.g. ``1280x800+3000+100`` from a second monitor). Applying it blind
+        opens the window off-screen — the app looks like it never started.
+        Parse WxH+X+Y, clamp the size to the current screen, and re-center
+        when the saved position is not visible.
+        """
+        import re
+
+        fallback = DEFAULT_WINDOW_GEOMETRY
+        try:
+            match = re.match(r"^(\d+)x(\d+)([+-]\d+)?([+-]\d+)?$", str(geometry or "").strip())
+            if not match:
+                return fallback
+            width, height = int(match.group(1)), int(match.group(2))
+            try:
+                screen_w = int(self.winfo_screenwidth())
+                screen_h = int(self.winfo_screenheight())
+            except Exception:
+                return f"{width}x{height}"
+            width = max(800, min(width, screen_w))
+            height = max(600, min(height, screen_h))
+            if match.group(3) is None or match.group(4) is None:
+                return f"{width}x{height}"
+            x, y = int(match.group(3)), int(match.group(4))
+            visible = (-width + 50 < x < screen_w - 50) and (-height + 50 < y < screen_h - 50)
+            if visible:
+                return f"{width}x{height}{x:+d}{y:+d}"
+            cx = max(0, (screen_w - width) // 2)
+            cy = max(0, (screen_h - height) // 2)
+            return f"{width}x{height}+{cx}+{cy}"
+        except Exception:
+            return fallback
 
     def _build_content(self) -> None:
         self.content = ctk.CTkFrame(self, corner_radius=0, fg_color="transparent")

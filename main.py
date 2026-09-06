@@ -159,9 +159,9 @@ def _migrate_legacy_portable() -> None:
 
 
 def _normalize_workspace(db) -> None:
-    """Keep customer documents next to the exe; software data in system folder.
+    """Keep customer documents in a user-writable folder; software data in system folder.
 
-    When frozen, the workspace is ALWAYS <exe folder>\\Workspace unless the
+    The workspace is %LOCALAPPDATA%\\SkyAdmin Pro\\Workspace unless the
     user explicitly picked a custom folder in Settings (workspace_custom=1).
     Any previous location is migrated in once, then the setting is pinned.
     """
