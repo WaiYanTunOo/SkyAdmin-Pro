@@ -21,6 +21,7 @@ Delegate using the Task tool or `/subagent-name`. Each subagent reads its listed
 | `ui-performance` | Scroll jank, nested scroll, first-paint, polling | Remaining scroll/perf polish | `skyadmin-stack`, `skyadmin-ui-performance` |
 | `company-details` | Company Details panel and sub-tabs | Sub-tab UX in `company_details/` | `skyadmin-stack`, `skyadmin-ui-widgets`, `skyadmin-ui-performance` |
 | `worker-api` | `skyadmin-worker/` routes, sync, license, D1 | Worker routes, Vitest, D1 migrations | `skyadmin-stack`, `skyadmin-worker` |
+| `cloudflare` | Deploys, D1 ops, secrets, tail/logs, edge triage | Wrangler deploys, migrations apply, secret rotation, deploy smoke | `skyadmin-stack`, `skyadmin-worker`, `cloudflare` |
 | `desktop-core` | `services/`, `db/`, sync, export, license logic | Services/DB hardening, sync allowlists | `skyadmin-stack` |
 | `qa-verifier` | After UI or API changes; pre-ship | Run pytest/vitest/release_check; report pass/fail (read-only) | `skyadmin-qa` |
 | `packaging-release` | Builds, installer, CI, version bumps | Release workflow, signing, version alignment | `skyadmin-stack`, `skyadmin-qa` |
@@ -54,6 +55,7 @@ These pairs can run in parallel without conflict:
 - `worker-api` + `ui-widgets` (different trees)
 - `desktop-core` + `ui-performance` (services vs views)
 - `packaging-release` + residual UI (workflow vs `skyadmin_pro/ui/`)
+- `cloudflare` + `worker-api` (platform ops vs route code; hand code changes back, never drive-by)
 - `qa-verifier` (background) while any implementer finishes
 
 Avoid parallel edits to the same file. `company-details` and `ui-widgets` both touch `widgets.py` — sequence those.
