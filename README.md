@@ -39,8 +39,8 @@ Disclaimer).
 
 | Location | Contents |
 |---|---|
-| `<exe folder>\Workspace\` | **Customer documents**: `Clients\…\01_Company_Setup`, `02_Accounting`, `03_Visa`, `04_Financial_Docs`, `Suppliers`, `00_Staging_Area`, `02_Ready_to_Upload`, `Z_Archive_Backup` |
-| `C:\Users\<you>\.skyadmin_pro\` | **Software data**: `skyadmin_pro.db` (all records), `backups\` (7 daily snapshots), `license.key`, `app.log` |
+| `<exe folder>\Workspace\` | Customer documents: Clients\…\01_Company_Setup, 02_Accounting, 03_Visa, 04_Financial_Docs, Suppliers, 00_Staging_Area, 02_Ready_to_Upload, Z_Archive_Backup |
+| `C:\Users\<you>\.skyadmin_pro\` | Software data: skyadmin_pro.db (all records), backups\ (7 daily snapshots), license.key, app.log |
 
 ## 3. Online vs offline use
 
