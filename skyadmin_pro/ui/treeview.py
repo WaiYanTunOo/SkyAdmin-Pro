@@ -210,7 +210,7 @@ class ThemedTreeview(ctk.CTkFrame):
                 column_id,
                 width=width,
                 minwidth=max(60, min(width, 90)),
-                stretch=is_last,
+                stretch=True,
                 anchor="w",
             )
 

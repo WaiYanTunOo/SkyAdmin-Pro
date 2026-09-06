@@ -44,7 +44,7 @@ APP_TAGLINE = "Wai Yan Tun Oo (SKY)"
 APP_VERSION = _resolve_app_version()
 
 # Default appearance — Settings will override from SQLite.
-DEFAULT_APPEARANCE_MODE = "dark"  # "dark" | "light" | "system"
+DEFAULT_APPEARANCE_MODE = "light"  # "dark" | "light" | "system"
 DEFAULT_COLOR_THEME = "blue"
 
 # ── Re-export everything from sub-modules ────────────────────────────────
