@@ -53,9 +53,15 @@ def user_documents_dir() -> Path:
 
 def default_workspace_root() -> Path:
     """Customer data (documents) lives next to the exe when frozen;
-    on Windows, it defaults to %LOCALAPPDATA%/Programs/SkyAdmin Pro/Workspace.
+    on Windows, it defaults to %LOCALAPPDATA%/SkyAdmin Pro/Workspace.
     """
     if getattr(sys, "frozen", False):
+        if sys.platform == "win32":
+            import os
+
+            local_app_data = os.environ.get("LOCALAPPDATA")
+            base = Path(local_app_data) if local_app_data else (Path.home() / "AppData" / "Local")
+            return base / APP_NAME / "Workspace"
         return Path(sys.executable).resolve().parent / "Workspace"
     if sys.platform == "win32":
         import os
