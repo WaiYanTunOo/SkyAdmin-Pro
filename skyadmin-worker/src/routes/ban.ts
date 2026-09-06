@@ -1,7 +1,7 @@
 /** POST /api/ban, /api/unban — Ban or un-ban a machine ID. */
 
 import { Context } from "hono";
-import { Env, bumpVersion } from "../db";
+import { CONTROL_LIST_CAP, Env, bumpVersion } from "../db";
 import { checkRateLimit } from "../rate_limit";
 
 export async function banHandler(c: Context<{ Bindings: Env }>) {
@@ -11,6 +11,9 @@ export async function banHandler(c: Context<{ Bindings: Env }>) {
   try {
     body = await c.req.json<{ mid?: string; reason?: string }>();
   } catch {
+    return c.json({ ok: false, error: "invalid json" }, 400);
+  }
+  if (!body || typeof body !== "object") {
     return c.json({ ok: false, error: "invalid json" }, 400);
   }
   const { mid, reason } = body;
@@ -33,6 +36,9 @@ export async function unbanHandler(c: Context<{ Bindings: Env }>) {
   } catch {
     return c.json({ ok: false, error: "invalid json" }, 400);
   }
+  if (!body || typeof body !== "object") {
+    return c.json({ ok: false, error: "invalid json" }, 400);
+  }
   const { mid } = body;
   if (!mid?.trim()) return c.json({ ok: false, error: "mid required" }, 400);
 
@@ -49,7 +55,7 @@ export async function listBansHandler(c: Context<{ Bindings: Env }>) {
   const limited = await checkRateLimit(c, "bans", { windowSeconds: 60, max: 30 });
   if (limited) return limited;
   const { results } = await c.env.DB.prepare(
-    "SELECT machine_id, reason, banned_at FROM bans ORDER BY id DESC"
+    `SELECT machine_id, reason, banned_at FROM bans ORDER BY id DESC LIMIT ${CONTROL_LIST_CAP}`
   ).all<{ machine_id: string; reason: string; banned_at: string }>();
   return c.json({ ok: true, bans: results || [] });
 }

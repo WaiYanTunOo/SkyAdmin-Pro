@@ -88,6 +88,20 @@ describe("pricing POST", () => {
     expect(body.error).toContain("array");
   });
 
+  it("rejects over-long over_year_text", async () => {
+    const res = await app.request("http://localhost/api/pricing", {
+      method: "POST",
+      headers: { "Content-Type": "application/json", ...AUTH },
+      body: JSON.stringify({
+        packages: [{ label: "1 Week", days: 7, price_thb: 500 }],
+        over_year_text: "x".repeat(2001),
+      }),
+    }, mockEnv());
+    expect(res.status).toBe(400);
+    const body = await res.json() as { ok: boolean; error: string };
+    expect(body.error).toContain("too long");
+  });
+
   it("fills defaults when empty packages provided", async () => {
     const res = await app.request("http://localhost/api/pricing", {
       method: "POST",

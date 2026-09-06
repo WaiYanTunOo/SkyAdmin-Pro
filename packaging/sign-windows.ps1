@@ -150,7 +150,7 @@ if (-not $signtool) {
 
 $pfx = Resolve-PfxPath -ExplicitPath $PfxPath
 $pw = Resolve-Password -ExplicitPassword $Password
-$thumb = Resolve-Thumbprint -ExplicitPath $Thumbprint
+$thumb = Resolve-Thumbprint -ExplicitThumbprint $Thumbprint
 $hasCert = [bool]($pfx -or $thumb)
 
 $azureVault = [Environment]::GetEnvironmentVariable("AZURE_TRUSTED_SIGNING_VAULT_URL")

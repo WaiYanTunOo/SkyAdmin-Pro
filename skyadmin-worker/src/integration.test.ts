@@ -219,6 +219,27 @@ describe("full license lifecycle", () => {
     expect(body.error).toContain("Machine ID");
   });
 
+  it("generate rejects fractional days", async () => {
+    const { db } = createMockDb();
+    const env = mockEnv(db);
+
+    const res = await app.request(
+      "http://localhost/api/generate",
+      {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+          Authorization: "Bearer test-api-token",
+        },
+        body: JSON.stringify({ mid: TEST_MID, days: 1.5 }),
+      },
+      env,
+    );
+    expect(res.status).toBe(400);
+    const body = await res.json() as { ok: boolean; error: string };
+    expect(body.error).toContain("Days must be");
+  });
+
   it("generate rejects without auth token", async () => {
     const { db } = createMockDb();
     const env = mockEnv(db);

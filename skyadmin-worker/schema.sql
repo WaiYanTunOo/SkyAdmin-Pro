@@ -112,6 +112,7 @@ CREATE TABLE IF NOT EXISTS sync_rows (
     row_json TEXT NOT NULL,
     updated_at TEXT NOT NULL,
     deleted_at TEXT,
+    hlc TEXT, -- Phase 2 merge clock (0006 on migrated DBs; nullable for legacy rows)
     UNIQUE(machine_id, table_name, global_id)
 );
 CREATE INDEX IF NOT EXISTS idx_sync_rows_pull ON sync_rows(machine_id, updated_at);

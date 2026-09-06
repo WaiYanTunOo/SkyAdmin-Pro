@@ -53,8 +53,11 @@ Exec=SkyAdminPro
 Icon=SkyAdminPro
 Categories=Office;
 EOF
-        # Copy icon if available
+        # Copy icon if available (make_icon.py writes icon.png at repo root)
         ICON="$ROOT/dist/SkyAdminPro.png"
+        if [[ ! -f "$ICON" && -f "$ROOT/icon.png" ]]; then
+            ICON="$ROOT/icon.png"
+        fi
         if [[ -f "$ICON" ]]; then
             cp "$ICON" "$APPDIR/usr/share/icons/hicolor/256x256/apps/SkyAdminPro.png"
             cp "$ICON" "$APPDIR/SkyAdminPro.png"

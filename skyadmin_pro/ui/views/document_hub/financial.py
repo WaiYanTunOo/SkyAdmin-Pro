@@ -135,6 +135,7 @@ class FinancialDocsPanel(ctk.CTkFrame):
         self._do_search()
 
     def _do_search(self) -> None:
+        self._search_after = None
         keyword = self.search_var.get().strip()
         cat_filter = self.cat_var.get()
         client_filter = self.client_var.get()

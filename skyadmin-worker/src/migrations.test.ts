@@ -37,7 +37,32 @@ describe("D1 migrations", () => {
     expect(sql).toMatch(/CREATE TABLE IF NOT EXISTS admin_audit_log/);
   });
 
-  it("applies 0001→0004 on a real SQLite DB when sqlite3 is available", () => {
+  it("0005 backfills sync_devices.expires_at without rebuilding", () => {
+    const sql = readFileSync(join(migrationsDir, "0005_sync_devices_expires_backfill.sql"), "utf8");
+    expect(sql).toMatch(/UPDATE sync_devices/);
+    expect(sql).toMatch(/expires_at/);
+    expect(sql).not.toMatch(/DROP TABLE/);
+    expect(sql).not.toMatch(/CREATE TABLE/);
+  });
+
+  it("0006 adds sync_rows.hlc without rebuilding", () => {
+    const sql = readFileSync(join(migrationsDir, "0006_sync_rows_hlc.sql"), "utf8");
+    expect(sql).toMatch(/ADD COLUMN hlc/);
+    expect(sql).not.toMatch(/DROP TABLE/);
+  });
+
+  it("migration files form a contiguous 0001-0006 chain", () => {
+    expect(migrationFiles()).toEqual([
+      "0001_initial.sql",
+      "0002_sync_devices_expires_at.sql",
+      "0003_sync_tokens_hash.sql",
+      "0004_admin_audit_log.sql",
+      "0005_sync_devices_expires_backfill.sql",
+      "0006_sync_rows_hlc.sql",
+    ]);
+  });
+
+  it("applies the full 0001-0006 chain on a real SQLite DB when sqlite3 is available", () => {
     let sqlite3 = "sqlite3";
     try {
       execFileSync(sqlite3, ["-version"], { stdio: "pipe" });
@@ -62,6 +87,12 @@ describe("D1 migrations", () => {
       expect(cols).not.toMatch(/\|token\|/);
       const tables = execFileSync(sqlite3, [dbPath, ".tables"], { encoding: "utf8" });
       expect(tables).toMatch(/admin_audit_log/);
+      const syncRows = execFileSync(
+        sqlite3,
+        [dbPath, "PRAGMA table_info(sync_rows);"],
+        { encoding: "utf8" },
+      );
+      expect(syncRows).toMatch(/hlc/);
     } finally {
       rmSync(dir, { recursive: true, force: true });
     }

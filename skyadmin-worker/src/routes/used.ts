@@ -13,6 +13,9 @@ export async function usedHandler(c: Context<{ Bindings: Env }>) {
   } catch {
     return c.json({ ok: false, error: "invalid json" }, 400);
   }
+  if (!body || typeof body !== "object") {
+    return c.json({ ok: false, error: "invalid json" }, 400);
+  }
   const { nonce } = body;
   if (!nonce?.trim()) return c.json({ ok: false, error: "nonce required" }, 400);
 
@@ -31,6 +34,9 @@ export async function revokePcHandler(c: Context<{ Bindings: Env }>) {
   try {
     body = await c.req.json<{ passcode?: string }>();
   } catch {
+    return c.json({ ok: false, error: "invalid json" }, 400);
+  }
+  if (!body || typeof body !== "object") {
     return c.json({ ok: false, error: "invalid json" }, 400);
   }
   const { passcode } = body;

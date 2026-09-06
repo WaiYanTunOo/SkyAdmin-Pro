@@ -61,4 +61,33 @@ describe("claim replay", () => {
     expect("license_key" in body).toBe(false);
     expect("expires_at" in body).toBe(false);
   });
+
+  it("rejects oversized codes before verification", async () => {
+    const res = await app.request(
+      "http://localhost/api/claim",
+      {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ code: "x".repeat(9000) }),
+      },
+      replayEnv(),
+    );
+    expect(res.status).toBe(400);
+    const body = (await res.json()) as Record<string, unknown>;
+    expect(body.ok).toBe(false);
+    expect(body.error).toBe("code too long");
+  });
+
+  it("rejects a null JSON body with 400 (not 500)", async () => {
+    const res = await app.request(
+      "http://localhost/api/claim",
+      {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: "null",
+      },
+      replayEnv(),
+    );
+    expect(res.status).toBe(400);
+  });
 });

@@ -28,6 +28,9 @@ export async function updatePostHandler(c: Context<{ Bindings: Env }>) {
   } catch {
     return c.json({ ok: false, error: "invalid json" }, 400);
   }
+  if (!body || typeof body !== "object") {
+    return c.json({ ok: false, error: "invalid json" }, 400);
+  }
   const version = (body.version || "").trim();
   const url = (body.url || "").trim();
   if (!version) {

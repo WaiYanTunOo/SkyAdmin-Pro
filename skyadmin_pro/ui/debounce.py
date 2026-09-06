@@ -15,12 +15,20 @@ def debounced_after(widget, callback: Callable[[], None], delay_ms: int = 300) -
                 widget.after_cancel(after_id[0])
             except Exception:
                 pass
-        after_id[0] = widget.after(delay_ms, _run)
+            after_id[0] = None
+        try:
+            after_id[0] = widget.after(delay_ms, _run)
+        except Exception:
+            after_id[0] = None
 
     def _run() -> None:
         after_id[0] = None
-        if widget.winfo_exists():
-            callback()
+        try:
+            if not widget.winfo_exists():
+                return
+        except Exception:
+            return
+        callback()
 
     def cancel() -> None:
         if after_id[0] is not None:

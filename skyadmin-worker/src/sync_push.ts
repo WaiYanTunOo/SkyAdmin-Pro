@@ -8,6 +8,11 @@ import {
 
 export const MAX_PUSH_CHANGES = 500;
 export const MAX_ROW_JSON_BYTES = 64 * 1024;
+// Protocol hardening (follow-up): identifier/timestamp length caps. Desktop
+// sends uuid-hex global_ids (32) and ISO timestamps (<=35 chars); anything
+// far larger is malformed and skipped, never merged.
+export const MAX_GLOBAL_ID_LENGTH = 128;
+export const MAX_UPDATED_AT_LENGTH = 64;
 export const D1_BATCH_SIZE = 100;
 
 /**
@@ -115,6 +120,10 @@ export function preparePushChanges(changes: PushChange[]): {
       skipped += 1;
       continue;
     }
+    if (globalId.length > MAX_GLOBAL_ID_LENGTH || updatedAt.length > MAX_UPDATED_AT_LENGTH) {
+      skipped += 1;
+      continue;
+    }
     if (!PUSH_TIMESTAMP_RE.test(updatedAt)) {
       skipped += 1;
       continue;
@@ -126,7 +135,8 @@ export function preparePushChanges(changes: PushChange[]): {
     }
 
     const rowJson = JSON.stringify(row);
-    if (rowJson.length > MAX_ROW_JSON_BYTES) {
+    // UTF-8 bytes, not UTF-16 length: CJK payloads must not slip past the cap.
+    if (new TextEncoder().encode(rowJson).length > MAX_ROW_JSON_BYTES) {
       skipped += 1;
       continue;
     }

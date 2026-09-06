@@ -3,7 +3,7 @@
 import { Context } from "hono";
 import { Env } from "../db";
 import { checkRateLimit, purgeStaleRateLimits } from "../rate_limit";
-import { parseActivationClaim } from "../verification";
+import { MAX_ACTIVATION_CODE_LENGTH, parseActivationClaim } from "../verification";
 import { checkActivationEligibility } from "../sync_eligibility";
 import { hashSyncToken, newSyncToken, syncAuthMiddleware } from "../sync_auth";
 import { withSyncDevicesExpiresAt } from "../sync_devices_schema";
@@ -57,9 +57,12 @@ export async function syncRegisterHandler(c: Context<{ Bindings: Env }>) {
   } catch {
     return c.json({ ok: false, error: "invalid json" }, 400);
   }
-  const code = (body.code || "").trim();
+  const code = (typeof body?.code === "string" ? body.code : "").trim();
   if (!code) {
     return c.json({ ok: false, error: "code required" }, 400);
+  }
+  if (code.length > MAX_ACTIVATION_CODE_LENGTH) {
+    return c.json({ ok: false, error: "code too long" }, 400);
   }
 
   const claim = await parseActivationClaim(code);
@@ -199,7 +202,7 @@ export async function syncPushHandler(c: Context<{ Bindings: Env }>) {
   } catch {
     return c.json({ ok: false, error: "invalid json" }, 400);
   }
-  const changes = body.changes || [];
+  const changes = body?.changes || [];
   if (!Array.isArray(changes) || !changes.length) {
     return c.json({ ok: false, error: "changes array required" }, 400);
   }

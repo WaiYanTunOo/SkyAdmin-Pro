@@ -42,6 +42,9 @@ export async function pricingPostHandler(c: Context<{ Bindings: Env }>) {
   } catch {
     return c.json({ ok: false, error: "invalid json" }, 400);
   }
+  if (!body || typeof body !== "object") {
+    return c.json({ ok: false, error: "invalid json" }, 400);
+  }
   if (!Array.isArray(body.packages)) {
     return c.json({ ok: false, error: "packages must be an array" }, 400);
   }
@@ -53,6 +56,10 @@ export async function pricingPostHandler(c: Context<{ Bindings: Env }>) {
   }
   if (!packages.length) {
     return c.json({ ok: false, error: "at least one package required" }, 400);
+  }
+  // Protocol hardening (follow-up): bound admin-controlled text stored in D1.
+  if (typeof body.over_year_text === "string" && body.over_year_text.length > 2000) {
+    return c.json({ ok: false, error: "over_year_text too long (max 2000 chars)" }, 400);
   }
   await setMeta(c.env.DB, PRICING_META_KEY, serializePricingPackages(packages));
   if (typeof body.over_year_text === "string" && body.over_year_text.trim()) {

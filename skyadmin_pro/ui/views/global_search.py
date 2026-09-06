@@ -258,9 +258,19 @@ class GlobalSearchDialog(ctk.CTkToplevel):
                     text_color=TEXT_MUTED,
                 ).grid(row=1, column=1, sticky="nw")
 
-            # Click handler
+            # Click handler — bind the row and its children so clicks on
+            # the badge/title/subtitle labels navigate too.
             nav = item["nav"]
-            row.bind("<Button-1>", lambda _, n=nav, self=self: self._navigate_and_close(n))
+
+            def _navigate(_event, n=nav, owner=self) -> None:
+                owner._navigate_and_close(n)
+
+            row.bind("<Button-1>", _navigate)
+            for child in row.winfo_children():
+                try:
+                    child.bind("<Button-1>", _navigate)
+                except Exception:
+                    pass
 
     def _navigate_and_close(self, nav_key: str) -> None:
         self.app.show_view(nav_key)

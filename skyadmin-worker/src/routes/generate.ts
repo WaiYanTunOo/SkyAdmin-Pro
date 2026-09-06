@@ -23,6 +23,9 @@ export async function generateHandler(c: Context<{ Bindings: Env }>) {
   } catch {
     return c.json({ ok: false, error: "invalid json" }, 400);
   }
+  if (!body || typeof body !== "object") {
+    return c.json({ ok: false, error: "invalid json" }, 400);
+  }
   const mid = (body.mid || "").trim().toUpperCase();
   const days = "days" in body ? body.days : 30;
   // Ignore client-supplied price; server computes from pricing packages to prevent injection
@@ -39,8 +42,9 @@ export async function generateHandler(c: Context<{ Bindings: Env }>) {
     return c.json({ ok: false, error: "Machine ID must be 16 hex characters." }, 400);
   }
 
-  // Validate days
-  if (days !== null && (typeof days !== "number" || days < 1 || days > 36500)) {
+  // Validate days — must be a whole number of days (fractional packages
+  // would mint nonsense expiries and never match a pricing package).
+  if (days !== null && (typeof days !== "number" || !Number.isInteger(days) || days < 1 || days > 36500)) {
     return c.json({ ok: false, error: "Days must be 1–36500 or null for never." }, 400);
   }
 

@@ -7,6 +7,13 @@ export const PASSCODE_PREFIX = "SKYPASS1:";
 export const ED25519_PUBLIC_KEY_HEX =
   "b9bc4ee341f806f7cdfe698c048fc4b212e8b5ef6ebffcb63bc4d527d136b501";
 
+/**
+ * Upper bound for activation codes accepted by claim/register. Real license
+ * keys and passcodes are a few hundred chars; anything larger is garbage
+ * that would only burn CPU in base64/JSON/Ed25519 parsing.
+ */
+export const MAX_ACTIVATION_CODE_LENGTH = 8192;
+
 function b64urlDecode(s: string): Uint8Array {
   let text = (s || "").replace(/-/g, "+").replace(/_/g, "/");
   while (text.length % 4) text += "=";

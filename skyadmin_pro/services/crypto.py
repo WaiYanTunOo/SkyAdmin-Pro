@@ -419,8 +419,7 @@ def restore_encrypted_backup(archive: Path, workspace_root: Path, db_file: Path)
             staged_db = db_file.with_suffix(db_file.suffix + ".new")
             staged_db.write_bytes(db_payload)
             try:
-                if _looks_like_sqlite(db_payload):
-                    _verify_sqlite_payload(staged_db)
+                _verify_sqlite_payload(staged_db)
                 os.replace(staged_db, db_file)
             finally:
                 try:

@@ -28,11 +28,19 @@ export async function purgeLicensesHandler(c: Context<{ Bindings: Env }>) {
   if (limited) return limited;
   let body: PurgeBody = {};
   try {
-    body = await c.req.json<PurgeBody>();
+    const parsed: unknown = await c.req.json<PurgeBody>();
+    if (parsed && typeof parsed === "object") {
+      body = parsed as PurgeBody;
+    }
   } catch {
     body = {};
   }
-  const olderThanDays = Math.max(1, Math.min(365, body.older_than_days ?? 30));
+  // Non-numeric input (e.g. a string) must not produce a "-NaN days" cutoff;
+  // fall back to the 30-day default instead of silently purging nothing.
+  const requestedDays = Number(body.older_than_days ?? 30);
+  const olderThanDays = Number.isFinite(requestedDays)
+    ? Math.max(1, Math.min(365, Math.floor(requestedDays)))
+    : 30;
   const cutoff = `-${olderThanDays} days`;
 
   const { results: candidates } = await c.env.DB.prepare(

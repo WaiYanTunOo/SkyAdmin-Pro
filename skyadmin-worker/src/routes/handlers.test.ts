@@ -75,6 +75,14 @@ describe("revoke / unrevoke", () => {
     expect(res.status).toBe(400);
   });
 
+  it("rejects a null JSON body with 400 (not 500)", async () => {
+    const res = await app.request("http://localhost/api/revoke", {
+      method: "POST", headers: { "Content-Type": "application/json", ...AUTH },
+      body: "null",
+    }, mockEnv());
+    expect(res.status).toBe(400);
+  });
+
   it("unrevokes a nonce", async () => {
     const res = await app.request("http://localhost/api/unrevoke", {
       method: "POST", headers: { "Content-Type": "application/json", ...AUTH },

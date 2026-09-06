@@ -106,6 +106,7 @@ class DashboardView(BaseView):
         self._detail_build_after: str | None = None
         self._header_extras_built = False
         self._snap_seq = 0
+        self._last_snap: dict | None = None
 
         self._header = ctk.CTkFrame(self.body, fg_color="transparent")
         self._header.grid(row=0, column=0, sticky="ew")
@@ -177,7 +178,14 @@ class DashboardView(BaseView):
                     self.after_cancel(self._timeline_resize_after)
                 except Exception:
                     pass
-            self._timeline_resize_after = self.after(150, lambda: self._draw_timeline() if self._visible else None)
+                self._timeline_resize_after = None
+
+            def _redraw() -> None:
+                self._timeline_resize_after = None
+                if self._visible:
+                    self._draw_timeline()
+
+            self._timeline_resize_after = self.after(150, _redraw)
 
         self.timeline_canvas.bind("<Configure>", _on_timeline_resize)
 
@@ -657,6 +665,8 @@ class DashboardView(BaseView):
         """Draw a bar-per-day expiry timeline for the next 45 days."""
         if not getattr(self, "_header_extras_built", False):
             return
+        if snap is None:
+            snap = getattr(self, "_last_snap", None)
         canvas = self.timeline_canvas
         canvas.delete("all")
         mode = ctk.get_appearance_mode()
@@ -673,6 +683,9 @@ class DashboardView(BaseView):
         if snap is not None:
             expiring = snap.get("expiring", [])
             supplier_expiring = snap.get("supplier_expiring", [])
+        elif self._last_snap is not None:
+            expiring = self._last_snap.get("expiring", [])
+            supplier_expiring = self._last_snap.get("supplier_expiring", [])
         else:
             expiring = self.app.db.list_expiring_documents()
             supplier_expiring = self.app.db.list_expiring_supplier_services()
@@ -827,6 +840,7 @@ class DashboardView(BaseView):
 
     def _apply_snapshot(self, snap: dict, *, force: bool = False) -> None:
         fingerprint = snap_fingerprint(snap)
+        self._last_snap = snap
         self._apply_stat_cards(snap)
         if getattr(self, "_detail_stage", 0) >= 1:
             self.month_panel.refresh()

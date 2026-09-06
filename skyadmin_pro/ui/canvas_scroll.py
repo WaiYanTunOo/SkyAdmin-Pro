@@ -51,6 +51,11 @@ class CanvasScrollFrame(ctk.CTkFrame):
     def _update_scrollregion(self) -> None:
         self._pending_scroll_update = None
         try:
+            if not self.winfo_exists():
+                return
+        except Exception:
+            return
+        try:
             self._canvas.configure(scrollregion=self._canvas.bbox("all"))
         except Exception:
             pass
@@ -134,6 +139,18 @@ class CanvasScrollFrame(ctk.CTkFrame):
         elif event.num == 5:
             self._canvas.yview_scroll(1, "units")
         return "break"
+
+    def destroy(self) -> None:
+        if getattr(self, "_pending_scroll_update", None) is not None:
+            try:
+                self.after_cancel(self._pending_scroll_update)
+            except Exception:
+                pass
+            self._pending_scroll_update = None
+        try:
+            super().destroy()
+        except Exception:
+            pass
 
     def winfo_children(self):
         children = list(super().winfo_children())

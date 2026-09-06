@@ -17,8 +17,6 @@ jobs:
   deploy:
     runs-on: ubuntu-latest
     environment: production
-    # Tip: add `environment: production` here after creating a protected
-    # GitHub Environment (required reviewers / wait timer) in repo settings.
     defaults:
       run:
         working-directory: skyadmin-worker

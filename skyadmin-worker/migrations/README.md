@@ -38,3 +38,7 @@ npx wrangler d1 migrations apply skyadmin-db --local
 - `0003_sync_tokens_hash.sql` rebuilds `sync_devices` with `token_hash` only
   (existing devices must re-register — D1 SQL cannot hash plaintext tokens)
 - `0004_admin_audit_log.sql` adds `admin_audit_log`
+- `0005_sync_devices_expires_backfill.sql` backfills `sync_devices.expires_at`
+  for rows left NULL by the 0003 rebuild (no re-register required)
+- `0006_sync_rows_hlc.sql` adds nullable `sync_rows.hlc` for Phase 2 HLC merge
+  (request-path code falls back to `updated_at` ordering pre-migration)

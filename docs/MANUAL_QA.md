@@ -238,6 +238,8 @@ One-page view of what blocks “perfect on Windows” vs polish already in code.
   persist verified); A.3 records (13 licenses, 3 machines) + filter JS;
   A.4 machines/bans section; A.5/A.6 endpoint validation only (published
   version untouched at `none`, nothing minted).
+- DONE 2026-09-06: `--require-signature` correctly BLOCKS the unsigned local
+  build (NotSigned on exe + installer) — gate proven, needs cert to pass.
 - `ADMIN_PASS` verified working; `API_TOKEN` is NOT exposed in the admin DOM
   (good — S5 holds): fetch it from wrangler/Cloudflare secrets for CLI steps.
 - Deliberately NOT run on prod (owner decision each): A.5 real publish

@@ -69,6 +69,42 @@ describe("preparePushChanges", () => {
     expect(skipped).toBe(1);
   });
 
+  it("measures the row cap in UTF-8 bytes (CJK cannot slip past)", () => {
+    // 22k CJK chars ≈ 66KB UTF-8 but only 22k UTF-16 units — must skip.
+    const cjk = "中".repeat(22000);
+    const { prepared, skipped } = preparePushChanges([
+      {
+        table: "tasks",
+        global_id: "gid-cjk",
+        updated_at: "2026-09-02T10:00:00Z",
+        hlc: "0000000000100-0000-NODEA",
+        proto: 2,
+        row: { body: cjk },
+      },
+    ]);
+    expect(prepared).toHaveLength(0);
+    expect(skipped).toBe(1);
+  });
+
+  it("skips over-long identifiers and timestamps", () => {
+    const { prepared, skipped } = preparePushChanges([
+      {
+        table: "clients",
+        global_id: "g".repeat(129),
+        updated_at: "2026-09-02T10:00:00Z",
+        row: { name: "X" },
+      },
+      {
+        table: "clients",
+        global_id: "gid-ok",
+        updated_at: `2026-09-02T10:00:00Z${"0".repeat(64)}`,
+        row: { name: "Y" },
+      },
+    ]);
+    expect(prepared).toHaveLength(0);
+    expect(skipped).toBe(2);
+  });
+
   it("skips garbage updated_at but keeps ISO and desktop space formats", () => {
     const { prepared, skipped } = preparePushChanges([
       { table: "clients", global_id: "g-ok-z", updated_at: "2026-09-02T10:00:00Z", row: { name: "A" } },
