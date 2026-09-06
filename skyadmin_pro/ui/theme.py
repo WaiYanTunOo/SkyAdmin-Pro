@@ -53,9 +53,9 @@ FONT_SIZE_TITLE = 20
 FONT_SIZE_HERO = 22
 
 # Semantic text colors — accessible in both Light/Dark
-TEXT_MUTED = ("gray40", "gray70")
-TEXT_SUBTLE = ("gray45", "gray65")
-TEXT_FAINT = ("gray40", "gray60")
+TEXT_MUTED = ("#4b5563", "#a1a1aa")
+TEXT_SUBTLE = ("#6b7280", "#a1a1aa")
+TEXT_FAINT = ("#9ca3af", "#71717a")
 TEXT_INVERSE = ("gray10", "gray90")
 
 # Feedback — refined accent & accessible contrast
@@ -109,11 +109,13 @@ def tabview_style_kwargs() -> dict:
     """CTkTabview colors that stay readable in light and dark mode."""
     return {
         "fg_color": SURFACE_BG,
-        "segmented_button_fg_color": ("#d4d4d4", "#343638"),
-        "segmented_button_selected_color": ACCENT,
-        "segmented_button_selected_hover_color": ACCENT_HOVER,
-        "segmented_button_unselected_color": ("#c8c8c8", "#4a4a4a"),
-        "segmented_button_unselected_hover_color": ("#b8b8b8", "#565b5e"),
+        "segmented_button_fg_color": ("#e2e8f0", "#343638"),
+        "segmented_button_selected_color": ("#ffffff", ACCENT[1]),
+        "segmented_button_selected_hover_color": ("#f8fafc", ACCENT_HOVER[1]),
+        "segmented_button_unselected_color": ("#e2e8f0", "#4a4a4a"),
+        "segmented_button_unselected_hover_color": ("#cbd5e1", "#565b5e"),
+        "text_color": ("#0f172a", "#ffffff"),
+        "text_color_disabled": ("#94a3b8", "#6b7280"),
     }
 
 
@@ -152,14 +154,14 @@ def table_palette(mode: str) -> dict[str, str]:
     return {
         "background": "#ffffff",
         "foreground": "#18181b",
-        "heading": "#e4e4e7",
-        "heading_fg": "#18181b",
+        "heading": "#cbd5e1",
+        "heading_fg": "#0f172a",
         "fieldbackground": "#ffffff",
         "selected": "#2563eb",
         "odd": "#ffffff",
-        "even": "#f4f4f5",
-        "scrollbar": "#d4d4d8",
-        "trough": "#f4f4f5",
+        "even": "#f1f5f9",
+        "scrollbar": "#94a3b8",
+        "trough": "#e2e8f0",
         "expired": "#fecaca",
         "urgent": "#fed7aa",
         "watch": "#fde68a",
