@@ -1,7 +1,8 @@
 """Local filesystem layout for SkyAdmin Pro.
 
-The workspace root defaults to Documents/SkyAdmin Pro and can be changed
-later from Settings. All document-pipeline folders live under that root.
+The workspace root defaults to %LOCALAPPDATA%/Programs/SkyAdmin Pro/Workspace on Windows
+(or next to the exe when frozen) and can be changed later from Settings.
+All document-pipeline folders live under that root.
 """
 
 from __future__ import annotations
@@ -52,10 +53,17 @@ def user_documents_dir() -> Path:
 
 def default_workspace_root() -> Path:
     """Customer data (documents) lives next to the exe when frozen;
-    during development it lives in Documents like any normal project."""
+    on Windows, it defaults to %LOCALAPPDATA%/Programs/SkyAdmin Pro/Workspace.
+    """
     if getattr(sys, "frozen", False):
         return Path(sys.executable).resolve().parent / "Workspace"
-    return user_documents_dir() / APP_NAME
+    if sys.platform == "win32":
+        import os
+
+        local_app_data = os.environ.get("LOCALAPPDATA")
+        base = Path(local_app_data) if local_app_data else (Path.home() / "AppData" / "Local")
+        return base / "Programs" / APP_NAME / "Workspace"
+    return Path.home() / APP_NAME / "Workspace"
 
 
 def app_data_dir() -> Path:

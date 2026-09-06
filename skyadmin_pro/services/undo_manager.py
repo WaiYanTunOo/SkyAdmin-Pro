@@ -7,6 +7,10 @@ UndoManager, never to concrete commands.
 
 from __future__ import annotations
 
+import logging
+
+logger = logging.getLogger(__name__)
+
 
 class Command:
     """One reversible mutation. do() applies, undo() reverts exactly once."""
@@ -71,6 +75,7 @@ class UndoManager:
         try:
             return list(check())
         except Exception:
+            logger.warning("preview_conflicts() failed; treating as clean", exc_info=True)
             return []
 
     def clear(self) -> None:

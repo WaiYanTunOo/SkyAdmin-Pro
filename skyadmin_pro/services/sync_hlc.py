@@ -75,6 +75,7 @@ def legacy_hlc(updated_at: str) -> tuple[int, int, str]:
     try:
         return (int(_parse_updated_at(updated_at or "") * 1000), 0, "")
     except Exception:
+        logger.warning("Failed to synthesize legacy HLC from %r", updated_at, exc_info=True)
         return (0, 0, "")
 
 

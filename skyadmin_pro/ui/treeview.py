@@ -195,11 +195,7 @@ class ThemedTreeview(ctk.CTkFrame):
 
         self._sort_col: str | None = None
         self._sort_reverse = False
-        num_cols = len(columns)
-        for i, (column_id, heading, width) in enumerate(columns):
-            # Only the last column stretches to fill extra width; preceding columns
-            # keep their readable width so horizontal scrolling activates when needed.
-            is_last = i == num_cols - 1
+        for column_id, heading, width in columns:
             self.tree.heading(
                 column_id,
                 text=heading,
@@ -286,8 +282,9 @@ class ThemedTreeview(ctk.CTkFrame):
     def _close_column_menu(self) -> None:
         if self._column_menu is not None:
             try:
-                self._column_menu.unpost()
-                self._column_menu.destroy()
+                if self._column_menu.winfo_exists():
+                    self._column_menu.unpost()
+                    self._column_menu.destroy()
             except Exception:
                 pass
             self._column_menu = None

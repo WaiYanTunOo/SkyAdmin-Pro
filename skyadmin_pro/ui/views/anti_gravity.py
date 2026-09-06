@@ -18,6 +18,7 @@ Requirements:
 
 from __future__ import annotations
 
+import logging
 import os
 import sqlite3
 import sys
@@ -25,6 +26,8 @@ import time
 from collections import OrderedDict
 from pathlib import Path
 from typing import Any
+
+logger = logging.getLogger(__name__)
 
 # ---------------------------------------------------------------------------
 # Qt6 Abstraction Layer: Supports both PySide6 and PyQt6 transparently
@@ -135,7 +138,7 @@ except ImportError:
 
         QT_BINDING = "PyQt6"
     except ImportError:
-        print("ERROR: Neither PySide6 nor PyQt6 is installed.\nPlease run: pip install PySide6\n")
+        logger.error("Neither PySide6 nor PyQt6 is installed. Please run: pip install PySide6")
         sys.exit(1)
 
 # ---------------------------------------------------------------------------
@@ -200,7 +203,10 @@ def ensure_mock_database(db_path: Path, target_rows: int = TOTAL_ROWS) -> Path:
         existing = cur.fetchone()[0]
 
         if existing < target_rows:
-            print(f"[*] Seeding benchmark database with {target_rows:,} rows (currently {existing:,})...")
+            logger.info(
+                "Seeding benchmark database with %s rows (currently %s)...",
+                f"{target_rows:,}", f"{existing:,}",
+            )
             start_time = time.time()
 
             # Temporary turbo mode for initial batch generation
@@ -250,7 +256,7 @@ def ensure_mock_database(db_path: Path, target_rows: int = TOTAL_ROWS) -> Path:
                 cur.executemany("INSERT INTO ledger_entries VALUES (?,?,?,?,?,?,?,?,?)", batch_data)
             conn.commit()
             conn.execute("PRAGMA synchronous=NORMAL")
-            print(f"[+] Seeded {target_rows:,} records in {time.time() - start_time:.2f}s.")
+            logger.info("Seeded %s records in %.2fs.", f"{target_rows:,}", time.time() - start_time)
     finally:
         conn.close()
 
@@ -338,7 +344,7 @@ class AsyncDbWorker(QObject):
                     (value, row_id),
                 )
         except Exception as err:
-            print(f"[!] Background SQLite update failed: {err}")
+            logger.error("Background SQLite update failed: %s", err, exc_info=True)
 
     def close(self) -> None:
         if self._conn is not None:

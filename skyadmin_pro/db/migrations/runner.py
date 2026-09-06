@@ -63,7 +63,7 @@ def run_pending_migrations(
             continue
         if version in applied:
             continue
-        upgrade(db)
         with db.connection() as conn:
+            upgrade(db)
             _record(conn, version, name)
         applied.add(version)

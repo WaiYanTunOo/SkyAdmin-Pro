@@ -42,6 +42,7 @@ class RestoreSummary:
     database_bytes: int
     workspace_files_restored: int
     workspace_bytes: int
+    paths_rewritten: int = 0
 
 
 def _snapshot_db_for_backup(db_file: Path, staging_dir: Path) -> Path:
@@ -114,6 +115,98 @@ def _verify_sqlite_payload(tmp_db: Path) -> None:
         return
     if not row or row[0] != "ok":
         raise ValueError("Backup database failed integrity check — restore aborted.")
+
+
+def _rewrite_db_paths(db_file: Path, new_workspace: Path) -> int:
+    """Rewrite stale absolute paths in the restored DB to *new_workspace*.
+
+    Scans ``documents.file_path``, ``financial_documents.file_path``,
+    ``financial_documents.stored_path``, and ``settings.workspace_root``.
+    Returns the number of rows updated.
+    """
+    from skyadmin_pro.config import SETTING_WORKSPACE_ROOT
+
+    new_root = str(new_workspace.resolve())
+
+    # Open the restored DB — try SQLCipher first, fall back to plaintext.
+    conn = None
+    try:
+        from skyadmin_pro.db.cipher import connect as cipher_connect
+
+        conn = cipher_connect(str(db_file))
+        # Verify the cipher connection can actually read the DB.
+        conn.execute("SELECT 1 FROM sqlite_master LIMIT 1")
+    except Exception:
+        if conn is not None:
+            try:
+                conn.close()
+            except Exception:
+                pass
+        try:
+            import sqlite3 as _sqlite3
+
+            conn = _sqlite3.connect(str(db_file))
+        except Exception:
+            logger.warning("Cannot open restored DB for path rewriting", exc_info=True)
+            return 0
+
+    updated = 0
+    try:
+        # Detect the old workspace root stored in settings.
+        try:
+            row = conn.execute(
+                "SELECT value FROM settings WHERE key = ?",
+                (SETTING_WORKSPACE_ROOT,),
+            ).fetchone()
+        except Exception:
+            row = None
+
+        old_root = row[0] if row and row[0] else None
+        if not old_root or old_root == new_root:
+            return 0
+
+        old_prefix = old_root + "%"
+        # Rewrite document file paths using prefix replacement.
+        for table, column in (
+            ("documents", "file_path"),
+            ("financial_documents", "file_path"),
+            ("financial_documents", "stored_path"),
+        ):
+            try:
+                # Count matching rows before the update.
+                cnt = conn.execute(
+                    f"SELECT COUNT(*) FROM {table} WHERE {column} LIKE ?",
+                    (old_prefix,),
+                ).fetchone()[0]
+                if cnt:
+                    conn.execute(
+                        f"UPDATE {table} SET {column} = ? || SUBSTR({column}, ?)",
+                        (new_root, len(old_root) + 1),
+                    )
+                    updated += cnt
+            except Exception:
+                pass  # table may not exist in older schemas
+
+        # Update the workspace_root setting.
+        try:
+            conn.execute(
+                "UPDATE settings SET value = ? WHERE key = ?",
+                (new_root, SETTING_WORKSPACE_ROOT),
+            )
+        except Exception:
+            pass
+
+        conn.commit()
+        if updated:
+            logger.info(
+                "Rewrote %d path(s) from %s -> %s", updated, old_root, new_root,
+            )
+    finally:
+        try:
+            conn.close()
+        except Exception:
+            pass
+    return updated
 
 
 def format_byte_size(num_bytes: int) -> str:
@@ -386,6 +479,7 @@ def restore_encrypted_backup(archive: Path, workspace_root: Path, db_file: Path)
     """Decrypt and restore an encrypted backup. Overwrites DB and workspace files."""
     archive = Path(archive)
     tmp_path = _decrypt_backup_zip(archive)
+    paths_rewritten = 0
     try:
         with zipfile.ZipFile(tmp_path, "r") as archive_zip:
             names = archive_zip.namelist()
@@ -441,10 +535,19 @@ def restore_encrypted_backup(archive: Path, workspace_root: Path, db_file: Path)
 
                 _os.replace(staged, target)
                 restored_files += 1
+
+        # Rewrite stale absolute paths after the ZIP is closed (avoids
+        # Windows file-locking issues with SQLite).
+        try:
+            paths_rewritten = _rewrite_db_paths(db_file, ws)
+        except Exception:
+            logger.warning("Path rewriting failed", exc_info=True)
+
         return RestoreSummary(
             database_bytes=db_info.file_size,
             workspace_files_restored=restored_files,
             workspace_bytes=workspace_bytes,
+            paths_rewritten=paths_rewritten,
         )
     finally:
         try:

@@ -200,6 +200,13 @@ def _normalize_workspace(db) -> None:
                     moved += 1
             if moved:
                 log.info("Workspace migrated %d file(s): %s -> %s", moved, source, desired)
+            try:
+                has_files = any(p.is_file() for p in source.rglob("*"))
+                if not has_files and ("OneDrive" in str(source) or "Documents" in str(source)):
+                    shutil.rmtree(source, ignore_errors=True)
+                    log.info("Removed empty legacy workspace folder: %s", source)
+            except Exception:
+                pass
         db.set_setting(SETTING_WORKSPACE_ROOT, str(desired))
     except Exception:
         logging.getLogger(__name__).exception("Workspace normalization failed")
