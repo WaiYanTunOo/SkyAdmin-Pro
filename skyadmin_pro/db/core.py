@@ -125,6 +125,9 @@ class CoreMixin:
 
     def _get_bg_conn(self) -> DBConnection:
         """Per-background-thread pooled handle (never shares main's handle)."""
+        return self._get_bg_conn_impl(_depth=0)
+
+    def _get_bg_conn_impl(self, *, _depth: int) -> DBConnection:
         conn = getattr(self._local, "conn", None)
         with self._lock:
             epoch = self._pool_epoch
@@ -147,8 +150,12 @@ class CoreMixin:
             self._local.conn_epoch = self._pool_epoch
         self._track_bg_conn(conn)
         if getattr(self._local, "conn", None) is not conn:
-            # Lost a race with _close_pooled_conn (epoch moved) — retry.
-            return self._get_bg_conn()
+            # Lost a race with _close_pooled_conn (epoch moved) — retry
+            # once.  A second failure means something is deeply wrong; raise
+            # instead of recursing infinitely.
+            if _depth >= 2:
+                raise RuntimeError("Failed to acquire background DB connection after retries")
+            return self._get_bg_conn_impl(_depth=_depth + 1)
         return conn
 
     def _get_pooled_conn(self) -> DBConnection:

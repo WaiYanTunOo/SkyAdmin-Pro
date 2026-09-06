@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import tkinter as tk
 from collections.abc import Callable
 from typing import TYPE_CHECKING
 
@@ -41,6 +42,49 @@ if TYPE_CHECKING:
     from skyadmin_pro.database import Database
     from skyadmin_pro.paths import WorkspacePaths
     from skyadmin_pro.ui.views.base import BaseView
+
+
+class _SidebarTooltip:
+    """Lightweight tooltip for collapsed sidebar buttons."""
+
+    def __init__(self, widget: ctk.CTkButton, text: str) -> None:
+        self._widget = widget
+        self._text = text
+        self._top: tk.Toplevel | None = None
+        widget.bind("<Enter>", self._show, add="+")
+        widget.bind("<Leave>", self._hide, add="+")
+        widget.bind("<ButtonPress>", self._hide, add="+")
+
+    def _show(self, _event=None) -> None:
+        if self._top is not None:
+            return
+        try:
+            x = self._widget.winfo_rootx() + self._widget.winfo_width() + 8
+            y = self._widget.winfo_rooty() + self._widget.winfo_height() // 2 - 12
+            top = tk.Toplevel(self._widget)
+            top.wm_overrideredirect(True)
+            top.wm_geometry(f"+{x}+{y}")
+            label = tk.Label(
+                top,
+                text=self._text,
+                background="#1e1e1e",
+                foreground="#f4f4f5",
+                padx=8,
+                pady=4,
+                font=("Segoe UI", 11),
+            )
+            label.pack()
+            self._top = top
+        except Exception:
+            self._top = None
+
+    def _hide(self, _event=None) -> None:
+        if self._top is not None:
+            try:
+                self._top.destroy()
+            except Exception:
+                pass
+            self._top = None
 
 
 class MainWindow(dnd_base_class()):
@@ -87,6 +131,7 @@ class MainWindow(dnd_base_class()):
         self._views: dict[str, ctk.CTkFrame] = {}
         self._active_key: str | None = None
         self._sidebar_collapsed = self.db.get_setting(SETTING_SIDEBAR_COLLAPSED) == "1"
+        self._sidebar_tooltips: dict[str, _SidebarTooltip] = {}
 
         self._build_sidebar()
         self._build_content()
@@ -319,9 +364,15 @@ class MainWindow(dnd_base_class()):
             if collapsed:
                 button.configure(text=icon, anchor="center")
                 button.grid_configure(padx=8)
+                if key not in self._sidebar_tooltips:
+                    label = self._nav_labels.get(key, key)
+                    self._sidebar_tooltips[key] = _SidebarTooltip(button, label)
             else:
                 button.configure(text=f"{icon}  {tr(self._nav_labels[key])}", anchor="w")
                 button.grid_configure(padx=SIDEBAR_PADX)
+                tip = self._sidebar_tooltips.pop(key, None)
+                if tip is not None:
+                    tip._hide()
 
     def _get_window_scaling(self) -> float:
         """Pixels-per-point reported by Tk (diagnostic use only)."""
@@ -345,6 +396,11 @@ class MainWindow(dnd_base_class()):
         view = factory(self)
         view.grid(row=0, column=0, sticky="nsew")
         self._views[key] = view
+        # Apply theme immediately so newly created views don't render with
+        # default colours before the first appearance-mode toggle.
+        from skyadmin_pro.ui.widgets import apply_form_theme
+
+        apply_form_theme(view)
         return view
 
     def get_view(self, key: str) -> ctk.CTkFrame | None:
@@ -520,9 +576,8 @@ class MainWindow(dnd_base_class()):
         if sys.platform == "win32":
             try:
                 import ctypes
-                ctypes.windll.shell32.SetCurrentProcessExplicitAppUserModelID(
-                    "SkyCreation.SkyAdminPro.App.0.3"
-                )
+
+                ctypes.windll.shell32.SetCurrentProcessExplicitAppUserModelID("SkyCreation.SkyAdminPro.App.0.3")
             except Exception:
                 pass
 

@@ -51,7 +51,7 @@ a = Analysis(
         "skyadmin_pro.services.license_authoring",
     ],
     noarchive=False,
-    optimize=0,
+    optimize=1,
 )
 
 pyz = PYZ(a.pure)

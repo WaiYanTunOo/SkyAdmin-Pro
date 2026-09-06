@@ -5,6 +5,37 @@ All views should import from here instead of hard-coding sizes/colors.
 
 from __future__ import annotations
 
+import colorsys
+
+
+def _hsl_to_hex(hue: float, sat: float, lit: float) -> str:
+    """Convert HSL (0-1 range) to a hex colour string."""
+    r, g, b = colorsys.hls_to_rgb(hue, lit, sat)
+    return f"#{int(r * 255):02x}{int(g * 255):02x}{int(b * 255):02x}"
+
+
+def set_accent(hue: float) -> None:
+    """Rebuild the accent palette from a hue value (0-1).
+
+    This mutates module-level ACCENT, ACCENT_STRONG, ACCENT_HOVER and
+    SIDEBAR_ACTIVE_BG so that every subsequent import sees the new colour.
+    Call on startup (from stored preference) or when the user picks a new
+    accent in Settings.
+    """
+    global ACCENT, ACCENT_STRONG, ACCENT_HOVER, SIDEBAR_ACTIVE_BG
+
+    primary_light = _hsl_to_hex(hue, 0.72, 0.44)
+    primary_dark = _hsl_to_hex(hue, 0.68, 0.38)
+    hover_light = _hsl_to_hex(hue, 0.72, 0.36)
+    hover_dark = _hsl_to_hex(hue, 0.68, 0.30)
+    strong_light = _hsl_to_hex(hue, 0.78, 0.38)
+    strong_dark = _hsl_to_hex(hue, 0.72, 0.32)
+
+    ACCENT = (primary_light, primary_dark)
+    ACCENT_STRONG = (strong_light, strong_dark)
+    ACCENT_HOVER = (hover_light, hover_dark)
+    SIDEBAR_ACTIVE_BG = (primary_light, primary_dark)
+
 # Sidebar — tweaked for density / icons
 SIDEBAR_WIDTH = 260
 SIDEBAR_COLLAPSED_WIDTH = 56

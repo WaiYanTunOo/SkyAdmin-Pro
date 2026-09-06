@@ -12,7 +12,7 @@ jobs:
     runs-on: ubuntu-latest
     strategy:
       matrix:
-        python-version: ["3.12"]
+        python-version: ["3.10", "3.11", "3.12"]
 
     steps:
       - name: Checkout
@@ -29,9 +29,11 @@ jobs:
           pip install -r requirements.txt -r requirements-dev.txt
 
       - name: Lint with ruff
+        if: matrix.python-version == '3.12'
         run: ruff check .
 
       - name: Check formatting with ruff
+        if: matrix.python-version == '3.12'
         run: ruff format --check .
 
       - name: Run tests
@@ -41,9 +43,11 @@ jobs:
           SKYADMIN_PROCESS_OFFLOAD: "0"
 
       - name: Audit Python dependencies
+        if: matrix.python-version == '3.12'
         run: pip-audit --strict
 
       - name: Security scan with bandit
+        if: matrix.python-version == '3.12'
         run: bandit -r skyadmin_pro/ -c pyproject.toml --severity-level medium
 
   perf:

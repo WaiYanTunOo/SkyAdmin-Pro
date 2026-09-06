@@ -46,7 +46,7 @@ class CanvasScrollFrame(ctk.CTkFrame):
                 self.after_cancel(self._pending_scroll_update)
             except Exception:  # defensive: Tk teardown/callback
                 pass
-        self._pending_scroll_update = self.after(30, self._update_scrollregion)
+        self._pending_scroll_update = self.after(100, self._update_scrollregion)
 
     def _update_scrollregion(self) -> None:
         self._pending_scroll_update = None
@@ -106,9 +106,7 @@ class CanvasScrollFrame(ctk.CTkFrame):
     def _on_mousewheel(self, event) -> None:
         # Let inner Treeview handle wheel if pointer is over a tree
         try:
-            # Check if event widget is a treeview canvas — let it scroll itself
             w = event.widget
-            # Walk up to see if we're inside a ThemedTreeview tree
             while w is not None:
                 if w.winfo_class() == "Treeview":
                     return  # let tree handle
@@ -119,7 +117,14 @@ class CanvasScrollFrame(ctk.CTkFrame):
         except Exception:  # defensive: Tk teardown/callback
             pass
         if event.delta:
-            self._canvas.yview_scroll(int(-event.delta / 120), "units")
+            # Windows: event.delta is multiples of 120 (120 = one notch).
+            # macOS: event.delta is raw pixel delta.  Normalise to "notches".
+            delta = event.delta
+            if abs(delta) < 120:
+                # macOS trackpad — use the raw value directly (units ≈ pixels/30)
+                self._canvas.yview_scroll(int(-delta / 30), "units")
+            else:
+                self._canvas.yview_scroll(int(-delta / 120), "units")
             return "break"
 
     def _on_mousewheel_linux(self, event) -> None:

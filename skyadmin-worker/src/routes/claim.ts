@@ -26,7 +26,10 @@ export async function claimHandler(c: Context<{ Bindings: Env }>) {
   } catch {
     return c.json({ ok: false, error: "invalid json" }, 400);
   }
-  const code = (typeof body?.code === "string" ? body.code : "").trim();
+  if (!body || typeof body !== "object") {
+    return c.json({ ok: false, error: "invalid request body" }, 400);
+  }
+  const code = (typeof body.code === "string" ? body.code : "").trim();
   if (!code) {
     return c.json({ ok: false, error: "code required" }, 400);
   }

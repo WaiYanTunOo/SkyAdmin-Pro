@@ -100,7 +100,7 @@ jobs:
           $machine | ForEach-Object { Write-Host " - $($_.FullName)" }
 
       - name: Run tests
-        run: pytest tests/ -q --tb=short
+        run: pytest tests/ -q --tb=short --ignore=tests/test_performance_clients.py --ignore=tests/test_performance_stress.py --ignore-glob="tests/test_qt_*.py"
         env:
           SKYADMIN_SKIP_DAILY_CHECK: "1"
           SKYADMIN_PROCESS_OFFLOAD: "0"

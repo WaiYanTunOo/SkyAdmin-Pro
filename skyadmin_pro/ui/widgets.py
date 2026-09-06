@@ -974,21 +974,44 @@ class DatePickerField(ctk.CTkFrame):
 
 
 class FeedbackLabel(ctk.CTkLabel):
+    _AUTO_DISMISS_MS = 4000
+
     def __init__(self, master, **kwargs) -> None:
         super().__init__(master, text="", anchor="w", wraplength=WRAP_CARD, **kwargs)
-        # Keep wrapping responsive — parents resize, so update with them.
         self.bind("<Configure>", lambda e: self.configure(wraplength=max(240, e.width - 8)))
+        self._dismiss_after_id: str | None = None
+
+    def _schedule_dismiss(self) -> None:
+        if self._dismiss_after_id is not None:
+            try:
+                self.after_cancel(self._dismiss_after_id)
+            except Exception:
+                pass
+        self._dismiss_after_id = self.after(self._AUTO_DISMISS_MS, self._auto_dismiss)
+
+    def _auto_dismiss(self) -> None:
+        self._dismiss_after_id = None
+        self.configure(text="")
 
     def success(self, message: str) -> None:
         self.configure(text=message, text_color=FEEDBACK_SUCCESS)
+        self._schedule_dismiss()
 
     def error(self, message: str) -> None:
         self.configure(text=message, text_color=FEEDBACK_ERROR)
+        self._schedule_dismiss()
 
     def info(self, message: str) -> None:
         self.configure(text=message, text_color=FEEDBACK_INFO)
+        self._schedule_dismiss()
 
     def clear(self) -> None:
+        if self._dismiss_after_id is not None:
+            try:
+                self.after_cancel(self._dismiss_after_id)
+            except Exception:
+                pass
+            self._dismiss_after_id = None
         self.configure(text="")
 
 

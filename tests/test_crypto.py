@@ -1,5 +1,6 @@
 """Crypto backup/restore safety checks."""
 
+import sqlite3
 import zipfile
 
 import pytest
@@ -111,3 +112,97 @@ def test_restore_rejects_zip_slip_outside_workspace(tmp_path):
 
     assert db_file.read_bytes() == b"live-db"
     assert not (tmp_path / "outside.txt").exists()
+
+
+def test_restore_rewrites_paths_for_cross_machine(tmp_path):
+    """Paths from the old workspace root are rewritten to the new root."""
+    old_ws = tmp_path / "old_machine" / "Workspace"
+    old_ws.mkdir(parents=True)
+
+    # Create a plain SQLite DB with app schema and absolute old-machine paths.
+    db_file = tmp_path / "skyadmin_pro.db"
+    conn = sqlite3.connect(str(db_file))
+    conn.execute("CREATE TABLE settings (key TEXT PRIMARY KEY, value TEXT)")
+    conn.execute(
+        "INSERT INTO settings (key, value) VALUES (?, ?)",
+        ("workspace_root", str(old_ws)),
+    )
+    conn.execute(
+        "CREATE TABLE documents (id INTEGER PRIMARY KEY, client_id INTEGER, "
+        "document_type TEXT, file_path TEXT)"
+    )
+    conn.execute(
+        "INSERT INTO documents (client_id, document_type, file_path) VALUES (?, ?, ?)",
+        (1, "tax", str(old_ws / "Clients" / "Acme" / "tax.pdf")),
+    )
+    conn.execute(
+        "CREATE TABLE financial_documents (id INTEGER PRIMARY KEY, client_id INTEGER, "
+        "category TEXT, file_name TEXT, file_path TEXT, stored_path TEXT)"
+    )
+    conn.execute(
+        "INSERT INTO financial_documents (client_id, category, file_name, file_path, stored_path) "
+        "VALUES (?, ?, ?, ?, ?)",
+        (1, "invoice", "inv.pdf", str(old_ws / "Staging" / "inv.pdf"), str(old_ws / "Archive" / "inv.pdf")),
+    )
+    conn.commit()
+    conn.close()
+
+    # Create backup archive.
+    archive = tmp_path / "cross_machine.skybackup"
+    crypto.create_encrypted_backup(old_ws, db_file, archive)
+
+    # Restore to a completely different workspace root.
+    new_ws = tmp_path / "new_machine" / "Workspace"
+    target_db = tmp_path / "restored.db"
+    summary = crypto.restore_encrypted_backup(archive, new_ws, target_db)
+
+    # Verify paths were rewritten.
+    assert summary.paths_rewritten > 0
+    conn2 = sqlite3.connect(str(target_db))
+    try:
+        # workspace_root setting updated.
+        row = conn2.execute("SELECT value FROM settings WHERE key = 'workspace_root'").fetchone()
+        assert row is not None
+        assert row[0] == str(new_ws)
+
+        # document file_path rewritten.
+        row = conn2.execute("SELECT file_path FROM documents WHERE id = 1").fetchone()
+        assert row is not None
+        assert row[0].startswith(str(new_ws))
+        assert "old_machine" not in row[0]
+
+        # financial_documents paths rewritten.
+        row = conn2.execute("SELECT file_path, stored_path FROM financial_documents WHERE id = 1").fetchone()
+        assert row is not None
+        assert row[0].startswith(str(new_ws))
+        assert row[1].startswith(str(new_ws))
+        assert "old_machine" not in row[0]
+        assert "old_machine" not in row[1]
+    finally:
+        conn2.close()
+
+
+def test_restore_no_path_rewrite_when_same_root(tmp_path):
+    """No rewriting when the backup was created with the same workspace root."""
+    ws = tmp_path / "workspace"
+    ws.mkdir()
+
+    db_file = tmp_path / "skyadmin_pro.db"
+    conn = sqlite3.connect(str(db_file))
+    conn.execute("CREATE TABLE settings (key TEXT PRIMARY KEY, value TEXT)")
+    conn.execute("INSERT INTO settings (key, value) VALUES (?, ?)", ("workspace_root", str(ws)))
+    conn.execute(
+        "CREATE TABLE documents (id INTEGER PRIMARY KEY, client_id INTEGER, "
+        "document_type TEXT, file_path TEXT)"
+    )
+    conn.execute("INSERT INTO documents (client_id, document_type, file_path) VALUES (?, ?, ?)", (1, "tax", str(ws / "a.pdf")))
+    conn.commit()
+    conn.close()
+
+    archive = tmp_path / "same_root.skybackup"
+    crypto.create_encrypted_backup(ws, db_file, archive)
+
+    target_db = tmp_path / "restored.db"
+    summary = crypto.restore_encrypted_backup(archive, ws, target_db)
+
+    assert summary.paths_rewritten == 0

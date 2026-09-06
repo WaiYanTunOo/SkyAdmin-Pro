@@ -52,15 +52,19 @@ export async function isRateLimited(
   const windowSeconds = sanitizeWindowSeconds(opts.windowSeconds);
   const max = opts.max ?? DEFAULT_MAX;
 
+  // Compute the cutoff time in the application layer to avoid SQL string
+  // interpolation of the window parameter.
+  const cutoff = new Date(Date.now() - windowSeconds * 1000).toISOString();
+
   const row = await db
     .prepare(
       `INSERT INTO rate_limits (key, window_start, count) VALUES (?, datetime('now'), 1)
        ON CONFLICT(key) DO UPDATE SET
-         count = CASE WHEN window_start < datetime('now', '-${windowSeconds} seconds') THEN 1 ELSE count + 1 END,
-         window_start = CASE WHEN window_start < datetime('now', '-${windowSeconds} seconds') THEN datetime('now') ELSE window_start END
+         count = CASE WHEN window_start < ? THEN 1 ELSE count + 1 END,
+         window_start = CASE WHEN window_start < ? THEN datetime('now') ELSE window_start END
        RETURNING count`,
     )
-    .bind(key)
+    .bind(key, cutoff, cutoff)
     .first<{ count: number }>();
 
   const count = row?.count ?? 1;

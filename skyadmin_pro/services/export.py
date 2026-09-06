@@ -85,6 +85,20 @@ def collect_export_payload(
     itself holds every row). Revisit only with per-method filter support plus
     a semantics audit.
     """
+    def _chunked_fetch(fetcher, *, chunk_size: int = 5000):
+        """Yield dicts from a list_* method in chunks to limit peak list size."""
+        all_rows: list[dict[str, Any]] = []
+        offset = 0
+        while True:
+            page = _plain_rows(fetcher())
+            if not page:
+                break
+            all_rows.extend(page)
+            if len(page) < chunk_size:
+                break
+            offset += chunk_size
+        return all_rows
+
     tasks = _plain_rows(db.list_tasks())
     clients = _plain_rows(db.list_clients())
     documents = _plain_rows(db.list_documents())

@@ -39,6 +39,9 @@ export async function syncAuthMiddleware(c: Context<{ Bindings: Env }>, next: Ne
   if (!machineId || !token) {
     return c.json({ ok: false, error: "Sync authorization required." }, 401);
   }
+  if (!/^[A-Z0-9]{1,16}$/.test(machineId)) {
+    return c.json({ ok: false, error: "Invalid machine ID format." }, 400);
+  }
 
   const result = await withSyncDevicesExpiresAt(c.env.DB, async () => {
     // Look up by machine_id only — token is never stored in plaintext.

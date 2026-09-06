@@ -119,6 +119,9 @@ export async function syncSchemaHandler(c: Context<{ Bindings: Env }>) {
 /** GET /api/sync/pull?since=ISO&tables=a,b&limit=N */
 export async function syncPullHandler(c: Context<{ Bindings: Env }>) {
   const machineId = (c.req.header("X-Machine-Id") || "").trim().toUpperCase();
+  if (!machineId || !/^[A-Z0-9]{1,16}$/.test(machineId)) {
+    return c.json({ ok: false, error: "Invalid machine ID format." }, 400);
+  }
   const limited = await checkRateLimit(c, "pull", { windowSeconds: 60, max: 30 });
   if (limited) return limited;
 
@@ -194,6 +197,9 @@ export async function syncPullHandler(c: Context<{ Bindings: Env }>) {
 /** POST /api/sync/push */
 export async function syncPushHandler(c: Context<{ Bindings: Env }>) {
   const machineId = (c.req.header("X-Machine-Id") || "").trim().toUpperCase();
+  if (!machineId || !/^[A-Z0-9]{1,16}$/.test(machineId)) {
+    return c.json({ ok: false, error: "Invalid machine ID format." }, 400);
+  }
   const limited = await checkRateLimit(c, "push", { windowSeconds: 60, max: 30 });
   if (limited) return limited;
   let body: { changes?: PushChange[] };

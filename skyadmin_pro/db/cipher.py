@@ -85,8 +85,14 @@ def _machine_salt() -> bytes:
 
         return get_machine_id().encode("utf-8")
     except Exception:
-        logger.warning("Machine ID unavailable; database key uses app salt only (relocatable, weaker binding)")
-        return b"SkyAdminDBSalt-v1"
+        env_id = os.environ.get("SKYADMIN_MACHINE_ID", "").strip()
+        if env_id:
+            logger.info("Using SKYADMIN_MACHINE_ID env var for database key")
+            return env_id.encode("utf-8")
+        raise RuntimeError(
+            "Machine ID unavailable — cannot derive database key. "
+            "Reinstall the application or set the SKYADMIN_MACHINE_ID environment variable."
+        )
 
 
 def derive_db_key_hex() -> str:
@@ -101,7 +107,8 @@ def connect(db_file: str | Path, *, timeout: int = 10, key_hex: str | None = Non
     """Open a keyed SQLCipher connection (fails closed without the driver)."""
     drv = driver()
     key = key_hex or derive_db_key_hex()
-    assert all(c in "0123456789abcdef" for c in key), "key must be hex"
+    if not all(c in "0123456789abcdef" for c in key):
+        raise ValueError("Invalid database key format — expected hex string")
     conn = drv.connect(str(db_file), timeout=timeout)
     try:
         conn.execute(f"PRAGMA kdf_iter = {int(CIPHER_KDF_ITERATIONS)}")

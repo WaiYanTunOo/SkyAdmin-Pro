@@ -6,8 +6,10 @@ import getpass
 import json
 import logging
 import os
+import random
 import re
 import sys
+import time
 import urllib.error
 import urllib.parse
 import urllib.request
@@ -264,6 +266,37 @@ def _sync_request(
         return False, str(exc)
 
 
+def _sync_request_with_retry(
+    method: str,
+    path: str,
+    *,
+    machine_id: str,
+    token: str,
+    body: dict | None = None,
+    query: str = "",
+    timeout: float = 20.0,
+    retries: int = 3,
+) -> tuple[bool, dict | str]:
+    """Retry transient network / 5xx failures with exponential backoff."""
+    last_ok, last_err = False, "No attempts made"
+    for attempt in range(retries):
+        ok, result = _sync_request(
+            method, path, machine_id=machine_id, token=token,
+            body=body, query=query, timeout=timeout,
+        )
+        if ok:
+            return True, result
+        last_ok, last_err = ok, result
+        err_str = str(result or "")
+        retryable = err_str.startswith("Sync HTTP 5") or "timed out" in err_str.lower() or "urllib" in err_str.lower()
+        if not retryable or attempt == retries - 1:
+            break
+        delay = min(2 ** attempt + random.uniform(0, 0.5), 8)
+        logger.debug("Sync %s %s failed (attempt %d), retrying in %.1fs: %s", method, path, attempt + 1, delay, result)
+        time.sleep(delay)
+    return last_ok, last_err
+
+
 def _client_global_id(db: Database, client_id: int | None) -> str | None:
     if not client_id:
         return None
@@ -365,6 +398,7 @@ def _parse_updated_at(value: str) -> float:
                 dt = dt.replace(tzinfo=timezone.utc)
         return dt.astimezone(timezone.utc).timestamp()
     except ValueError:
+        logger.debug("Unparseable updated_at %r; falling back to epoch 0", value)
         return 0.0
 
 
@@ -713,7 +747,7 @@ def sync_data(db: Database, *, timeout: float = 25.0) -> tuple[bool, str]:
         query_parts = [f"limit={SYNC_PULL_PAGE_SIZE}"]
         if since:
             query_parts.insert(0, f"since={urllib.parse.quote(str(since))}")
-        pull_ok, pull_result = _sync_request(
+        pull_ok, pull_result = _sync_request_with_retry(
             "GET",
             "/api/sync/pull",
             machine_id=machine_id,
@@ -753,7 +787,7 @@ def sync_data(db: Database, *, timeout: float = 25.0) -> tuple[bool, str]:
             break
 
         push_pages += 1
-        push_ok, push_result = _sync_request(
+        push_ok, push_result = _sync_request_with_retry(
             "POST",
             "/api/sync/push",
             machine_id=machine_id,
