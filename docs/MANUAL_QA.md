@@ -1,6 +1,7 @@
 # SkyAdmin Pro — Manual QA guide
 
 Use this checklist before shipping a new build. Run automated gates first, then sign off on a **clean PC** (or VM) that has never run this build.
+*(Note: Clean-PC QA is an owner-only step, not executed by automated agents.)*
 
 **Distribution:** ship the **Windows installer** (`SkyAdminPro-Setup-<version>.exe`). The portable `SkyAdminPro.exe` is a build artifact only (used internally by Inno Setup).
 

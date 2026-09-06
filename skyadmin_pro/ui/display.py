@@ -30,7 +30,7 @@ def apply_high_dpi_scaling() -> float:
             ctypes.windll.shcore.SetProcessDpiAwareness(2)
         except Exception:
             ctypes.windll.user32.SetProcessDPIAware()
-    except Exception:
+    except Exception:  # defensive: Tk teardown/callback
         pass
 
     # CustomTkinter automatically reads system DPI after awareness is set.

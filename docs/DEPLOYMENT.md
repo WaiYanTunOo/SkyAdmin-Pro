@@ -53,6 +53,7 @@ npx wrangler dev             # local dev server
 CI (`.github/workflows/deploy.yml`) runs typecheck + Vitest, applies D1 migrations, then deploys.
 A **concurrency group** (`skyadmin-worker-deploy`, `cancel-in-progress: false`) prevents overlapping migrate+deploy races on `main`.
 Optionally add `environment: production` in that workflow after creating a protected GitHub Environment.
+*(Note: Staging Worker+D1 and GitHub Environment protection are owner-only steps, not executed by automated agents.)*
 
 ### D1 Database Setup
 

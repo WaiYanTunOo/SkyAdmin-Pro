@@ -80,6 +80,7 @@ Notes:
 ## Publish an app update (all platforms)
 
 After a tagged release (recommended):
+*(Note: Tag publish requires token+cert and is an owner-only step, not executed by automated agents.)*
 
 ```bash
 # CI publishes the Worker LATEST line on git tag v* (requires SKYADMIN_API_TOKEN —

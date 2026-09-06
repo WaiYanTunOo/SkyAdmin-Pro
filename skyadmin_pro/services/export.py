@@ -41,7 +41,11 @@ def _atomic_excel_write(writer_builder, dest: Path) -> Path:
     try:
         writer_builder(tmp)
         os.replace(tmp, dest)
-    except Exception:
+    except (
+        OSError,
+        ValueError,
+        KeyError,
+    ):  # defensive: pandas/openpyxl/xlsxwriter can raise any type — clean tmp, then re-raise
         try:
             tmp.unlink(missing_ok=True)
         except OSError:

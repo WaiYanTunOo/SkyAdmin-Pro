@@ -3,8 +3,11 @@
 from __future__ import annotations
 
 import logging
+import sqlite3
 from datetime import date, datetime
 from pathlib import Path
+
+from skyadmin_pro.db.cipher import DB_ERRORS
 
 logger = logging.getLogger(__name__)
 
@@ -84,7 +87,11 @@ def run_auto_backup(workspace_root: Path, db_file: Path, backup_dir: Path) -> Pa
         if pruned:
             logger.info("Pruned %d old auto-backup(s), keeping %d", pruned, AUTO_BACKUP_KEEP)
         return dest
-    except Exception:
+    except (
+        OSError,
+        ValueError,
+        sqlite3.Error,
+    ):  # defensive: crypto+file pipeline — one failure surfaces as a failed backup (logged)
         logger.exception("Auto-backup failed")
         return None
 
@@ -106,7 +113,7 @@ class AutoBackupScheduler:
         if self._timer_id is not None:
             try:
                 self.app.after_cancel(self._timer_id)
-            except Exception:
+            except Exception:  # defensive: after_cancel raises once the timer already fired (Tk)
                 pass
             self._timer_id = None
 
@@ -115,13 +122,13 @@ class AutoBackupScheduler:
         self.stop()
         try:
             self._timer_id = self.app.after(max(0, int(delay_ms)), self._check)
-        except Exception:
+        except Exception:  # defensive: app.after is unavailable during teardown — fall back to a fresh schedule
             self.start()
 
     def _schedule_check(self) -> None:
         try:
             self._timer_id = self.app.after(self._check_interval_ms, self._check)
-        except Exception:
+        except Exception:  # defensive: app.after fails during app teardown — nothing to reschedule for
             pass
 
     def _check(self) -> None:
@@ -144,17 +151,17 @@ class AutoBackupScheduler:
                         from skyadmin_pro.config.tasks import SETTING_LAST_ENCRYPTED_BACKUP
 
                         db.set_setting(SETTING_LAST_ENCRYPTED_BACKUP, now.date().isoformat())
-                    except Exception:
+                    except DB_ERRORS:
                         logger.warning("Could not update backup banner setting", exc_info=True)
                     # One status-bar toast per run (scheduler ticks on the main thread).
                     try:
                         set_status = getattr(self.app, "set_status", None)
                         if callable(set_status):
                             set_status(f"Auto-backup completed: {result.name}")
-                    except Exception:
+                    except Exception:  # defensive: status-bar toast is cosmetic — never fail a completed backup for it
                         logger.debug("Could not show auto-backup toast", exc_info=True)
                     logger.info("Auto-backup completed: %s", result)
-        except Exception:
+        except Exception:  # defensive: scheduler must survive any unexpected failure and keep ticking
             logger.exception("Auto-backup check failed")
         finally:
             self._schedule_check()

@@ -292,7 +292,7 @@ def images_to_pdf(
             for image in rgb_images:
                 try:
                     image.close()
-                except Exception:
+                except OSError:
                     pass
         return outputs
     # Single-file mode: one image in memory at a time.
@@ -323,7 +323,11 @@ def merge_pdfs(sources: list[Path], output: Path) -> Path:
             if getattr(reader, "is_encrypted", False):
                 try:
                     reader.decrypt("")
-                except Exception as exc:
+                except (
+                    OSError,
+                    ValueError,
+                    KeyError,
+                ) as exc:  # defensive: pypdf decrypt failure — normalize to a user-facing error
                     raise RuntimeError(f"Cannot read encrypted PDF: {source.name}") from exc
             for page in reader.pages:
                 writer.add_page(page)
@@ -341,11 +345,11 @@ def merge_pdfs(sources: list[Path], output: Path) -> Path:
             if stream is not None:
                 try:
                     stream.close()
-                except Exception:
+                except OSError:
                     pass
         try:
             writer.close()
-        except Exception:
+        except OSError:
             pass
 
 

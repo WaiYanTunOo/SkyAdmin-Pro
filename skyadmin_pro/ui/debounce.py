@@ -13,7 +13,7 @@ def debounced_after(widget, callback: Callable[[], None], delay_ms: int = 300) -
         if after_id[0] is not None:
             try:
                 widget.after_cancel(after_id[0])
-            except Exception:
+            except Exception:  # defensive: Tk teardown/callback
                 pass
             after_id[0] = None
         try:
@@ -34,7 +34,7 @@ def debounced_after(widget, callback: Callable[[], None], delay_ms: int = 300) -
         if after_id[0] is not None:
             try:
                 widget.after_cancel(after_id[0])
-            except Exception:
+            except Exception:  # defensive: Tk teardown/callback
                 pass
             after_id[0] = None
 

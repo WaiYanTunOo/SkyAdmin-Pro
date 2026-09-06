@@ -15,7 +15,7 @@ from pathlib import Path
 from typing import TYPE_CHECKING, Any
 
 from skyadmin_pro.config import API_BASE_URL, SETTING_DATA_SYNC_ENABLED, SETTING_SYNC_LAST_PULL, SETTING_SYNC_LAST_PUSH
-from skyadmin_pro.db.cipher import INTEGRITY_ERRORS
+from skyadmin_pro.db.cipher import DB_ERRORS, INTEGRITY_ERRORS
 from skyadmin_pro.services.license import find_license_file, get_machine_id
 from skyadmin_pro.services.sync_hlc import hlc_now, legacy_hlc, note_remote_hlc, parse_hlc
 from skyadmin_pro.services.sync_schema import (
@@ -184,7 +184,7 @@ def register_sync_device(timeout: float = 10.0) -> tuple[bool, str]:
             return False, str(data.get("error") or f"HTTP {exc.code}")
         except (json.JSONDecodeError, ValueError, UnicodeDecodeError):
             return False, f"Sync registration failed (HTTP {exc.code})."
-    except Exception as exc:
+    except (OSError, ValueError) as exc:
         return False, f"Sync registration failed: {exc}"
 
     if not isinstance(data, dict) or not data.get("ok"):
@@ -260,7 +260,7 @@ def _sync_request(
         except (json.JSONDecodeError, ValueError, UnicodeDecodeError):
             pass
         return False, f"Sync HTTP {exc.code}"
-    except Exception as exc:
+    except (OSError, ValueError) as exc:
         return False, str(exc)
 
 
@@ -438,13 +438,13 @@ def collect_local_changes(db: Database, *, since: str = "", limit: int | None = 
     try:
         for row in db._fetch_all("SELECT id, global_id FROM clients"):
             client_gid_map[int(row["id"])] = str(row["global_id"]) if row.get("global_id") else None
-    except Exception:
+    except DB_ERRORS:
         logger.warning("Batch client GID lookup failed, using per-row fallback", exc_info=True)
         client_gid_map = {}
     try:
         for row in db._fetch_all("SELECT id, global_id FROM client_groups WHERE deleted_at IS NULL"):
             group_gid_map[int(row["id"])] = str(row["global_id"]) if row.get("global_id") else None
-    except Exception:
+    except DB_ERRORS:
         logger.warning("Batch group GID lookup failed, using per-row fallback", exc_info=True)
         group_gid_map = {}
     for table in SYNC_PUSH_ORDER:
@@ -697,7 +697,7 @@ def sync_data(db: Database, *, timeout: float = 25.0) -> tuple[bool, str]:
         # Stale credentials — remove and prompt re-register
         try:
             _credentials_path().unlink(missing_ok=True)
-        except Exception:
+        except OSError:
             pass
         return False, "Sync credentials are for a different machine ID — please re-activate."
 

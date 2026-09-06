@@ -13,6 +13,8 @@ import json
 import logging
 from typing import TYPE_CHECKING
 
+from skyadmin_pro.db.cipher import DB_ERRORS
+
 if TYPE_CHECKING:
     from skyadmin_pro.database import Database
 
@@ -31,7 +33,7 @@ def _setting_key() -> str:
 def _load_all(db: Database) -> dict:
     try:
         raw = db.get_setting(_setting_key()) or ""
-    except Exception:
+    except DB_ERRORS:
         return {}
     if not raw:
         return {}
@@ -46,7 +48,7 @@ def _load_all(db: Database) -> dict:
 def _save_all(db: Database, data: dict) -> None:
     try:
         db.set_setting(_setting_key(), json.dumps(data))
-    except Exception:
+    except DB_ERRORS:
         logger.warning("Could not persist table-columns setting", exc_info=True)
 
 

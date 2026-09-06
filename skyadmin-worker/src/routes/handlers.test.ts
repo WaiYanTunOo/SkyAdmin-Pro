@@ -160,8 +160,83 @@ describe("records", () => {
     const body = await res.json() as { ok: boolean; licenses: unknown[]; machines: unknown[]; pagination: { page: number; limit: number; total: number } };
     expect(body.ok).toBe(true);
     expect(Array.isArray(body.licenses)).toBe(true);
+    expect(Array.isArray(body.machines)).toBe(true);
     expect(body.pagination.page).toBe(1);
     expect(body.pagination.limit).toBe(10);
+  });
+
+  it("returns a clean 500 and writes an audit entry when the count query fails", async () => {
+    const auditRun: string[] = [];
+    const db = {
+      prepare: (sql: string) => {
+        const chain = {
+          bind: (..._params: unknown[]) => ({
+            first: async () => {
+              if (sql.includes("rate_limits")) return { count: 1 };
+              throw new Error("db boom");
+            },
+            run: async () => {
+              if (sql.includes("admin_audit_log")) auditRun.push(sql);
+              return { success: true };
+            },
+            all: async () => {
+              throw new Error("db boom");
+            },
+          }),
+          first: async () => {
+            if (sql.includes("rate_limits")) return { count: 1 };
+            throw new Error("db boom");
+          },
+          run: async () => ({ success: true }),
+          all: async () => {
+            throw new Error("db boom");
+          },
+        };
+        return chain;
+      },
+    } as unknown as D1Database;
+
+    const res = await app.request("http://localhost/api/records", {
+      headers: AUTH,
+    }, mockEnv({ DB: db }));
+    expect(res.status).toBe(500);
+    const body = await res.json() as { ok: boolean; error: string };
+    expect(body.ok).toBe(false);
+    expect(body.error).toBe("Failed to load records.");
+    expect(auditRun.some((s) => s.includes("admin_audit_log"))).toBe(true);
+  });
+
+  it("returns a clean 500 when the paginated list query fails", async () => {
+    const db = {
+      prepare: (sql: string) => ({
+        bind: () => ({
+          first: async () => {
+            if (sql.includes("rate_limits")) return { count: 1 };
+            return null;
+          },
+          run: async () => ({ success: true }),
+          all: async () => {
+            if (!sql.includes("rate_limits")) throw new Error("db boom");
+            return { results: [] };
+          },
+        }),
+        first: async () => {
+          if (sql.includes("rate_limits")) return { count: 1 };
+          if (sql.includes("COUNT(*)")) return { total: 0 };
+          return null;
+        },
+        run: async () => ({ success: true }),
+        all: async () => ({ results: [] }),
+      }),
+    } as unknown as D1Database;
+
+    const res = await app.request("http://localhost/api/records", {
+      headers: AUTH,
+    }, mockEnv({ DB: db }));
+    expect(res.status).toBe(500);
+    const body = await res.json() as { ok: boolean; error: string };
+    expect(body.ok).toBe(false);
+    expect(body.error).toBe("Failed to load records.");
   });
 
   it("rejects records without auth", async () => {
@@ -169,6 +244,137 @@ describe("records", () => {
       headers: { "Content-Type": "application/json" },
     }, mockEnv());
     expect(res.status).toBe(401);
+  });
+});
+
+describe("records machine summary", () => {
+  interface Row {
+    id: number;
+    machine_id: string;
+    license_key: string;
+    passcode: string;
+    package_days: number | null;
+    expires_at: string | null;
+    nonce: string;
+    issued_at: string;
+    price_thb: number;
+    revoked: number;
+    used: number;
+  }
+
+  const threeRows = (): Row[] =>
+    Array.from({ length: 3 }, (_, i) => ({
+      id: i + 1,
+      machine_id: `M${i + 1}`,
+      license_key: `K${i}`,
+      passcode: `P${i}`,
+      package_days: 30,
+      expires_at: null,
+      nonce: `n${i}`,
+      issued_at: "2026-01-01",
+      price_thb: 0,
+      revoked: 0,
+      used: 0,
+    }));
+
+  function makeRecordsDb(rows: Row[], seen: string[]): D1Database {
+    return {
+      prepare: (sql: string) => {
+        seen.push(sql);
+        const chain = {
+          bind: () => ({
+            first: async () => {
+              if (sql.includes("rate_limits")) return { count: 1 };
+              if (sql.includes("COUNT(*)")) return { total: rows.length };
+              return null;
+            },
+            run: async () => ({ success: true }),
+            all: async () => ({ results: rows }),
+          }),
+          first: async () => {
+            if (sql.includes("rate_limits")) return { count: 1 };
+            if (sql.includes("COUNT(*)")) return { total: rows.length };
+            return null;
+          },
+          run: async () => ({ success: true }),
+          all: async () => ({ results: rows }),
+        };
+        return chain;
+      },
+    } as unknown as D1Database;
+  }
+
+  it("keeps licenses + machines response shape stable on the paginated path", async () => {
+    const seen: string[] = [];
+    const db = makeRecordsDb(threeRows(), seen);
+    const res = await app.request("http://localhost/api/records?page=1&limit=10", {
+      headers: AUTH,
+    }, mockEnv({ DB: db }));
+    expect(res.status).toBe(200);
+    const body = await res.json() as {
+      ok: boolean;
+      licenses: Array<{
+        id: number;
+        machine_id: string;
+        revoked: boolean;
+        used: boolean;
+        expires_label: string;
+        expiry_state: string;
+        expiring_soon: boolean;
+      }>;
+      machines: Array<{ machine_id: string; status: string; license_count: number }>;
+      pagination: { page: number; limit: number; total: number; pages: number };
+    };
+    expect(body.ok).toBe(true);
+    expect(body.licenses).toHaveLength(3);
+    expect(body.licenses[0]).toMatchObject({
+      id: 1,
+      machine_id: "M1",
+      revoked: false,
+      used: false,
+      expires_label: "Never expires",
+      expiry_state: "unlimited",
+      expiring_soon: false,
+    });
+    expect(body.machines).toHaveLength(3);
+    expect(body.machines.map((m) => m.machine_id).sort()).toEqual(["M1", "M2", "M3"]);
+    for (const m of body.machines) {
+      expect(m.status).toBe("pending");
+      expect(m.license_count).toBe(1);
+    }
+    expect(body.pagination).toEqual({ page: 1, limit: 10, total: 3, pages: 1 });
+  });
+
+  it("reuses page rows for the summary when page=1 and limit >= summary_limit (no second scan)", async () => {
+    const seen: string[] = [];
+    const db = makeRecordsDb(threeRows(), seen);
+    const res = await app.request("http://localhost/api/records?page=1&limit=500&summary_limit=500", {
+      headers: AUTH,
+    }, mockEnv({ DB: db }));
+    expect(res.status).toBe(200);
+    const body = await res.json() as { ok: boolean; licenses: unknown[]; machines: Array<{ machine_id: string }>; pagination: { page: number; limit: number; total: number; pages: number } };
+    expect(body.ok).toBe(true);
+    expect(body.licenses).toHaveLength(3);
+    expect(body.machines).toHaveLength(3);
+    expect(body.machines.map((m) => m.machine_id).sort()).toEqual(["M1", "M2", "M3"]);
+    expect(body.pagination).toEqual({ page: 1, limit: 500, total: 3, pages: 1 });
+    // Deduped: the summary scan must NOT be issued as a separate query.
+    expect(seen.some((s) => s.startsWith("SELECT l.machine_id"))).toBe(false);
+    expect(seen.some((s) => s.startsWith("SELECT l.id"))).toBe(true);
+  });
+
+  it("still runs the summary scan when the page does not cover the summary window", async () => {
+    const seen: string[] = [];
+    const db = makeRecordsDb(threeRows(), seen);
+    const res = await app.request("http://localhost/api/records?page=1&limit=10&summary_limit=100", {
+      headers: AUTH,
+    }, mockEnv({ DB: db }));
+    expect(res.status).toBe(200);
+    const body = await res.json() as { ok: boolean; licenses: unknown[]; machines: Array<{ machine_id: string }> };
+    expect(body.ok).toBe(true);
+    expect(body.licenses).toHaveLength(3);
+    expect(body.machines).toHaveLength(3);
+    expect(seen.some((s) => s.startsWith("SELECT l.machine_id"))).toBe(true);
   });
 });
 

@@ -81,11 +81,11 @@ def cancel_pump(widget) -> None:
         return
     try:
         widget._async_pump_after = None
-    except Exception:
+    except Exception:  # defensive: Tk teardown/callback
         pass
     try:
         widget.after_cancel(after_id)
-    except Exception:
+    except Exception:  # defensive: Tk teardown/callback
         pass
 
 
@@ -112,8 +112,8 @@ def run_on_main(widget, fn: Callable[[], None], *, feedback=None) -> None:
             if target is not None and hasattr(target, "error"):
                 try:
                     target.error(str(exc))
-                except Exception:
-                    pass
+                except Exception:  # defensive: Tk teardown/callback
+                    _log.exception("UI callback target error handler failed")
 
     try:
         widget.after(0, wrapped)
@@ -168,15 +168,15 @@ def run_background(
                 if on_error:
                     try:
                         on_error(str(exc))
-                    except Exception:
-                        pass
+                    except Exception:  # defensive: Tk teardown/callback
+                        _log.exception("Background UI fallback error handler failed")
                 else:
                     target = feedback if feedback is not None else _feedback_for(widget)
                     if target is not None and hasattr(target, "error"):
                         try:
                             target.error(str(exc))
-                        except Exception:
-                            pass
+                        except Exception:  # defensive: Tk teardown/callback
+                            _log.exception("Background UI fallback target error handler failed")
             finally:
                 if finally_fn:
                     try:
@@ -201,7 +201,7 @@ def run_background(
         _log.exception("Failed to schedule UI pump")
         try:
             widget._async_pump_after = None
-        except Exception:
+        except Exception:  # defensive: Tk teardown/callback
             pass
         with _ACTIVE_LOCK:
             _ACTIVE -= 1

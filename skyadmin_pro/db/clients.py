@@ -7,7 +7,7 @@ from datetime import date, datetime, timedelta
 from skyadmin_pro.config import (
     NEW_CUSTOMER_QUOTATION_TASKS,
 )
-from skyadmin_pro.db.cipher import INTEGRITY_ERRORS
+from skyadmin_pro.db.cipher import DB_ERRORS, INTEGRITY_ERRORS
 from skyadmin_pro.db.sql_helpers import (
     _escape_like,
     _in_clause,
@@ -421,7 +421,7 @@ class ClientsMixin:
                 if limit is not None and int(limit) > 0:
                     return self._fetch_page(base, (fts_query,), limit=limit, offset=offset)
                 return self._fetch_all(base, (fts_query,))
-        except Exception:
+        except DB_ERRORS:
             self._log.debug("FTS search failed, falling back to LIKE", exc_info=True)
         like = f"%{_escape_like(q)}%"
         base = (

@@ -124,5 +124,9 @@ describe("purgeLicensesHandler", () => {
 
     // Retention: conflicts older than 90 days pruned on each purge run.
     expect(seenSql.some((s) => s.includes("DELETE FROM sync_conflicts"))).toBe(true);
+
+    // Control version bump runs via the top-level static import (P1.6) —
+    // the INSERT ... RETURNING value upsert proves bumpVersion() executed.
+    expect(seenSql.some((s) => s.includes("INSERT INTO control_meta") && s.includes("RETURNING value"))).toBe(true);
   });
 });

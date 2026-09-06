@@ -44,7 +44,7 @@ class CanvasScrollFrame(ctk.CTkFrame):
         if self._pending_scroll_update is not None:
             try:
                 self.after_cancel(self._pending_scroll_update)
-            except Exception:
+            except Exception:  # defensive: Tk teardown/callback
                 pass
         self._pending_scroll_update = self.after(30, self._update_scrollregion)
 
@@ -57,7 +57,7 @@ class CanvasScrollFrame(ctk.CTkFrame):
             return
         try:
             self._canvas.configure(scrollregion=self._canvas.bbox("all"))
-        except Exception:
+        except Exception:  # defensive: Tk teardown/callback
             pass
         # Re-bind wheel for newly added children
         self._bind_wheel_recursive(self.content)
@@ -86,7 +86,7 @@ class CanvasScrollFrame(ctk.CTkFrame):
                 try:
                     if child.winfo_class() == "Treeview":
                         continue
-                except Exception:
+                except Exception:  # defensive: Tk teardown/callback
                     pass
                 path = str(child)
                 if path not in self._wheel_bound:
@@ -95,7 +95,7 @@ class CanvasScrollFrame(ctk.CTkFrame):
                     child.bind("<Button-5>", self._on_mousewheel_linux, add="+")
                     self._wheel_bound.add(path)
                 stack.extend(child.winfo_children())
-            except Exception:
+            except Exception:  # defensive: Tk teardown/callback
                 pass
 
     def _bind_mousewheel(self, widget) -> None:
@@ -116,7 +116,7 @@ class CanvasScrollFrame(ctk.CTkFrame):
                     w = w.master  # type: ignore[attr-defined]
                 except Exception:
                     break
-        except Exception:
+        except Exception:  # defensive: Tk teardown/callback
             pass
         if event.delta:
             self._canvas.yview_scroll(int(-event.delta / 120), "units")
@@ -132,7 +132,7 @@ class CanvasScrollFrame(ctk.CTkFrame):
                     w = w.master  # type: ignore[attr-defined]
                 except Exception:
                     break
-        except Exception:
+        except Exception:  # defensive: Tk teardown/callback
             pass
         if event.num == 4:
             self._canvas.yview_scroll(-1, "units")
@@ -144,12 +144,12 @@ class CanvasScrollFrame(ctk.CTkFrame):
         if getattr(self, "_pending_scroll_update", None) is not None:
             try:
                 self.after_cancel(self._pending_scroll_update)
-            except Exception:
+            except Exception:  # defensive: Tk teardown/callback
                 pass
             self._pending_scroll_update = None
         try:
             super().destroy()
-        except Exception:
+        except Exception:  # defensive: Tk teardown/callback
             pass
 
     def winfo_children(self):

@@ -11,6 +11,7 @@ from __future__ import annotations
 
 from typing import TYPE_CHECKING, Any
 
+from skyadmin_pro.db.cipher import DB_ERRORS
 from skyadmin_pro.services.undo_manager import Command, UndoConflictError
 
 if TYPE_CHECKING:
@@ -46,7 +47,7 @@ def _linked_tables(db: Database) -> list[str]:
         for table in tables:
             try:
                 cols = {row[1] for row in conn.execute(f'PRAGMA table_info("{table}")').fetchall()}
-            except Exception:
+            except DB_ERRORS:
                 continue
             if "client_id" in cols:
                 linked.append(table)
@@ -226,7 +227,7 @@ class DeleteClientsCommand(Command):
             for cid in self._ids:
                 try:
                     secret = conn.execute("SELECT ird_password FROM clients WHERE id = ?", (cid,)).fetchone()
-                except Exception:
+                except DB_ERRORS:
                     continue
                 if secret is not None:
                     self._raw_secrets[cid] = secret["ird_password"]
@@ -239,7 +240,7 @@ class DeleteClientsCommand(Command):
                         f'SELECT rowid AS _rowid, * FROM "{table}" WHERE client_id IN ({placeholders})',
                         tuple(self._ids),
                     ).fetchall()
-                except Exception:
+                except DB_ERRORS:
                     continue
                 self._dependents[table] = [dict(r) for r in rows]
         return db.batch_delete_clients(self._ids)
@@ -254,7 +255,7 @@ class DeleteClientsCommand(Command):
                     hit = conn.execute(
                         "SELECT id FROM clients WHERE name = ? COLLATE NOCASE", (row["name"],)
                     ).fetchone()
-                except Exception:
+                except DB_ERRORS:
                     continue
                 if hit is not None and int(hit["id"]) != int(row["id"]):
                     found.append(f"Client name reused: {row['name']}")
@@ -262,7 +263,7 @@ class DeleteClientsCommand(Command):
                 if sync_key:
                     try:
                         hit = conn.execute("SELECT id FROM clients WHERE global_id = ?", (sync_key,)).fetchone()
-                    except Exception:
+                    except DB_ERRORS:
                         continue
                     if hit is not None and int(hit["id"]) != int(row["id"]):
                         found.append(f"Sync key reused for: {row['name']}")
@@ -308,7 +309,7 @@ class DeleteClientsCommand(Command):
             for table in ["clients", *self._dependents]:
                 try:
                     top = conn.execute(f'SELECT MAX(rowid) AS m FROM "{table}"').fetchone()["m"]
-                except Exception:
+                except DB_ERRORS:
                     continue
                 if top:
                     conn.execute(

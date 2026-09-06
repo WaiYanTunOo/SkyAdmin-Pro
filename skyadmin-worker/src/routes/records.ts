@@ -2,8 +2,43 @@
 
 import { Context } from "hono";
 import { Env } from "../db";
-import { checkRateLimit } from "../rate_limit";
+import { checkRateLimit, getClientIp } from "../rate_limit";
+import { auditLog } from "../admin_security";
 import { describeLicenseExpiry, summarizeMachines } from "../license_status";
+
+interface IssuedLicenseRow {
+  id: number;
+  machine_id: string;
+  license_key: string;
+  passcode: string;
+  package_days: number | null;
+  expires_at: string | null;
+  nonce: string;
+  issued_at: string;
+  price_thb: number;
+  revoked: number;
+  used: number;
+}
+
+interface SummarySourceRow {
+  machine_id: string;
+  expires_at: string | null;
+  issued_at: string;
+  package_days: number | null;
+  nonce: string;
+  revoked: number | boolean;
+  used: number | boolean;
+}
+
+async function recordsDbError(c: Context<{ Bindings: Env }>, action: string, err: unknown): Promise<Response> {
+  console.error(`D1 error during records (${action}):`, err);
+  try {
+    await auditLog(c.env.DB, "/" + c.env.ADMIN_PATH, `RECORDS_${action}`, null, getClientIp(c));
+  } catch {
+    // The audit write must never mask the underlying D1 failure.
+  }
+  return c.json({ ok: false, error: "Failed to load records." }, 500);
+}
 
 export async function recordsHandler(c: Context<{ Bindings: Env }>) {
   const limited = await checkRateLimit(c, "records", { windowSeconds: 60, max: 30 });
@@ -15,39 +50,38 @@ export async function recordsHandler(c: Context<{ Bindings: Env }>) {
   const offset = (page - 1) * limit;
 
   // Get total count
-  const countResult = await c.env.DB.prepare(
-    "SELECT COUNT(*) as total FROM issued_licenses"
-  ).first<{ total: number }>();
-  const total = countResult?.total || 0;
+  let total = 0;
+  try {
+    const countResult = await c.env.DB.prepare(
+      "SELECT COUNT(*) as total FROM issued_licenses"
+    ).first<{ total: number }>();
+    total = countResult?.total || 0;
+  } catch (err) {
+    return recordsDbError(c, "COUNT", err);
+  }
 
   // Get paginated results with revoked/used status via LEFT JOINs
   // (avoids loading entire revocations + used_nonces tables into memory)
-  const { results } = await c.env.DB.prepare(
-    `SELECT l.id, l.machine_id, l.license_key, l.passcode, l.package_days,
-            l.expires_at, l.nonce, l.issued_at, l.price_thb,
-            (r.target IS NOT NULL OR r2.target IS NOT NULL) AS revoked,
-            u.nonce IS NOT NULL AS used
-     FROM issued_licenses l
-     LEFT JOIN revocations r ON r.target = l.nonce
-     LEFT JOIN revocations r2 ON r2.target = l.machine_id
-     LEFT JOIN used_nonces u ON u.nonce = l.nonce
-     ORDER BY l.id DESC
-     LIMIT ? OFFSET ?`
-  ).bind(limit, offset).all<{
-    id: number;
-    machine_id: string;
-    license_key: string;
-    passcode: string;
-    package_days: number | null;
-    expires_at: string | null;
-    nonce: string;
-    issued_at: string;
-    price_thb: number;
-    revoked: number;
-    used: number;
-  }>();
+  let pageRows: IssuedLicenseRow[];
+  try {
+    const { results } = await c.env.DB.prepare(
+      `SELECT l.id, l.machine_id, l.license_key, l.passcode, l.package_days,
+              l.expires_at, l.nonce, l.issued_at, l.price_thb,
+              (r.target IS NOT NULL OR r2.target IS NOT NULL) AS revoked,
+              u.nonce IS NOT NULL AS used
+       FROM issued_licenses l
+       LEFT JOIN revocations r ON r.target = l.nonce
+       LEFT JOIN revocations r2 ON r2.target = l.machine_id
+       LEFT JOIN used_nonces u ON u.nonce = l.nonce
+       ORDER BY l.id DESC
+       LIMIT ? OFFSET ?`
+    ).bind(limit, offset).all<IssuedLicenseRow>();
+    pageRows = results || [];
+  } catch (err) {
+    return recordsDbError(c, "LIST", err);
+  }
 
-  const enriched = (results || []).map((r) => {
+  const enriched = pageRows.map((r) => {
     const isRevoked = Boolean(r.revoked);
     const isUsed = Boolean(r.used);
     const expiry = describeLicenseExpiry(
@@ -71,29 +105,38 @@ export async function recordsHandler(c: Context<{ Bindings: Env }>) {
     };
   });
 
-  // Machine summary — scan recent rows for machine aggregation
+  // Machine summary — aggregate recent rows for machine-level overview.
   const parsedSummary = parseInt(c.req.query("summary_limit") || "1000", 10);
   const summaryLimit = Math.min(1000, Math.max(100, Number.isNaN(parsedSummary) ? 1000 : parsedSummary));
-  const allRows = await c.env.DB.prepare(
-    `SELECT l.machine_id, l.expires_at, l.issued_at, l.package_days, l.nonce,
-            (r.target IS NOT NULL OR r2.target IS NOT NULL) AS revoked,
-            u.nonce IS NOT NULL AS used
-     FROM issued_licenses l
-     LEFT JOIN revocations r ON r.target = l.nonce
-     LEFT JOIN revocations r2 ON r2.target = l.machine_id
-     LEFT JOIN used_nonces u ON u.nonce = l.nonce
-     ORDER BY l.id DESC LIMIT ?`,
-  ).bind(summaryLimit).all<{
-    machine_id: string;
-    expires_at: string | null;
-    issued_at: string;
-    package_days: number | null;
-    nonce: string;
-    revoked: number;
-    used: number;
-  }>();
 
-  const allEnriched = (allRows.results || []).map((r) => ({
+  let summarySource: SummarySourceRow[];
+  if (page === 1 && limit >= summaryLimit) {
+    // Dedup the summary scan: on page 1 with limit >= summary_limit the page
+    // rows ARE the most recently issued rows (same ORDER BY l.id DESC, same
+    // joins), so the summary can reuse pageRows.slice(0, summaryLimit). This is
+    // only sound at offset 0 — on later pages the page window sits past the head
+    // rows the summary scans, so limit*page >= summary_limit would NOT mean the
+    // page covers them (the rows would be disjoint). Keep them separate there.
+    summarySource = pageRows.slice(0, summaryLimit);
+  } else {
+    try {
+      const { results: allRows } = await c.env.DB.prepare(
+        `SELECT l.machine_id, l.expires_at, l.issued_at, l.package_days, l.nonce,
+                (r.target IS NOT NULL OR r2.target IS NOT NULL) AS revoked,
+                u.nonce IS NOT NULL AS used
+         FROM issued_licenses l
+         LEFT JOIN revocations r ON r.target = l.nonce
+         LEFT JOIN revocations r2 ON r2.target = l.machine_id
+         LEFT JOIN used_nonces u ON u.nonce = l.nonce
+         ORDER BY l.id DESC LIMIT ?`,
+      ).bind(summaryLimit).all<SummarySourceRow>();
+      summarySource = allRows || [];
+    } catch (err) {
+      return recordsDbError(c, "SUMMARY", err);
+    }
+  }
+
+  const allEnriched = summarySource.map((r) => ({
     ...r,
     revoked: Boolean(r.revoked),
     used: Boolean(r.used),

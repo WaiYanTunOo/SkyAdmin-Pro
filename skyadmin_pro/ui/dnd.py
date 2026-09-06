@@ -20,7 +20,7 @@ try:
     DND_FILES = _DND_FILES
     TkinterDnD = _TkinterDnD
     DND_AVAILABLE = True
-except Exception:
+except Exception:  # defensive: Tk teardown/callback
     pass
 
 
@@ -65,5 +65,5 @@ def enable_drop(widget: Any, callback: Callable[[list[Path]], None], enabled: bo
             "<<Drop>>",
             lambda event: callback(parse_dropped_files(widget, event.data)),
         )
-    except Exception:
+    except Exception:  # defensive: Tk teardown/callback
         pass

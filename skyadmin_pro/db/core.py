@@ -117,7 +117,7 @@ class CoreMixin:
                     self._local.conn = None
                 try:
                     conn.close()
-                except Exception:
+                except Exception:  # defensive: close is best-effort cleanup on a stale pool handle
                     pass
                 return
             if conn not in self._bg_conns:
@@ -133,7 +133,7 @@ class CoreMixin:
         if conn is not None:
             try:
                 conn.close()
-            except Exception:
+            except Exception:  # defensive: close is best-effort cleanup on a stale handle
                 pass
             with self._lock:
                 try:
@@ -165,7 +165,7 @@ class CoreMixin:
                 if conn is not None:
                     try:
                         conn.close()
-                    except Exception:
+                    except Exception:  # defensive: close is best-effort cleanup on a stale handle
                         pass
                     self._pooled_conn = None
                 conn = self._connect()
@@ -199,7 +199,7 @@ class CoreMixin:
         try:
             yield conn
             conn.commit()
-        except Exception:
+        except Exception:  # defensive: caller body may raise anything — always roll back, then re-raise
             conn.rollback()
             raise
 
@@ -219,10 +219,10 @@ class CoreMixin:
         conn = self._get_pooled_conn()
         try:
             yield conn
-        except Exception:
+        except Exception:  # defensive: caller body may raise anything — roll back to reset, then re-raise
             try:
                 conn.rollback()
-            except Exception:
+            except Exception:  # defensive: rollback itself failed — connection is dead, nothing more to do
                 pass
             raise
 
@@ -260,7 +260,7 @@ class CoreMixin:
         try:
             yield conn
             conn.commit()
-        except Exception:
+        except Exception:  # defensive: caller body may raise anything — always roll back, then re-raise
             conn.rollback()
             raise
         finally:

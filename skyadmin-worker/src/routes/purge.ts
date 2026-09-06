@@ -1,7 +1,7 @@
 /** POST /api/purge-licenses — Archive and delete stale license rows. */
 
 import { Context } from "hono";
-import { Env } from "../db";
+import { Env, bumpVersion } from "../db";
 import { purgeOldSyncConflicts } from "../admin_security";
 import { checkRateLimit } from "../rate_limit";
 import { D1_BATCH_SIZE } from "../sync_push";
@@ -124,7 +124,6 @@ export async function purgeLicensesHandler(c: Context<{ Bindings: Env }>) {
   // on each purge run so the conflict audit log cannot grow forever.
   await purgeOldSyncConflicts(c.env.DB);
 
-  const { bumpVersion } = await import("../db");
   await bumpVersion(c.env.DB);
 
   return c.json({

@@ -310,7 +310,7 @@ class ActivationDialog(ctk.CTkToplevel):
     def _focus_key_box(self) -> None:
         try:
             self.key_box.focus_set()
-        except Exception:
+        except Exception:  # defensive: Tk teardown/callback
             pass
 
     def _schedule_ui(self, fn) -> None:
@@ -320,7 +320,7 @@ class ActivationDialog(ctk.CTkToplevel):
         except Exception:
             try:
                 fn()
-            except Exception:
+            except Exception:  # defensive: Tk teardown/callback
                 pass
 
     def _customer_email(self) -> str:
@@ -337,7 +337,7 @@ class ActivationDialog(ctk.CTkToplevel):
                 top = self.winfo_toplevel()
                 top.clipboard_clear()
                 top.clipboard_append(mid)
-            except Exception:
+            except Exception:  # defensive: Tk teardown/callback
                 pass
         self._set_status("Machine ID copied.", "info")
 
@@ -354,7 +354,7 @@ class ActivationDialog(ctk.CTkToplevel):
             import pyperclip
 
             pyperclip.copy(body)
-        except Exception:
+        except Exception:  # defensive: Tk teardown/callback
             pass
         self._set_status(
             "Email opened — press Send. We reply to your email with the code,"
@@ -479,7 +479,7 @@ class ActivationDialog(ctk.CTkToplevel):
         top.attributes("-topmost", True)
         try:
             top.grab_set()
-        except Exception:
+        except Exception:  # defensive: Tk teardown/callback
             pass
         top.bind("<Escape>", lambda _e: top.destroy())
         top.grid_columnconfigure(0, weight=1)
@@ -503,7 +503,7 @@ class ActivationDialog(ctk.CTkToplevel):
             if self._on_close_request is not None:
                 try:
                     self._on_close_request()
-                except Exception:
+                except Exception:  # defensive: Tk teardown/callback
                     pass
 
     def _set_status(self, text: str, kind: str) -> None:
@@ -529,7 +529,7 @@ def run_activation_standalone() -> bool:
     def _finish() -> None:
         try:
             app.quit()
-        except Exception:
+        except Exception:  # defensive: Tk teardown/callback
             pass
 
     dialog = ActivationDialog(app, allow_quit=True, on_close_request=_finish)
@@ -537,16 +537,16 @@ def run_activation_standalone() -> bool:
         dialog.attributes("-topmost", True)
         dialog.lift()
         dialog.focus_force()
-    except Exception:
+    except Exception:  # defensive: Tk teardown/callback
         pass
     app.mainloop()
     try:
         dialog.destroy()
-    except Exception:
+    except Exception:  # defensive: Tk teardown/callback
         pass
     try:
         app.destroy()
-    except Exception:
+    except Exception:  # defensive: Tk teardown/callback
         pass
     ok, _msg = verify_license()
     return ok
