@@ -6,7 +6,8 @@ from pathlib import Path
 from PIL import Image
 
 ROOT = Path(__file__).resolve().parent.parent
-SOURCE_LOGO = ROOT / "logo.jpg"
+SOURCE_LOGO_PNG = ROOT / "logo.png"
+SOURCE_LOGO_JPG = ROOT / "logo.jpg"
 OUT_ICO = ROOT / "icon.ico"
 OUT_ICNS = ROOT / "icon.icns"
 OUT_PNG = ROOT / "icon.png"
@@ -14,9 +15,11 @@ OUT_PNG = ROOT / "icon.png"
 ICON_SIZES = (16, 24, 32, 48, 64, 128, 256, 512, 1024)
 
 def load_source() -> Image.Image:
-    if not SOURCE_LOGO.is_file():
-        raise FileNotFoundError(f"Source logo not found: {SOURCE_LOGO}")
-    return Image.open(SOURCE_LOGO).convert("RGBA")
+    if SOURCE_LOGO_PNG.is_file():
+        return Image.open(SOURCE_LOGO_PNG).convert("RGBA")
+    if SOURCE_LOGO_JPG.is_file():
+        return Image.open(SOURCE_LOGO_JPG).convert("RGBA")
+    raise FileNotFoundError(f"Source logo not found: {SOURCE_LOGO_PNG} or {SOURCE_LOGO_JPG}")
 
 def resize_image(img: Image.Image, size: int) -> Image.Image:
     # Use LANCZOS for high-quality downsampling

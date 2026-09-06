@@ -74,6 +74,7 @@ class MainWindow(dnd_base_class()):
         self._register_view_factories()
 
         self.title(APP_NAME)
+        self._set_window_icon()
         geometry = self.db.get_setting(SETTING_WINDOW_GEOMETRY, DEFAULT_WINDOW_GEOMETRY)
         self.geometry(geometry or DEFAULT_WINDOW_GEOMETRY)
         self.minsize(*MIN_WINDOW_SIZE)
@@ -510,6 +511,40 @@ class MainWindow(dnd_base_class()):
         view = self._views.get("dashboard")
         if view is not None and hasattr(view, "mark_stale"):
             view.mark_stale()
+
+    def _set_window_icon(self) -> None:
+        """Set application icon for window titlebar, taskbar, and Alt-Tab."""
+        import sys
+        from pathlib import Path
+
+        if sys.platform == "win32":
+            try:
+                import ctypes
+                ctypes.windll.shell32.SetCurrentProcessExplicitAppUserModelID(
+                    "SkyCreation.SkyAdminPro.App.0.3"
+                )
+            except Exception:
+                pass
+
+        base_dir = (
+            Path(sys.executable).resolve().parent
+            if getattr(sys, "frozen", False)
+            else Path(__file__).resolve().parent.parent.parent
+        )
+        ico_path = base_dir / "icon.ico"
+        png_path = base_dir / "icon.png"
+
+        try:
+            if sys.platform == "win32" and ico_path.is_file():
+                self.iconbitmap(str(ico_path))
+            elif png_path.is_file():
+                from PIL import Image, ImageTk
+
+                img = Image.open(png_path)
+                self._icon_photo = ImageTk.PhotoImage(img)
+                self.iconphoto(True, self._icon_photo)
+        except Exception:
+            pass
 
     def _on_close(self) -> None:
         # Give the active view a chance to cancel polling / after handles so

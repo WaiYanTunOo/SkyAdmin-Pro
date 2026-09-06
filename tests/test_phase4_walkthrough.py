@@ -205,7 +205,7 @@ def test_phase4_company_details_lazy_subtabs(app):
     assert hasattr(panel, "fin_doc_tree")
 
 
-def test_phase5_activation_dialog_offscreen(monkeypatch, fake_app_dir):
+def test_phase5_activation_dialog_offscreen(monkeypatch, fake_app_dir, app):
     """Activation dialog builds and accepts a valid dev-signed key offline."""
     import time
 
@@ -225,8 +225,6 @@ def test_phase5_activation_dialog_offscreen(monkeypatch, fake_app_dir):
         lambda content: saved.append(content),
     )
 
-    app = ctk.CTk()
-    app.withdraw()
     dialog = ActivationDialog(app, allow_quit=False)
     dialog.geometry("620x740")
     dialog.update()
@@ -245,7 +243,6 @@ def test_phase5_activation_dialog_offscreen(monkeypatch, fake_app_dir):
     status_text = dialog.status.cget("text")
 
     dialog.destroy()
-    app.destroy()
 
     assert saved, "activation should save license when online check disabled"
     assert "Activation complete" in status_text
