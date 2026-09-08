@@ -333,3 +333,125 @@ describe("CSP on all admin HTML responses", () => {
     expect(csp).toContain(`script-src 'nonce-${match![1]}'`);
   });
 });
+
+/** Helper: login, extract session cookie + dashboard CSRF token. */
+async function loginAndGetTokens(env: Env): Promise<{ cookie: string; csrf: string }> {
+  const page = await app.request(adminUrl("/"), {}, env);
+  expect(page.status).toBe(200);
+  const html = await page.text();
+  const csrfMatch = html.match(/name="csrf_token" value="([^"]+)"/);
+  expect(csrfMatch).toBeTruthy();
+  const csrfToken = csrfMatch![1];
+
+  const res = await app.request(
+    adminUrl("/login"),
+    {
+      method: "POST",
+      headers: { "Content-Type": "application/x-www-form-urlencoded" },
+      body: `password=${PASS}&csrf_token=${csrfToken}`,
+    },
+    env,
+  );
+  expect(res.status).toBe(303);
+  const setCookie = res.headers.get("Set-Cookie") || "";
+  const cookieMatch = setCookie.match(/(skyadm_\S+=[^;]+)/);
+  expect(cookieMatch).toBeTruthy();
+  const cookie = cookieMatch![1];
+
+  const dash = await app.request(adminUrl("/"), { headers: { Cookie: cookie } }, env);
+  expect(dash.status).toBe(200);
+  const dashHtml = await dash.text();
+  const dashCsrfMatch = dashHtml.match(/var CSRF_TOKEN="([^"]+)"/);
+  expect(dashCsrfMatch).toBeTruthy();
+  const dashCsrf = dashCsrfMatch![1];
+
+  return { cookie, csrf: dashCsrf };
+}
+
+describe("session-based API POST (pricing, generate, update)", () => {
+  it("pricing POST works with session cookie + dashboard CSRF", async () => {
+    const env = mockEnv();
+    const { cookie, csrf } = await loginAndGetTokens(env);
+
+    const res = await app.request("http://localhost/api/pricing", {
+      method: "POST",
+      headers: {
+        "Content-Type": "application/json",
+        "X-CSRF-Token": csrf,
+        Cookie: cookie,
+      },
+      body: JSON.stringify({
+        packages: [{ label: "1 Week", days: 7, price_thb: 500 }],
+        over_year_text: "Test",
+      }),
+    }, env);
+    expect(res.status).toBe(200);
+    const body = (await res.json()) as { ok: boolean; packages?: { label: string }[] };
+    expect(body.ok).toBe(true);
+    expect(body.packages).toHaveLength(1);
+    expect(body.packages![0].label).toBe("1 Week");
+  });
+
+  it("pricing POST rejects without CSRF token", async () => {
+    const env = mockEnv();
+    const { cookie } = await loginAndGetTokens(env);
+
+    const res = await app.request("http://localhost/api/pricing", {
+      method: "POST",
+      headers: {
+        "Content-Type": "application/json",
+        Cookie: cookie,
+      },
+      body: JSON.stringify({ packages: [{ label: "X", days: 7, price_thb: 100 }] }),
+    }, env);
+    expect(res.status).toBe(403);
+    const body = (await res.json()) as { ok: boolean; error: string };
+    expect(body.error).toContain("CSRF");
+  });
+
+  it("pricing POST rejects without session cookie", async () => {
+    const env = mockEnv();
+    const { csrf } = await loginAndGetTokens(env);
+
+    const res = await app.request("http://localhost/api/pricing", {
+      method: "POST",
+      headers: {
+        "Content-Type": "application/json",
+        "X-CSRF-Token": csrf,
+      },
+      body: JSON.stringify({ packages: [{ label: "X", days: 7, price_thb: 100 }] }),
+    }, env);
+    expect(res.status).toBe(401);
+  });
+
+  it("update POST works with session cookie + dashboard CSRF", async () => {
+    const env = mockEnv();
+    const { cookie, csrf } = await loginAndGetTokens(env);
+
+    const res = await app.request("http://localhost/api/update", {
+      method: "POST",
+      headers: {
+        "Content-Type": "application/json",
+        "X-CSRF-Token": csrf,
+        Cookie: cookie,
+      },
+      body: JSON.stringify({ version: "0.3.3", url: "https://example.com/SkyAdminPro.exe" }),
+    }, env);
+    expect(res.status).toBe(200);
+    const body = (await res.json()) as { ok: boolean; version?: string };
+    expect(body.ok).toBe(true);
+    expect(body.version).toBe("0.3.3");
+  });
+
+  it("records GET works with session cookie", async () => {
+    const env = mockEnv();
+    const { cookie } = await loginAndGetTokens(env);
+
+    const res = await app.request("http://localhost/api/records?limit=500", {
+      headers: { Cookie: cookie },
+    }, env);
+    expect(res.status).toBe(200);
+    const body = (await res.json()) as { ok: boolean; licenses?: unknown[] };
+    expect(body.ok).toBe(true);
+  });
+});

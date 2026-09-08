@@ -108,25 +108,25 @@ button.sm{width:auto;padding:7px 12px;font-size:12px;border-radius:8px;margin-to
 <label>Over 1-year message</label>
 <input id="overYear" placeholder="Over 1 Year — discuss on WhatsApp">
 <div class="btns" style="margin-top:8px">
-<button type="button" class="sm green" onclick="addPackageRow()">Add package</button>
-<button type="button" class="sm gray" onclick="savePricing()">Save packages</button>
-<button type="button" class="sm gray" onclick="loadPricing(true)">Reload</button>
+<button type="button" id="addPkgBtn" class="sm green">Add package</button>
+<button type="button" id="savePkgBtn" class="sm gray">Save packages</button>
+<button type="button" id="reloadPkgBtn" class="sm gray">Reload</button>
 </div>
 
 <h2>Generate License</h2>
 <label>Machine ID</label>
 <input id="mid" placeholder="72FA00DC6B64525F" autocomplete="off" autocapitalize="characters" spellcheck="false">
 <label>Package</label>
-<select id="days" onchange="document.getElementById('cWrap').style.display=this.value==='__custom__'?'block':'none'">
+<select id="days">
 <option value="7" selected>Loading packages…</option>
 </select>
 <div id="cWrap" style="display:none"><label>Custom days</label><input id="cDays" type="number" min="1" max="36500"></div>
-<button type="button" id="genBtn" onclick="generate()">Generate</button>
+<button type="button" id="genBtn">Generate</button>
 
 <div id="result" style="display:none">
 <label>License Key</label>
 <div id="license" class="out"></div>
-<div class="btns"><button type="button" class="sm gray" onclick="copyEl('license')">Copy Key</button><button type="button" class="sm gray" onclick="copyEl('passcode')">Copy Passcode</button></div>
+<div class="btns"><button type="button" id="copyKeyBtn" class="sm gray">Copy Key</button><button type="button" id="copyPassBtn" class="sm gray">Copy Passcode</button></div>
 <label>Passcode</label>
 <div id="passcode" class="out" style="font-size:18px;letter-spacing:3px;text-align:center"></div>
 </div>
@@ -138,8 +138,8 @@ button.sm{width:auto;padding:7px 12px;font-size:12px;border-radius:8px;margin-to
 <label>Download URL</label>
 <input id="updUrl" placeholder="https://your-cdn/SkyAdminPro.exe">
 <div class="btns" style="margin-top:8px">
-<button type="button" class="sm green" onclick="publishUpdate()">Publish update</button>
-<button type="button" class="sm gray" onclick="loadUpdateInfo()">Reload</button>
+<button type="button" id="publishBtn" class="sm green">Publish update</button>
+<button type="button" id="reloadUpdBtn" class="sm gray">Reload</button>
 </div>
 <div id="updStatus" class="hint"></div>
 
@@ -147,32 +147,32 @@ button.sm{width:auto;padding:7px 12px;font-size:12px;border-radius:8px;margin-to
 <label>Ban machine</label>
 <div style="display:flex;gap:6px">
 <input id="banIn" placeholder="Machine ID" spellcheck="false" style="flex:1">
-<button type="button" class="sm red" style="margin:0" onclick="addBan()">Ban</button>
+<button type="button" id="banBtn" class="sm red" style="margin:0">Ban</button>
 </div>
 <div id="banList"></div>
 
 <h2>Machines <span id="machCnt" style="color:#6b7280;font-size:12px"></span></h2>
 <div class="hint">Per-machine status. Timed packages: <b>24h to activate</b> — full period (e.g. 7 days) starts when they activate on desktop. Use <b>Use ID</b> to fill Generate License, or renew with package buttons / custom days.</div>
 <div class="btns filt" style="margin:8px 0">
-<button type="button" class="sm gray" data-mf="all" onclick="setMachFilter('all')">All</button>
-<button type="button" class="sm gray" data-mf="active" onclick="setMachFilter('active')">Active</button>
-<button type="button" class="sm gray" data-mf="expiring" onclick="setMachFilter('expiring')">Expiring &lt;7d</button>
-<button type="button" class="sm gray" data-mf="pending" onclick="setMachFilter('pending')">Pending</button>
-<button type="button" class="sm gray" data-mf="expired" onclick="setMachFilter('expired')">Expired</button>
+<button type="button" class="sm gray" data-mf="all">All</button>
+<button type="button" class="sm gray" data-mf="active">Active</button>
+<button type="button" class="sm gray" data-mf="expiring">Expiring &lt;7d</button>
+<button type="button" class="sm gray" data-mf="pending">Pending</button>
+<button type="button" class="sm gray" data-mf="expired">Expired</button>
 </div>
-<input id="machSearch" placeholder="Search machine ID…" oninput="renderMachines()">
+<input id="machSearch" placeholder="Search machine ID…">
 <div id="machines"></div>
 
 <h2>Records <span id="cnt" style="color:#6b7280;font-size:12px"></span></h2>
 <div class="hint">Every issued key. Copy, quick-renew from packages, revoke, or unrevoke.</div>
 <div class="btns filt" style="margin:8px 0">
-<button type="button" class="sm gray" data-rf="all" onclick="setRecFilter('all')">All</button>
-<button type="button" class="sm gray" data-rf="active" onclick="setRecFilter('active')">Active</button>
-<button type="button" class="sm gray" data-rf="expiring" onclick="setRecFilter('expiring')">Expiring &lt;7d</button>
-<button type="button" class="sm gray" data-rf="pending" onclick="setRecFilter('pending')">Pending</button>
-<button type="button" class="sm gray" data-rf="expired" onclick="setRecFilter('expired')">Expired</button>
+<button type="button" class="sm gray" data-rf="all">All</button>
+<button type="button" class="sm gray" data-rf="active">Active</button>
+<button type="button" class="sm gray" data-rf="expiring">Expiring &lt;7d</button>
+<button type="button" class="sm gray" data-rf="pending">Pending</button>
+<button type="button" class="sm gray" data-rf="expired">Expired</button>
 </div>
-<input id="search" placeholder="Search..." oninput="renderRecords()">
+<input id="search" placeholder="Search...">
 <div id="records"></div>
 
 <h2>Housekeeping</h2>
@@ -181,7 +181,7 @@ button.sm{width:auto;padding:7px 12px;font-size:12px;border-radius:8px;margin-to
   <label for="purgeDays" style="margin:0">Older than</label>
   <input id="purgeDays" type="number" min="1" max="365" value="30" class="renew-days" style="width:80px">
   <span style="font-size:12px;color:#9ca3af">days</span>
-  <button type="button" class="sm red" onclick="purgeOldLicenses()">Clear old licenses</button>
+  <button type="button" id="purgeBtn" class="sm red">Clear old licenses</button>
 </div>
 <div id="purgeResult" class="hint"></div>
 
@@ -234,7 +234,7 @@ var DEFAULT_PACKAGES=[
   {label:'1 Year',days:365,price_thb:9000}
 ];
 
-function mkBtn(t,c,f){var x=document.createElement('button');x.type='button';x.className='sm '+c;x.textContent=t;x.onclick=f;return x;}
+function mkBtn(t,c,f){var x=document.createElement('button');x.type='button';x.className='sm '+c;x.textContent=t;x.addEventListener('click',f);return x;}
 
 function updatePackageViews(){
   renderPackageSummary();
@@ -363,7 +363,8 @@ function addPackageRow(pkg){
     '<input class="pkg-label" placeholder="Label" value="'+(pkg.label||'').replace(/"/g,'&quot;')+'">'+
     '<input class="pkg-days" type="number" min="1" max="36500" placeholder="Days" value="'+(pkg.days||'')+'">'+
     '<input class="pkg-price" type="number" min="0" placeholder="Baht" value="'+(pkg.price_thb||0)+'">'+
-    '<button type="button" class="sm red" onclick="this.parentNode.remove()">Del</button>';
+    '<button type="button" class="sm red del-row-btn">Del</button>';
+  row.querySelector('.del-row-btn').addEventListener('click',function(){row.remove();});
   box.appendChild(row);
 }
 
@@ -682,7 +683,7 @@ function renderBans(){
     var b=_bans[i];var m=b.machine_id;
     (function(m){
       var c=document.createElement('span');c.className='chip';c.textContent=m+' ';
-      var x=document.createElement('button');x.textContent='\u2715';x.onclick=function(){
+      var x=document.createElement('button');x.textContent='\u2715';x.addEventListener('click',function(){
         api('POST','/api/unban',{mid:m}).then(function(){
           showStatus('Unbanned');
           loadBans();
@@ -700,6 +701,32 @@ loadPricing().then(function(){
   setMachFilter('all');setRecFilter('all');
   loadUpdateInfo();
   loadRecords();loadBans();checkSigningKey();
+});
+
+document.addEventListener('DOMContentLoaded',function(){
+  document.getElementById('addPkgBtn').addEventListener('click',function(){addPackageRow();});
+  document.getElementById('savePkgBtn').addEventListener('click',function(){savePricing();});
+  document.getElementById('reloadPkgBtn').addEventListener('click',function(){loadPricing(true);});
+  document.getElementById('days').addEventListener('change',function(){
+    document.getElementById('cWrap').style.display=this.value==='__custom__'?'block':'none';
+  });
+  document.getElementById('genBtn').addEventListener('click',function(){generate();});
+  document.getElementById('copyKeyBtn').addEventListener('click',function(){copyEl('license');});
+  document.getElementById('copyPassBtn').addEventListener('click',function(){copyEl('passcode');});
+  document.getElementById('publishBtn').addEventListener('click',function(){publishUpdate();});
+  document.getElementById('reloadUpdBtn').addEventListener('click',function(){loadUpdateInfo();});
+  document.getElementById('banBtn').addEventListener('click',function(){addBan();});
+  document.getElementById('purgeBtn').addEventListener('click',function(){purgeOldLicenses();});
+  document.getElementById('machSearch').addEventListener('input',function(){renderMachines();});
+  document.getElementById('search').addEventListener('input',function(){renderRecords();});
+  var mfBtns=document.querySelectorAll('[data-mf]');
+  for(var i=0;i<mfBtns.length;i++){
+    mfBtns[i].addEventListener('click',function(){setMachFilter(this.getAttribute('data-mf'));});
+  }
+  var rfBtns=document.querySelectorAll('[data-rf]');
+  for(var i=0;i<rfBtns.length;i++){
+    rfBtns[i].addEventListener('click',function(){setRecFilter(this.getAttribute('data-rf'));});
+  }
 });
 </script></body></html>`;
 }
