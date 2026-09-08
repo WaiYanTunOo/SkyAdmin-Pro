@@ -356,6 +356,10 @@ class SupplierPaymentsTab:
             parent=self.host.winfo_toplevel(),
         ):
             return
-        self.app.db.delete_supplier_payment(int(iid))
+        try:
+            self.app.db.delete_supplier_payment(int(iid))
+        except Exception as exc:
+            self.feedback.error(f"Could not delete payment: {exc}")
+            return
         self.feedback.success("Payment deleted.")
         self.host.refresh()
