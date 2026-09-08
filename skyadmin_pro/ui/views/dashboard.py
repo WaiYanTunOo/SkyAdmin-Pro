@@ -751,6 +751,10 @@ class DashboardView(BaseView):
 
     def on_show(self) -> None:
         self._visible = True
+        # Clear any stale selection in the next-actions tree so returning from
+        # a sub-view (e.g. Renewals) doesn't re-fire _next_selected and loop.
+        if getattr(self, "next_tree", None) is not None:
+            self.next_tree.tree.selection_remove(*self.next_tree.tree.selection())
         self._build_header_extras()
         self._schedule_detail_trees_progressive()
         self.refresh_async()

@@ -138,24 +138,28 @@ class SupplierServicesTab:
             self.feedback.error("Enter a valid expiry date (YYYY-MM-DD or DD/MM/YYYY).")
             return
         notes = self.svc_notes.get().strip() or None
-        if self._editing_svc_id:
-            self.app.db.update_supplier_service(
-                self._editing_svc_id,
-                company_name=company,
-                service_type=service,
-                expiry_date=expiry,
-                notes=notes,
-            )
-            self.feedback.success("Supplier service updated.")
-        else:
-            self.app.db.add_supplier_service(
-                supplier_id=supplier_id,
-                company_name=company,
-                service_type=service,
-                expiry_date=expiry,
-                notes=notes,
-            )
-            self.feedback.success("Supplier service added.")
+        try:
+            if self._editing_svc_id:
+                self.app.db.update_supplier_service(
+                    self._editing_svc_id,
+                    company_name=company,
+                    service_type=service,
+                    expiry_date=expiry,
+                    notes=notes,
+                )
+                self.feedback.success("Supplier service updated.")
+            else:
+                self.app.db.add_supplier_service(
+                    supplier_id=supplier_id,
+                    company_name=company,
+                    service_type=service,
+                    expiry_date=expiry,
+                    notes=notes,
+                )
+                self.feedback.success("Supplier service added.")
+        except Exception as exc:
+            self.feedback.error(f"Could not save supplier service: {exc}")
+            return
         self._clear_svc_form()
         self._refresh_supplier_services()
 
@@ -200,6 +204,10 @@ class SupplierServicesTab:
             parent=self.host.winfo_toplevel(),
         ):
             return
-        self.app.db.delete_supplier_service(int(iid))
+        try:
+            self.app.db.delete_supplier_service(int(iid))
+        except Exception as exc:
+            self.feedback.error(f"Could not delete supplier service: {exc}")
+            return
         self.feedback.success("Supplier service deleted.")
         self._refresh_supplier_services()

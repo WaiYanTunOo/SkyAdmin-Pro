@@ -143,7 +143,10 @@ class SupplierDirectoryTab:
             if self.on_supplier_selected:
                 self.on_supplier_selected(None)
             return
-        supplier = self.app.db.get_supplier(int(iid))
+        try:
+            supplier = self.app.db.get_supplier(int(iid))
+        except Exception:
+            supplier = None
         if supplier is None:
             self.selected_supplier_id = None
             if self.on_supplier_selected:
@@ -187,6 +190,9 @@ class SupplierDirectoryTab:
         except ValueError as exc:
             self.feedback.error(str(exc))
             return
+        except Exception as exc:
+            self.feedback.error(f"Could not save supplier: {exc}")
+            return
         self.feedback.success("Supplier saved.")
         self._new_supplier()
         self.host.refresh_after_directory_change()
@@ -211,7 +217,11 @@ class SupplierDirectoryTab:
             parent=self.host.winfo_toplevel(),
         ):
             return
-        self.app.db.delete_supplier(int(iid))
+        try:
+            self.app.db.delete_supplier(int(iid))
+        except Exception as exc:
+            self.feedback.error(f"Could not delete supplier: {exc}")
+            return
         self.feedback.success("Supplier deleted (payments removed too).")
         self._new_supplier()
         self.host.refresh_after_directory_change()

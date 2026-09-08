@@ -263,7 +263,11 @@ class CourierPanel(ctk.CTkFrame):
             self.feedback.error("Enter a valid date sent.")
             return
         client_name = self.client_box.get().strip()
-        client_id = self.app.db.get_or_create_client(client_name) if client_name else None
+        try:
+            client_id = self.app.db.get_or_create_client(client_name) if client_name else None
+        except Exception as exc:
+            self.feedback.error(f"Could not resolve client: {exc}")
+            return
         task_choice = self.task_menu.get()
         task_id = self._task_lookup.get(task_choice)
         try:
@@ -279,6 +283,9 @@ class CourierPanel(ctk.CTkFrame):
         except ValueError as exc:
             self.feedback.error(str(exc))
             return
+        except Exception as exc:
+            self.feedback.error(f"Could not log courier: {exc}")
+            return
         self.feedback.success(f"Logged {tracking} ({self.driver_box.get()}).")
         self.tracking_var.set("")
         self.dest_var.set("")
@@ -292,6 +299,10 @@ class CourierPanel(ctk.CTkFrame):
             return
         if not messagebox.askyesno("Delete courier log", "Remove this delivery record?", parent=self.winfo_toplevel()):
             return
-        self.app.db.delete_courier_log(int(iid))
+        try:
+            self.app.db.delete_courier_log(int(iid))
+        except Exception as exc:
+            self.feedback.error(f"Could not delete log: {exc}")
+            return
         self.feedback.success("Courier log deleted.")
         self.refresh()

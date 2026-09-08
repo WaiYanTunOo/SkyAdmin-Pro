@@ -361,11 +361,17 @@ class TaskPanel(ctk.CTkFrame):
         except ValueError as exc:
             self.feedback.error(str(exc))
             return
+        except Exception as exc:
+            self.feedback.error(f"Could not save task: {exc}")
+            return
         saved_status = "pending"
         if self._editing_id is not None:
-            task = self.app.db.get_task(self._editing_id)
-            if task:
-                saved_status = task.get("status") or "pending"
+            try:
+                task = self.app.db.get_task(self._editing_id)
+                if task:
+                    saved_status = task.get("status") or "pending"
+            except Exception:
+                pass
         self.status_label.configure(text=f"Status: {saved_status}")
         self.refresh()
         if self._editing_id is not None:
@@ -380,7 +386,11 @@ class TaskPanel(ctk.CTkFrame):
         if self._editing_id is None:
             self.feedback.error("Select or save a task first.")
             return
-        self.app.db.set_task_status(self._editing_id, TASK_STATUS_COMPLETED)
+        try:
+            self.app.db.set_task_status(self._editing_id, TASK_STATUS_COMPLETED)
+        except Exception as exc:
+            self.feedback.error(f"Could not complete task: {exc}")
+            return
         self.feedback.success("Marked as completed.")
         self.refresh()
         self.status_label.configure(text="Status: completed")
@@ -390,7 +400,11 @@ class TaskPanel(ctk.CTkFrame):
         if self._editing_id is None:
             self.feedback.error("Select a task first.")
             return
-        self.app.db.set_task_status(self._editing_id, TASK_STATUS_PENDING)
+        try:
+            self.app.db.set_task_status(self._editing_id, TASK_STATUS_PENDING)
+        except Exception as exc:
+            self.feedback.error(f"Could not reopen task: {exc}")
+            return
         self.feedback.success("Task reopened.")
         self.refresh()
         self.status_label.configure(text="Status: pending")
@@ -406,7 +420,11 @@ class TaskPanel(ctk.CTkFrame):
             parent=self.winfo_toplevel(),
         ):
             return
-        self.app.db.delete_task(self._editing_id)
+        try:
+            self.app.db.delete_task(self._editing_id)
+        except Exception as exc:
+            self.feedback.error(f"Could not delete task: {exc}")
+            return
         self.feedback.success("Task deleted.")
         self._new()
         self.refresh()

@@ -118,6 +118,20 @@ def _style_tabview_tabs(tabview: ctk.CTkTabview) -> None:
 def bind_wrap_label(label: ctk.CTkLabel, parent: ctk.Misc, *, pad: int = 32) -> None:
     """Keep label wraplength in sync with parent width."""
 
+    # Clean up previous bindings if called again on the same label
+    old_bind_id = getattr(label, "_wrap_bind_id", None)
+    old_after_id = getattr(label, "_wrap_after_id", None)
+    if old_bind_id is not None:
+        try:
+            parent.unbind("<Configure>", old_bind_id)
+        except Exception:
+            pass
+    if old_after_id is not None:
+        try:
+            parent.after_cancel(old_after_id)
+        except Exception:
+            pass
+
     def _resize(event=None) -> None:
         try:
             width = event.width if event is not None else parent.winfo_width()
@@ -568,7 +582,12 @@ class MonthStatusPanel(ctk.CTkFrame):
         statuses = self.app.db.list_client_month_status(self._month_key())
         record = statuses.get(client_id)
         current = record["status"] if record else MONTH_STATUS_OPEN
-        next_status = _STATUS_CYCLE[_STATUS_CYCLE.index(current) + 1]
+        try:
+            idx = _STATUS_CYCLE.index(current)
+        except ValueError:
+            idx = 0
+            current = _STATUS_CYCLE[0]
+        next_status = _STATUS_CYCLE[(idx + 1) % len(_STATUS_CYCLE)]
         self.app.db.set_client_month_status(client_id, self._month_key(), next_status)
         self.app.set_status(f"Status advanced to '{_STATUS_LABEL[next_status]}' for this client.")
         self.refresh()
@@ -980,6 +999,16 @@ class FeedbackLabel(ctk.CTkLabel):
         super().__init__(master, text="", anchor="w", wraplength=WRAP_CARD, **kwargs)
         self.bind("<Configure>", lambda e: self.configure(wraplength=max(240, e.width - 8)))
         self._dismiss_after_id: str | None = None
+        self.bind("<Destroy>", self._on_destroy, add="+")
+
+    def _on_destroy(self, _event=None) -> None:
+        """Cancel pending after callback before the widget is destroyed."""
+        if self._dismiss_after_id is not None:
+            try:
+                self.after_cancel(self._dismiss_after_id)
+            except Exception:
+                pass
+            self._dismiss_after_id = None
 
     def _schedule_dismiss(self) -> None:
         if self._dismiss_after_id is not None:
@@ -991,7 +1020,11 @@ class FeedbackLabel(ctk.CTkLabel):
 
     def _auto_dismiss(self) -> None:
         self._dismiss_after_id = None
-        self.configure(text="")
+        try:
+            if self.winfo_exists():
+                self.configure(text="")
+        except Exception:
+            pass
 
     def success(self, message: str) -> None:
         self.configure(text=message, text_color=FEEDBACK_SUCCESS)

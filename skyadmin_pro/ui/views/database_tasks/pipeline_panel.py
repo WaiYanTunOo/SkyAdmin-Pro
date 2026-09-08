@@ -198,6 +198,65 @@ class ServicePipelinePanel(ctk.CTkFrame):
 
         run_background(self, work=work, on_success=on_success, on_error=on_error)
 
+    def _silent_refresh(self) -> None:
+        """Refresh the pipeline tree without showing the loading feedback message."""
+        from skyadmin_pro.ui.async_ui import run_background
+
+        try:
+            current_client = self.pipe_client.get()
+        except Exception:
+            current_client = ""
+
+        self._refresh_seq += 1
+        seq = self._refresh_seq
+        db = self.app.db
+        page, page_size = self._page, self._page_size
+
+        def work():
+            return {
+                "names": db.list_client_names(),
+                "service_types": db.list_service_types(),
+                "items": db.list_pipeline_items(limit=page_size + 1, offset=page * page_size),
+                "summary": db.pipeline_summary(),
+                "current_client": current_client,
+            }
+
+        def on_success(payload) -> None:
+            if seq != self._refresh_seq or not self.winfo_exists():
+                return
+            fill_combo(self.pipe_client, payload["names"], payload["current_client"])
+            self.pipe_service.configure(values=payload["service_types"])
+            fetched = payload["items"]
+            self._has_more = len(fetched) > self._page_size
+            shown = fetched[: self._page_size]
+            rows: list[tuple] = []
+            iids: list[str] = []
+            tags: list[list[str]] = []
+            for item in shown:
+                step = max(1, min(int(item["step"]), PIPELINE_MAX_STEP))
+                status = PIPELINE_STEPS[step - 1]
+                tag = "done" if step == PIPELINE_MAX_STEP else ("wip" if step in (4, 5, 6, 7, 8) else "")
+                rows.append(
+                    (
+                        item.get("client_name") or "Unassigned",
+                        item["service"],
+                        f"{step}/{PIPELINE_MAX_STEP}",
+                        status,
+                        item.get("updated_at") or "",
+                    )
+                )
+                iids.append(str(item["id"]))
+                tags.append([tag] if tag else [])
+            self.pipe_tree.set_rows(rows, iids=iids, tags=tags, empty_message="No pipeline items yet.")
+            summary = payload["summary"]
+            self.summary.configure(text=f"{summary['total']} engagement(s) tracked — {summary['completed']} completed.")
+            self._update_pager(len(shown))
+
+        def on_error(msg: str) -> None:
+            pass  # silently ignore errors on silent refresh
+
+        run_background(self, work=work, on_success=on_success, on_error=on_error)
+
     def _update_pager(self, shown: int) -> None:
         label = f"Page {self._page + 1} · {shown} shown"
         if self._has_more:
@@ -241,11 +300,17 @@ class ServicePipelinePanel(ctk.CTkFrame):
         if service not in self.app.db.list_service_types():
             self.feedback.error("Pick a service from the list — add new services in Settings.")
             return
-        client_id = self.app.db.get_or_create_client(name)
-        self.app.db.add_pipeline_item(client_id=client_id, service=service)
-        self.pipe_service.set("")
+        try:
+            client_id = self.app.db.get_or_create_client(name)
+            self.app.db.add_pipeline_item(client_id=client_id, service=service)
+        except Exception as exc:
+            self.feedback.error(f"Could not add pipeline item: {exc}")
+            return
         self.feedback.success(f"Added {name} — {service} to the pipeline (step 1).")
-        self.refresh()
+        # Silent refresh — clear the loading message so it doesn't flash
+        self.pipe_tree.apply_theme()
+        self._page = 0
+        self._silent_refresh()
         self._refresh_tasks_panel()
 
     def _selected_item_id(self) -> int | None:
@@ -259,11 +324,18 @@ class ServicePipelinePanel(ctk.CTkFrame):
         if item_id is None:
             self.feedback.error("Select a pipeline item first.")
             return
-        item = self.app.db.get_pipeline_item(int(item_id))
+        try:
+            item = self.app.db.get_pipeline_item(int(item_id))
+        except Exception:
+            item = None
         if item and int(item["step"]) >= PIPELINE_MAX_STEP:
             self.feedback.info("This item is already completed.")
             return
-        self.app.db.advance_pipeline(int(item_id))
+        try:
+            self.app.db.advance_pipeline(int(item_id))
+        except Exception as exc:
+            self.feedback.error(f"Could not advance pipeline: {exc}")
+            return
         self.feedback.success("Pipeline advanced one step.")
         self.refresh()
         self._refresh_tasks_panel()
@@ -281,7 +353,11 @@ class ServicePipelinePanel(ctk.CTkFrame):
             step = 1
         if step > PIPELINE_MAX_STEP:
             step = PIPELINE_MAX_STEP
-        self.app.db.set_pipeline_step(item_id, step)
+        try:
+            self.app.db.set_pipeline_step(item_id, step)
+        except Exception as exc:
+            self.feedback.error(f"Could not set step: {exc}")
+            return
         self.feedback.success(f"Step set to {PIPELINE_STEPS[step - 1]}.")
         self.refresh()
         self._refresh_tasks_panel()
@@ -297,7 +373,11 @@ class ServicePipelinePanel(ctk.CTkFrame):
             parent=self.winfo_toplevel(),
         ):
             return
-        self.app.db.delete_pipeline_item(item_id)
+        try:
+            self.app.db.delete_pipeline_item(item_id)
+        except Exception as exc:
+            self.feedback.error(f"Could not delete pipeline item: {exc}")
+            return
         self.feedback.success("Pipeline item deleted.")
         self.refresh()
         self._refresh_tasks_panel()

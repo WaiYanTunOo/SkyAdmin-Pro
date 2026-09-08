@@ -321,16 +321,24 @@ class RenewalPanel(ctk.CTkFrame):
         checkbox = self._checkboxes.get(item_id)
         if checkbox is None:
             return
-        self.app.db.set_renewal_item_done(item_id, bool(checkbox.get()))
+        try:
+            self.app.db.set_renewal_item_done(item_id, bool(checkbox.get()))
+        except Exception as exc:
+            self.feedback.error(f"Could not update item: {exc}")
+            return
         self._update_progress()
 
     def _reset_all(self) -> None:
         client_id = self._selected_client_id()
         if client_id is None:
             return
-        items = self.app.db.list_renewal_checklist(client_id, self._template)
-        for item in items:
-            self.app.db.set_renewal_item_done(int(item["id"]), False)
-        fresh = self.app.db.list_renewal_checklist(client_id, self._template)
+        try:
+            items = self.app.db.list_renewal_checklist(client_id, self._template)
+            for item in items:
+                self.app.db.set_renewal_item_done(int(item["id"]), False)
+            fresh = self.app.db.list_renewal_checklist(client_id, self._template)
+        except Exception as exc:
+            self.feedback.error(f"Could not reset checklist: {exc}")
+            return
         self._rebuild_checklist(fresh)
         self.feedback.success("Renewal checklist reset — all items to do.")

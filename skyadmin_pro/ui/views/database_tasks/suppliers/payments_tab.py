@@ -202,11 +202,18 @@ class SupplierPaymentsTab:
         if not supplier_name:
             self.feedback.error("Select or type a supplier name.")
             return
-        supplier_id = self.app.db.get_or_create_supplier(supplier_name)
+        try:
+            supplier_id = self.app.db.get_or_create_supplier(supplier_name)
+        except Exception as exc:
+            self.feedback.error(f"Could not resolve supplier: {exc}")
+            return
         client_id: int | None = None
         client_name = self.pay_client.get().strip()
         if client_name:
-            client_id = self.app.db.client_id_by_name(client_name)
+            try:
+                client_id = self.app.db.client_id_by_name(client_name)
+            except Exception:
+                client_id = None
             if client_id is None:
                 self.feedback.error(f"Client '{client_name}' does not exist — add the client first.")
                 return
@@ -227,12 +234,16 @@ class SupplierPaymentsTab:
             paid_date=pay_date,
             notes=self.pay_notes.get().strip() or None,
         )
-        if self._editing_payment_id:
-            self.app.db.update_supplier_payment(self._editing_payment_id, **fields)
-            self.feedback.success("Supplier payment updated.")
-        else:
-            self.app.db.add_supplier_payment(**fields)
-            self.feedback.success("Supplier payment recorded.")
+        try:
+            if self._editing_payment_id:
+                self.app.db.update_supplier_payment(self._editing_payment_id, **fields)
+                self.feedback.success("Supplier payment updated.")
+            else:
+                self.app.db.add_supplier_payment(**fields)
+                self.feedback.success("Supplier payment recorded.")
+        except Exception as exc:
+            self.feedback.error(f"Could not save payment: {exc}")
+            return
         self._new_payment()
         self.host.refresh()
 
@@ -280,7 +291,10 @@ class SupplierPaymentsTab:
         if iid is None:
             self.feedback.error("Select a payment first.")
             return
-        payment = self.app.db.get_supplier_payment(int(iid))
+        try:
+            payment = self.app.db.get_supplier_payment(int(iid))
+        except Exception:
+            payment = None
         if payment is None:
             self.feedback.error("Payment record not found.")
             return
@@ -320,7 +334,11 @@ class SupplierPaymentsTab:
             if not parsed:
                 self.feedback.error("Enter a valid payment date.")
                 return
-            self.app.db.set_supplier_payment_paid(int(iid), True, paid_date=parsed)
+            try:
+                self.app.db.set_supplier_payment_paid(int(iid), True, paid_date=parsed)
+            except Exception as exc:
+                self.feedback.error(f"Could not mark as paid: {exc}")
+                return
             top.destroy()
             self.feedback.success("Payment marked as paid.")
             self.host.refresh()

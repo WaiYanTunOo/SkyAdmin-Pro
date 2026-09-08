@@ -69,6 +69,7 @@ class CanvasScrollFrame(ctk.CTkFrame):
         # Bind wheel to widget and all current descendants; called on content changes.
         # Iterative (no recursion-depth risk) with a bound-path set so repeated
         # passes don't stack duplicate handlers on the same widget.
+        # Skip Treeview widgets — they handle their own scrolling.
         try:
             for dead in [p for p in self._wheel_bound]:
                 try:
@@ -81,13 +82,12 @@ class CanvasScrollFrame(ctk.CTkFrame):
         while stack:
             child = stack.pop()
             try:
-                if "ThemedTreeview" in [c.__name__ for c in type(child).__mro__]:
-                    continue
                 try:
-                    if child.winfo_class() == "Treeview":
-                        continue
-                except Exception:  # defensive: Tk teardown/callback
-                    pass
+                    cls = child.winfo_class()
+                except Exception:
+                    continue
+                if cls == "Treeview":
+                    continue  # Treeview handles its own scrolling
                 path = str(child)
                 if path not in self._wheel_bound:
                     child.bind("<MouseWheel>", self._on_mousewheel, add="+")
@@ -108,10 +108,14 @@ class CanvasScrollFrame(ctk.CTkFrame):
         try:
             w = event.widget
             while w is not None:
-                if w.winfo_class() == "Treeview":
+                try:
+                    cls = w.winfo_class()
+                except Exception:
+                    break
+                if cls == "Treeview":
                     return  # let tree handle
                 try:
-                    w = w.master  # type: ignore[attr-defined]
+                    w = w.master
                 except Exception:
                     break
         except Exception:  # defensive: Tk teardown/callback
@@ -131,10 +135,14 @@ class CanvasScrollFrame(ctk.CTkFrame):
         try:
             w = event.widget
             while w is not None:
-                if w.winfo_class() == "Treeview":
+                try:
+                    cls = w.winfo_class()
+                except Exception:
+                    break
+                if cls == "Treeview":
                     return
                 try:
-                    w = w.master  # type: ignore[attr-defined]
+                    w = w.master
                 except Exception:
                     break
         except Exception:  # defensive: Tk teardown/callback
