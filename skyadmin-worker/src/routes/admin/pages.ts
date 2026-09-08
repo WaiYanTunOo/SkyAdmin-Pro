@@ -688,7 +688,7 @@ function renderBans(){
           showStatus('Unbanned');
           loadBans();
         }).catch(function(e){alert(e.message);});
-      };c.appendChild(x);box.appendChild(c);
+      });c.appendChild(x);box.appendChild(c);
     })(m);
   }
 }
