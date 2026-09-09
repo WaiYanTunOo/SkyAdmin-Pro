@@ -7,9 +7,9 @@ from datetime import date
 from pathlib import Path
 from typing import TYPE_CHECKING, Any
 
-if TYPE_CHECKING:
-    import pandas as pd
+from openpyxl import Workbook
 
+if TYPE_CHECKING:
     from skyadmin_pro.database import Database
 
 
@@ -19,14 +19,32 @@ def _assert_export_columns_safe(columns) -> None:
         raise ValueError(f"Refusing export — forbidden column(s): {', '.join(sorted(bad))}")
 
 
-def _sheet(frame, mapping: dict[str, str]) -> pd.DataFrame:
-    import pandas as pd
+def _ordered_keys(records: list[dict[str, Any]]) -> list[str]:
+    """Column-key order matching pandas' list-of-dicts DataFrame construction."""
+    seen: list[str] = []
+    for record in records:
+        for key in record:
+            if key not in seen:
+                seen.append(key)
+    return seen
 
-    if frame is None or frame.empty:
-        return pd.DataFrame(columns=list(mapping.values()))
-    keep = [column for column in mapping if column in frame.columns]
+
+def _sheet_rows(records: list[dict[str, Any]], mapping: dict[str, str]) -> tuple[list[str], list[list[Any]]]:
+    """Return (headers, rows) for a sheet using the column mapping.
+
+    Mirrors the old pandas path: only mapping keys present in the data are
+    kept (in mapping order); empty data yields the full header set; data with
+    no matching keys yields no headers and no rows.
+    """
+    keep = [column for column in mapping if column in _ordered_keys(records)]
     _assert_export_columns_safe(keep)
-    return frame[keep].rename(columns=mapping)
+    if not records:
+        return list(mapping.values()), []
+    if not keep:
+        return [], []
+    headers = [mapping[column] for column in keep]
+    rows = [[record.get(column) for column in keep] for record in records]
+    return headers, rows
 
 
 def _atomic_excel_write(writer_builder, dest: Path) -> Path:
@@ -45,7 +63,7 @@ def _atomic_excel_write(writer_builder, dest: Path) -> Path:
         OSError,
         ValueError,
         KeyError,
-    ):  # defensive: pandas/openpyxl/xlsxwriter can raise any type — clean tmp, then re-raise
+    ):  # defensive: openpyxl can raise any type — clean tmp, then re-raise
         try:
             tmp.unlink(missing_ok=True)
         except OSError:
@@ -146,8 +164,6 @@ def collect_export_payload(
 
 def write_excel_from_payload(payload: dict[str, Any], dest: str | Path) -> str:
     """Build the Excel workbook from a picklable payload. Returns dest as str."""
-    import pandas as pd
-
     tasks = payload.get("tasks") or []
     clients = payload.get("clients") or []
     documents = payload.get("documents") or []
@@ -160,37 +176,49 @@ def write_excel_from_payload(payload: dict[str, Any], dest: str | Path) -> str:
     financial_docs = payload.get("financial_docs") or []
     visible_only = payload.get("visible_only")
 
+    def normalize_paid(records: list[dict[str, Any]]) -> list[dict[str, Any]]:
+        if records and "paid" in _ordered_keys(records):
+            return [
+                {
+                    **record,
+                    "paid": (
+                        "Yes"
+                        if record.get("paid") in (1, True)
+                        else ("No" if record.get("paid") in (0, False) else record.get("paid"))
+                    ),
+                }
+                for record in records
+            ]
+        return records
+
+    def effective_mapping(sheet: str, mapping: dict[str, str]) -> dict[str, str]:
+        if not visible_only or sheet not in visible_only:
+            return mapping
+        keep = [field for field in mapping if field in set(visible_only[sheet])]
+        # Never silently empty a sheet — fall back to complete mapping.
+        return {k: mapping[k] for k in keep} if keep else mapping
+
     def build(target: Path) -> None:
-        payments_frame = pd.DataFrame(supplier_payments)
-        if not payments_frame.empty and "paid" in payments_frame.columns:
-            payments_frame = payments_frame.copy()
-            payments_frame["paid"] = payments_frame["paid"].apply(
-                lambda value: "Yes" if value in (1, True) else ("No" if value in (0, False) else value)
-            )
-
-        def effective_mapping(sheet: str, mapping: dict[str, str]) -> dict[str, str]:
-            if not visible_only or sheet not in visible_only:
-                return mapping
-            keep = [field for field in mapping if field in set(visible_only[sheet])]
-            # Never silently empty a sheet — fall back to complete mapping.
-            return {k: mapping[k] for k in keep} if keep else mapping
-
-        with pd.ExcelWriter(target, engine="openpyxl") as writer:
-            for sheet_name, frame, mapping in (
-                ("Tasks", pd.DataFrame(tasks), _TASK_COLUMNS),
-                ("Clients", pd.DataFrame(clients), _CLIENT_COLUMNS),
-                ("Documents", pd.DataFrame(documents), _DOCUMENT_COLUMNS),
-                ("Courier", pd.DataFrame(courier), _COURIER_COLUMNS),
-                ("Suppliers", pd.DataFrame(suppliers), _SUPPLIER_COLUMNS),
-                ("Supplier Payments", payments_frame, _SUPPLIER_PAYMENT_COLUMNS),
-                ("Supplier Services", pd.DataFrame(supplier_services), _SUPPLIER_SERVICE_COLUMNS),
-                ("Pipeline", pd.DataFrame(pipeline), _PIPELINE_COLUMNS),
-                ("Renewals", pd.DataFrame(renewals), _RENEWAL_COLUMNS),
-                ("Financial Docs", pd.DataFrame(financial_docs), _FINANCIAL_DOC_COLUMNS),
-            ):
-                _sheet(frame, effective_mapping(sheet_name, mapping)).to_excel(
-                    writer, sheet_name=sheet_name[:31], index=False
-                )
+        payments = normalize_paid(supplier_payments)
+        wb = Workbook(write_only=True)
+        for sheet_name, records, mapping in (
+            ("Tasks", tasks, _TASK_COLUMNS),
+            ("Clients", clients, _CLIENT_COLUMNS),
+            ("Documents", documents, _DOCUMENT_COLUMNS),
+            ("Courier", courier, _COURIER_COLUMNS),
+            ("Suppliers", suppliers, _SUPPLIER_COLUMNS),
+            ("Supplier Payments", payments, _SUPPLIER_PAYMENT_COLUMNS),
+            ("Supplier Services", supplier_services, _SUPPLIER_SERVICE_COLUMNS),
+            ("Pipeline", pipeline, _PIPELINE_COLUMNS),
+            ("Renewals", renewals, _RENEWAL_COLUMNS),
+            ("Financial Docs", financial_docs, _FINANCIAL_DOC_COLUMNS),
+        ):
+            headers, rows = _sheet_rows(records, effective_mapping(sheet_name, mapping))
+            ws = wb.create_sheet(title=sheet_name[:31])
+            ws.append(headers)
+            for row in rows:
+                ws.append(row)
+        wb.save(target)
 
     return str(_atomic_excel_write(build, Path(dest)))
 
@@ -213,7 +241,7 @@ def export_to_excel(
     filter would empty them, export complete — a sheet is never silently
     emptied. FORBIDDEN_EXPORT_COLUMNS never export regardless.
 
-    When *offload* is True, pandas/openpyxl run in a child process after DB
+    When *offload* is True, openpyxl runs in a child process after DB
     queries complete in the parent (connections are never pickled).
     """
     payload = collect_export_payload(
@@ -379,15 +407,16 @@ def collect_monthly_report_payload(db: Database, year: int, month: int) -> dict[
 
 def write_monthly_report_from_payload(payload: dict[str, Any], dest: str | Path) -> str:
     """Write monthly incentive Excel from a picklable payload."""
-    import pandas as pd
-
     columns = payload.get("columns") or ["No.", "Date", "Client", "Service", "Amount"]
     records = payload.get("records") or []
 
     def build(target: Path) -> None:
-        df = pd.DataFrame(records, columns=columns)
-        with pd.ExcelWriter(target, engine="openpyxl") as writer:
-            df.to_excel(writer, sheet_name="Pipeline", index=False)
+        wb = Workbook(write_only=True)
+        ws = wb.create_sheet(title="Pipeline")
+        ws.append(columns)
+        for record in records:
+            ws.append([record.get(column) for column in columns])
+        wb.save(target)
 
     return str(_atomic_excel_write(build, Path(dest)))
 

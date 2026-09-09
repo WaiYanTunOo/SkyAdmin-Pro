@@ -37,15 +37,27 @@ def test_export_supplier_columns(db, tmp_path):
     export_to_excel(db, dest)
     assert dest.exists()
 
-    import pandas as pd
+    import openpyxl
 
-    suppliers = pd.read_excel(dest, sheet_name="Suppliers")
-    assert "Company" in suppliers.columns
-    assert "Contact" in suppliers.columns
-    assert suppliers.iloc[0]["Supplier"] == "IRD Liaison"
-    assert suppliers.iloc[0]["Company"] == "Gov Services"
-    assert suppliers.iloc[0]["Contact"] == "officer@example.com"
+    wb = openpyxl.load_workbook(dest, read_only=True, data_only=True)
+    try:
+        suppliers = wb["Suppliers"]
+        headers = [cell.value for cell in next(suppliers.iter_rows(min_row=1, max_row=1))]
+        first = next(suppliers.iter_rows(min_row=2, max_row=2, values_only=True))
+    finally:
+        wb.close()
+    assert "Company" in headers
+    assert "Contact" in headers
+    assert first[headers.index("Supplier")] == "IRD Liaison"
+    assert first[headers.index("Company")] == "Gov Services"
+    assert first[headers.index("Contact")] == "officer@example.com"
 
-    payments = pd.read_excel(dest, sheet_name="Supplier Payments")
-    assert "Notes" in payments.columns
-    assert payments.iloc[0]["Notes"] == "Filing fee"
+    wb = openpyxl.load_workbook(dest, read_only=True, data_only=True)
+    try:
+        payments = wb["Supplier Payments"]
+        pay_headers = [cell.value for cell in next(payments.iter_rows(min_row=1, max_row=1))]
+        pay_first = next(payments.iter_rows(min_row=2, max_row=2, values_only=True))
+    finally:
+        wb.close()
+    assert "Notes" in pay_headers
+    assert pay_first[pay_headers.index("Notes")] == "Filing fee"
