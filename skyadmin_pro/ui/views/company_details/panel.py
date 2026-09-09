@@ -168,9 +168,9 @@ class CompanyDetailsPanel(
         elif name == SUBTAB_GENERAL:
             # Company info form scrolls; service/doc trees stay outside CanvasScrollFrame.
             tab.grid_columnconfigure(0, weight=1)
-            tab.grid_rowconfigure(0, weight=3)
-            tab.grid_rowconfigure(1, weight=2)
-            tab.grid_rowconfigure(2, weight=2)
+            tab.grid_rowconfigure(0, weight=1)
+            tab.grid_rowconfigure(1, weight=3)
+            tab.grid_rowconfigure(2, weight=3)
             general_scroll = CanvasScrollFrame(tab)
             general_scroll.grid(row=0, column=0, sticky="nsew")
             general_scroll.content.grid_columnconfigure(0, weight=1)
