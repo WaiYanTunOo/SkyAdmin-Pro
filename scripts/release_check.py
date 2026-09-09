@@ -23,6 +23,7 @@ if str(ROOT) not in sys.path:
     sys.path.insert(0, str(ROOT))
 DEFAULT_EXE = ROOT / "dist" / "SkyAdminPro.exe"
 MIN_EXE_BYTES = 10 * 1024 * 1024
+MAX_EXE_BYTES = 65 * 1024 * 1024
 FORBIDDEN_EXE_STRINGS = (
     b"skyadmin_pro.services.license_authoring",
     b"generate_ed25519_license",
@@ -52,7 +53,9 @@ def check_exe(exe: Path) -> list[str]:
     size = exe.stat().st_size
     if size < MIN_EXE_BYTES:
         errors.append(_fail(f"Executable too small ({size:,} bytes) — expected a full PyInstaller build"))
-    else:
+    if size > MAX_EXE_BYTES:
+        errors.append(_fail(f"Executable too large ({size:,} bytes) — ceiling {MAX_EXE_BYTES:,} (trimmed Qt bundle regression?)"))
+    if MIN_EXE_BYTES <= size <= MAX_EXE_BYTES:
         _ok(f"Executable size {size / (1024 * 1024):.1f} MB")
 
     data = exe.read_bytes()

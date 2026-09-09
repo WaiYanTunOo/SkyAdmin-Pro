@@ -12,13 +12,14 @@ import pytest
 ROOT = Path(__file__).resolve().parents[1]
 EXE = ROOT / "dist" / "SkyAdminPro.exe"
 MIN_EXE_BYTES = 10 * 1024 * 1024
+MAX_EXE_BYTES = 65 * 1024 * 1024
 
 
 @pytest.mark.release
 def test_exe_exists_and_reasonable_size():
     if not EXE.is_file():
         pytest.skip("dist/SkyAdminPro.exe not built — run pyinstaller SkyAdminPro.spec")
-    assert EXE.stat().st_size >= MIN_EXE_BYTES
+    assert MIN_EXE_BYTES <= EXE.stat().st_size <= MAX_EXE_BYTES
 
 
 @pytest.mark.release
