@@ -23,9 +23,11 @@ def test_default_workspace_root_frozen(monkeypatch, tmp_path):
     fake_exe = tmp_path / "bin" / "SkyAdminPro.exe"
     monkeypatch.setattr(sys, "frozen", True, raising=False)
     monkeypatch.setattr(sys, "executable", str(fake_exe))
+    monkeypatch.setattr(sys, "platform", "win32")
+    monkeypatch.setenv("LOCALAPPDATA", str(tmp_path))
 
     root = default_workspace_root()
-    assert root == fake_exe.parent / "Workspace"
+    assert root == tmp_path / APP_NAME / "Workspace"
 
 
 def test_workspace_paths_structure(tmp_path):
