@@ -92,7 +92,7 @@ def _machine_salt() -> bytes:
         raise RuntimeError(
             "Machine ID unavailable — cannot derive database key. "
             "Reinstall the application or set the SKYADMIN_MACHINE_ID environment variable."
-        )
+        ) from None
 
 
 def derive_db_key_hex() -> str:

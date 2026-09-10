@@ -6,6 +6,8 @@ supplier paperwork; suppliers themselves are contacted in English.
 
 from __future__ import annotations
 
+from typing import Protocol
+
 # (label, source code, target code)
 TRANSLATE_DIRECTIONS: tuple[tuple[str, str, str], ...] = (
     ("Burmese → English", "my", "en"),
@@ -20,6 +22,10 @@ DEFAULT_DIRECTION = TRANSLATE_DIRECTIONS[0][0]
 TRANSLATE_TIMEOUT_S = 15.0
 
 
+class _Translator(Protocol):
+    def translate(self, text: str) -> str: ...
+
+
 def direction_codes(label: str) -> tuple[str, str]:
     for name, source, target in TRANSLATE_DIRECTIONS:
         if name == label:
@@ -27,7 +33,7 @@ def direction_codes(label: str) -> tuple[str, str]:
     return TRANSLATE_DIRECTIONS[0][1], TRANSLATE_DIRECTIONS[0][2]
 
 
-def _translate_once(translator, text: str) -> str:
+def _translate_once(translator: _Translator, text: str) -> str:
     """Run one blocking translate call with a timeout (daemon thread + join).
 
     The worker is daemonic so a timed-out call never outlives the process;

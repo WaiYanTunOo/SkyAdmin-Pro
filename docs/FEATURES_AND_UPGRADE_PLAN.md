@@ -1,7 +1,7 @@
 # SkyAdmin Pro — Features & Upgrade Plan
 
-**Version baseline:** `0.3.3`  
-**Stack:** Python 3 + CustomTkinter + SQLite · Cloudflare Worker (TypeScript/Hono) + D1  
+**Version baseline:** `0.3.3`
+**Stack:** Python 3 + CustomTkinter + SQLite · Cloudflare Worker (TypeScript/Hono) + D1
 **Status:** Phases 7–11, S1 hardening, and residual sprint **P0–P3** are landed. This document inventories **what the product does today** and the **ordered plan to upgrade** next.
 
 Related: [MASTER_ROADMAP.md](MASTER_ROADMAP.md) · [ARCHITECTURE.md](ARCHITECTURE.md) · [ROADMAP.md](ROADMAP.md) · [AGENTS.md](../AGENTS.md)
@@ -163,9 +163,9 @@ flowchart LR
     E -->|No| G[Stay on CustomTkinter]
 ```
 
-**Now:** Wave A **human** MANUAL_QA / UI_CHECKLIST, then **tag release** (see §6) when secrets ready.  
-**Landed:** Wave B F1.1–F1.6 + Wave C C1–C3 in tree.  
-**Next:** Wave D ops / human QA.  
+**Now:** Wave A **human** MANUAL_QA / UI_CHECKLIST, then **tag release** (see §6) when secrets ready.
+**Landed:** Wave B F1.1–F1.6 + Wave C C1–C3 in tree.
+**Next:** Wave D ops / human QA.
 **Avoid:** Re-doing landed security/UI/CI work; baking new columns into applied D1 `0001`.
 
 ---

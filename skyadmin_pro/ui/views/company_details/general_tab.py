@@ -14,6 +14,7 @@ from skyadmin_pro.services.file_ops import (
 from skyadmin_pro.ui.canvas_scroll import CanvasScrollFrame
 from skyadmin_pro.ui.theme import CARD_RADIUS, CARD_TITLE_SIZE, TEXT_MUTED
 from skyadmin_pro.ui.treeview import ThemedTreeview
+from skyadmin_pro.ui.views.company_details.constants import SUBTAB_GENERAL
 from skyadmin_pro.ui.widgets import DatePickerField, bind_wrap_label, themed_entry, themed_textbox
 
 
@@ -111,7 +112,7 @@ class GeneralTabMixin:
             self.feedback.error(f"Could not save company info: {exc}")
             return
         self.feedback.success("Company info saved.")
-        self._refresh_general_mutation()
+        self._refresh_after_mutation(SUBTAB_GENERAL)
 
     def _build_services(self, master) -> ctk.CTkFrame:
         frame = ctk.CTkFrame(master, corner_radius=CARD_RADIUS)

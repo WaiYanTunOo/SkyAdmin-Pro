@@ -173,11 +173,27 @@ def _apply_input_theme(widget: ctk.CTkBaseClass) -> None:
 
 
 _LAST_THEME_MODE: str | None = None
+_THEMED_WIDGETS: set[int] = set()
+
+
+def _clear_theme_cache() -> None:
+    """Clear the theme cache when appearance mode changes."""
+    global _THEMED_WIDGETS
+    _THEMED_WIDGETS.clear()
 
 
 def apply_form_theme(root: ctk.Misc) -> None:
-    """Re-apply input and table styling after appearance mode changes."""
+    """Re-apply input and table styling after appearance mode changes.
+
+    Tracks already-themed widgets per appearance mode to skip redundant walks.
+    """
     from skyadmin_pro.ui.canvas_scroll import CanvasScrollFrame
+
+    # Skip if already themed for current mode
+    widget_id = id(root)
+    if widget_id in _THEMED_WIDGETS:
+        return
+    _THEMED_WIDGETS.add(widget_id)
 
     if isinstance(root, ThemedTreeview):
         root.apply_theme()
@@ -208,6 +224,7 @@ def should_apply_theme() -> bool:
     if current == _LAST_THEME_MODE:
         return False
     _LAST_THEME_MODE = current
+    _clear_theme_cache()
     return True
 
 

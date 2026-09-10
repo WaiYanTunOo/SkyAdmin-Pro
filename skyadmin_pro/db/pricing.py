@@ -2,13 +2,18 @@
 
 from __future__ import annotations
 
+from typing import TYPE_CHECKING
+
 from skyadmin_pro.config import (
     DEFAULT_PRICING_MATRIX,
 )
 
+if TYPE_CHECKING:
+    from skyadmin_pro.db.core import CoreMixin
+
 
 class PricingMixin:
-    def get_pricing_matrix(self, *, service_type: str | None = None) -> list[dict]:
+    def get_pricing_matrix(self: CoreMixin, *, service_type: str | None = None) -> list[dict]:
         if service_type:
             return self._fetch_all(
                 """
@@ -20,11 +25,11 @@ class PricingMixin:
             )
         return self._fetch_all("SELECT * FROM pricing_matrix ORDER BY service_type, monthly_fee ASC")
 
-    def get_pricing_tier(self, tier_id: int) -> dict | None:
+    def get_pricing_tier(self: CoreMixin, tier_id: int) -> dict | None:
         return self._fetch_one("SELECT * FROM pricing_matrix WHERE id = ?", (tier_id,))
 
     def add_pricing_tier(
-        self,
+        self: CoreMixin,
         *,
         service_type: str,
         transaction_range: str,
@@ -55,7 +60,7 @@ class PricingMixin:
             return int(cursor.lastrowid)
 
     def update_pricing_tier(
-        self,
+        self: CoreMixin,
         tier_id: int,
         *,
         service_type: str | None = None,
@@ -88,12 +93,12 @@ class PricingMixin:
                 tuple(params),
             )
 
-    def delete_pricing_tier(self, tier_id: int) -> None:
+    def delete_pricing_tier(self: CoreMixin, tier_id: int) -> None:
         with self.connection() as conn:
             conn.execute("DELETE FROM pricing_matrix WHERE id = ?", (tier_id,))
 
     def lookup_pricing_by_range(
-        self,
+        self: CoreMixin,
         transaction_range: str,
         *,
         service_type: str | None = None,
@@ -123,7 +128,7 @@ class PricingMixin:
             (transaction_range,),
         )
 
-    def reset_service_pricing_to_defaults(self, service_type: str) -> None:
+    def reset_service_pricing_to_defaults(self: CoreMixin, service_type: str) -> None:
         from skyadmin_pro.config import (
             PRICING_DEFAULT_SERVICE,
             default_charge_lines_for,

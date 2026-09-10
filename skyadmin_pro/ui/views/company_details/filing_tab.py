@@ -12,6 +12,7 @@ from skyadmin_pro.config import (
 from skyadmin_pro.ui.debounce import debounced_after
 from skyadmin_pro.ui.theme import CARD_RADIUS, CARD_TITLE_SIZE, TEXT_FAINT, TEXT_MUTED
 from skyadmin_pro.ui.treeview import ThemedTreeview
+from skyadmin_pro.ui.views.company_details.constants import SUBTAB_FILING
 from skyadmin_pro.ui.widgets import make_modal
 
 
@@ -190,7 +191,7 @@ class FilingTabMixin:
             )
         self.app.db.update_client_fields(client_id, **{field: new_val})
         if refresh:
-            self._refresh_filing_mutation()
+            self._refresh_after_mutation(SUBTAB_FILING)
         self.feedback.success(f"{TAX_FILING_LABELS.get(field, field)} saved.")
 
     def _save_filing_statuses(self) -> None:
@@ -200,7 +201,7 @@ class FilingTabMixin:
             return
         for field in TAX_FILING_FIELDS:
             self._persist_filing_field(field, refresh=False)
-        self._refresh_filing_mutation()
+        self._refresh_after_mutation(SUBTAB_FILING)
         self.feedback.success("All filing statuses saved.")
 
     def _edit_filing_status(self, field: str) -> None:
@@ -241,7 +242,7 @@ class FilingTabMixin:
                     )
             dialog.destroy()
             self.feedback.success(f"{label} updated to {new_val}.")
-            self._refresh_filing_mutation()
+            self._refresh_after_mutation(SUBTAB_FILING)
 
         ctk.CTkButton(dialog, text="Save", width=100, command=_confirm).grid(
             row=1, column=0, columnspan=2, pady=(12, 16)
@@ -259,7 +260,7 @@ class FilingTabMixin:
         self.app.db.log_tax_change(client_id, field, old_val, "Not Applicable")
         self.app.db.update_client_fields(client_id, **{field: "Not Applicable"})
         self.feedback.success(f"{label} reset to N/A.")
-        self._refresh_filing_mutation()
+        self._refresh_after_mutation(SUBTAB_FILING)
 
     def _reset_all_filing_statuses(self) -> None:
         client_id = self._selected_client_id()
@@ -277,4 +278,4 @@ class FilingTabMixin:
             self.feedback.success(f"{len(updates)} filing status(es) reset to N/A.")
         else:
             self.feedback.info("All filing statuses already N/A.")
-        self._refresh_filing_mutation()
+        self._refresh_after_mutation(SUBTAB_FILING)

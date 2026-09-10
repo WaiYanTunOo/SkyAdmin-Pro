@@ -103,6 +103,7 @@ def collect_export_payload(
     itself holds every row). Revisit only with per-method filter support plus
     a semantics audit.
     """
+
     def _chunked_fetch(fetcher, *, chunk_size: int = 5000):
         """Yield dicts from a list_* method in chunks to limit peak list size."""
         all_rows: list[dict[str, Any]] = []

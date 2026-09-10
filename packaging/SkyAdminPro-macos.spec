@@ -59,10 +59,6 @@ a = Analysis(
     runtime_hooks=[],
     excludes=[
         "skyadmin_pro.services.license_authoring",
-        "PySide6",
-        "PySide6.*",
-        "shiboken6",
-        "shiboken6.*",
         "numpy",
         "numpy.*",
         "Cython",

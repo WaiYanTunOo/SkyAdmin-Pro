@@ -48,6 +48,9 @@ Format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 
 ## [Unreleased]
 
+### Removed
+
+- Qt6 (PySide6) opt-in shell (`skyadmin_pro/ui/qt/`, `requirements-qt6.txt`, CI parity job, release_check gate) — eliminated dual-UI maintenance overhead; CustomTkinter stack meets all perf/UX targets.
 
 ## [0.3.1] - 2026-03-01
 

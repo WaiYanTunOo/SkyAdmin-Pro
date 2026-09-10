@@ -18,6 +18,7 @@ from skyadmin_pro.services.workflow import (
 )
 from skyadmin_pro.ui.theme import CARD_RADIUS, CARD_TITLE_SIZE, TEXT_MUTED
 from skyadmin_pro.ui.treeview import ThemedTreeview
+from skyadmin_pro.ui.views.company_details.constants import SUBTAB_TAX_IDS
 from skyadmin_pro.ui.widgets import DatePickerField, themed_entry
 
 
@@ -277,4 +278,4 @@ class TaxIdsTabMixin:
             self.feedback.error(f"Could not save tax IDs: {exc}")
             return
         self.feedback.success("Tax IDs & service info saved.")
-        self._refresh_tax_ids_mutation()
+        self._refresh_after_mutation(SUBTAB_TAX_IDS)

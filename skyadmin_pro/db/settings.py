@@ -4,6 +4,7 @@ from __future__ import annotations
 
 import json
 import logging
+from typing import TYPE_CHECKING
 
 from skyadmin_pro.config import (
     CHECKLIST_TEMPLATES,
@@ -16,9 +17,12 @@ from skyadmin_pro.db.sql_helpers import (
     _in_clause,
 )
 
+if TYPE_CHECKING:
+    from skyadmin_pro.db.core import CoreMixin
+
 
 class SettingsMixin:
-    def list_checklist_template_names(self) -> list[str]:
+    def list_checklist_template_names(self: CoreMixin) -> list[str]:
         rows = self._fetch_all("SELECT DISTINCT name FROM checklist_templates ORDER BY name")
         return [row["name"] for row in rows] or [name for name, _ in CHECKLIST_TEMPLATES]
 

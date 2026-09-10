@@ -143,4 +143,3 @@ CREATE TABLE IF NOT EXISTS admin_audit_log (
 CREATE INDEX IF NOT EXISTS idx_admin_audit_log_timestamp ON admin_audit_log(timestamp);
 CREATE INDEX IF NOT EXISTS idx_admin_audit_log_action ON admin_audit_log(action);
 CREATE INDEX IF NOT EXISTS idx_admin_audit_log_target ON admin_audit_log(target);
-

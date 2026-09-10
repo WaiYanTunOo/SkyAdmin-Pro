@@ -31,6 +31,8 @@ class CanvasScrollFrame(ctk.CTkFrame):
         # Tk paths of widgets already wheel-bound; prevents stacking duplicate
         # handlers on every scrollregion update (paths are pruned when dead).
         self._wheel_bound: set[str] = set()
+        # Cache of widget paths we've already visited; avoids full tree walk on every scrollregion update.
+        self._widget_cache: set[str] = set()
         self.content.bind("<Configure>", self._on_content_configure)
         self._canvas.bind("<Configure>", self._on_canvas_configure)
         self._pending_scroll_update: str | None = None
@@ -70,6 +72,7 @@ class CanvasScrollFrame(ctk.CTkFrame):
         # Iterative (no recursion-depth risk) with a bound-path set so repeated
         # passes don't stack duplicate handlers on the same widget.
         # Skip Treeview widgets — they handle their own scrolling.
+        # Uses _widget_cache to avoid re-walking already-seen subtrees.
         try:
             for dead in [p for p in self._wheel_bound]:
                 try:
@@ -82,13 +85,18 @@ class CanvasScrollFrame(ctk.CTkFrame):
         while stack:
             child = stack.pop()
             try:
+                path = str(child)
+                # Skip entire subtree if we've already processed this widget
+                if path in self._widget_cache:
+                    continue
+                self._widget_cache.add(path)
+
                 try:
                     cls = child.winfo_class()
                 except Exception:
                     continue
                 if cls == "Treeview":
                     continue  # Treeview handles its own scrolling
-                path = str(child)
                 if path not in self._wheel_bound:
                     child.bind("<MouseWheel>", self._on_mousewheel, add="+")
                     child.bind("<Button-4>", self._on_mousewheel_linux, add="+")

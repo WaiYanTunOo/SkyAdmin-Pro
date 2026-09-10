@@ -11,6 +11,7 @@ from skyadmin_pro.services.tax_ids_rollout import (
     parse_document_types,
 )
 from skyadmin_pro.ui.setup_rollout import RolloutAction, SetupRolloutPanel
+from skyadmin_pro.ui.views.company_details.constants import SUBTAB_GENERAL, SUBTAB_TAX_IDS
 
 
 class AccountingSetupTabMixin:
@@ -122,10 +123,10 @@ class AccountingSetupTabMixin:
         self.refresh_accounting_setup()
         if self._selected_client_id() == int(row["id"]):
             tab = self._current_subtab()
-            if tab == "Tax IDs":
-                self._refresh_tax_ids_mutation()
-            elif tab == "General":
-                self._refresh_general_mutation()
+            if tab == SUBTAB_TAX_IDS:
+                self._refresh_after_mutation(SUBTAB_TAX_IDS)
+            elif tab == SUBTAB_GENERAL:
+                self._refresh_after_mutation(SUBTAB_GENERAL)
 
     def _infer_all_service_types(self) -> None:
         pending = sum(
@@ -163,7 +164,7 @@ class AccountingSetupTabMixin:
             self.refresh_accounting_setup()
             if self._selected_client_id() == client_id:
                 tab = self._current_subtab()
-                if tab == "Tax IDs":
-                    self._refresh_tax_ids_mutation()
+                if tab == SUBTAB_TAX_IDS:
+                    self._refresh_after_mutation(SUBTAB_TAX_IDS)
         else:
             self.feedback.error("No matching pricing tier — check Settings → Pricing matrix.")

@@ -141,7 +141,7 @@ def _rewrite_db_paths(db_file: Path, new_workspace: Path) -> int:
             try:
                 conn.close()
             except Exception:
-                pass
+                logger.debug("Failed to close cipher connection", exc_info=True)
         try:
             import sqlite3 as _sqlite3
 
@@ -185,7 +185,7 @@ def _rewrite_db_paths(db_file: Path, new_workspace: Path) -> int:
                     )
                     updated += cnt
             except Exception:
-                pass  # table may not exist in older schemas
+                logger.debug("Table %s not found during path rewrite", table)
 
         # Update the workspace_root setting.
         try:
@@ -194,18 +194,21 @@ def _rewrite_db_paths(db_file: Path, new_workspace: Path) -> int:
                 (new_root, SETTING_WORKSPACE_ROOT),
             )
         except Exception:
-            pass
+            logger.debug("Settings table not found during path rewrite")
 
         conn.commit()
         if updated:
             logger.info(
-                "Rewrote %d path(s) from %s -> %s", updated, old_root, new_root,
+                "Rewrote %d path(s) from %s -> %s",
+                updated,
+                old_root,
+                new_root,
             )
     finally:
         try:
             conn.close()
         except Exception:
-            pass
+            logger.debug("Failed to close connection after path rewrite", exc_info=True)
     return updated
 
 
@@ -307,7 +310,7 @@ def encrypt_file(path: Path, machine_id: str) -> bool:
             try:
                 os.unlink(tmp_name)
             except OSError:
-                pass
+                logger.debug("Failed to unlink temp file %s", tmp_name, exc_info=True)
             raise
         return True
     except OSError as exc:
@@ -355,7 +358,7 @@ def decrypt_file(path: Path, machine_id: str) -> bool:
             try:
                 os.unlink(tmp_name)
             except OSError:
-                pass
+                logger.debug("Failed to unlink temp file %s", tmp_name, exc_info=True)
             raise
         return True
     except (InvalidToken, OSError, ValueError):
@@ -422,7 +425,7 @@ def inspect_encrypted_backup(archive: Path) -> BackupArchiveInfo:
         try:
             tmp_path.unlink(missing_ok=True)
         except OSError:
-            pass
+            logger.debug("Failed to unlink temp path %s", tmp_path, exc_info=True)
 
 
 def create_encrypted_backup(workspace_root: Path, db_file: Path, dest: Path) -> Path:
@@ -472,7 +475,7 @@ def create_encrypted_backup(workspace_root: Path, db_file: Path, dest: Path) -> 
         try:
             tmp_path.unlink(missing_ok=True)
         except OSError:
-            pass
+            logger.debug("Failed to unlink temp path %s", tmp_path, exc_info=True)
 
 
 def restore_encrypted_backup(archive: Path, workspace_root: Path, db_file: Path) -> RestoreSummary:
@@ -516,10 +519,8 @@ def restore_encrypted_backup(archive: Path, workspace_root: Path, db_file: Path)
                 _verify_sqlite_payload(staged_db)
                 os.replace(staged_db, db_file)
             finally:
-                try:
-                    staged_db.unlink(missing_ok=True)
-                except OSError:
-                    pass
+                pass
+
             remove_sqlite_sidecars(db_file)
 
             restored_files = 0
@@ -553,4 +554,4 @@ def restore_encrypted_backup(archive: Path, workspace_root: Path, db_file: Path)
         try:
             tmp_path.unlink(missing_ok=True)
         except OSError:
-            pass
+            logger.debug("Failed to unlink temp path %s", tmp_path, exc_info=True)

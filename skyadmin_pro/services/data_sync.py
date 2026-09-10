@@ -88,6 +88,7 @@ def load_sync_credentials() -> tuple[str, str] | None:
             mid = str(data.get("machine_id") or "").strip().upper()
             token = str(data.get("sync_token") or "").strip()
             if mid and token:
+                logger.warning("sync_device.json was stored in plaintext; re-encrypting immediately")
                 save_sync_credentials(mid, token)
                 return mid, token
             return None
@@ -281,8 +282,13 @@ def _sync_request_with_retry(
     last_ok, last_err = False, "No attempts made"
     for attempt in range(retries):
         ok, result = _sync_request(
-            method, path, machine_id=machine_id, token=token,
-            body=body, query=query, timeout=timeout,
+            method,
+            path,
+            machine_id=machine_id,
+            token=token,
+            body=body,
+            query=query,
+            timeout=timeout,
         )
         if ok:
             return True, result
@@ -291,7 +297,7 @@ def _sync_request_with_retry(
         retryable = err_str.startswith("Sync HTTP 5") or "timed out" in err_str.lower() or "urllib" in err_str.lower()
         if not retryable or attempt == retries - 1:
             break
-        delay = min(2 ** attempt + random.uniform(0, 0.5), 8)
+        delay = min(2**attempt + random.uniform(0, 0.5), 8)
         logger.debug("Sync %s %s failed (attempt %d), retrying in %.1fs: %s", method, path, attempt + 1, delay, result)
         time.sleep(delay)
     return last_ok, last_err

@@ -10,6 +10,7 @@ from skyadmin_pro.services.vo_csh_rollout import (
     list_vo_csh_setup_rows,
 )
 from skyadmin_pro.ui.setup_rollout import RolloutAction, SetupRolloutPanel
+from skyadmin_pro.ui.views.company_details.constants import SUBTAB_VO_CSH
 
 
 class VoCshSetupTabMixin:
@@ -102,8 +103,8 @@ class VoCshSetupTabMixin:
             return
         self.feedback.success(f"Inferred {result['vo']} VO and {result['csh']} CSH renewal date(s).")
         self.refresh_vo_csh_setup()
-        if self._selected_client_id() == int(row["id"]) and self._current_subtab() == "VO & CSH":
-            self._refresh_vo_csh_mutation()
+        if self._selected_client_id() == int(row["id"]) and self._current_subtab() == SUBTAB_VO_CSH:
+            self._refresh_after_mutation(SUBTAB_VO_CSH)
 
     def _infer_all_vo_csh_dates(self) -> None:
         pending = sum(

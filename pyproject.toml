@@ -44,6 +44,68 @@ known-first-party = ["skyadmin_pro"]
 [tool.pytest.ini_options]
 testpaths = ["tests"]
 markers = [
-    "release: pre-ship build and integration gates (run via scripts/release_check.py)",
+    "release: pre-ship build and integration gates (via scripts/release_check.py)",
     "walkthrough: offscreen UI walkthrough helpers (Phase 4/5)",
 ]
+
+[tool.mypy]
+python_version = "3.10"
+warn_return_any = true
+warn_unused_configs = true
+disallow_untyped_defs = false
+disallow_incomplete_defs = false
+check_untyped_defs = true
+no_implicit_optional = true
+warn_redundant_casts = true
+warn_unused_ignores = true
+warn_no_return = true
+follow_imports = "normal"
+namespace_packages = true
+explicit_package_bases = true
+show_error_codes = true
+pretty = true
+
+[[tool.mypy.overrides]]
+module = [
+    "skyadmin_pro.ui.*",
+    "customtkinter",
+]
+ignore_missing_imports = true
+
+[[tool.mypy.overrides]]
+module = "skyadmin_pro.services.*"
+disallow_untyped_defs = true
+
+[[tool.mypy.overrides]]
+module = "skyadmin_pro.db.*"
+disallow_untyped_defs = true
+
+[[tool.mypy.overrides]]
+module = "skyadmin_pro.config.*"
+disallow_untyped_defs = true
+
+[[tool.mypy.overrides]]
+module = "skyadmin_pro.config.__init__"
+ignore_missing_imports = true
+
+[[tool.mypy.overrides]]
+module = "skyadmin_pro.services.workflow"
+disallow_untyped_defs = false
+ignore_missing_imports = true
+
+[[tool.mypy.overrides]]
+module = "skyadmin_pro.services.translate"
+ignore_missing_imports = true
+
+[[tool.mypy.overrides]]
+module = "skyadmin_pro.services.snippets"
+disallow_untyped_defs = false
+ignore_missing_imports = true
+
+[[tool.mypy.overrides]]
+module = "skyadmin_pro.db.cipher"
+ignore_missing_imports = true
+
+[[tool.mypy.overrides]]
+module = "sqlcipher3.dbapi2"
+ignore_missing_imports = true

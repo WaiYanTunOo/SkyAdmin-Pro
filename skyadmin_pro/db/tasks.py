@@ -2,6 +2,8 @@
 
 from __future__ import annotations
 
+from typing import TYPE_CHECKING
+
 from skyadmin_pro.config import (
     EXPIRY_ALERT_DAYS,
     GENERAL_RENEWAL_TEMPLATE_NAME,
@@ -15,9 +17,14 @@ from skyadmin_pro.db.sql_helpers import (
 )
 from skyadmin_pro.services.tracking import days_until, effective_expiry_date
 
+if TYPE_CHECKING:
+    from skyadmin_pro.db.core import CoreMixin
+
 
 class TasksMixin:
-    def list_tasks(self, status: str | None = None, *, limit: int | None = None, offset: int = 0) -> list[dict]:
+    def list_tasks(
+        self: CoreMixin, status: str | None = None, *, limit: int | None = None, offset: int = 0
+    ) -> list[dict]:
         sql = """
             SELECT t.id, t.client_id, t.title, t.description, t.status, t.category,
                    t.due_date, t.completed_at, t.created_at, t.updated_at,

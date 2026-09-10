@@ -551,7 +551,7 @@ def test_sync_push_paginates_until_drained(db, monkeypatch, fake_app_dir):
             body = json.dumps({"ok": True, "server_time": "2026-08-01T13:00:00Z", "changes": []}).encode()
         else:
             raw = req.data or b"{}"
-            payload = json.loads(raw.decode() if isinstance(raw, (bytes, bytearray)) else raw)
+            payload = json.loads(raw.decode() if isinstance(raw, bytes | bytearray) else raw)
             push_bodies.append(payload.get("changes") or [])
             body = json.dumps(
                 {

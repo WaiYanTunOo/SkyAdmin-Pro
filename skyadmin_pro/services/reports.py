@@ -53,7 +53,7 @@ def _assert_no_forbidden(model: dict) -> None:
                 if str(key).lower() in FORBIDDEN_EXPORT_COLUMNS:
                     raise ValueError(f"Refusing report — forbidden key: {key}")
                 walk(value)
-        elif isinstance(node, (list, tuple)):
+        elif isinstance(node, list | tuple):
             for item in node:
                 walk(item)
 

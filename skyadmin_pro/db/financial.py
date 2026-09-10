@@ -2,14 +2,19 @@
 
 from __future__ import annotations
 
+from typing import TYPE_CHECKING
+
 from skyadmin_pro.db.sql_helpers import (
     _escape_like,
 )
 
+if TYPE_CHECKING:
+    from skyadmin_pro.db.core import CoreMixin
+
 
 class FinancialMixin:
     def add_financial_document(
-        self,
+        self: CoreMixin,
         *,
         client_id: int,
         category: str,
@@ -42,9 +47,9 @@ class FinancialMixin:
                     description,
                 ),
             )
-        return cursor.lastrowid  # type: ignore[return-value]
+            return int(cursor.lastrowid)
 
-    def list_financial_documents(self, client_id: int, category: str | None = None) -> list[dict]:
+    def list_financial_documents(self: CoreMixin, client_id: int, category: str | None = None) -> list[dict]:
         """List financial documents for a client, optionally filtered by category."""
         if category:
             return self._fetch_all(

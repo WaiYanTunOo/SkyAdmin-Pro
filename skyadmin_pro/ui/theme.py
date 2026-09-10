@@ -36,6 +36,7 @@ def set_accent(hue: float) -> None:
     ACCENT_HOVER = (hover_light, hover_dark)
     SIDEBAR_ACTIVE_BG = (primary_light, primary_dark)
 
+
 # Sidebar — tweaked for density / icons
 SIDEBAR_WIDTH = 260
 SIDEBAR_COLLAPSED_WIDTH = 56

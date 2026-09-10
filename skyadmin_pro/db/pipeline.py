@@ -2,15 +2,20 @@
 
 from __future__ import annotations
 
+from typing import TYPE_CHECKING
+
 from skyadmin_pro.config import (
     PIPELINE_MAX_STEP,
     PIPELINE_STEPS,
     PIPELINE_TASK_CATEGORIES,
 )
 
+if TYPE_CHECKING:
+    from skyadmin_pro.db.core import CoreMixin
+
 
 class PipelineMixin:
-    def add_pipeline_item(self, *, client_id: int, service: str, step: int = 1) -> int:
+    def add_pipeline_item(self: CoreMixin, *, client_id: int, service: str, step: int = 1) -> int:
         cleaned = service.strip()
         if not cleaned:
             raise ValueError("Enter a service name.")

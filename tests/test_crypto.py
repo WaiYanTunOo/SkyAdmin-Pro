@@ -128,8 +128,7 @@ def test_restore_rewrites_paths_for_cross_machine(tmp_path):
         ("workspace_root", str(old_ws)),
     )
     conn.execute(
-        "CREATE TABLE documents (id INTEGER PRIMARY KEY, client_id INTEGER, "
-        "document_type TEXT, file_path TEXT)"
+        "CREATE TABLE documents (id INTEGER PRIMARY KEY, client_id INTEGER, " "document_type TEXT, file_path TEXT)"
     )
     conn.execute(
         "INSERT INTO documents (client_id, document_type, file_path) VALUES (?, ?, ?)",
@@ -192,10 +191,11 @@ def test_restore_no_path_rewrite_when_same_root(tmp_path):
     conn.execute("CREATE TABLE settings (key TEXT PRIMARY KEY, value TEXT)")
     conn.execute("INSERT INTO settings (key, value) VALUES (?, ?)", ("workspace_root", str(ws)))
     conn.execute(
-        "CREATE TABLE documents (id INTEGER PRIMARY KEY, client_id INTEGER, "
-        "document_type TEXT, file_path TEXT)"
+        "CREATE TABLE documents (id INTEGER PRIMARY KEY, client_id INTEGER, " "document_type TEXT, file_path TEXT)"
     )
-    conn.execute("INSERT INTO documents (client_id, document_type, file_path) VALUES (?, ?, ?)", (1, "tax", str(ws / "a.pdf")))
+    conn.execute(
+        "INSERT INTO documents (client_id, document_type, file_path) VALUES (?, ?, ?)", (1, "tax", str(ws / "a.pdf"))
+    )
     conn.commit()
     conn.close()
 

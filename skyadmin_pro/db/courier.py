@@ -2,10 +2,15 @@
 
 from __future__ import annotations
 
+from typing import TYPE_CHECKING
+
+if TYPE_CHECKING:
+    from skyadmin_pro.db.core import CoreMixin
+
 
 class CourierMixin:
     def add_courier_log(
-        self,
+        self: CoreMixin,
         *,
         tracking_number: str,
         driver_name: str,
@@ -38,7 +43,7 @@ class CourierMixin:
             )
             return int(cursor.lastrowid)
 
-    def list_courier_logs(self, *, limit: int | None = None, offset: int = 0) -> list[dict]:
+    def list_courier_logs(self: CoreMixin, *, limit: int | None = None, offset: int = 0) -> list[dict]:
         base = """
             SELECT cl.id, cl.client_id, cl.task_id, cl.tracking_number, cl.driver_name,
                    cl.date_sent, cl.destination, cl.notes, cl.created_at,
@@ -52,7 +57,7 @@ class CourierMixin:
             return self._fetch_page(base, (), limit=limit, offset=offset)
         return self._fetch_all(base)
 
-    def delete_courier_log(self, log_id: int) -> None:
+    def delete_courier_log(self: CoreMixin, log_id: int) -> None:
         with self.connection() as conn:
             conn.execute("DELETE FROM courier_logs WHERE id = ?", (log_id,))
 

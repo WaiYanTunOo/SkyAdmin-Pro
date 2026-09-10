@@ -8,6 +8,7 @@ from skyadmin_pro.services.file_ops import (
     parse_flexible_date,
 )
 from skyadmin_pro.ui.theme import CARD_RADIUS, CARD_TITLE_SIZE
+from skyadmin_pro.ui.views.company_details.constants import SUBTAB_VO_CSH
 from skyadmin_pro.ui.widgets import DatePickerField, themed_entry
 
 
@@ -111,4 +112,4 @@ class VoCshTabMixin:
             self.feedback.error(f"Could not save VO & CSH: {exc}")
             return
         self.feedback.success("VO & CSH info saved.")
-        self._refresh_vo_csh_mutation()
+        self._refresh_after_mutation(SUBTAB_VO_CSH)

@@ -6,9 +6,9 @@ from unittest.mock import MagicMock
 
 import pytest
 
-pytest.importorskip("customtkinter")
-
 from skyadmin_pro.ui.views.dashboard import DashboardView, snap_fingerprint
+
+pytest.importorskip("customtkinter")
 
 
 @pytest.fixture(scope="module")

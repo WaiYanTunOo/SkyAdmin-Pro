@@ -25,6 +25,19 @@ from skyadmin_pro.ui.combo_utils import fill_combo
 from skyadmin_pro.ui.theme import CARD_TITLE_SIZE, TEXT_MUTED
 from skyadmin_pro.ui.treeview import ThemedTreeview
 from skyadmin_pro.ui.views.company_details.accounting_setup_tab import AccountingSetupTabMixin
+
+# Sub-tab names — single source of truth for the tab bar, lazy loader,
+# refresh dispatcher, and cross-module callers (database_tasks/view.py).
+from skyadmin_pro.ui.views.company_details.constants import (
+    SUBTAB_ACCOUNTING,
+    SUBTAB_FILING,
+    SUBTAB_FINANCIAL_DOCS,
+    SUBTAB_GENERAL,
+    SUBTAB_NAMES,
+    SUBTAB_TAX_IDS,
+    SUBTAB_VO_CSH,
+    SUBTAB_VO_CSH_SETUP,
+)
 from skyadmin_pro.ui.views.company_details.filing_tab import FilingTabMixin
 from skyadmin_pro.ui.views.company_details.financial_docs_tab import FinancialDocsTabMixin
 from skyadmin_pro.ui.views.company_details.general_tab import GeneralTabMixin
@@ -38,26 +51,6 @@ from skyadmin_pro.ui.widgets import (
     make_modal,
     themed_entry,
     themed_tabview,
-)
-
-# Sub-tab names — single source of truth for the tab bar, lazy loader,
-# refresh dispatcher, and cross-module callers (database_tasks/view.py).
-SUBTAB_ACCOUNTING = "Accounting Setup"
-SUBTAB_GENERAL = "General"
-SUBTAB_TAX_IDS = "Tax IDs"
-SUBTAB_FILING = "Filing Statuses"
-SUBTAB_VO_CSH_SETUP = "VO/CSH Setup"
-SUBTAB_VO_CSH = "VO & CSH"
-SUBTAB_FINANCIAL_DOCS = "Financial Docs"
-
-SUBTAB_NAMES: tuple[str, ...] = (
-    SUBTAB_ACCOUNTING,
-    SUBTAB_GENERAL,
-    SUBTAB_TAX_IDS,
-    SUBTAB_FILING,
-    SUBTAB_VO_CSH_SETUP,
-    SUBTAB_VO_CSH,
-    SUBTAB_FINANCIAL_DOCS,
 )
 
 
@@ -294,19 +287,6 @@ class CompanyDetailsPanel(
         else:
             self._refresh_subtab(tab_name, client_id, client)
         self.app.invalidate_dashboard()
-
-    def _refresh_general_mutation(self) -> None:
-        """After General-tab service/document edits — refresh trees and header counts only."""
-        self._refresh_after_mutation(SUBTAB_GENERAL)
-
-    def _refresh_filing_mutation(self) -> None:
-        self._refresh_after_mutation(SUBTAB_FILING)
-
-    def _refresh_tax_ids_mutation(self) -> None:
-        self._refresh_after_mutation(SUBTAB_TAX_IDS)
-
-    def _refresh_vo_csh_mutation(self) -> None:
-        self._refresh_after_mutation(SUBTAB_VO_CSH)
 
     def _refresh_subtab(
         self,
@@ -636,7 +616,7 @@ class CompanyDetailsPanel(
         self.service_amount.set("")
         self.service_progress.set(SERVICE_PROGRESS[0])
         self.service_paid.deselect()
-        self._refresh_general_mutation()
+        self._refresh_after_mutation(SUBTAB_GENERAL)
 
     def _renew_service(self) -> None:
         iid = self.service_tree.selected_iid()
@@ -733,7 +713,7 @@ class CompanyDetailsPanel(
                 return
             top.destroy()
             self.feedback.success("Service renewed — expiry updated and recorded.")
-            self._refresh_general_mutation()
+            self._refresh_after_mutation(SUBTAB_GENERAL)
 
         ctk.CTkButton(top, text="Record renewal", command=_do_record).grid(
             row=9, column=0, sticky="ew", padx=20, pady=(6, 18)
@@ -873,7 +853,7 @@ class CompanyDetailsPanel(
         self.doc_expiry.set("")
         self.doc_file.set("")
         self.doc_path.set("")
-        self._refresh_general_mutation()
+        self._refresh_after_mutation(SUBTAB_GENERAL)
 
     def _delete_service(self) -> None:
         iid = self.service_tree.selected_iid()
@@ -886,7 +866,7 @@ class CompanyDetailsPanel(
             return
         self.app.db.delete_document(int(iid))
         self.feedback.success("Service record deleted.")
-        self._refresh_general_mutation()
+        self._refresh_after_mutation(SUBTAB_GENERAL)
 
     def _delete_document(self) -> None:
         iid = self.doc_tree.selected_iid()
@@ -899,7 +879,7 @@ class CompanyDetailsPanel(
             return
         self.app.db.delete_document(int(iid))
         self.feedback.success("Document record deleted.")
-        self._refresh_general_mutation()
+        self._refresh_after_mutation(SUBTAB_GENERAL)
 
     def _missing_docs_workflow(self) -> None:
         client_id = self._selected_client_id()

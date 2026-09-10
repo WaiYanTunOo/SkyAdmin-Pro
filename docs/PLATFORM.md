@@ -26,20 +26,7 @@ New in **Office Hub** (sidebar):
 - **Password Vault** — encrypted credentials linked to clients/contacts
 - **Notebook** — daily/weekly reports, customer instructions, senior notes
 
-### Qt6 shell (Phase 3, optional)
-
-An opt-in Qt6 shell lives in `skyadmin_pro/ui/qt/` (nav + lazy stacked
-pages + QThread async bridge + theme bridge over `ui/theme.py` tokens).
-CustomTkinter stays the default and only ship path.
-
-```powershell
-pip install -r requirements-qt6.txt   # PySide6 (LGPL)
-$env:SKYADMIN_UI = "qt6"; python main.py
-```
-
-PySide6 is preferred over PyQt6 (LGPL dynamic-link OK for proprietary
-builds; PyQt6 needs a commercial license). Per-view ports land behind the
-same lazy seam; the Phase 4 walkthrough suite is the acceptance bar.
+> **Note:** A Qt6 shell was previously available as an opt-in alternative (v0.3.x). It was removed in v0.3.3 to eliminate dual-UI maintenance overhead. The CustomTkinter stack meets all current perf/UX targets (tab-switch <100ms, refresh <500ms). A future Qt migration remains possible if measured CTk perf budgets fail at scale — see Wave E in `FEATURES_AND_UPGRADE_PLAN.md`.
 
 ## Cross-platform strategy (later)
 
