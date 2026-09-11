@@ -100,7 +100,7 @@ class SetupTabMixin:
             self.feedback.error("Select a client first.")
             return
         name = (row.get("name") or "").strip()
-        self._ensure_tab("Contacts")
+        self._ensure_panel("Contacts")
         self.tabs.set("Contacts")
         self.contact_search_var.set(name)
         self._refresh_contacts()

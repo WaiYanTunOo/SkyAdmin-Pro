@@ -502,7 +502,6 @@ class LicenseMixin:
         top.title(f"SkyAdmin Pro — {title}")
         top.geometry("720x560")
         top.transient(self.winfo_toplevel())
-        top.attributes("-topmost", True)
         from skyadmin_pro.ui.widgets import make_modal
 
         make_modal(top)

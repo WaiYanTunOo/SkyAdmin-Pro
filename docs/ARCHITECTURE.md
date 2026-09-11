@@ -128,6 +128,8 @@ Desktop App                    Cloudflare Worker               D1 Database
 - [API_REFERENCE.md](API_REFERENCE.md) — endpoint contracts
 - [DEPLOYMENT.md](DEPLOYMENT.md) — Worker + desktop ship path
 - [WORKER_ADMIN.md](WORKER_ADMIN.md) — admin UI auth split
+- [FEATURE_MAP.md](FEATURE_MAP.md) — feature → code → test → fix lookup
+- [ROADMAP_MASTER.md](ROADMAP_MASTER.md) — feature-tracked roadmap + fix backlog
 - [MASTER_ROADMAP.md](MASTER_ROADMAP.md) — audit + backlog
 - [FEATURES_AND_UPGRADE_PLAN.md](FEATURES_AND_UPGRADE_PLAN.md) — product features + upgrade plan
 - [../AGENTS.md](../AGENTS.md) — subagent orchestration

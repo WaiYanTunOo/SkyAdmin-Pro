@@ -192,6 +192,8 @@ flowchart LR
 | Doc | Use |
 |-----|-----|
 | This file | Feature inventory + upgrade waves |
+| FEATURE_MAP | Feature → code files → tests → fix locations |
+| ROADMAP_MASTER | Feature-tracked roadmap + consolidated fix backlog |
 | MASTER_ROADMAP | Historical audit + checkboxes |
 | ARCHITECTURE | System diagram |
 | API_REFERENCE | Contracts |

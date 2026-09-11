@@ -58,24 +58,3 @@ class BaseView(ctk.CTkFrame):
 
     def on_hide(self) -> None:
         """Called when the sidebar leaves this view."""
-
-
-class PlaceholderView(BaseView):
-    """Temporary body used until a module is implemented."""
-
-    placeholder_message = "This module will be implemented in the next step."
-
-    def build(self) -> None:
-        card = ctk.CTkFrame(self.body, corner_radius=12)
-        card.grid(row=0, column=0, sticky="nsew")
-        card.grid_columnconfigure(0, weight=1)
-        card.grid_rowconfigure(0, weight=1)
-
-        ctk.CTkLabel(
-            card,
-            text=self.placeholder_message,
-            font=ctk.CTkFont(size=15),
-            text_color=("gray30", "gray75"),
-            justify="center",
-            wraplength=640,
-        ).grid(row=0, column=0, padx=40, pady=40)

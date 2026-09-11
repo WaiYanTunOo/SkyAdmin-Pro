@@ -166,4 +166,4 @@ class ChecklistMixin:
         view = self.app.get_view("database_tasks")
         if view is None:
             return
-        view.sync_service_menus()
+        view._refresh_service_menus()

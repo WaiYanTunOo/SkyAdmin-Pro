@@ -51,7 +51,7 @@ describe("D1 migrations", () => {
     expect(sql).not.toMatch(/DROP TABLE/);
   });
 
-  it("migration files form a contiguous 0001-0006 chain", () => {
+  it("migration files form a contiguous 0001-0007 chain", () => {
     expect(migrationFiles()).toEqual([
       "0001_initial.sql",
       "0002_sync_devices_expires_at.sql",
@@ -59,6 +59,7 @@ describe("D1 migrations", () => {
       "0004_admin_audit_log.sql",
       "0005_sync_devices_expires_backfill.sql",
       "0006_sync_rows_hlc.sql",
+      "0007_drop_redundant_sync_devices_index.sql",
     ]);
   });
 

@@ -19,7 +19,9 @@ class AuditLogDialog(ctk.CTkToplevel):
         self.geometry("900x500")
         self.resizable(True, True)
         self.transient(app)
-        self.grab_set()
+        # Non-blocking modal grab — wait_visibility() inside after() is a nested
+        # event loop that hangs if the window is closed before it fires.
+        self.bind("<Map>", lambda _e: self.grab_set(), add="+")
 
         self.grid_columnconfigure(0, weight=1)
         self.grid_rowconfigure(1, weight=1)

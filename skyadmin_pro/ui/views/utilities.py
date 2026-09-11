@@ -547,7 +547,6 @@ class UtilitiesView(BaseView):
         top.title("Message history")
         top.geometry("620x520")
         top.transient(self.winfo_toplevel())
-        top.attributes("-topmost", True)
         make_modal(top)
         top.grid_columnconfigure(0, weight=1)
         top.grid_rowconfigure(0, weight=1)
@@ -675,7 +674,6 @@ class UtilitiesView(BaseView):
         top.title("Fill placeholders")
         top.geometry(f"500x{230 + len(tokens) * 44}")
         top.transient(self.winfo_toplevel())
-        top.attributes("-topmost", True)
         make_modal(top)
         top.grid_columnconfigure(0, weight=1)
 

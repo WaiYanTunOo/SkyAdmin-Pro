@@ -18,13 +18,17 @@ export async function banHandler(c: Context<{ Bindings: Env }>) {
   }
   const { mid, reason } = body;
   if (!mid?.trim()) return c.json({ ok: false, error: "mid required" }, 400);
+  const trimmed = mid.trim().toUpperCase();
+  if (!/^[0-9A-F]{1,16}$/.test(trimmed)) {
+    return c.json({ ok: false, error: "mid must be 1-16 uppercase hex characters" }, 400);
+  }
 
   await c.env.DB.prepare(
     "INSERT OR IGNORE INTO bans (machine_id, reason) VALUES (?, ?)"
-  ).bind(mid.trim().toUpperCase(), reason || "").run();
+  ).bind(trimmed, reason || "").run();
   await bumpVersion(c.env.DB);
 
-  return c.json({ ok: true, message: `Machine ${mid.trim()} banned.` });
+  return c.json({ ok: true, message: `Machine ${trimmed} banned.` });
 }
 
 export async function unbanHandler(c: Context<{ Bindings: Env }>) {
@@ -41,13 +45,17 @@ export async function unbanHandler(c: Context<{ Bindings: Env }>) {
   }
   const { mid } = body;
   if (!mid?.trim()) return c.json({ ok: false, error: "mid required" }, 400);
+  const trimmed = mid.trim().toUpperCase();
+  if (!/^[0-9A-F]{1,16}$/.test(trimmed)) {
+    return c.json({ ok: false, error: "mid must be 1-16 uppercase hex characters" }, 400);
+  }
 
   await c.env.DB.prepare(
     "DELETE FROM bans WHERE machine_id = ?"
-  ).bind(mid.trim().toUpperCase()).run();
+  ).bind(trimmed).run();
   await bumpVersion(c.env.DB);
 
-  return c.json({ ok: true, message: `Machine ${mid.trim()} un-banned.` });
+  return c.json({ ok: true, message: `Machine ${trimmed} un-banned.` });
 }
 
 /** GET /api/bans — List all banned machine IDs. */
@@ -55,7 +63,7 @@ export async function listBansHandler(c: Context<{ Bindings: Env }>) {
   const limited = await checkRateLimit(c, "bans", { windowSeconds: 60, max: 30 });
   if (limited) return limited;
   const { results } = await c.env.DB.prepare(
-    `SELECT machine_id, reason, banned_at FROM bans ORDER BY id DESC LIMIT ${CONTROL_LIST_CAP}`
-  ).all<{ machine_id: string; reason: string; banned_at: string }>();
+    `SELECT machine_id, reason, banned_at FROM bans ORDER BY id DESC LIMIT ?`
+  ).bind(CONTROL_LIST_CAP).all<{ machine_id: string; reason: string; banned_at: string }>();
   return c.json({ ok: true, bans: results || [] });
 }

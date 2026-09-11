@@ -154,7 +154,7 @@ def test_shortcut_dispatch_reaches_clients_panel(app, monkeypatch):
     app.update()
     view = app.get_view("database_tasks")
     assert view is not None
-    view._ensure_lazy_panel("Clients & Expiry")
+    view._ensure_panel("Clients & Expiry")
     panel = view.clients_panel
     assert panel is not None
 
@@ -178,7 +178,7 @@ def test_shortcut_new_from_dashboard_navigates(app, monkeypatch):
     # Pre-create the view and stub the dialog before the shortcut runs.
     tasks = app._ensure_view("database_tasks")
     assert tasks is not None
-    tasks._ensure_lazy_panel("Clients & Expiry")
+    tasks._ensure_panel("Clients & Expiry")
     monkeypatch.setattr(
         tasks.clients_panel,
         "_open_client_dialog",

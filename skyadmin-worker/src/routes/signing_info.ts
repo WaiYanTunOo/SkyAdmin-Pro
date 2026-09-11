@@ -21,8 +21,7 @@ export async function signingPublicKeyHandler(c: Context<{ Bindings: Env }>) {
       client_public_key_hex: ED25519_PUBLIC_KEY_HEX,
       matches_desktop: publicKeyHex.toLowerCase() === ED25519_PUBLIC_KEY_HEX.toLowerCase(),
     });
-  } catch (err) {
-    const message = err instanceof Error ? err.message : String(err);
-    return c.json({ ok: false, error: message }, 500);
+  } catch {
+    return c.json({ ok: false, error: "Failed to export signing key" }, 500);
   }
 }

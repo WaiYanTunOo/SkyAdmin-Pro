@@ -67,8 +67,8 @@ class _SidebarTooltip:
             label = tk.Label(
                 top,
                 text=self._text,
-                background="#1e1e1e",
-                foreground="#f4f4f5",
+                background="#1e1e1e" if ctk.get_appearance_mode() == "Dark" else "#f4f4f5",
+                foreground="#f4f4f5" if ctk.get_appearance_mode() == "Dark" else "#1e1e1e",
                 padx=8,
                 pady=4,
                 font=("Segoe UI", 11),

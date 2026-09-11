@@ -470,30 +470,44 @@ class TaxMixin:
 
     def roll_forward_stale_expiry_dates(self) -> int:
         """Persist rolled 31-Dec annual expiry dates so lists/exports match the dashboard."""
+        total_updated = 0
+        offset = 0
+        batch_size = 500
+        while True:
+            with self.connection() as conn:
+                rows = conn.execute(
+                    """
+                    SELECT id, document_type, expiry_date
+                    FROM documents
+                    WHERE expiry_date IS NOT NULL AND trim(expiry_date) != ''
+                    ORDER BY id
+                    LIMIT ? OFFSET ?
+                    """,
+                    (batch_size, offset),
+                ).fetchall()
 
-        rows = self._fetch_all(
-            """
-            SELECT id, document_type, expiry_date
-            FROM documents
-            WHERE expiry_date IS NOT NULL AND trim(expiry_date) != ''
-            """
-        )
-        # Collect updates to apply in a single transaction
-        updates: list[tuple[str, int]] = []
-        for row in rows:
-            effective = effective_expiry_date(row["expiry_date"], row["document_type"])
-            if effective and effective != row["expiry_date"]:
-                updates.append((effective, int(row["id"])))
+            if not rows:
+                break
 
-        if not updates:
-            return 0
+            updates: list[tuple[str, int]] = []
+            for row in rows:
+                effective = effective_expiry_date(row["expiry_date"], row["document_type"])
+                if effective and effective != row["expiry_date"]:
+                    updates.append((effective, int(row["id"])))
 
-        with self.connection() as conn:
-            conn.executemany(
-                "UPDATE documents SET expiry_date = ? WHERE id = ?",
-                updates,
-            )
-        return len(updates)
+            if updates:
+                with self.connection() as conn:
+                    conn.executemany(
+                        "UPDATE documents SET expiry_date = ? WHERE id = ?",
+                        updates,
+                    )
+                total_updated += len(updates)
+
+            offset += len(rows)
+            if len(rows) < batch_size:
+                break
+
+        return total_updated
 
     def count_vo_csh_expiring(self, days: int = 30) -> int:
         """Count of clients with VO or CSH renewal within N days."""

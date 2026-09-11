@@ -29,7 +29,15 @@ from skyadmin_pro.ui.theme import (
     CANVAS_TEXT,
     CANVAS_VALUE_TEXT,
     CARD_TITLE_SIZE,
+    STAT_CRITICAL,
+    STAT_MUTED,
+    STAT_SUCCESS,
+    STAT_WARNING,
     TEXT_MUTED,
+    TIMELINE_CAUTION,
+    TIMELINE_CRITICAL,
+    TIMELINE_OK,
+    TIMELINE_WARNING,
 )
 from skyadmin_pro.ui.treeview import ThemedTreeview
 from skyadmin_pro.ui.views.base import BaseView
@@ -712,17 +720,17 @@ class DashboardView(BaseView):
             canvas.create_text(x, height - 8, text=f"d{day}", fill=text_color, font=("Segoe UI", 8))
 
         # Bars
-        colors = {0: "#dc2626", 1: "#ea580c", 2: "#d97706"}
+        colors = {0: TIMELINE_CRITICAL, 1: TIMELINE_WARNING, 2: TIMELINE_CAUTION}
         for day in sorted(buckets):
             count = buckets[day]
             bh = max(3, int((count / max_count) * (height - 40)))
-            color = colors.get(min(day // 7, 2), "#16a34a") if day <= 14 else "#16a34a"
+            color = colors.get(min(day // 7, 2), TIMELINE_OK) if day <= 14 else TIMELINE_OK
             if day <= 7:
-                color = "#dc2626"
+                color = TIMELINE_CRITICAL
             elif day <= 14:
-                color = "#ea580c"
+                color = TIMELINE_WARNING
             elif day <= 30:
-                color = "#d97706"
+                color = TIMELINE_CAUTION
             x = x0 + day * bar_w
             canvas.create_rectangle(
                 x - bar_w // 2,
@@ -743,7 +751,12 @@ class DashboardView(BaseView):
                 )
         # Legend
         lx = width - 180
-        for txt, col in [("≤7d", "#dc2626"), ("≤14d", "#ea580c"), ("≤30d", "#d97706"), ("31-45d", "#16a34a")]:
+        for txt, col in [
+            ("≤7d", TIMELINE_CRITICAL),
+            ("≤14d", TIMELINE_WARNING),
+            ("≤30d", TIMELINE_CAUTION),
+            ("31-45d", TIMELINE_OK),
+        ]:
             canvas.create_rectangle(lx, 6, lx + 8, 14, fill=col, outline="")
             canvas.create_text(lx + 12, 10, text=txt, anchor="w", fill=text_color, font=("Segoe UI", 8))
             lx += 45
@@ -883,29 +896,29 @@ class DashboardView(BaseView):
         self.card_vo_csh.configure(text=str(vo_csh_expiring))
 
         if counts["expiring"]:
-            self.card_expiring.configure(text_color=("#b45309", "#fbbf24"))
+            self.card_expiring.configure(text_color=STAT_WARNING)
         else:
-            self.card_expiring.configure(text_color=("gray10", "gray90"))
+            self.card_expiring.configure(text_color=STAT_MUTED)
         if counts["overdue"]:
-            self.card_overdue.configure(text_color=("#b91c1c", "#f87171"))
+            self.card_overdue.configure(text_color=STAT_CRITICAL)
         else:
-            self.card_overdue.configure(text_color=("gray10", "gray90"))
+            self.card_overdue.configure(text_color=STAT_MUTED)
         if counts["supplier_due"]:
-            self.card_supplier.configure(text_color=("#b45309", "#fbbf24"))
+            self.card_supplier.configure(text_color=STAT_WARNING)
         else:
-            self.card_supplier.configure(text_color=("gray10", "gray90"))
+            self.card_supplier.configure(text_color=STAT_MUTED)
         if counts["ongoing"]:
-            self.card_ongoing.configure(text_color=("#15803d", "#4ade80"))
+            self.card_ongoing.configure(text_color=STAT_SUCCESS)
         else:
-            self.card_ongoing.configure(text_color=("gray10", "gray90"))
+            self.card_ongoing.configure(text_color=STAT_MUTED)
         if pending_filings:
-            self.card_pending_filings.configure(text_color=("#b45309", "#fbbf24"))
+            self.card_pending_filings.configure(text_color=STAT_WARNING)
         else:
-            self.card_pending_filings.configure(text_color=("gray10", "gray90"))
+            self.card_pending_filings.configure(text_color=STAT_MUTED)
         if vo_csh_expiring:
-            self.card_vo_csh.configure(text_color=("#b45309", "#fbbf24"))
+            self.card_vo_csh.configure(text_color=STAT_WARNING)
         else:
-            self.card_vo_csh.configure(text_color=("gray10", "gray90"))
+            self.card_vo_csh.configure(text_color=STAT_MUTED)
 
     def _refresh_priority_trees(self, snap: dict, _seq: int | None = None) -> None:
         self._tree_refresh_after = None

@@ -10,7 +10,15 @@ from skyadmin_pro.config import (
     TAX_FILING_STATUSES,
 )
 from skyadmin_pro.ui.debounce import debounced_after
-from skyadmin_pro.ui.theme import CARD_RADIUS, CARD_TITLE_SIZE, TEXT_FAINT, TEXT_MUTED
+from skyadmin_pro.ui.theme import (
+    CARD_RADIUS,
+    CARD_TITLE_SIZE,
+    STATUS_COMPLETE,
+    STATUS_ONGOING,
+    STATUS_PENDING,
+    TEXT_FAINT,
+    TEXT_MUTED,
+)
 from skyadmin_pro.ui.treeview import ThemedTreeview
 from skyadmin_pro.ui.views.company_details.constants import SUBTAB_FILING
 from skyadmin_pro.ui.widgets import make_modal
@@ -51,9 +59,9 @@ class FilingTabMixin:
         self.filing_summary_labels: dict[str, ctk.CTkLabel] = {}
         for idx, (key, color) in enumerate(
             [
-                ("complete", ("#15803d", "#4ade80")),
-                ("ongoing", ("#a16207", "#fbbf24")),
-                ("pending", ("#b91c1c", "#f87171")),
+                ("complete", STATUS_COMPLETE),
+                ("ongoing", STATUS_ONGOING),
+                ("pending", STATUS_PENDING),
                 ("na", TEXT_MUTED),
             ]
         ):

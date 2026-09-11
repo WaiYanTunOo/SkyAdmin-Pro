@@ -11,7 +11,6 @@ from skyadmin_pro.config import (
 from skyadmin_pro.services.file_ops import (
     format_thousands,
 )
-from skyadmin_pro.ui.canvas_scroll import CanvasScrollFrame
 from skyadmin_pro.ui.theme import CARD_RADIUS, CARD_TITLE_SIZE, TEXT_MUTED
 from skyadmin_pro.ui.treeview import ThemedTreeview
 from skyadmin_pro.ui.views.company_details.constants import SUBTAB_GENERAL
@@ -118,7 +117,8 @@ class GeneralTabMixin:
         frame = ctk.CTkFrame(master, corner_radius=CARD_RADIUS)
         frame.grid_columnconfigure(0, weight=1)
         frame.grid_columnconfigure(1, weight=0)
-        frame.grid_rowconfigure(2, weight=1)
+        frame.grid_rowconfigure(1, weight=1)
+        frame.grid_rowconfigure(2, weight=0)
         ctk.CTkLabel(
             frame,
             text="Services — expiry, payment & progress",
@@ -152,12 +152,8 @@ class GeneralTabMixin:
         self.service_tree.tree.configure(height=5)
         self.service_tree.grid(row=1, column=0, columnspan=2, sticky="ew", padx=12, pady=(0, 8))
 
-        form_scroll = CanvasScrollFrame(frame)
-        form_scroll.grid(row=2, column=0, columnspan=2, sticky="nsew")
-        form_scroll.content.grid_columnconfigure(0, weight=1)
-
-        form = ctk.CTkFrame(form_scroll.content, fg_color="transparent")
-        form.grid(row=0, column=0, sticky="ew", padx=12, pady=(0, 12))
+        form = ctk.CTkFrame(frame, fg_color="transparent")
+        form.grid(row=2, column=0, columnspan=2, sticky="ew", padx=12, pady=(0, 12))
         form.grid_columnconfigure((0, 1, 2, 3), weight=1)
 
         self.service_status_label = ctk.CTkLabel(form, text="New service record", text_color=TEXT_MUTED)
@@ -241,7 +237,8 @@ class GeneralTabMixin:
     def _build_documents(self, master) -> ctk.CTkFrame:
         frame = ctk.CTkFrame(master, corner_radius=CARD_RADIUS)
         frame.grid_columnconfigure(0, weight=1)
-        frame.grid_rowconfigure(2, weight=1)
+        frame.grid_rowconfigure(1, weight=1)
+        frame.grid_rowconfigure(2, weight=0)
         ctk.CTkLabel(
             frame,
             text="Important documents",
@@ -263,12 +260,8 @@ class GeneralTabMixin:
         self.doc_tree.tree.configure(height=5)
         self.doc_tree.grid(row=1, column=0, sticky="ew", padx=12, pady=(0, 8))
 
-        form_scroll = CanvasScrollFrame(frame)
-        form_scroll.grid(row=2, column=0, sticky="nsew")
-        form_scroll.content.grid_columnconfigure(0, weight=1)
-
-        form = ctk.CTkFrame(form_scroll.content, fg_color="transparent")
-        form.grid(row=0, column=0, sticky="ew", padx=12, pady=(0, 12))
+        form = ctk.CTkFrame(frame, fg_color="transparent")
+        form.grid(row=2, column=0, sticky="ew", padx=12, pady=(0, 12))
         form.grid_columnconfigure((0, 1, 2), weight=1)
 
         self.document_status_label = ctk.CTkLabel(form, text="New document record", text_color=TEXT_MUTED)

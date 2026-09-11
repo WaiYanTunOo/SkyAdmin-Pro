@@ -621,6 +621,8 @@ flowchart LR
 ## Related Docs
 
 - [ROADMAP.md](ROADMAP.md) — Phase 7-11 detail
+- [FEATURE_MAP.md](FEATURE_MAP.md) — feature → code → test → fix lookup
+- [ROADMAP_MASTER.md](ROADMAP_MASTER.md) — feature-tracked roadmap + fix backlog
 - [PLATFORM.md](PLATFORM.md) — Cross-platform strategy
 - [MANUAL_QA.md](MANUAL_QA.md) — Pre-ship checklist
 - [UI_CHECKLIST.md](UI_CHECKLIST.md) — Theme/layout QA

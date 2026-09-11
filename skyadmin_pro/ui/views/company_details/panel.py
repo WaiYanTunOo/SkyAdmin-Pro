@@ -129,7 +129,7 @@ class CompanyDetailsPanel(
     def _on_shortcut_save(self) -> bool:
         """Ctrl+S: save the primary form for the visible Company Details sub-tab."""
         tab = self._current_subtab()
-        self._ensure_lazy_tab(tab)
+        self._ensure_panel(tab)
         if tab == SUBTAB_GENERAL:
             self._save_company_info()
             return True
@@ -145,10 +145,10 @@ class CompanyDetailsPanel(
         return False
 
     def _on_subtab_changed(self) -> None:
-        self._ensure_lazy_tab(self._current_subtab())
+        self._ensure_panel(self._current_subtab())
         self.refresh()
 
-    def _ensure_lazy_tab(self, name: str) -> None:
+    def _ensure_panel(self, name: str) -> None:
         if name in self._lazy_tabs:
             return
         tab = self.tabs.tab(name)
@@ -159,19 +159,17 @@ class CompanyDetailsPanel(
             self._accounting_setup_frame = self._build_accounting_setup(tab)
             self._accounting_setup_frame.grid(row=0, column=0, sticky="nsew")
         elif name == SUBTAB_GENERAL:
-            # Company info form scrolls; service/doc trees stay outside CanvasScrollFrame.
             tab.grid_columnconfigure(0, weight=1)
             tab.grid_rowconfigure(0, weight=1)
-            tab.grid_rowconfigure(1, weight=3)
-            tab.grid_rowconfigure(2, weight=3)
             general_scroll = CanvasScrollFrame(tab)
             general_scroll.grid(row=0, column=0, sticky="nsew")
             general_scroll.content.grid_columnconfigure(0, weight=1)
+            general_scroll.content.grid_rowconfigure(0, weight=1)
             self._company_frame = self._build_company_info(general_scroll.content)
-            self._company_frame.grid(row=0, column=0, sticky="ew", pady=(0, 8))
-            self._services_frame = self._build_services(tab)
+            self._company_frame.grid(row=0, column=0, sticky="nsew", pady=(0, 8))
+            self._services_frame = self._build_services(general_scroll.content)
             self._services_frame.grid(row=1, column=0, sticky="nsew", pady=(0, 8))
-            self._docs_frame = self._build_documents(tab)
+            self._docs_frame = self._build_documents(general_scroll.content)
             self._docs_frame.grid(row=2, column=0, sticky="nsew")
         elif name == SUBTAB_TAX_IDS:
             # Form scrolls; client cred tree stays fixed outside the canvas.
@@ -267,7 +265,7 @@ class CompanyDetailsPanel(
         if update_header:
             self._update_company_info_line(client_id)
         tab = self._current_subtab()
-        self._ensure_lazy_tab(tab)
+        self._ensure_panel(tab)
         client = self.app.db.get_client(client_id) if client_id is not None else None
         self._refresh_subtab(tab, client_id, client)
 

@@ -148,6 +148,7 @@ class ThemedTreeview(ctk.CTkFrame):
     ) -> None:
         super().__init__(master, fg_color="transparent", **kwargs)
         self._on_select = on_select
+        self._on_double_click = on_double_click
         self._column_ids = [column[0] for column in columns]
         self._column_headings = {column[0]: column[1] for column in columns}
         # Persistence identity: trees with table_id+db remember hidden columns
@@ -213,6 +214,8 @@ class ThemedTreeview(ctk.CTkFrame):
         self.tree.bind("<<TreeviewSelect>>", self._handle_select)
         if on_double_click:
             self.tree.bind("<Double-1>", lambda _e: on_double_click(self.selected_iid()))
+        self.tree.bind("<Return>", self._on_tree_activate)
+        self.tree.bind("<space>", self._on_tree_activate)
         # Excel-like column menu (hide/show); header click stays sort.
         self.tree.bind("<Button-3>", self._on_header_right_click)
 
@@ -603,6 +606,14 @@ class ThemedTreeview(ctk.CTkFrame):
         if self._on_select:
             self._on_select(self.selected_iid())
 
+    def _on_tree_activate(self, event=None) -> None:
+        """Handle Enter/Space on treeview — trigger double-click callback."""
+        if self._on_double_click is None:
+            return
+        selection = self.tree.selection()
+        if selection:
+            self._on_double_click(event)
+
     def _scroll_vertical(self, delta: int) -> str:
         if self._virtual_active:
             self._virtual_scroll_by_units(delta, "units")
@@ -616,8 +627,6 @@ class ThemedTreeview(ctk.CTkFrame):
 
     # Excel-like helpers
     def _on_mousewheel(self, event) -> None:
-        import sys
-
         if sys.platform == "darwin":
             delta = -event.delta
         else:
@@ -627,8 +636,6 @@ class ThemedTreeview(ctk.CTkFrame):
         return "break"
 
     def _on_shift_mousewheel(self, event) -> None:
-        import sys
-
         if sys.platform == "darwin":
             delta = -event.delta
         else:

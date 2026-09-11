@@ -176,12 +176,12 @@ def test_phase4_company_details_vo_fields(app):
     view = app._views["database_tasks"]
     view.tabs.set("Company Details")
     app.update()
-    view._ensure_lazy_panel("Company Details")
+    view._ensure_panel("Company Details")
     app.update()
     panel = view.company_panel
     panel.tabs.set("VO & CSH")
     app.update()
-    panel._ensure_lazy_tab("VO & CSH")
+    panel._ensure_panel("VO & CSH")
     assert hasattr(panel, "vo_address_var")
     assert hasattr(panel, "shareholder_var")
 
@@ -192,7 +192,7 @@ def test_phase4_company_details_lazy_subtabs(app):
     view = app._views["database_tasks"]
     view.tabs.set("Company Details")
     app.update()
-    view._ensure_lazy_panel("Company Details")
+    view._ensure_panel("Company Details")
     app.update()
     panel = view.company_panel
     panel.refresh()

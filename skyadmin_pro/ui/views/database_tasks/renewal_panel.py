@@ -11,7 +11,15 @@ from skyadmin_pro.services.tracking import (
     effective_expiry_date,
 )
 from skyadmin_pro.ui.combo_utils import fill_combo
-from skyadmin_pro.ui.theme import CARD_RADIUS, CARD_TITLE_SIZE, TEXT_MUTED
+from skyadmin_pro.ui.theme import (
+    CARD_RADIUS,
+    CARD_TITLE_SIZE,
+    STAT_CRITICAL,
+    STAT_SUCCESS,
+    STAT_WARNING,
+    STATUS_ONGOING,
+    TEXT_MUTED,
+)
 from skyadmin_pro.ui.widgets import FeedbackLabel, combo_style_kwargs, themed_scrollable_frame
 
 
@@ -262,10 +270,10 @@ class RenewalPanel(ctk.CTkFrame):
             else:
                 detail = f"{left} day(s) left"
             tag_color = {
-                "red": ("#b91c1c", "#f87171"),
-                "orange": ("#b45309", "#fbbf24"),
-                "yellow": ("#a16207", "#fde047"),
-                "green": ("#15803d", "#4ade80"),
+                "red": STAT_CRITICAL,
+                "orange": STAT_WARNING,
+                "yellow": STATUS_ONGOING,
+                "green": STAT_SUCCESS,
             }.get(tag, ("gray10", "gray90"))
             self.countdown.configure(text=f"{document_type} — {detail}", text_color=tag_color)
             try:

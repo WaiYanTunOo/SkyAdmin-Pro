@@ -21,7 +21,7 @@ def _panel_with_tabs(current_tab: str) -> CompanyDetailsPanel:
     panel.tabs = MagicMock()
     panel.tabs.get.return_value = current_tab
     panel._lazy_tabs = {current_tab}
-    panel._ensure_lazy_tab = MagicMock()
+    panel._ensure_panel = MagicMock()
     panel._refresh_general_subtab = MagicMock()
     panel._refresh_tax_ids_subtab = MagicMock()
     panel._refresh_filing_subtab = MagicMock()

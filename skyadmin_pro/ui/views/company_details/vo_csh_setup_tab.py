@@ -69,8 +69,8 @@ class VoCshSetupTabMixin:
         )
 
     def refresh_vo_csh_setup(self) -> None:
-        if hasattr(self, "_ensure_lazy_tab"):
-            self._ensure_lazy_tab("VO/CSH Setup")
+        if hasattr(self, "_ensure_panel"):
+            self._ensure_panel("VO/CSH Setup")
         if hasattr(self, "_vo_csh_setup_panel"):
             self._vo_csh_setup_panel.refresh()
 

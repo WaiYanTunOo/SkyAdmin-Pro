@@ -42,7 +42,7 @@ class OfficeHubView(SetupTabMixin, ContactsTabMixin, VaultTabMixin, NotebookTabM
         self._build_setup_tab(self.tabs.tab("Setup"))
         self._lazy_tabs.add("Setup")
 
-    def _ensure_tab(self, name: str) -> None:
+    def _ensure_panel(self, name: str) -> None:
         if name in self._lazy_tabs:
             return
         if name == "Contacts":
@@ -58,7 +58,7 @@ class OfficeHubView(SetupTabMixin, ContactsTabMixin, VaultTabMixin, NotebookTabM
             current = self.tabs.get()
         except Exception:
             current = "Setup"
-        self._ensure_tab(current)
+        self._ensure_panel(current)
         self._refresh_active_tab(current)
 
     def _refresh_active_tab(self, tab_name: str) -> None:
@@ -86,7 +86,7 @@ class OfficeHubView(SetupTabMixin, ContactsTabMixin, VaultTabMixin, NotebookTabM
             current = self.tabs.get()
         except Exception:
             current = "Setup"
-        self._ensure_tab(current)
+        self._ensure_panel(current)
         self._refresh_active_tab(current)
         pending = getattr(self, "_pending_client_credentials", None)
         if pending:
@@ -117,7 +117,7 @@ class OfficeHubView(SetupTabMixin, ContactsTabMixin, VaultTabMixin, NotebookTabM
         clean = (client_name or "").strip()
         if not clean:
             return
-        self._ensure_tab("Passwords")
+        self._ensure_panel("Passwords")
         self.tabs.set("Passwords")
         self._password_subtabs.set("Client DBD / RD")
         type_filter = credential_type if credential_type else "All"

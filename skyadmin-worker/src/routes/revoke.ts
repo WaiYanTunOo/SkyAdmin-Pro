@@ -18,6 +18,9 @@ export async function revokeHandler(c: Context<{ Bindings: Env }>) {
   }
   const { nonce } = body;
   if (!nonce?.trim()) return c.json({ ok: false, error: "nonce required" }, 400);
+  if (nonce.trim().length > 256) {
+    return c.json({ ok: false, error: "nonce too long (max 256)" }, 400);
+  }
 
   await c.env.DB.prepare(
     "INSERT OR IGNORE INTO revocations (target) VALUES (?)"

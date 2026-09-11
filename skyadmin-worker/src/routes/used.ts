@@ -18,6 +18,9 @@ export async function usedHandler(c: Context<{ Bindings: Env }>) {
   }
   const { nonce } = body;
   if (!nonce?.trim()) return c.json({ ok: false, error: "nonce required" }, 400);
+  if (nonce.trim().length > 256) {
+    return c.json({ ok: false, error: "nonce too long (max 256)" }, 400);
+  }
 
   await c.env.DB.prepare(
     "INSERT OR IGNORE INTO used_nonces (nonce) VALUES (?)"
@@ -41,6 +44,9 @@ export async function revokePcHandler(c: Context<{ Bindings: Env }>) {
   }
   const { passcode } = body;
   if (!passcode?.trim()) return c.json({ ok: false, error: "passcode required" }, 400);
+  if (passcode.trim().length > 256) {
+    return c.json({ ok: false, error: "passcode too long (max 256)" }, 400);
+  }
 
   await c.env.DB.prepare(
     "INSERT OR IGNORE INTO revoked_passcodes (passcode) VALUES (?)"

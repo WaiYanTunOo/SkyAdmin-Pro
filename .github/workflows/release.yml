@@ -6,9 +6,6 @@ on:
       - "v*"
   workflow_dispatch:
 
-permissions:
-  contents: write
-
 concurrency:
   group: release-${{ github.ref }}
   cancel-in-progress: false
@@ -16,6 +13,7 @@ concurrency:
 jobs:
   worker:
     runs-on: ubuntu-latest
+    timeout-minutes: 15
     defaults:
       run:
         working-directory: skyadmin-worker
@@ -34,6 +32,7 @@ jobs:
     # Short-circuit before the expensive Windows build when Worker Vitest fails.
     needs: [worker]
     runs-on: windows-latest
+    timeout-minutes: 45
     outputs:
       version: ${{ steps.version.outputs.version }}
     steps:
@@ -44,8 +43,12 @@ jobs:
       - uses: actions/setup-python@v5
         with:
           python-version: "3.12"
+          cache: pip
+          cache-dependency-path: |
+            requirements.txt
+            requirements-dev.txt
 
-      - uses: ilammy/msvc-dev-cmd@v1
+      - uses: ilammy/msvc-dev-cmd@v1.13.0
 
       - name: Resolve version
         id: version
@@ -182,6 +185,9 @@ jobs:
     if: startsWith(github.ref, 'refs/tags/')
     needs: [windows-release, worker]
     runs-on: ubuntu-latest
+    timeout-minutes: 10
+    permissions:
+      contents: write
     steps:
       - uses: actions/checkout@v4
 

@@ -72,7 +72,9 @@ export async function adminHandler(c: Context<{ Bindings: Env }>): Promise<Respo
       // Record failed attempt
       await auditLog(c.env.DB, adminPath, "LOGIN_FAILURE", null, ip);
       await recordLoginAttempt(c, ip);
-    } catch {}
+    } catch (err) {
+      console.error("Login POST parse error:", err);
+    }
     c.header("Content-Security-Policy", ADMIN_CSP);
     return c.html(loginPage(adminPath, "Wrong password"), 401);
   }

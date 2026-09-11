@@ -302,20 +302,24 @@ class ClientsMixin:
 
         sql = f"{doc_sql} UNION ALL {pipe_sql} ORDER BY service_date ASC"
         rows = self._fetch_all(sql, tuple(doc_params))
+        pricing_cache = self.get_pricing_matrix()
         for row in rows:
             row["source"] = row["src"]
             row["id_key"] = f"{'doc' if row['src'] == 'doc' else 'pipe'}-{row['id']}"
-            row["amount"] = self._resolve_incentive_amount(row.get("service"), row.get("amount"))
+            row["amount"] = self._resolve_incentive_amount(
+                row.get("service"), row.get("amount"), pricing_cache=pricing_cache
+            )
         return rows
 
-    def _resolve_incentive_amount(self, service: str | None, doc_amount) -> str | int | None:
+    def _resolve_incentive_amount(self, service: str | None, doc_amount, *, pricing_cache=None) -> str | int | None:
         """Amount for incentive report — document value, else pricing matrix headcount/fee."""
         if doc_amount not in (None, ""):
             return doc_amount
         service_name = (service or "").strip()
         if not service_name:
             return None
-        tiers = self.get_pricing_matrix(service_type=service_name)
+        matrix = pricing_cache if pricing_cache is not None else self.get_pricing_matrix()
+        tiers = [t for t in matrix if (t.get("service_type") or "").lower() == service_name.lower()]
         if not tiers:
             tiers = self._fetch_all(
                 """

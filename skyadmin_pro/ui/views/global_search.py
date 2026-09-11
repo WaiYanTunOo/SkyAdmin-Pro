@@ -5,6 +5,10 @@ from __future__ import annotations
 import customtkinter as ctk
 
 from skyadmin_pro.ui.theme import (
+    BADGE_CLIENT,
+    BADGE_CONTACT,
+    BADGE_DOCUMENT,
+    BADGE_TASK,
     CONTENT_PAD,
     TEXT_MUTED,
 )
@@ -21,7 +25,9 @@ class GlobalSearchDialog(ctk.CTkToplevel):
         self.geometry("700x520")
         self.resizable(True, True)
         self.transient(app)
-        self.grab_set()
+        # Non-blocking modal grab — wait_visibility() inside after() is a nested
+        # event loop that hangs if the window is closed before it fires.
+        self.bind("<Map>", lambda _e: self.grab_set(), add="+")
 
         self.grid_columnconfigure(0, weight=1)
         self.grid_rowconfigure(2, weight=1)
@@ -224,10 +230,10 @@ class GlobalSearchDialog(ctk.CTkToplevel):
             # Type badge — (light, dark) pairs; CTk resolves fg_color tuples
             # per appearance mode. Light variants are darkened for white text.
             badge_colors = {
-                "Client": ("#2563eb", "#3b82f6"),
-                "Task": ("#b45309", "#f59e0b"),
-                "Document": ("#047857", "#10b981"),
-                "Contact": ("#6d28d9", "#8b5cf6"),
+                "Client": BADGE_CLIENT,
+                "Task": BADGE_TASK,
+                "Document": BADGE_DOCUMENT,
+                "Contact": BADGE_CONTACT,
             }
             badge = ctk.CTkLabel(
                 row,

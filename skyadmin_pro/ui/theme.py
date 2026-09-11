@@ -98,6 +98,29 @@ FEEDBACK_INFO = TEXT_MUTED
 ACCENT = ("#2563eb", "#3b82f6")
 ACCENT_STRONG = ("#1d4ed8", "#1e40af")
 
+# Semantic status colors (light, dark)
+STAT_WARNING = ("#b45309", "#fbbf24")
+STAT_CRITICAL = ("#b91c1c", "#f87171")
+STAT_SUCCESS = ("#15803d", "#4ade80")
+STAT_MUTED = ("gray50", "gray60")
+
+# Dashboard timeline bar colors (dark, light variants)
+TIMELINE_CRITICAL = "#dc2626"
+TIMELINE_WARNING = "#ea580c"
+TIMELINE_CAUTION = "#d97706"
+TIMELINE_OK = "#16a34a"
+
+# Global search badge colors (light, dark)
+BADGE_CLIENT = ("#2563eb", "#3b82f6")
+BADGE_TASK = ("#b45309", "#f59e0b")
+BADGE_DOCUMENT = ("#15803d", "#4ade80")
+BADGE_CONTACT = ("#7c3aed", "#a78bfa")
+
+# Filing / renewal status colors (light, dark)
+STATUS_COMPLETE = ("#15803d", "#4ade80")
+STATUS_ONGOING = ("#a16207", "#fbbf24")
+STATUS_PENDING = ("#b91c1c", "#f87171")
+
 # Status bar
 STATUS_BAR_HEIGHT = 32
 

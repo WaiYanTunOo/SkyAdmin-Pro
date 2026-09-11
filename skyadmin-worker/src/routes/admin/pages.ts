@@ -195,6 +195,32 @@ var _tickTimer=null;
 var _machFilter='all';
 var _recFilter='all';
 
+function esc(s){var d=document.createElement('div');d.appendChild(document.createTextNode(s));return d.innerHTML;}
+
+function styledConfirm(msg){
+  return new Promise(function(resolve){
+    var overlay=document.createElement('div');
+    overlay.style.cssText='position:fixed;inset:0;z-index:200;background:rgba(0,0,0,.6);display:flex;align-items:center;justify-content:center';
+    var box=document.createElement('div');
+    box.style.cssText='background:#1f2937;border:1px solid #374151;border-radius:14px;padding:24px;max-width:360px;width:90%;text-align:center';
+    box.innerHTML='<div style="font-size:14px;margin-bottom:16px;color:#f9fafb;line-height:1.5">'+esc(msg)+'</div>';
+    var btnRow=document.createElement('div');
+    btnRow.style.cssText='display:flex;gap:8px;justify-content:center';
+    var cancelBtn=document.createElement('button');
+    cancelBtn.type='button';cancelBtn.textContent='Cancel';
+    cancelBtn.style.cssText='padding:10px 20px;border:1px solid #4b5563;border-radius:8px;background:#374151;color:#e5e7eb;font-size:13px;font-weight:600;cursor:pointer';
+    cancelBtn.onclick=function(){overlay.remove();resolve(false);};
+    var okBtn=document.createElement('button');
+    okBtn.type='button';okBtn.textContent='Confirm';
+    okBtn.style.cssText='padding:10px 20px;border:0;border-radius:8px;background:#dc2626;color:white;font-size:13px;font-weight:600;cursor:pointer';
+    okBtn.onclick=function(){overlay.remove();resolve(true);};
+    btnRow.appendChild(cancelBtn);btnRow.appendChild(okBtn);
+    box.appendChild(btnRow);overlay.appendChild(box);
+    overlay.addEventListener('click',function(e){if(e.target===overlay){overlay.remove();resolve(false);}});
+    document.body.appendChild(overlay);
+  });
+}
+
 function showStatus(m){
   var s=document.getElementById('status');s.textContent=m;s.style.display='block';
   setTimeout(function(){s.style.display='none';},2000);
@@ -256,7 +282,7 @@ function renderPackageSummary(){
     shown++;
     var item=document.createElement('div');
     item.className='item';
-    item.innerHTML='<span><b>'+p.label+'</b> · '+p.days+' day'+(p.days===1?'':'s')+'</span><span class="price">'+fmtBaht(p.price_thb)+' Baht</span>';
+    item.innerHTML='<span><b>'+esc(p.label)+'</b> · '+p.days+' day'+(p.days===1?'':'s')+'</span><span class="price">'+fmtBaht(p.price_thb)+' Baht</span>';
     box.appendChild(item);
   }
   if(!shown) box.innerHTML='<div class="hint" style="padding:4px 0">No packages loaded yet.</div>';
@@ -319,7 +345,7 @@ function buildDaysSelect(){
     if(p.days===null) continue;
     var opt=document.createElement('option');
     opt.value=String(p.days);
-    opt.textContent=p.label+' \u2014 '+fmtBaht(p.price_thb)+' Baht';
+    opt.textContent=esc(p.label)+' \u2014 '+fmtBaht(p.price_thb)+' Baht';
     if(p.days===7) opt.selected=true;
     sel.appendChild(opt);
   }
@@ -360,7 +386,7 @@ function addPackageRow(pkg){
   var row=document.createElement('div');
   row.className='pkg-row';
   row.innerHTML=
-    '<input class="pkg-label" placeholder="Label" value="'+(pkg.label||'').replace(/"/g,'&quot;')+'">'+
+    '<input class="pkg-label" placeholder="Label" value="'+esc(pkg.label||'')+'">'+
     '<input class="pkg-days" type="number" min="1" max="36500" placeholder="Days" value="'+(pkg.days||'')+'">'+
     '<input class="pkg-price" type="number" min="0" placeholder="Baht" value="'+(pkg.price_thb||0)+'">'+
     '<button type="button" class="sm red del-row-btn">Del</button>';
@@ -393,7 +419,7 @@ function loadPricing(showToast){
 
 function savePricing(){
   var packages=readPackageRows();
-  if(!packages.length){alert('Add at least one package.');return;}
+  if(!packages.length){showStatus('Add at least one package.');return;}
   api('POST','/api/pricing',{
     packages:packages,
     over_year_text:document.getElementById('overYear').value.trim()
@@ -538,7 +564,7 @@ function renderMachines(){
     var div=document.createElement('div');div.className='mach';
     var pkg=m.package_days==null?'Unlimited':m.package_days+'d';
     div.innerHTML=
-      '<div class="row"><span class="ttl">'+mid+'</span> '+machStatusTag(m.status)+'</div>'+
+      '<div class="row"><span class="ttl">'+esc(mid)+'</span> '+machStatusTag(m.status)+'</div>'+
       '<div class="row expiry '+expiryClass(exp,m.status==='revoked')+'">'+left+'</div>'+
       '<div class="row">Expires: '+(m.expires_label||'—')+' · Package: '+pkg+
       (m.issued_at?' · Issued: '+m.issued_at:'')+
@@ -554,10 +580,10 @@ function renderMachines(){
 
 function generate(){
   var mid=document.getElementById('mid').value.trim().toUpperCase();
-  if(!mid||!/^[0-9A-F]{16}$/.test(mid)){alert('Enter 16-hex Machine ID');return;}
+  if(!mid||!/^[0-9A-F]{16}$/.test(mid)){showStatus('Enter 16-hex Machine ID');return;}
   var sel=document.getElementById('days').value;
   var days;
-  if(sel==='__custom__'){days=parseInt(document.getElementById('cDays').value);if(!days||days<1){alert('Enter days');return;}}
+  if(sel==='__custom__'){days=parseInt(document.getElementById('cDays').value);if(!days||days<1){showStatus('Enter days');return;}}
   else if(sel===''){days=null;}
   else days=parseInt(sel);
   var btn=document.getElementById('genBtn');btn.disabled=true;btn.textContent='Signing...';
@@ -596,7 +622,7 @@ function renderRecords(){
     var expLabel=r.expires_label||(exp==='never'?'Never expires':exp);
     var d=document.createElement('div');d.className='rec'+(isRevoked?' revoked':'');
     var pkgStr=(pkg===null||pkg===undefined)?'Unlimited':pkg+'d';
-    d.innerHTML='<div class="row"><b>'+mid+'</b> '+tag+'</div>'+
+    d.innerHTML='<div class="row"><b>'+esc(mid)+'</b> '+tag+'</div>'+
       '<div class="row expiry '+expiryClass(exp,isRevoked)+'">'+left+'</div>'+
       '<div class="row">Expires: '+expLabel+' · '+pkgStr+(price?' · '+price+'\u0e3f':'')+' · Issued: '+ts+'</div>';
     var b=document.createElement('div');b.className='btns';
@@ -612,32 +638,35 @@ function renderRecords(){
 }
 
 function renew(mid,days){
-  if(!confirm('Generate a new '+days+'-day license for '+mid+'?'))return;
+  styledConfirm('Generate a new '+days+'-day license for '+mid+'?').then(function(ok){if(!ok)return;
   var price=priceForDays(days);
   api('POST','/api/generate',{mid:mid,days:days,price:price}).then(function(d){
     navigator.clipboard.writeText(d.license_key);
     showStatus(days+'d generated & copied');
     return loadRecords();
   }).catch(function(e){alert(e.message);});
+  });
 }
 
 function purgeOldLicenses(){
   var days=parseInt(document.getElementById('purgeDays').value,10);
-  if(!days||days<1||days>365){alert('Enter days between 1 and 365');return;}
-  if(!confirm('Archive and delete stale license records older than '+days+' days?\\n\\nActive licenses are kept.'))return;
+  if(!days||days<1||days>365){showStatus('Enter days 1–365');return;}
+  styledConfirm('Archive and delete stale license records older than '+days+' days?\n\nActive licenses are kept.').then(function(ok){if(!ok)return;
   api('POST','/api/purge-licenses',{older_than_days:days}).then(function(d){
     document.getElementById('purgeResult').textContent='Cleared '+d.purged+' record(s), archived '+d.archived+'.';
     showStatus('Purged '+d.purged);
     return loadRecords();
   }).catch(function(e){alert(e.message);});
+  });
 }
 
 function doRevoke(nonce){
-  if(!confirm('Revoke this license?'))return;
+  styledConfirm('Revoke this license?').then(function(ok){if(!ok)return;
   api('POST','/api/revoke',{nonce:nonce}).then(function(){
     showStatus('Revoked');
     return loadRecords();
   }).catch(function(e){alert(e.message);});
+  });
 }
 function doUnrevoke(nonce){
   api('POST','/api/unrevoke',{nonce:nonce}).then(function(){
@@ -659,7 +688,7 @@ function loadUpdateInfo(){
 function publishUpdate(){
   var version=(document.getElementById('updVer').value||'').trim();
   var url=(document.getElementById('updUrl').value||'').trim();
-  if(!version){alert('Enter a version number.');return;}
+  if(!version){showStatus('Enter a version number.');return;}
   api('POST','/api/update',{version:version,url:url}).then(function(d){
     showStatus('Update published');
     document.getElementById('updStatus').textContent='Published v'+version+(url?' → '+url:'');
@@ -668,7 +697,7 @@ function publishUpdate(){
 
 function addBan(){
   var mid=document.getElementById('banIn').value.trim().toUpperCase();
-  if(!/^[0-9A-F]{16}$/.test(mid)){alert('16 hex chars');return;}
+  if(!/^[0-9A-F]{16}$/.test(mid)){showStatus('Enter 16 hex characters');return;}
   api('POST','/api/ban',{mid:mid}).then(function(){
     document.getElementById('banIn').value='';
     showStatus('Banned');

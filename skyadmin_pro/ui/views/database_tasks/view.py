@@ -7,6 +7,7 @@ from tkinter import filedialog, messagebox
 import customtkinter as ctk
 
 from skyadmin_pro.services.export import default_export_name, export_to_excel
+from skyadmin_pro.ui.canvas_scroll import CanvasScrollFrame
 from skyadmin_pro.ui.views.base import BaseView
 from skyadmin_pro.ui.views.company_details import CompanyDetailsPanel
 from skyadmin_pro.ui.views.company_details.panel import (
@@ -95,46 +96,51 @@ class DatabaseTasksView(BaseView):
         self.company_panel = None
         self.suppliers_panel = None
 
-    def _ensure_lazy_panel(self, name: str) -> None:
+    def _ensure_panel(self, name: str) -> None:
         if name in self._lazy_panels:
             return
+        tab = self.tabs.tab(name)
+        scroll = CanvasScrollFrame(tab)
+        scroll.grid(row=0, column=0, sticky="nsew", padx=8, pady=8)
+        scroll.content.grid_columnconfigure(0, weight=1)
+        content = scroll.content
         if name == TAB_TASKS:
-            self.tasks_panel = TaskPanel(self.tabs.tab(TAB_TASKS), self.app, self.feedback)
-            self.tasks_panel.grid(row=0, column=0, sticky="nsew", padx=8, pady=8)
+            self.tasks_panel = TaskPanel(content, self.app, self.feedback)
+            self.tasks_panel.grid(row=0, column=0, sticky="nsew")
             self._lazy_panels[name] = self.tasks_panel
         elif name == TAB_CLIENTS:
-            self.clients_panel = ClientsExpiryPanel(self.tabs.tab(TAB_CLIENTS), self.app, self.feedback)
-            self.clients_panel.grid(row=0, column=0, sticky="nsew", padx=8, pady=8)
+            self.clients_panel = ClientsExpiryPanel(content, self.app, self.feedback)
+            self.clients_panel.grid(row=0, column=0, sticky="nsew")
             self._lazy_panels[name] = self.clients_panel
         elif name == TAB_COURIER:
-            self.courier_panel = CourierPanel(self.tabs.tab(TAB_COURIER), self.app, self.feedback)
-            self.courier_panel.grid(row=0, column=0, sticky="nsew", padx=8, pady=8)
+            self.courier_panel = CourierPanel(content, self.app, self.feedback)
+            self.courier_panel.grid(row=0, column=0, sticky="nsew")
             self._lazy_panels[name] = self.courier_panel
         elif name == TAB_MONTH:
             # MonthStatusPanel is lightweight with its own tree scrollbar; outer scroll not needed
             self.month_panel = MonthStatusPanel(
-                self.tabs.tab(TAB_MONTH),
+                content,
                 self.app,
                 showheight=12,
                 title="Monthly tax status per client",
             )
-            self.month_panel.grid(row=0, column=0, sticky="nsew", padx=8, pady=8)
+            self.month_panel.grid(row=0, column=0, sticky="nsew")
             self._lazy_panels[name] = self.month_panel
         elif name == TAB_COMPANY:
-            self.company_panel = CompanyDetailsPanel(self.tabs.tab(TAB_COMPANY), self.app, self.feedback)
-            self.company_panel.grid(row=0, column=0, sticky="nsew", padx=8, pady=8)
+            self.company_panel = CompanyDetailsPanel(content, self.app, self.feedback)
+            self.company_panel.grid(row=0, column=0, sticky="nsew")
             self._lazy_panels[name] = self.company_panel
         elif name == TAB_RENEWALS:
-            self.renewals_panel = RenewalPanel(self.tabs.tab(TAB_RENEWALS), self.app, self.feedback)
-            self.renewals_panel.grid(row=0, column=0, sticky="nsew", padx=8, pady=8)
+            self.renewals_panel = RenewalPanel(content, self.app, self.feedback)
+            self.renewals_panel.grid(row=0, column=0, sticky="nsew")
             self._lazy_panels[name] = self.renewals_panel
         elif name == TAB_PIPELINE:
-            self.pipeline_panel = ServicePipelinePanel(self.tabs.tab(TAB_PIPELINE), self.app, self.feedback)
-            self.pipeline_panel.grid(row=0, column=0, sticky="nsew", padx=8, pady=8)
+            self.pipeline_panel = ServicePipelinePanel(content, self.app, self.feedback)
+            self.pipeline_panel.grid(row=0, column=0, sticky="nsew")
             self._lazy_panels[name] = self.pipeline_panel
         elif name == TAB_SUPPLIERS:
-            self.suppliers_panel = SuppliersPanel(self.tabs.tab(TAB_SUPPLIERS), self.app, self.feedback)
-            self.suppliers_panel.grid(row=0, column=0, sticky="nsew", padx=8, pady=8)
+            self.suppliers_panel = SuppliersPanel(content, self.app, self.feedback)
+            self.suppliers_panel.grid(row=0, column=0, sticky="nsew")
             self._lazy_panels[name] = self.suppliers_panel
 
     def _on_tab_changed(self) -> None:
@@ -142,7 +148,7 @@ class DatabaseTasksView(BaseView):
             current = self.tabs.get()
         except Exception:
             current = ""
-        self._ensure_lazy_panel(current)
+        self._ensure_panel(current)
         self.refresh_active_tab(current)
 
     def refresh_active_tab(self, tab_name: str | None = None) -> None:
@@ -170,11 +176,8 @@ class DatabaseTasksView(BaseView):
         elif tab_name == TAB_SUPPLIERS and self.suppliers_panel is not None:
             self.suppliers_panel.refresh()
 
-    def _refresh_active_tab(self, tab_name: str) -> None:
-        self.refresh_active_tab(tab_name)
-
     def _require_company_panel(self) -> CompanyDetailsPanel:
-        self._ensure_lazy_panel(TAB_COMPANY)
+        self._ensure_panel(TAB_COMPANY)
         assert self.company_panel is not None
         return self.company_panel
 
@@ -183,7 +186,7 @@ class DatabaseTasksView(BaseView):
             current = self.tabs.get()
         except Exception:
             current = TAB_TASKS
-        self._ensure_lazy_panel(current)
+        self._ensure_panel(current)
         self.refresh_active_tab(current)
 
     def open_company_details(self, client_name: str) -> None:
@@ -220,19 +223,19 @@ class DatabaseTasksView(BaseView):
 
     def open_task(self, task_id: int) -> None:
         self.tabs.set(TAB_TASKS)
-        self._ensure_lazy_panel(TAB_TASKS)
+        self._ensure_panel(TAB_TASKS)
         if self.tasks_panel is not None:
             self.tasks_panel.select_task(task_id)
 
     def open_renewal(self, client_name: str) -> None:
-        self._ensure_lazy_panel(TAB_RENEWALS)
+        self._ensure_panel(TAB_RENEWALS)
         self.tabs.set(TAB_RENEWALS)
         assert self.renewals_panel is not None
         self.renewals_panel.select_client(client_name)
         self.renewals_panel.refresh()
 
     def open_pipeline(self) -> None:
-        self._ensure_lazy_panel(TAB_PIPELINE)
+        self._ensure_panel(TAB_PIPELINE)
         self.tabs.set(TAB_PIPELINE)
         if self.pipeline_panel is not None:
             self.pipeline_panel.refresh()
@@ -243,47 +246,37 @@ class DatabaseTasksView(BaseView):
             return
         self.refresh_active_tab()
 
-    def sync_service_menus(self) -> None:
-        """Update service-type combobox values on constructed panels without full tab refresh."""
-        types = self.app.db.list_service_types()
-        if self.clients_panel is not None:
-            combo = self.clients_panel.expiry_type
-            combo.configure(values=types)
-            if combo.get() not in types:
-                combo.set(types[0] if types else "")
-        if self.company_panel is not None:
-            combo = getattr(self.company_panel, "service_type", None)
-            if combo is not None:
-                combo.configure(values=types)
-                if combo.get() not in types:
-                    combo.set(types[0] if types else "")
-        if self.pipeline_panel is not None:
-            combo = self.pipeline_panel.pipe_service
-            combo.configure(values=types)
-            if combo.get() not in types:
-                combo.set(types[0] if types else "")
+    def _refresh_service_menus(self, tab_name: str | None = None) -> None:
+        """Update service-type combobox values on constructed panels.
 
-    def _refresh_service_menus(self, tab_name: str) -> None:
-        panel_key = service_menu_panel_key(tab_name)
-        if panel_key is None:
-            return
+        When *tab_name* is given only the panel owning that tab's combo is
+        refreshed.  When ``None`` all three known panels are refreshed.
+        """
         types = self.app.db.list_service_types()
-        if panel_key == "clients" and self.clients_panel is not None:
-            combo = self.clients_panel.expiry_type
-            combo.configure(values=types)
-            if combo.get() not in types:
-                combo.set(types[0] if types else "")
-        elif panel_key == "company" and self.company_panel is not None:
-            combo = getattr(self.company_panel, "service_type", None)
-            if combo is not None:
+        if tab_name is not None:
+            panel_key = service_menu_panel_key(tab_name)
+            if panel_key is None:
+                return
+            panels = [panel_key]
+        else:
+            panels = ["clients", "company", "pipeline"]
+        for key in panels:
+            if key == "clients" and self.clients_panel is not None:
+                combo = self.clients_panel.expiry_type
                 combo.configure(values=types)
                 if combo.get() not in types:
                     combo.set(types[0] if types else "")
-        elif panel_key == "pipeline" and self.pipeline_panel is not None:
-            combo = self.pipeline_panel.pipe_service
-            combo.configure(values=types)
-            if combo.get() not in types:
-                combo.set(types[0] if types else "")
+            elif key == "company" and self.company_panel is not None:
+                combo = getattr(self.company_panel, "service_type", None)
+                if combo is not None:
+                    combo.configure(values=types)
+                    if combo.get() not in types:
+                        combo.set(types[0] if types else "")
+            elif key == "pipeline" and self.pipeline_panel is not None:
+                combo = self.pipeline_panel.pipe_service
+                combo.configure(values=types)
+                if combo.get() not in types:
+                    combo.set(types[0] if types else "")
 
     def _export_excel(self) -> None:
         from skyadmin_pro.ui.views.export_filter_dialog import ExportFilterDialog
@@ -452,7 +445,7 @@ class DatabaseTasksView(BaseView):
             self.tabs.set(TAB_CLIENTS)
         except Exception:
             pass
-        self._ensure_lazy_panel(TAB_CLIENTS)
+        self._ensure_panel(TAB_CLIENTS)
         if self.clients_panel is not None:
             self.clients_panel._open_client_dialog()
 
@@ -465,7 +458,7 @@ class DatabaseTasksView(BaseView):
             tab = self.tabs.get()
         except Exception:
             return False
-        self._ensure_lazy_panel(tab)
+        self._ensure_panel(tab)
         if tab == TAB_TASKS and self.tasks_panel is not None:
             self.tasks_panel._save()
             return True
@@ -474,6 +467,6 @@ class DatabaseTasksView(BaseView):
         return False
 
     def _on_shortcut_undo(self) -> None:
-        self._ensure_lazy_panel(TAB_CLIENTS)
+        self._ensure_panel(TAB_CLIENTS)
         if self.clients_panel is not None:
             self.clients_panel._undo_last()

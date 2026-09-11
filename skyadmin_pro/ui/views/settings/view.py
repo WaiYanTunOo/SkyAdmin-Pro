@@ -66,7 +66,7 @@ class SettingsView(BackupMixin, ChecklistMixin, LicenseMixin, PricingMixin, Work
             tab.grid_propagate(True)
 
         # General is the default tab — build it now; others on first visit.
-        self._ensure_lazy_tab("General")
+        self._ensure_panel("General")
 
     def _current_tab(self) -> str:
         try:
@@ -76,7 +76,7 @@ class SettingsView(BackupMixin, ChecklistMixin, LicenseMixin, PricingMixin, Work
 
     def _on_tab_changed(self) -> None:
         name = self._current_tab()
-        self._ensure_lazy_tab(name)
+        self._ensure_panel(name)
         if name == "License":
             self._refresh_license_label()
         elif name == "Business":
@@ -100,7 +100,7 @@ class SettingsView(BackupMixin, ChecklistMixin, LicenseMixin, PricingMixin, Work
         except Exception:
             pass
 
-    def _ensure_lazy_tab(self, name: str) -> None:
+    def _ensure_panel(self, name: str) -> None:
         if name in self._lazy_tabs:
             return
         tab = self.tabs.tab(name)
@@ -203,8 +203,6 @@ class SettingsView(BackupMixin, ChecklistMixin, LicenseMixin, PricingMixin, Work
             width=160,
         )
         self.zoom_menu.grid(row=4, column=1, sticky="w", pady=4)
-
-        from skyadmin_pro.ui.theme import TEXT_MUTED
 
         ctk.CTkLabel(
             body,
@@ -814,7 +812,7 @@ class SettingsView(BackupMixin, ChecklistMixin, LicenseMixin, PricingMixin, Work
     def on_show(self) -> None:
         # Ensure the visible tab exists before refreshing its widgets.
         current = self._current_tab()
-        self._ensure_lazy_tab(current)
+        self._ensure_panel(current)
 
         if "General" in self._lazy_tabs:
             current_mode = ctk.get_appearance_mode()

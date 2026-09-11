@@ -43,9 +43,10 @@ class UndoManager:
     def __init__(self) -> None:
         self._pending: Command | None = None
 
-    def execute(self, cmd: Command) -> None:
-        cmd.do()
+    def execute(self, cmd: Command):
+        result = cmd.do()
         self._pending = cmd
+        return result
 
     def can_undo(self) -> bool:
         return self._pending is not None

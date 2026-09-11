@@ -102,8 +102,6 @@ CREATE TABLE IF NOT EXISTS sync_devices (
     expires_at TEXT NOT NULL DEFAULT (datetime('now', '+30 days'))
 );
 
-CREATE INDEX IF NOT EXISTS idx_sync_devices_machine_id ON sync_devices(machine_id);
-
 CREATE TABLE IF NOT EXISTS sync_rows (
     id INTEGER PRIMARY KEY AUTOINCREMENT,
     machine_id TEXT NOT NULL,

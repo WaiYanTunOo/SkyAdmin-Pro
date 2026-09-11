@@ -78,8 +78,8 @@ class AccountingSetupTabMixin:
         )
 
     def refresh_accounting_setup(self) -> None:
-        if hasattr(self, "_ensure_lazy_tab"):
-            self._ensure_lazy_tab("Accounting Setup")
+        if hasattr(self, "_ensure_panel"):
+            self._ensure_panel("Accounting Setup")
         if hasattr(self, "_accounting_setup_panel"):
             self._accounting_setup_panel.refresh()
 
