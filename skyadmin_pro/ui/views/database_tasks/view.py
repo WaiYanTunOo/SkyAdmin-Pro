@@ -100,6 +100,16 @@ class DatabaseTasksView(BaseView):
         if name in self._lazy_panels:
             return
         tab = self.tabs.tab(name)
+
+        if name == TAB_COMPANY:
+            # CompanyDetailsPanel manages its own tabview + per-sub-tab CanvasScrollFrame;
+            # wrapping it in another CanvasScrollFrame prevents the height from expanding
+            # (canvas window items only get width updates, not height).  Place it directly.
+            self.company_panel = CompanyDetailsPanel(tab, self.app, self.feedback)
+            self.company_panel.grid(row=0, column=0, sticky="nsew", padx=8, pady=8)
+            self._lazy_panels[name] = self.company_panel
+            return
+
         scroll = CanvasScrollFrame(tab)
         scroll.grid(row=0, column=0, sticky="nsew", padx=8, pady=8)
         scroll.content.grid_columnconfigure(0, weight=1)
@@ -126,10 +136,6 @@ class DatabaseTasksView(BaseView):
             )
             self.month_panel.grid(row=0, column=0, sticky="nsew")
             self._lazy_panels[name] = self.month_panel
-        elif name == TAB_COMPANY:
-            self.company_panel = CompanyDetailsPanel(content, self.app, self.feedback)
-            self.company_panel.grid(row=0, column=0, sticky="nsew")
-            self._lazy_panels[name] = self.company_panel
         elif name == TAB_RENEWALS:
             self.renewals_panel = RenewalPanel(content, self.app, self.feedback)
             self.renewals_panel.grid(row=0, column=0, sticky="nsew")

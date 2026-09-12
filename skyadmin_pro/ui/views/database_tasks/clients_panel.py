@@ -53,11 +53,27 @@ class ClientsExpiryPanel(ctk.CTkFrame):
         self.search_var = ctk.StringVar()
         self._search_after: str | None = None
         self.search_var.trace_add("write", lambda *_args: self._debounced_search())
-        themed_entry(
-            title_row,
+        search_box = ctk.CTkFrame(title_row, fg_color="transparent")
+        search_box.grid(row=0, column=1, sticky="ew", padx=(12, 8))
+        search_box.grid_columnconfigure(0, weight=1)
+        self.search_entry = themed_entry(
+            search_box,
             textvariable=self.search_var,
             placeholder_text="Search name / email",
-        ).grid(row=0, column=1, sticky="ew", padx=(12, 8))
+        )
+        self.search_entry.grid(row=0, column=0, sticky="ew")
+        self.search_entry.bind("<Return>", lambda _e: self._run_search())
+        self.clear_search_btn = ctk.CTkButton(
+            search_box,
+            text="✕",
+            width=26,
+            height=26,
+            fg_color="transparent",
+            hover_color=("gray80", "gray30"),
+            text_color=TEXT_MUTED,
+            command=self._clear_search,
+        )
+        self.clear_search_btn.grid(row=0, column=1, padx=(4, 0))
         self._group_filter_var = ctk.StringVar(value="All")
         self.group_filter_menu = ctk.CTkOptionMenu(
             title_row,
@@ -369,6 +385,14 @@ class ClientsExpiryPanel(ctk.CTkFrame):
         self._search_after = None
         self._page = 0
         self._refresh_client_table()
+
+    def _clear_search(self) -> None:
+        self.search_var.set("")
+        self._run_search()
+        try:
+            self.search_entry.focus_set()
+        except Exception:
+            pass
 
     def _refresh_clients(self) -> None:
         """Group-filter menu legacy entry point (was missing → AttributeError)."""

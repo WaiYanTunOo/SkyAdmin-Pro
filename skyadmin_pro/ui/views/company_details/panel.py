@@ -131,7 +131,12 @@ class CompanyDetailsPanel(
         tab = self._current_subtab()
         self._ensure_panel(tab)
         if tab == SUBTAB_GENERAL:
-            self._save_company_info()
+            if getattr(self, "_editing_service_id", None) is not None:
+                self._save_service()
+            elif getattr(self, "_editing_doc_id", None) is not None:
+                self._save_document()
+            else:
+                self._save_company_info()
             return True
         if tab == SUBTAB_TAX_IDS:
             self._save_tax_ids()
@@ -145,6 +150,8 @@ class CompanyDetailsPanel(
         return False
 
     def _on_subtab_changed(self) -> None:
+        self._cancel_service_edit()
+        self._cancel_document_edit()
         self._ensure_panel(self._current_subtab())
         self.refresh()
 
@@ -233,8 +240,8 @@ class CompanyDetailsPanel(
         fill_combo(self.company_box, names, current)
 
     def _on_company(self, _choice: str) -> None:
-        self._editing_service_id = None
-        self._editing_doc_id = None
+        self._cancel_service_edit()
+        self._cancel_document_edit()
         self.refresh()
 
     def _update_company_info_line(
@@ -512,8 +519,29 @@ class CompanyDetailsPanel(
             raise ValueError("Enter a valid date (YYYY-MM-DD or DD/MM/YYYY).")
         return parsed
 
+    def _cancel_service_edit(self) -> None:
+        self._editing_service_id = None
+        if hasattr(self, "service_status_label"):
+            self.service_status_label.configure(text="New service record")
+        if hasattr(self, "service_start"):
+            self.service_start.set("")
+            self.service_expiry.set("")
+            self.service_payment.set("")
+            self.service_amount.set("")
+            self.service_progress.set(SERVICE_PROGRESS[0])
+            self.service_paid.deselect()
+
+    def _cancel_document_edit(self) -> None:
+        self._editing_doc_id = None
+        if hasattr(self, "document_status_label"):
+            self.document_status_label.configure(text="New document record")
+        if hasattr(self, "doc_expiry"):
+            self.doc_expiry.set("")
+            self.doc_file.set("")
+            self.doc_path.set("")
+
     def _edit_service(self, iid: str | None) -> None:
-        if iid is None:
+        if not iid or iid == "__empty__" or not str(iid).isdigit():
             return
         item = self.app.db.get_document(int(iid))
         if not item:
@@ -536,7 +564,7 @@ class CompanyDetailsPanel(
             self.service_paid.deselect()
 
     def _edit_document(self, iid: str | None) -> None:
-        if iid is None:
+        if not iid or iid == "__empty__" or not str(iid).isdigit():
             return
         item = self.app.db.get_document(int(iid))
         if not item:
@@ -618,7 +646,7 @@ class CompanyDetailsPanel(
 
     def _renew_service(self) -> None:
         iid = self.service_tree.selected_iid()
-        if iid is None:
+        if not iid or iid == "__empty__" or not str(iid).isdigit():
             self.feedback.error("Select a service to renew.")
             return
         service = self.app.db.get_document(int(iid))
@@ -719,7 +747,7 @@ class CompanyDetailsPanel(
 
     def _renewal_history(self) -> None:
         iid = self.service_tree.selected_iid()
-        if iid is None:
+        if not iid or iid == "__empty__" or not str(iid).isdigit():
             self.feedback.error("Select a service to view its renewal history.")
             return
         service = self.app.db.get_document(int(iid))
@@ -844,6 +872,7 @@ class CompanyDetailsPanel(
                 expiry_date=expiry,
                 file_name=file_name,
                 file_path=saved_path,
+                clear=True,
             )
             self.feedback.success("Document record updated.")
         self._editing_doc_id = None
@@ -855,7 +884,7 @@ class CompanyDetailsPanel(
 
     def _delete_service(self) -> None:
         iid = self.service_tree.selected_iid()
-        if iid is None:
+        if not iid or iid == "__empty__" or not str(iid).isdigit():
             self.feedback.error("Select a service row first.")
             return
         if not messagebox.askyesno(
@@ -868,7 +897,7 @@ class CompanyDetailsPanel(
 
     def _delete_document(self) -> None:
         iid = self.doc_tree.selected_iid()
-        if iid is None:
+        if not iid or iid == "__empty__" or not str(iid).isdigit():
             self.feedback.error("Select a document row first.")
             return
         if not messagebox.askyesno(

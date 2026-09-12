@@ -15,7 +15,7 @@ from skyadmin_pro.services.file_ops import parse_flexible_date
 from skyadmin_pro.ui.combo_utils import fill_combo
 from skyadmin_pro.ui.theme import CARD_RADIUS, CARD_TITLE_SIZE, FORM_ROW_GAP, FORM_SIDEBAR_MIN_WIDTH, TEXT_MUTED
 from skyadmin_pro.ui.treeview import ThemedTreeview
-from skyadmin_pro.ui.widgets import FeedbackLabel, FormField, themed_scrollable_frame
+from skyadmin_pro.ui.widgets import FeedbackLabel, FormField, themed_entry, themed_scrollable_frame
 
 FORM_PADX = 16
 
@@ -43,6 +43,32 @@ class TaskPanel(ctk.CTkFrame):
         )
         self.filter.set("Pending")
         self.filter.pack(side="left")
+
+        self.search_var = ctk.StringVar()
+        self._search_after: str | None = None
+        self.search_var.trace_add("write", lambda *_args: self._debounced_search())
+        search_box = ctk.CTkFrame(top, fg_color="transparent")
+        search_box.pack(side="left", fill="x", expand=True, padx=(12, 12))
+        search_box.grid_columnconfigure(0, weight=1)
+        self.search_entry = themed_entry(
+            search_box,
+            textvariable=self.search_var,
+            placeholder_text="Search task / client / category…",
+        )
+        self.search_entry.grid(row=0, column=0, sticky="ew")
+        self.search_entry.bind("<Return>", lambda _e: self._run_search())
+        self.clear_search_btn = ctk.CTkButton(
+            search_box,
+            text="✕",
+            width=26,
+            height=26,
+            fg_color="transparent",
+            hover_color=("gray80", "gray30"),
+            text_color=TEXT_MUTED,
+            command=self._clear_search,
+        )
+        self.clear_search_btn.grid(row=0, column=1, padx=(4, 0))
+
         self.columns_btn = ctk.CTkButton(
             top,
             text="⋮ Columns",
@@ -203,6 +229,11 @@ class TaskPanel(ctk.CTkFrame):
         elif choice == "Completed":
             status = TASK_STATUS_COMPLETED
 
+        try:
+            search_query = self.search_var.get().strip()
+        except Exception:
+            search_query = ""
+
         self._refresh_seq += 1
         seq = self._refresh_seq
         db = self.app.db
@@ -212,7 +243,7 @@ class TaskPanel(ctk.CTkFrame):
         def work():
             names = db.list_client_names()
             # Fetch one extra row to know whether a next page exists.
-            tasks = db.list_tasks(status=status, limit=page_size + 1, offset=page * page_size)
+            tasks = db.list_tasks(status=status, q=search_query, limit=page_size + 1, offset=page * page_size)
             return {"names": names, "tasks": tasks, "choice": choice, "current": current_combo}
 
         def on_success(payload) -> None:
@@ -246,6 +277,27 @@ class TaskPanel(ctk.CTkFrame):
             self.feedback.error(f"Tasks failed to load: {msg}")
 
         run_background(self, work=work, on_success=on_success, on_error=on_error)
+
+    def _debounced_search(self) -> None:
+        if self._search_after is not None:
+            try:
+                self.after_cancel(self._search_after)
+            except Exception:
+                pass
+        self._search_after = self.after(300, self._run_search)
+
+    def _run_search(self) -> None:
+        self._search_after = None
+        self._page = 0
+        self.refresh()
+
+    def _clear_search(self) -> None:
+        self.search_var.set("")
+        self._run_search()
+        try:
+            self.search_entry.focus_set()
+        except Exception:
+            pass
 
     def _update_pager(self, shown: int) -> None:
         label = f"Page {self._page + 1} · {shown} shown"

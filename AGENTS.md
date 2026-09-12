@@ -38,6 +38,10 @@ Phases 7–11, S1 hardening, and residual sprint P0–P2 are **done**:
 - Release publish `needs: [windows-release, worker]`; installer auto-update URL; tag fail-closed without `SKYADMIN_API_TOKEN`
 - `clients.group_id` numeric FK stays local; Wave C syncs `client_groups` + `group_global_id`
 - Versioned desktop migrations; thin `_migrate_*` CoreMixin wrappers removed
+- `ThemedTreeview` empty placeholder safety (`__empty__` returns `None`), keyboard activate signature fix (`self.selected_iid()`), and upward mousewheel delegation to parent `CanvasScrollFrame`
+- Company Details General tab: Cancel edit buttons, automatic edit state reset on tab/company switch, and smart `Ctrl+S` save routing
+- Clients & Tasks search entries: inline Clear (`✕`) button + Enter key immediate search execution; live `DatePickerField` border validation
+- Detailed procedures, invariants & command cheat sheet in `docs/PROCEDURES_AND_PLAYBOOK.md`
 
 Do **not** re-open timing-oracle / sync-TTL / CSP / trees-out-of-scroll / release Worker gate as greenfield P0.
 
@@ -84,6 +88,7 @@ docs/WORKER_ADMIN.md                    # Admin UI split — multi-AI handoff
 tests/                                  # pytest
 skyadmin-worker/src/*.test.ts           # Vitest
 docs/UI_CHECKLIST.md                    # Manual UI QA
+docs/PROCEDURES_AND_PLAYBOOK.md         # Procedures, invariants & command cheat sheet
 docs/ROADMAP.md                         # Phases 7–11 (landed)
 docs/MASTER_ROADMAP.md                  # Audit + backlog
 ```

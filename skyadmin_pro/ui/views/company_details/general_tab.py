@@ -195,17 +195,25 @@ class GeneralTabMixin:
 
         buttons = ctk.CTkFrame(form, fg_color="transparent")
         buttons.grid(row=4, column=2, columnspan=2, sticky="ew")
-        buttons.grid_columnconfigure((0, 1), weight=1)
+        buttons.grid_columnconfigure((0, 1, 2), weight=1)
         ctk.CTkButton(buttons, text="Save service", command=self._save_service).grid(
             row=0, column=0, sticky="ew", padx=(0, 4)
         )
+        self.cancel_service_btn = ctk.CTkButton(
+            buttons,
+            text="Cancel",
+            fg_color="transparent",
+            border_width=1,
+            command=self._cancel_service_edit,
+        )
+        self.cancel_service_btn.grid(row=0, column=1, sticky="ew", padx=(2, 2))
         ctk.CTkButton(
             buttons,
             text="Delete selected",
             fg_color="transparent",
             border_width=1,
             command=self._delete_service,
-        ).grid(row=0, column=1, sticky="ew", padx=(4, 0))
+        ).grid(row=0, column=2, sticky="ew", padx=(4, 0))
 
         renew_buttons = ctk.CTkFrame(form, fg_color="transparent")
         renew_buttons.grid(row=5, column=0, columnspan=4, sticky="ew", pady=(8, 0))
@@ -292,15 +300,23 @@ class GeneralTabMixin:
 
         buttons = ctk.CTkFrame(form, fg_color="transparent")
         buttons.grid(row=3, column=0, columnspan=3, sticky="ew", pady=(8, 0))
-        buttons.grid_columnconfigure((0, 1), weight=1)
+        buttons.grid_columnconfigure((0, 1, 2), weight=1)
         ctk.CTkButton(buttons, text="Save document", command=self._save_document).grid(
             row=0, column=0, sticky="ew", padx=(0, 4)
         )
+        self.cancel_doc_btn = ctk.CTkButton(
+            buttons,
+            text="Cancel",
+            fg_color="transparent",
+            border_width=1,
+            command=self._cancel_document_edit,
+        )
+        self.cancel_doc_btn.grid(row=0, column=1, sticky="ew", padx=(2, 2))
         ctk.CTkButton(
             buttons,
             text="Delete selected",
             fg_color="transparent",
             border_width=1,
             command=self._delete_document,
-        ).grid(row=0, column=1, sticky="ew", padx=(4, 0))
+        ).grid(row=0, column=2, sticky="ew", padx=(4, 0))
         return frame

@@ -22,6 +22,7 @@ class AuditLogDialog(ctk.CTkToplevel):
         # Non-blocking modal grab — wait_visibility() inside after() is a nested
         # event loop that hangs if the window is closed before it fires.
         self.bind("<Map>", lambda _e: self.grab_set(), add="+")
+        self.bind("<Escape>", lambda _: self.destroy())
 
         self.grid_columnconfigure(0, weight=1)
         self.grid_rowconfigure(1, weight=1)

@@ -22,6 +22,8 @@ class ExportFilterDialog(ctk.CTkToplevel):
         self.resizable(False, False)
         self.transient(app)
         make_modal(self)
+        self.bind("<Escape>", lambda _: self.destroy())
+        self.bind("<Return>", lambda _: self._export_filtered())
 
         self.grid_columnconfigure(0, weight=1)
 

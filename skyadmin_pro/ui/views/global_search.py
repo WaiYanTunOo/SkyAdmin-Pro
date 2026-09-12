@@ -48,6 +48,7 @@ class GlobalSearchDialog(ctk.CTkToplevel):
         )
         search_entry.grid(row=0, column=1, sticky="ew")
         search_entry.focus_set()
+        search_entry.bind("<Return>", lambda _: self._run_search())
         self.bind("<Escape>", lambda _: self.destroy())
 
         # ── Filter tabs ───────────────────────────────────────────────

@@ -189,8 +189,8 @@ class ThemedTreeview(ctk.CTkFrame):
         # Excel-like: smooth wheel scrolling (Shift+wheel for horizontal)
         self.tree.bind("<MouseWheel>", self._on_mousewheel)
         self.tree.bind("<Shift-MouseWheel>", self._on_shift_mousewheel)
-        self.tree.bind("<Button-4>", lambda _e: self._scroll_vertical(-1))
-        self.tree.bind("<Button-5>", lambda _e: self._scroll_vertical(1))
+        self.tree.bind("<Button-4>", lambda _e: self._scroll_vertical_with_parent_fallback(-1))
+        self.tree.bind("<Button-5>", lambda _e: self._scroll_vertical_with_parent_fallback(1))
         self.tree.bind("<Shift-Button-4>", lambda _e: self._scroll_horizontal(-1))
         self.tree.bind("<Shift-Button-5>", lambda _e: self._scroll_horizontal(1))
 
@@ -590,11 +590,14 @@ class ThemedTreeview(ctk.CTkFrame):
 
     def selected_iid(self) -> str | None:
         selection = self.tree.selection()
-        return str(selection[0]) if selection else None
+        if not selection:
+            return None
+        iid = str(selection[0])
+        return None if iid == "__empty__" else iid
 
     def selected_iids(self) -> list[str]:
         """Return all currently selected iids (for multi-select mode)."""
-        return [str(s) for s in self.tree.selection()]
+        return [str(s) for s in self.tree.selection() if str(s) != "__empty__"]
 
     def selected_values(self) -> tuple | None:
         iid = self.selected_iid()
@@ -610,9 +613,52 @@ class ThemedTreeview(ctk.CTkFrame):
         """Handle Enter/Space on treeview — trigger double-click callback."""
         if self._on_double_click is None:
             return
-        selection = self.tree.selection()
-        if selection:
-            self._on_double_click(event)
+        iid = self.selected_iid()
+        if iid is not None:
+            self._on_double_click(iid)
+
+    def _find_parent_canvas_scroll(self):
+        w = self.master
+        while w is not None:
+            if hasattr(w, "_canvas") and hasattr(w, "_on_mousewheel"):
+                return w
+            try:
+                w = w.master
+            except Exception:
+                break
+        return None
+
+    def _can_scroll_vertical(self, delta: int) -> bool:
+        if self._virtual_active:
+            if len(self._virtual_rows) <= self._virtual_page_size:
+                return False
+            if delta < 0 and self._virtual_offset <= 0:
+                return False
+            return not (delta > 0 and self._virtual_offset + self._virtual_page_size >= len(self._virtual_rows))
+        try:
+            yv = self.tree.yview()
+            if not yv or len(yv) < 2:
+                return True
+            first, last = yv
+            if first <= 0.001 and last >= 0.999:
+                return False
+            if delta < 0 and first <= 0.001:
+                return False
+            return not (delta > 0 and last >= 0.999)
+        except Exception:
+            return True
+
+    def _scroll_vertical_with_parent_fallback(self, delta: int) -> str:
+        if self._can_scroll_vertical(delta):
+            self._scroll_vertical(delta)
+        else:
+            parent = self._find_parent_canvas_scroll()
+            if parent is not None:
+                try:
+                    parent._canvas.yview_scroll(delta, "units")
+                except Exception:
+                    pass
+        return "break"
 
     def _scroll_vertical(self, delta: int) -> str:
         if self._virtual_active:
@@ -632,7 +678,7 @@ class ThemedTreeview(ctk.CTkFrame):
         else:
             delta = int(-event.delta / 120) if event.delta else 0
         if delta:
-            self._scroll_vertical(delta)
+            return self._scroll_vertical_with_parent_fallback(delta)
         return "break"
 
     def _on_shift_mousewheel(self, event) -> None:

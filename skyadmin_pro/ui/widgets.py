@@ -536,7 +536,7 @@ class MonthStatusPanel(ctk.CTkFrame):
         month_key = self._month_key()
         try:
             self.month_label.configure(text=f"{calendar.month_name[self._month]} {self._year}")
-        except Exception:
+        except tk.TclError:
             pass
         self.tree.apply_theme()
 
@@ -561,7 +561,7 @@ class MonthStatusPanel(ctk.CTkFrame):
                 self.summary.configure(
                     text=(f"{summary['closed']}/{summary['clients']} closed · {summary['in_progress']} in progress")
                 )
-            except Exception:
+            except tk.TclError:
                 pass
             rows, iids, tags = [], [], []
             for client in payload["clients"]:
@@ -662,6 +662,7 @@ class DatePickerField(ctk.CTkFrame):
         ).grid(row=0, column=1, padx=(8, 0))
         self.bind("<Destroy>", self._on_destroy)
         self._entry.bind("<FocusOut>", lambda _e: self._validate_entry())
+        self.var.trace_add("write", lambda *_: self._validate_entry())
 
     def _on_destroy(self, event) -> None:
         if event.widget is self:

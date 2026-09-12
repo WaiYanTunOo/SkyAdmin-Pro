@@ -20,7 +20,9 @@ Per-company services, tax, VO/CSH, documents. 7-mixin lazy sub-tabs — forms us
 
 ## Architecture Decisions
 - **MRO**: mixins searched left→right: General → Accounting → Tax IDs → Filing → VO/CSH Setup → VO & CSH → Financial Docs → CTkFrame.
-- **Trees outside CanvasScrollFrame** — forms use scroll frame, trees fixed (U1.0a landed).
+- **Trees outside CanvasScrollFrame** — split-pane tabs (Tax IDs, Filing) keep trees fixed outside form scroll frames; General tab cards scroll smoothly inside `CanvasScrollFrame` with mousewheel fallback from `ThemedTreeview`.
+- **Placeholder & Activation Safety** — `__empty__` placeholder rows filter to `None` in `selected_iid()`, preventing `ValueError` / `TypeError` on click, keyboard activation (`<Return>`/`<Space>`), and action buttons.
+- **Cancel Edit Controls** — General tab Service and Document forms include explicit Cancel buttons and automatically clear edit state on sub-tab or company changes.
 - **Lazy sub-tabs**: only built on first visit.
 - **Refresh dispatch** lives on panel class, not mixins (avoids override conflicts).
 - Sub-tab names in `constants.py` — imported by `database_tasks/view.py` to avoid circular imports.
@@ -29,6 +31,7 @@ Per-company services, tax, VO/CSH, documents. 7-mixin lazy sub-tabs — forms us
 
 | File | Covers |
 |------|--------|
+| `tests/test_general_tab_complete.py` | Complete General tab functions, date validation, cancel edit, shortcut routing, wheel delegation |
 | `tests/test_company_details_refresh.py` | Sub-tab refresh, lazy build |
 | `tests/test_tax_ids_rollout.py` | Tax ID field inference rollout |
 | `tests/test_vo_csh_rollout.py` | VO/CSH inference (clear copy of vo_csh_rollout.py surface) |

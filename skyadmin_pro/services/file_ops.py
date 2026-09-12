@@ -43,18 +43,24 @@ def sanitize_amount(value: str) -> str:
     return cleaned or sanitize_token(value)
 
 
-def format_thousands(value: str) -> str:
+def format_thousands(value: str | int | float | None) -> str:
     """Group the integer part of an amount with thousands separators for display.
 
     Leaves the value untouched when it is empty or not a plain number, and
-    keeps at most two decimal places.
+    keeps at most two decimal places. Accepts str, int, float, or None.
     """
-    stripped = value.strip().replace(",", "")
+    if value is None:
+        return ""
+    if isinstance(value, int | float):
+        val_str = f"{value:.2f}".rstrip("0").rstrip(".") if isinstance(value, float) else str(value)
+    else:
+        val_str = str(value)
+    stripped = val_str.strip().replace(",", "")
     if not stripped:
-        return value
+        return val_str
     cleaned = _AMOUNT_KEEP.sub("", stripped)
     if not cleaned:
-        return value
+        return val_str
     if "." in cleaned:
         integer_part, decimal_part = cleaned.split(".", 1)
     else:
@@ -62,9 +68,9 @@ def format_thousands(value: str) -> str:
     try:
         grouped = f"{int(integer_part):,}" if integer_part else ""
     except ValueError:
-        return value
+        return val_str
     result = grouped + (f".{decimal_part[:2]}" if decimal_part else "")
-    return result or value
+    return result or val_str
 
 
 def parse_flexible_date(value: str) -> str | None:
