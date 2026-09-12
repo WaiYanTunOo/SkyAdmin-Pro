@@ -244,11 +244,11 @@ class FinancialDocsTabMixin:
         ).grid(row=5, column=0, columnspan=2, pady=(12, 16))
 
     def _open_financial_doc(self) -> None:
-        selected = self.fin_doc_tree.tree.selection()
-        if not selected:
+        iid = self.fin_doc_tree.selected_iid()
+        if not iid or iid == "__empty__" or not str(iid).isdigit():
             self.feedback.error("Select a document first.")
             return
-        doc_id = int(selected[0])
+        doc_id = int(iid)
         doc = self.app.db.get_financial_document(doc_id)
         if not doc:
             return
@@ -262,8 +262,8 @@ class FinancialDocsTabMixin:
             self.feedback.error(f"Could not open file: {exc}")
 
     def _delete_financial_doc(self) -> None:
-        selected = self.fin_doc_tree.tree.selection()
-        if not selected:
+        iid = self.fin_doc_tree.selected_iid()
+        if not iid or iid == "__empty__" or not str(iid).isdigit():
             self.feedback.error("Select a document first.")
             return
         import tkinter.messagebox as mb
@@ -271,10 +271,10 @@ class FinancialDocsTabMixin:
         if not mb.askyesno(
             "Delete",
             "Delete this financial document?",
-            parent=self.winfo_toplevel(),
+            parent=self.host.winfo_toplevel(),
         ):
             return
-        doc_id = int(selected[0])
+        doc_id = int(iid)
         doc = self.app.db.delete_financial_document(doc_id)
         if doc:
             stored = doc.get("stored_path") or ""

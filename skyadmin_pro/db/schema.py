@@ -62,11 +62,13 @@ CREATE TABLE IF NOT EXISTS tasks (
     pipeline_item_id INTEGER,
     pipeline_step    INTEGER,
     source_document_id INTEGER,
+    parent_task_id INTEGER,
     global_id     TEXT UNIQUE,
     deleted_at    TEXT,
     created_at    TEXT    NOT NULL DEFAULT (datetime('now', 'localtime')),
     updated_at    TEXT    NOT NULL DEFAULT (datetime('now', 'localtime')),
-    FOREIGN KEY (client_id) REFERENCES clients(id) ON DELETE SET NULL
+    FOREIGN KEY (client_id) REFERENCES clients(id) ON DELETE SET NULL,
+    FOREIGN KEY (parent_task_id) REFERENCES tasks(id) ON DELETE SET NULL
 );
 
 CREATE TABLE IF NOT EXISTS documents (

@@ -808,6 +808,32 @@ class SettingsView(BackupMixin, ChecklistMixin, LicenseMixin, PricingMixin, Work
         )
         self.auto_backup_retention_label.grid(row=3, column=0, sticky="ew", pady=(6, 0))
         bind_wrap_label(self.auto_backup_retention_label, backup_body, pad=24)
+        row += 1
+
+        advanced = SectionCard(
+            scroll,
+            title="Advanced Database Settings",
+            subtitle="Low-level options for performance tuning. Requires app restart.",
+        )
+        advanced.grid(row=row, column=0, sticky="ew", pady=(8, 0))
+        adv_body = advanced.body
+        self._wal_mode_var = ctk.StringVar(
+            value=self.app.db.get_setting("db_wal_mode", "1")
+        )
+        ctk.CTkSwitch(
+            adv_body,
+            text="Enable WAL (Write-Ahead Logging) mode for concurrent reads",
+            variable=self._wal_mode_var,
+            onvalue="1",
+            offvalue="0",
+            command=self._toggle_wal_mode,
+        ).pack(anchor="w", pady=(4, 0))
+        row += 1
+
+    def _toggle_wal_mode(self) -> None:
+        self.app.db.set_setting("db_wal_mode", self._wal_mode_var.get())
+        from tkinter import messagebox
+        messagebox.showinfo("Restart Required", "Database mode changed. Please restart SkyAdmin Pro for changes to take effect.")
 
     def on_show(self) -> None:
         # Ensure the visible tab exists before refreshing its widgets.

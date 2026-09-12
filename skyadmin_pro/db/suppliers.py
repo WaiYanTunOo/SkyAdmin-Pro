@@ -127,7 +127,9 @@ class SuppliersMixin:
                    ss.expiry_date, ss.notes, s.name AS supplier_name
             FROM supplier_services ss
             LEFT JOIN suppliers s ON s.id = ss.supplier_id
+            LEFT JOIN clients c ON c.name = ss.company_name
             WHERE ss.expiry_date IS NOT NULL AND trim(ss.expiry_date) != ''
+              AND c.id IS NOT NULL AND c.deleted_at IS NULL AND COALESCE(c.status, 'active') != 'inactive'
             ORDER BY ss.expiry_date ASC
             """
         )
@@ -297,6 +299,7 @@ class SuppliersMixin:
             LEFT JOIN suppliers s ON s.id = sp.supplier_id
             LEFT JOIN clients c ON c.id = sp.client_id
             WHERE sp.paid = 0
+              AND (sp.client_id IS NULL OR (c.deleted_at IS NULL AND COALESCE(c.status, 'active') != 'inactive'))
               AND sp.due_date IS NOT NULL AND trim(sp.due_date) != ''
               AND sp.due_date < date('now', 'localtime')
             ORDER BY sp.due_date ASC

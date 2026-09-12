@@ -98,17 +98,27 @@ class TaxMixin:
             "open": max(0, int(total) - int(closed) - int(in_progress)),
         }
 
-    def dashboard_counts(self, *, expiring_total: int | None = None) -> dict[str, int]:
+    def dashboard_counts(self, *, expiring_total: int | None = None, exclude_expired_tasks: bool = False) -> dict[str, int]:
         # Resolve helpers BEFORE opening the connection so they don't nest
         # additional connections inside this one.
         if expiring_total is None:
-            expiring = len(self.list_expiring_documents()) + len(self.list_expiring_supplier_services())
+            expiring = len(self.list_expiring_documents(exclude_expired=exclude_expired_tasks)) + len(self.list_expiring_supplier_services())
         else:
             expiring = int(expiring_total)
         service_types = tuple(self.list_service_types())
         overdue_clause, overdue_params = _in_clause("document_type", service_types)
+        
         with self.connection() as conn:
-            pending = conn.execute("SELECT COUNT(*) AS n FROM tasks WHERE status = 'pending'").fetchone()["n"]
+            pending_sql = """
+                SELECT COUNT(*) AS n FROM tasks t
+                LEFT JOIN clients c ON c.id = t.client_id
+                WHERE t.status = 'pending'
+                  AND (t.client_id IS NULL OR (c.deleted_at IS NULL AND COALESCE(c.status, 'active') != 'inactive'))
+            """
+            if exclude_expired_tasks:
+                pending_sql += " AND (t.due_date IS NULL OR t.due_date >= date('now', 'localtime'))"
+            pending = conn.execute(pending_sql).fetchone()["n"]
+            
             done_today = conn.execute(
                 """
                 SELECT COUNT(*) AS n FROM tasks
@@ -156,21 +166,24 @@ class TaxMixin:
         }
 
     def dashboard_snapshot(self) -> dict:
-        """Single refresh bundle — one pinned connection for all snapshot queries."""
+        """Single refresh bundle - one pinned connection for all snapshot queries."""
         from datetime import date
 
         today = date.today()
         with self.bundle_queries():
-            expiring = self.list_expiring_documents()
+            expiring = self.list_expiring_documents(exclude_expired=True)
             supplier_expiring = self.list_expiring_supplier_services()
-            counts = self.dashboard_counts(expiring_total=len(expiring) + len(supplier_expiring))
+            counts = self.dashboard_counts(
+                expiring_total=len(expiring) + len(supplier_expiring),
+                exclude_expired_tasks=True
+            )
             return {
                 "counts": counts,
                 "expiring": expiring,
                 "supplier_expiring": supplier_expiring,
                 "overdue": self.list_overdue_services(),
                 "supplier_due": self.list_pending_supplier_payments(),
-                "pending": self.list_tasks(status="pending"),
+                "pending": self.list_tasks(status="pending", exclude_expired=True),
                 "ongoing": self.list_ongoing_services(),
                 "renewal_due": self.list_renewal_items_due(),
                 "pending_filings": self.count_pending_filings(),
@@ -188,6 +201,7 @@ class TaxMixin:
             FROM documents d
             LEFT JOIN clients c ON c.id = d.client_id
             WHERE d.client_id IS NOT NULL
+              AND c.deleted_at IS NULL AND COALESCE(c.status, 'active') != 'inactive'
               AND d.payment_date IS NOT NULL AND trim(d.payment_date) != ''
               AND date(d.payment_date) < date('now', 'localtime')
               AND COALESCE(d.paid, 0) = 0

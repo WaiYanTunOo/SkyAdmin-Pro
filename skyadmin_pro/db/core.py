@@ -87,15 +87,28 @@ class CoreMixin:
         conn.execute("PRAGMA temp_store = MEMORY")
         conn.execute("PRAGMA cache_size = -8000")
         conn.execute("PRAGMA busy_timeout = 5000")
+        
+        wal_setting = True
         try:
-            cur = conn.execute("PRAGMA journal_mode=WAL")
-            mode = cur.fetchone()
-            # WAL returns 'wal' on success; log if fallback
-            if mode and str(mode[0]).lower() != "wal":
-                self._log.warning("WAL mode not enabled, got %s", mode[0])
-                self._wal_enabled = False
+            row = conn.execute("SELECT value FROM settings WHERE key = 'db_wal_mode'").fetchone()
+            if row and row["value"] == "0":
+                wal_setting = False
+        except Exception:
+            pass
+            
+        try:
+            if wal_setting:
+                cur = conn.execute("PRAGMA journal_mode=WAL")
+                mode = cur.fetchone()
+                # WAL returns 'wal' on success; log if fallback
+                if mode and str(mode[0]).lower() != "wal":
+                    self._log.warning("WAL mode not enabled, got %s", mode[0])
+                    self._wal_enabled = False
+                else:
+                    self._wal_enabled = True
             else:
-                self._wal_enabled = True
+                conn.execute("PRAGMA journal_mode=DELETE")
+                self._wal_enabled = False
         except DB_ERRORS:
             self._log.warning("WAL mode unavailable; staying in rollback-journal mode")
             self._wal_enabled = False

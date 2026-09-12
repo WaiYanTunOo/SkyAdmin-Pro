@@ -29,10 +29,12 @@ class SupplierDirectoryTab:
         scroll = themed_scrollable_frame(master)
         scroll.grid(row=0, column=0, sticky="nsew")
         scroll.grid_columnconfigure(0, weight=1)
+        scroll.grid_rowconfigure(0, weight=1)
 
         card = ctk.CTkFrame(scroll, corner_radius=CARD_RADIUS)
-        card.grid(row=0, column=0, sticky="ew", pady=(0, 10))
+        card.grid(row=0, column=0, sticky="nsew", pady=(0, 10))
         card.grid_columnconfigure(0, weight=1)
+        card.grid_rowconfigure(3, weight=1)
         ctk.CTkLabel(
             card,
             text="Supplier directory",

@@ -68,6 +68,8 @@ def test_pending_supplier_payments(db):
 
 
 def test_list_expiring_supplier_services(db):
+    client_a_id = db.get_or_create_client("Client A")
+    db.update_client_fields(client_a_id, status="active")
     supplier_id = db.add_supplier(name="Address Co")
     soon = (date.today() + timedelta(days=10)).isoformat()
     later = (date.today() + timedelta(days=EXPIRY_ALERT_DAYS + 5)).isoformat()

@@ -65,6 +65,12 @@
 5. **Numeric Formatting**:
    - `format_thousands(val)` must accept `int`, `float`, and `str`. Do not assume `val` has `.strip()`.
 
+### 2.4 Dashboard & Filters Invariants
+1. **Expired Item Filtering**:
+   - The dashboard explicitly filters out already-expired regular client services and tasks (`days_until < 0`) from the **Next Actions** and **Expiry Alerts** priority trees so users are not cluttered with dead items.
+   - **Exception**: Supplier services (e.g. Attori) are **excluded** from this rule. Expired supplier obligations must continue to display on the dashboard until they are explicitly marked as paid or renewed.
+   - **Implementation**: Handled natively in Python inside `dashboard_snapshot` via `exclude_expired=True` on `list_expiring_documents()` and `list_tasks()`, combined with an explicit connection-pinned SQL query in `dashboard_counts()` to ensure counts accurately reflect the filtered state without breaking connection tracking.
+
 ---
 
 ## 3. Fast Verification & Testing Playbook

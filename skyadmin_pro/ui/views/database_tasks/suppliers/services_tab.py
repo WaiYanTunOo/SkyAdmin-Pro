@@ -28,10 +28,12 @@ class SupplierServicesTab:
         scroll = themed_scrollable_frame(master)
         scroll.grid(row=0, column=0, sticky="nsew")
         scroll.grid_columnconfigure(0, weight=1)
+        scroll.grid_rowconfigure(0, weight=1)
 
         svc_card = ctk.CTkFrame(scroll, corner_radius=CARD_RADIUS)
-        svc_card.grid(row=0, column=0, sticky="ew")
+        svc_card.grid(row=0, column=0, sticky="nsew")
         svc_card.grid_columnconfigure(0, weight=1)
+        svc_card.grid_rowconfigure(4, weight=1)
 
         ctk.CTkLabel(
             svc_card,

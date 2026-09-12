@@ -68,10 +68,9 @@ Avoid parallel edits to the same file. `company-details` and `ui-widgets` both t
 
 | Keep | Fix / improve | Do not rewrite (yet) |
 |------|----------------|----------------------|
-| Python `services/`, `db/` | Optional UX polish above | Entire app in Kotlin/Swift |
-| SQLite schema + versioned migrations | `deploy.yml` concurrency | Full desktop framework migration |
-| TypeScript Worker + D1 migrations | Doc drift only | Re-do S1 / P0–P2 landed work |
-| Landed Phase 7–11 + S1 + P0–P2 | Feature pack F1 later | |
+| SQLite schema + versioned migrations | Optional UX polish above; **Aggressive Code Splitting** (<100 lines per file) | Entire app in Kotlin/Swift |
+| TypeScript Worker + D1 migrations | `deploy.yml` concurrency | Full desktop framework migration |
+| Landed Phase 7–11 + S1 + P0–P2 | Doc drift only | Re-do S1 / P0–P2 landed work |
 
 ## Key paths
 

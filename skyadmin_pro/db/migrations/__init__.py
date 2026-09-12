@@ -15,6 +15,8 @@ from skyadmin_pro.db.migrations import (
     m010_fts_rebuild,
     m011_client_groups_sync,
     m012_sync_hlc,
+    m013_task_dependencies,
+    m014_recurring_tasks,
 )
 from skyadmin_pro.db.migrations.runner import register_migrations, run_pending_migrations
 
@@ -51,6 +53,16 @@ register_migrations(
             m012_sync_hlc.VERSION,
             m012_sync_hlc.NAME,
             m012_sync_hlc.upgrade,
+        ),
+        (
+            m013_task_dependencies.VERSION,
+            m013_task_dependencies.NAME,
+            m013_task_dependencies.upgrade,
+        ),
+        (
+            m014_recurring_tasks.VERSION,
+            m014_recurring_tasks.NAME,
+            m014_recurring_tasks.upgrade,
         ),
     ]
 )

@@ -119,14 +119,17 @@ Treat as **done** unless regressions appear:
 | C2 | Sync pull pagination UX | Large tenants | ✅ Desktop loops `limit` pages; status shows page count |
 | C3 | Conflict review UI | Operators need to see LWW skips | ✅ Table filter, copy Global ID, refresh |
 
-### Wave D — Platform & ops (ongoing)
+### Wave D - UI, UX, Database & Tasks Upgrades (Proposed)
 
-| ID | Item | Owner |
-|----|------|-------|
-| D1 | macOS notarization / Linux packaging polish | `packaging-release` |
-| D2 | Staging Worker + D1 (separate wrangler env) before prod deploy | `worker-api` + ops |
-| D3 | SAST / deeper dependency gates already partial in CI — keep green | `packaging-release` |
-| D4 | Deeper Dashboard SQL ≤3 rewrite (optional; budget already ≤40/1 conn) | `desktop-core` |
+| ID | Item | Detail | Owner |
+|----|------|--------|-------|
+| D1 | **Global Command Palette** | Press `Ctrl+K` to search clients, documents, or jump to tabs instantly. | `ui-widgets` |
+| D2 | **Drag-and-Drop Financial Docs** | Bypass the file picker dialog; allow users to drop PDFs directly onto the treeview in the Financial Docs tab. | `company-details` |
+| D3 | **Task Dependencies** | Create multi-step pipelines where Task B cannot be completed until Task A is checked off. | `desktop-core` |
+| D4 | **Cron/Recurring Task Engine** | Automatically generate monthly bookkeeping tasks based on client profiles without manual creation. | `desktop-core` |
+| D5 | **Database WAL Mode Toggle** | Enable `PRAGMA journal_mode=WAL` via settings for concurrent dashboard refresh reads. | `desktop-core` |
+| D6 | **macOS / Linux Polish** | Extend packaging workflow for notarized Mac and AppImage Linux builds. | `packaging-release` |
+| D7 | **Aggressive Code Splitting** | Refactor and split all code files by related functions/tasks/features so that every file is strictly under 100 lines of code. | `desktop-core` |
 
 ### Wave E — Framework rewrite (**last resort**)
 

@@ -571,6 +571,18 @@ def main() -> None:
 
         threading.Thread(target=_periodic_license_check, daemon=True).start()
 
+﻿        def _run_cron():
+            import time as _time
+            while True:
+                try:
+                    app.db.generate_recurring_tasks()
+                except Exception:
+                    pass
+                _time.sleep(3600)  # Check every hour
+
+        threading.Thread(target=_run_cron, daemon=True).start()
+
+
         try:
             app.mainloop()
         finally:

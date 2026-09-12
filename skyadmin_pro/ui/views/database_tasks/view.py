@@ -101,13 +101,17 @@ class DatabaseTasksView(BaseView):
             return
         tab = self.tabs.tab(name)
 
-        if name == TAB_COMPANY:
-            # CompanyDetailsPanel manages its own tabview + per-sub-tab CanvasScrollFrame;
-            # wrapping it in another CanvasScrollFrame prevents the height from expanding
-            # (canvas window items only get width updates, not height).  Place it directly.
-            self.company_panel = CompanyDetailsPanel(tab, self.app, self.feedback)
-            self.company_panel.grid(row=0, column=0, sticky="nsew", padx=8, pady=8)
-            self._lazy_panels[name] = self.company_panel
+        if name in (TAB_COMPANY, TAB_SUPPLIERS):
+            # These panels manage their own tabviews and internal scroll frames.
+            # Wrapping them in CanvasScrollFrame prevents height from expanding.
+            if name == TAB_COMPANY:
+                self.company_panel = CompanyDetailsPanel(tab, self.app, self.feedback)
+                self.company_panel.grid(row=0, column=0, sticky="nsew", padx=8, pady=8)
+                self._lazy_panels[name] = self.company_panel
+            else:
+                self.suppliers_panel = SuppliersPanel(tab, self.app, self.feedback)
+                self.suppliers_panel.grid(row=0, column=0, sticky="nsew", padx=8, pady=8)
+                self._lazy_panels[name] = self.suppliers_panel
             return
 
         scroll = CanvasScrollFrame(tab)
@@ -144,10 +148,6 @@ class DatabaseTasksView(BaseView):
             self.pipeline_panel = ServicePipelinePanel(content, self.app, self.feedback)
             self.pipeline_panel.grid(row=0, column=0, sticky="nsew")
             self._lazy_panels[name] = self.pipeline_panel
-        elif name == TAB_SUPPLIERS:
-            self.suppliers_panel = SuppliersPanel(content, self.app, self.feedback)
-            self.suppliers_panel.grid(row=0, column=0, sticky="nsew")
-            self._lazy_panels[name] = self.suppliers_panel
 
     def _on_tab_changed(self) -> None:
         try:

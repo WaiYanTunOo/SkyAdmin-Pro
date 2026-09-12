@@ -279,12 +279,12 @@ class ClientsMixin:
             doc_clause, doc_params = _in_clause("d.document_type", tuple(service_types))
             doc_sql = f"""
             SELECT d.id, 'doc' AS src, d.client_id, d.document_type AS service,
-                   d.amount, d.start_date AS service_date,
+                   d.amount, d.payment_date AS service_date,
                    c.name AS client_name
             FROM documents d
             LEFT JOIN clients c ON c.id = d.client_id
-            WHERE d.start_date IS NOT NULL
-              AND d.start_date LIKE '{prefix}%'
+            WHERE d.payment_date IS NOT NULL
+              AND d.payment_date LIKE '{prefix}%'
               AND {doc_clause}
             """
         else:
