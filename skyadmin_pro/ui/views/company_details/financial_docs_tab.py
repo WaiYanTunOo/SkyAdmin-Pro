@@ -75,6 +75,10 @@ class FinancialDocsTabMixin:
         self.fin_doc_tree.tree.configure(height=8)
         self.fin_doc_tree.grid(row=3, column=0, sticky="nsew", padx=12, pady=(0, 8))
 
+        from skyadmin_pro.ui.dnd import enable_drop
+
+        enable_drop(frame, self._on_financial_doc_drop, enabled=True)
+
         # Buttons
         btn_row = ctk.CTkFrame(frame, fg_color="transparent")
         btn_row.grid(row=4, column=0, sticky="ew", padx=16, pady=(0, 14))
@@ -134,24 +138,31 @@ class FinancialDocsTabMixin:
             iids.append(str(d["id"]))
         self.fin_doc_tree.set_rows(rows, iids=iids, empty_message="No financial documents for this client yet.")
 
-    def _add_financial_doc(self) -> None:
+    def _on_financial_doc_drop(self, paths: list[Path]) -> None:
+        if not paths:
+            return
+        self._add_financial_doc(str(paths[0]))
+
+    def _add_financial_doc(self, preset_path: str = "") -> None:
         from skyadmin_pro.config import FINANCIAL_DOC_CATEGORIES
 
         client_id = self._selected_client_id()
         if client_id is None:
             self.feedback.error("Select a company first.")
             return
-        file_path = filedialog.askopenfilename(
-            parent=self.winfo_toplevel(),
-            title="Select financial document",
-            filetypes=[
-                ("All supported", "*.pdf *.jpg *.jpeg *.png *.xlsx *.xls *.csv"),
-                ("PDF files", "*.pdf"),
-                ("Images", "*.jpg *.jpeg *.png"),
-                ("Excel", "*.xlsx *.xls *.csv"),
-                ("All files", "*.*"),
-            ],
-        )
+        file_path = preset_path
+        if not file_path:
+            file_path = filedialog.askopenfilename(
+                parent=self.winfo_toplevel(),
+                title="Select financial document",
+                filetypes=[
+                    ("All supported", "*.pdf *.jpg *.jpeg *.png *.xlsx *.xls *.csv"),
+                    ("PDF files", "*.pdf"),
+                    ("Images", "*.jpg *.jpeg *.png"),
+                    ("Excel", "*.xlsx *.xls *.csv"),
+                    ("All files", "*.*"),
+                ],
+            )
         if not file_path:
             return
         import os
@@ -244,11 +255,11 @@ class FinancialDocsTabMixin:
         ).grid(row=5, column=0, columnspan=2, pady=(12, 16))
 
     def _open_financial_doc(self) -> None:
-        iid = self.fin_doc_tree.selected_iid()
-        if not iid or iid == "__empty__" or not str(iid).isdigit():
+        selected = self.fin_doc_tree.tree.selection()
+        if not selected:
             self.feedback.error("Select a document first.")
             return
-        doc_id = int(iid)
+        doc_id = int(selected[0])
         doc = self.app.db.get_financial_document(doc_id)
         if not doc:
             return
@@ -262,8 +273,8 @@ class FinancialDocsTabMixin:
             self.feedback.error(f"Could not open file: {exc}")
 
     def _delete_financial_doc(self) -> None:
-        iid = self.fin_doc_tree.selected_iid()
-        if not iid or iid == "__empty__" or not str(iid).isdigit():
+        selected = self.fin_doc_tree.tree.selection()
+        if not selected:
             self.feedback.error("Select a document first.")
             return
         import tkinter.messagebox as mb
@@ -271,10 +282,10 @@ class FinancialDocsTabMixin:
         if not mb.askyesno(
             "Delete",
             "Delete this financial document?",
-            parent=self.host.winfo_toplevel(),
+            parent=self.winfo_toplevel(),
         ):
             return
-        doc_id = int(iid)
+        doc_id = int(selected[0])
         doc = self.app.db.delete_financial_document(doc_id)
         if doc:
             stored = doc.get("stored_path") or ""

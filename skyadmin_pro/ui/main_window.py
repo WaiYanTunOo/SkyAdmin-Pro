@@ -155,6 +155,8 @@ class MainWindow(dnd_base_class()):
         self.bind("<Control-E>", lambda _e: self._shortcut_action("export"))
         self.bind("<Control-f>", lambda _e: self.open_global_search())
         self.bind("<Control-F>", lambda _e: self.open_global_search())
+        self.bind("<Control-k>", lambda _e: self.open_global_search())
+        self.bind("<Control-K>", lambda _e: self.open_global_search())
         self.bind("<Control-n>", lambda _e: self._shortcut_new())
         self.bind("<Control-N>", lambda _e: self._shortcut_new())
         self.bind("<Control-s>", lambda _e: self._shortcut_save())
