@@ -817,9 +817,7 @@ class SettingsView(BackupMixin, ChecklistMixin, LicenseMixin, PricingMixin, Work
         )
         advanced.grid(row=row, column=0, sticky="ew", pady=(8, 0))
         adv_body = advanced.body
-        self._wal_mode_var = ctk.StringVar(
-            value=self.app.db.get_setting("db_wal_mode", "1")
-        )
+        self._wal_mode_var = ctk.StringVar(value=self.app.db.get_setting("db_wal_mode", "1"))
         ctk.CTkSwitch(
             adv_body,
             text="Enable WAL (Write-Ahead Logging) mode for concurrent reads",
@@ -833,7 +831,10 @@ class SettingsView(BackupMixin, ChecklistMixin, LicenseMixin, PricingMixin, Work
     def _toggle_wal_mode(self) -> None:
         self.app.db.set_setting("db_wal_mode", self._wal_mode_var.get())
         from tkinter import messagebox
-        messagebox.showinfo("Restart Required", "Database mode changed. Please restart SkyAdmin Pro for changes to take effect.")
+
+        messagebox.showinfo(
+            "Restart Required", "Database mode changed. Please restart SkyAdmin Pro for changes to take effect."
+        )
 
     def on_show(self) -> None:
         # Ensure the visible tab exists before refreshing its widgets.

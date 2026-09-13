@@ -87,7 +87,7 @@ class CoreMixin:
         conn.execute("PRAGMA temp_store = MEMORY")
         conn.execute("PRAGMA cache_size = -8000")
         conn.execute("PRAGMA busy_timeout = 5000")
-        
+
         wal_setting = True
         try:
             row = conn.execute("SELECT value FROM settings WHERE key = 'db_wal_mode'").fetchone()
@@ -95,7 +95,7 @@ class CoreMixin:
                 wal_setting = False
         except Exception:
             pass
-            
+
         try:
             if wal_setting:
                 cur = conn.execute("PRAGMA journal_mode=WAL")

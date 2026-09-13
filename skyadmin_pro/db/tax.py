@@ -98,16 +98,20 @@ class TaxMixin:
             "open": max(0, int(total) - int(closed) - int(in_progress)),
         }
 
-    def dashboard_counts(self, *, expiring_total: int | None = None, exclude_expired_tasks: bool = False) -> dict[str, int]:
+    def dashboard_counts(
+        self, *, expiring_total: int | None = None, exclude_expired_tasks: bool = False
+    ) -> dict[str, int]:
         # Resolve helpers BEFORE opening the connection so they don't nest
         # additional connections inside this one.
         if expiring_total is None:
-            expiring = len(self.list_expiring_documents(exclude_expired=exclude_expired_tasks)) + len(self.list_expiring_supplier_services())
+            expiring = len(self.list_expiring_documents(exclude_expired=exclude_expired_tasks)) + len(
+                self.list_expiring_supplier_services()
+            )
         else:
             expiring = int(expiring_total)
         service_types = tuple(self.list_service_types())
         overdue_clause, overdue_params = _in_clause("document_type", service_types)
-        
+
         with self.connection() as conn:
             pending_sql = """
                 SELECT COUNT(*) AS n FROM tasks t
@@ -118,7 +122,7 @@ class TaxMixin:
             if exclude_expired_tasks:
                 pending_sql += " AND (t.due_date IS NULL OR t.due_date >= date('now', 'localtime'))"
             pending = conn.execute(pending_sql).fetchone()["n"]
-            
+
             done_today = conn.execute(
                 """
                 SELECT COUNT(*) AS n FROM tasks
@@ -174,8 +178,7 @@ class TaxMixin:
             expiring = self.list_expiring_documents(exclude_expired=True)
             supplier_expiring = self.list_expiring_supplier_services()
             counts = self.dashboard_counts(
-                expiring_total=len(expiring) + len(supplier_expiring),
-                exclude_expired_tasks=True
+                expiring_total=len(expiring) + len(supplier_expiring), exclude_expired_tasks=True
             )
             return {
                 "counts": counts,
