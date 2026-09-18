@@ -168,7 +168,7 @@ jobs:
         run: npm test
 
       - name: Security scan with semgrep
-        uses: semgrep/semgrep-action@v1.95.0
+        uses: semgrep/semgrep-action@v1
         with:
           config: p/typescript
           generatingCode: false
