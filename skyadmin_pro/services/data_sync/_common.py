@@ -1,4 +1,4 @@
-"""P4 cross-device business data sync (Worker API)."""
+"""Shared imports and helpers for data_sync chunks."""
 
 from __future__ import annotations
 

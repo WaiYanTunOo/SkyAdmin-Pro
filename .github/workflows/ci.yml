@@ -174,4 +174,4 @@ jobs:
           generatingCode: false
 
       - name: Audit Worker dependencies
-        run: npm audit --audit-level=moderate
+        run: npm audit --audit-level=high
