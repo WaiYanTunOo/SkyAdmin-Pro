@@ -1,6 +1,7 @@
 /** Admin login POST — form-encoded password. */
 
 import { Context } from "hono";
+import type { ContentfulStatusCode } from "hono/utils/http-status";
 import { Env } from "../../../db";
 import { adminSessionSalt } from "../../../env_secrets";
 import { timingSafeEqual } from "../../../timing_safe";
@@ -21,7 +22,7 @@ async function loginErr(
   c: Context<{ Bindings: Env }>,
   adminPath: string,
   msg: string,
-  status: number,
+  status: ContentfulStatusCode,
 ): Promise<Response> {
   c.header("Content-Security-Policy", ADMIN_CSP);
   return c.html(await loginHtmlWithCsrf(c.env, adminPath, msg), status);
