@@ -14,27 +14,41 @@ async function pull(creds){
   return data;
 }
 
+function formatSyncLabel(iso){
+  if(!iso)return "Never synced";
+  try{
+    const d=new Date(iso);
+    if(Number.isNaN(d.getTime()))return "Last synced "+iso;
+    return "Last synced "+d.toLocaleString();
+  }catch{return "Last synced "+iso}
+}
+
 async function syncNow(){
   const creds=loadCreds();
   if(!creds)return showActivate();
+  $("syncStatus").className="status";
   $("syncStatus").textContent="Syncing…";
   try{
     const data=await pull(creds);
-    state.clients=activeRows(data.changes||[],"clients").sort((a,b)=>(a.name||"").localeCompare(b.name||""));
-    state.tasks=activeRows(data.changes||[],"tasks").sort((a,b)=>{
+    const changes=data.changes||[];
+    state.groups=activeRows(changes,"client_groups").sort((a,b)=>(a.name||"").localeCompare(b.name||""));
+    state.clients=activeRows(changes,"clients").sort((a,b)=>(a.name||"").localeCompare(b.name||""));
+    state.tasks=activeRows(changes,"tasks").sort((a,b)=>{
       const ad=a.due_date||"9999",bd=b.due_date||"9999";
       if(ad!==bd)return ad.localeCompare(bd);
       return (a.title||"").localeCompare(b.title||"");
     });
-    state.contacts=activeRows(data.changes||[],"office_contacts").sort((a,b)=>(a.name||"").localeCompare(b.name||""));
-    state.notes=activeRows(data.changes||[],"notebook_entries").sort((a,b)=>(b.entry_date||"").localeCompare(a.entry_date||""));
+    state.contacts=activeRows(changes,"office_contacts").sort((a,b)=>(a.name||"").localeCompare(b.name||""));
+    state.notes=activeRows(changes,"notebook_entries").sort((a,b)=>(b.entry_date||"").localeCompare(a.entry_date||""));
+    const when=data.server_time||new Date().toISOString();
+    saveLastSync(when);
     $("machineLabel").textContent="Machine "+creds.machine_id+" · read-only";
-    $("syncStatus").textContent="Updated "+(data.server_time||new Date().toISOString());
+    $("syncStatus").textContent=formatSyncLabel(when);
     render();
   }catch(err){
-    $("syncStatus").textContent="";
+    const last=loadLastSync();
     $("syncStatus").className="status error";
-    $("syncStatus").textContent=String(err.message||err);
+    $("syncStatus").textContent=String(err.message||err)+(last?" · "+formatSyncLabel(last):"");
   }
 }
 `;

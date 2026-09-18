@@ -20,8 +20,11 @@ main{padding:12px 16px 24px;padding-bottom:max(24px,env(safe-area-inset-bottom))
 .meta{font-size:12px;color:var(--muted);line-height:1.5}
 .body{margin-top:8px;font-size:14px;line-height:1.55;white-space:pre-wrap}
 .badge{display:inline-block;padding:2px 8px;border-radius:999px;background:#1d4ed833;color:#93c5fd;font-size:11px;font-weight:600;margin-right:6px}
+.swatch{display:inline-block;width:10px;height:10px;border-radius:50%;margin-right:6px;vertical-align:middle;border:1px solid #ffffff44}
 .pin{color:#fbbf24}
-.empty{text-align:center;color:var(--muted);padding:40px 16px}
+.empty{text-align:center;color:var(--muted);padding:48px 16px;font-size:14px;line-height:1.5}
+.empty strong{display:block;color:var(--text);font-size:15px;margin-bottom:6px}
+.row2{display:flex;gap:8px;flex-wrap:wrap;margin-top:4px}
 .status{font-size:12px;color:var(--muted);margin-top:8px}
 .error{color:#fca5a5}
 #activate{padding:24px 16px;max-width:480px;margin:0 auto}

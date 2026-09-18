@@ -8,7 +8,7 @@ import { getJsPart1 } from "./parts/js_1";
 import { getJsPart2 } from "./parts/js_2";
 import { getJsPart3 } from "./parts/js_3";
 
-const VIEWER_TABLES = "clients,tasks,office_contacts,notebook_entries";
+const VIEWER_TABLES = "client_groups,clients,tasks,office_contacts,notebook_entries";
 
 export function viewerHandler(_c: Context) {
   const nonce = randomCspNonce();

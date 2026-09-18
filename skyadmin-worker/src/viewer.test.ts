@@ -1,20 +1,24 @@
-/** P4.1 viewer route smoke tests. */
+/** Wave D — viewer PWA covers all SYNC_TABLES (read-only). */
 
 import { describe, expect, it } from "vitest";
 import app from "./index";
+import { SYNC_TABLES } from "./sync_schema";
 
 describe("viewer routes", () => {
-  it("serves the PWA shell at /viewer", async () => {
+  it("serves the PWA shell at /viewer with all SYNC_TABLES", async () => {
     const res = await app.request("http://localhost/viewer");
     expect(res.status).toBe(200);
     const html = await res.text();
     expect(html).toContain("SkyAdmin Viewer");
-    expect(html).toContain("clients");
-    expect(html).toContain("tasks");
-    expect(html).toContain("office_contacts");
+    expect(html).toContain('data-tab="groups"');
+    expect(html).toContain("panel-groups");
+    expect(html).toContain("Last synced");
+    for (const table of SYNC_TABLES) {
+      expect(html).toContain(table);
+    }
   });
 
-  it("serves manifest and service worker", async () => {
+  it("serves manifest and bumped service worker cache", async () => {
     const manifest = await app.request("http://localhost/viewer/manifest.webmanifest");
     expect(manifest.status).toBe(200);
     expect(manifest.headers.get("content-type")).toContain("manifest");
@@ -23,7 +27,7 @@ describe("viewer routes", () => {
 
     const sw = await app.request("http://localhost/viewer/sw.js");
     expect(sw.status).toBe(200);
-    expect(await sw.text()).toContain("skyadmin-viewer-v2");
+    expect(await sw.text()).toContain("skyadmin-viewer-v3");
   });
 
   it("allows its inline script via per-response CSP nonce", async () => {

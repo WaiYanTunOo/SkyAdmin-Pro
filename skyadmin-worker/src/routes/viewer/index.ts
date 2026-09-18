@@ -1,4 +1,4 @@
-/** P4.1 — read-only mobile/PWA viewer (office_contacts + notebook_entries). */
+/** Wave D — read-only mobile/PWA viewer (all SYNC_TABLES). */
 
 export { VIEWER_CSP } from "./csp";
 export { viewerManifestHandler } from "./manifest";
