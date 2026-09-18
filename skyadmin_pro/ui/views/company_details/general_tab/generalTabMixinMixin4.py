@@ -32,7 +32,7 @@ class GeneralTabMixinMixin4:
             table_id="company.documents",
             db=self.app.db,
         )
-        self.doc_tree.tree.configure(height=5)
+        self.doc_tree.tree.configure(height=8)
         self.doc_tree.grid(row=1, column=0, sticky="nsew", padx=12, pady=(0, 8))
 
         form = ctk.CTkFrame(frame, fg_color="transparent")

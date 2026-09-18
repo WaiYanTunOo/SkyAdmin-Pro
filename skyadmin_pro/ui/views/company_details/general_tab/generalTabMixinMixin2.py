@@ -43,7 +43,7 @@ class GeneralTabMixinMixin2:
             table_id="company.services",
             db=self.app.db,
         )
-        self.service_tree.tree.configure(height=5)
+        self.service_tree.tree.configure(height=8)
         self.service_tree.grid(row=1, column=0, columnspan=2, sticky="nsew", padx=12, pady=(0, 8))
 
         form = ctk.CTkFrame(frame, fg_color="transparent")

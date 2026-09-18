@@ -19,23 +19,25 @@ class CompanyDetailsPanelMixin3:
             return
         tab = self.tabs.tab(name)
         if name == SUBTAB_GENERAL:
+            # Company form scrolls; service/doc trees stay fixed outside the canvas.
             tab.grid_columnconfigure(0, weight=1)
             tab.grid_rowconfigure(0, weight=1)
+            tab.grid_rowconfigure(1, weight=1)
+            tab.grid_rowconfigure(2, weight=1)
             general_scroll = CanvasScrollFrame(tab)
             general_scroll.grid(row=0, column=0, sticky="nsew")
             general_scroll.content.grid_columnconfigure(0, weight=1)
-            general_scroll.content.grid_rowconfigure(0, weight=1)
             self._company_frame = self._build_company_info(general_scroll.content)
-            self._company_frame.grid(row=0, column=0, sticky="nsew", pady=(0, 8))
-            self._services_frame = self._build_services(general_scroll.content)
+            self._company_frame.grid(row=0, column=0, sticky="ew", pady=(0, 8))
+            self._services_frame = self._build_services(tab)
             self._services_frame.grid(row=1, column=0, sticky="nsew", pady=(0, 8))
-            self._docs_frame = self._build_documents(general_scroll.content)
+            self._docs_frame = self._build_documents(tab)
             self._docs_frame.grid(row=2, column=0, sticky="nsew")
         elif name == SUBTAB_TAX_IDS:
             # Form scrolls; client cred tree stays fixed outside the canvas.
             tab.grid_columnconfigure(0, weight=1)
             tab.grid_rowconfigure(0, weight=1)
-            tab.grid_rowconfigure(2, weight=1)
+            tab.grid_rowconfigure(2, weight=2)
             tax_ids_scroll = CanvasScrollFrame(tab)
             tax_ids_scroll.grid(row=0, column=0, sticky="nsew")
             tax_ids_scroll.content.grid_columnconfigure(0, weight=1)

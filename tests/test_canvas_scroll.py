@@ -82,13 +82,13 @@ def test_office_hub_trees_outside_form_scroll():
 
 def test_general_and_financial_trees_outside_canvas_scroll():
     panel_src = _pkg_text("skyadmin_pro", "ui", "views", "company_details", "panel")
-    # Company info, services, and documents all scroll inside the same CanvasScrollFrame.
+    # Company form scrolls; service/doc trees are parented on the tab (outside CanvasScrollFrame).
     assert "general_scroll = CanvasScrollFrame(tab)" in panel_src
     assert "_build_company_info(general_scroll.content)" in panel_src
-    assert "_build_services(general_scroll.content)" in panel_src
-    assert "_build_documents(general_scroll.content)" in panel_src
-    assert "_build_services(tab)" not in panel_src
-    assert "_build_documents(tab)" not in panel_src
+    assert "_build_services(tab)" in panel_src
+    assert "_build_documents(tab)" in panel_src
+    assert "_build_services(general_scroll.content)" not in panel_src
+    assert "_build_documents(general_scroll.content)" not in panel_src
     assert "fin_scroll = CanvasScrollFrame(fin_tab)" not in panel_src
     assert "_build_financial_docs(fin_tab)" in panel_src
 

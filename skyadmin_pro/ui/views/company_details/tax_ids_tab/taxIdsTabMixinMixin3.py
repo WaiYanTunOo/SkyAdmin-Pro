@@ -35,11 +35,12 @@ class TaxIdsTabMixinMixin3:
                 ("portal", "Portal URL", 200),
             ),
             on_select=self._on_client_cred_select,
-            showheight=8,
+            showheight=12,
             table_id="company.tax_ids",
             db=self.app.db,
         )
         self.client_cred_tree.grid(row=2, column=0, sticky="nsew", padx=16, pady=(0, 8))
+        self.client_cred_tree.tree.configure(height=12)
 
         cred_detail = ctk.CTkFrame(cred_card, fg_color="transparent")
         cred_detail.grid(row=3, column=0, sticky="ew", padx=16, pady=(0, 8))
