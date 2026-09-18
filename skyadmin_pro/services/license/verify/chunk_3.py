@@ -73,7 +73,7 @@ def _fetch_control_from_api(api_url: str, timeout: float) -> tuple[bool, str | N
         headers={"User-Agent": "SkyAdminPro", "Cache-Control": "no-cache"},
     )
     try:
-        with urllib.request.urlopen(req, timeout=timeout) as resp:
+        with urllib.request.urlopen(req, timeout=timeout) as resp:  # nosec B310
             raw_bytes = resp.read(200 * 1024 + 1)
             if len(raw_bytes) > 200 * 1024:
                 return False, "API: control list too large"

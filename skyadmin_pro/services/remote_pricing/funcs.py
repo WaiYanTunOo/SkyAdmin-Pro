@@ -28,7 +28,7 @@ def fetch_pricing_tiers(timeout: float = 4.0) -> tuple[tuple[tuple[str, int, int
     url = api_url.rstrip("/") + "/api/pricing"
     req = urllib.request.Request(url, headers={"User-Agent": "SkyAdminPro"})
     try:
-        with urllib.request.urlopen(req, timeout=timeout) as resp:
+        with urllib.request.urlopen(req, timeout=timeout) as resp:  # nosec B310
             data = json.loads(resp.read(32 * 1024).decode("utf-8", errors="replace"))
     except _NETWORK_ERRORS as exc:
         logger.warning("Pricing fetch failed, using embedded defaults: %s", exc)
@@ -77,7 +77,7 @@ def fetch_signing_key_status(timeout: float = 4.0) -> tuple[bool, str]:
     url = api_url.rstrip("/") + "/api/signing/public-key"
     req = urllib.request.Request(url, headers={"User-Agent": "SkyAdminPro"})
     try:
-        with urllib.request.urlopen(req, timeout=timeout) as resp:
+        with urllib.request.urlopen(req, timeout=timeout) as resp:  # nosec B310
             data = json.loads(resp.read(16 * 1024).decode("utf-8", errors="replace"))
     except _NETWORK_ERRORS as exc:
         logger.debug("Signing-key status check failed (treated as match): %s", exc)

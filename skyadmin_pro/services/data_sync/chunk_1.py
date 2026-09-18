@@ -25,7 +25,7 @@ def register_sync_device(timeout: float = 10.0) -> tuple[bool, str]:
         url, data=payload, method="POST", headers={"Content-Type": "application/json", "User-Agent": "SkyAdminPro"}
     )
     try:
-        with urllib.request.urlopen(req, timeout=timeout) as resp:
+        with urllib.request.urlopen(req, timeout=timeout) as resp:  # nosec B310
             raw = resp.read(256 * 1024).decode("utf-8", errors="replace")
             data = json.loads(raw)
     except urllib.error.HTTPError as exc:

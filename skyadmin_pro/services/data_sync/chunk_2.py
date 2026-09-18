@@ -31,7 +31,7 @@ def _sync_request(
         headers["Content-Type"] = "application/json"
     req = urllib.request.Request(url, data=data, method=method, headers=headers)
     try:
-        with urllib.request.urlopen(req, timeout=timeout) as resp:
+        with urllib.request.urlopen(req, timeout=timeout) as resp:  # nosec B310
             raw = resp.read(4 * 1024 * 1024).decode("utf-8", errors="replace")
             parsed = json.loads(raw)
             return (True, parsed if isinstance(parsed, dict) else {})

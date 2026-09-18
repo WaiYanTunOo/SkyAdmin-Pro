@@ -74,6 +74,8 @@ You should receive a response within 48 hours.
 - CI pipeline runs both checks on every push
 - `PYSEC-2022-252` (deep-translator) is ignored in CI: historical PyPI
   compromise with no fixed release; pin stays on current `1.11.4`
+- Bandit skips `B608` (parameterized `IN (...)` SQL builders); HTTPS
+  `urlopen` call sites use `# nosec B310` after `require_https_api_url`
 
 ## Updates
 

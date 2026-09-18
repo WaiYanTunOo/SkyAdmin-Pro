@@ -59,7 +59,8 @@ jobs:
 
       - name: Security scan with bandit
         if: matrix.python-version == '3.12'
-        run: bandit -r skyadmin_pro/ --severity-level medium
+        # B608: f-string SQL with bound ? placeholders (IN-clause builders), not user SQL.
+        run: bandit -r skyadmin_pro/ --severity-level medium --skip B608
 
   python-windows:
     # Windows CI job: catches Windows-only issues on every PR (previously only at release).
@@ -105,7 +106,8 @@ jobs:
         run: pip-audit --strict --ignore-vuln PYSEC-2022-252
 
       - name: Security scan with bandit
-        run: bandit -r skyadmin_pro/ --severity-level medium
+        # B608: f-string SQL with bound ? placeholders (IN-clause builders), not user SQL.
+        run: bandit -r skyadmin_pro/ --severity-level medium --skip B608
 
   perf:
     # Dedicated performance gate: budget tests block the build, and per-test

@@ -28,7 +28,7 @@ def _fetch_control_from_gist(timeout: float) -> tuple[bool, str]:
         headers={"User-Agent": "SkyAdminPro", "Cache-Control": "no-cache"},
     )
     try:
-        with urllib.request.urlopen(req, timeout=timeout) as resp:
+        with urllib.request.urlopen(req, timeout=timeout) as resp:  # nosec B310
             try:
                 raw_bytes = resp.read(200 * 1024 + 1)
             except TypeError:
