@@ -2,8 +2,6 @@ from __future__ import annotations
 
 import customtkinter as ctk
 
-from skyadmin_pro.ui.canvas_scroll import CanvasScrollFrame
-
 from .tabs import install_tabs
 
 
@@ -33,13 +31,11 @@ class DashboardViewMixin0:
         self._header.grid_propagate(False)
         self._header.grid_columnconfigure(0, weight=1)
 
-        self._detail_scroll = CanvasScrollFrame(self.body)
-        self._detail_scroll.grid(row=1, column=0, sticky="nsew")
-        self._detail_scroll.content.grid_columnconfigure(0, weight=1)
-
-        self._detail = ctk.CTkFrame(self._detail_scroll.content, fg_color="transparent")
-        self._detail.grid(row=0, column=0, sticky="ew")
+        # Tabs fill body; Today scrolls inside its tab. Incentive tree is outside scroll.
+        self._detail = ctk.CTkFrame(self.body, fg_color="transparent")
+        self._detail.grid(row=1, column=0, sticky="nsew")
         self._detail.grid_columnconfigure(0, weight=1)
+        self._detail.grid_rowconfigure(0, weight=1)
         install_tabs(self)
 
     def _build_header_extras(self) -> None:

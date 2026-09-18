@@ -62,5 +62,5 @@ class DashboardViewMixin4:
         open_company(self.app, values[0])
 
     def _overdue_selected(self) -> int | None:
-        iid = self.overdue_tree.selected_iid()
-        return int(iid) if iid is not None else None
+        # Orphaned: overdue_tree was never rebuilt; use Suppliers jump card instead.
+        return None

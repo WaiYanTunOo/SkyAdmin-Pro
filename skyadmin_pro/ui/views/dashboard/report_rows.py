@@ -31,8 +31,9 @@ def fill_report(view) -> None:
         iids=[row["id_key"] for row in rows] + (["__total__"] if rows else []),
         empty_message="No fees or pipeline items for this month.",
     )
-    fit_tree(view.report_tree, len(tree_rows), empty=1, cap=10)
-    view._detail_scroll._on_content_configure()
+    # Fill panel: set_rows grows with sticky=nsew; fit_tree only for empty shrink.
+    if not tree_rows:
+        fit_tree(view.report_tree, 0, empty=1, cap=10)
 
 
 def open_report_row(view, iid: str | None) -> None:

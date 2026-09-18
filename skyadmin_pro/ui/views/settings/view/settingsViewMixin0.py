@@ -85,9 +85,10 @@ class SettingsViewMixin0:
             return
         self._lazy_tabs.add(name)
 
-    def _scroll_tab(self, tab) -> ctk.CTkFrame:
+    def _scroll_tab(self, tab, *, row: int = 0, sticky: str = "nsew") -> ctk.CTkFrame:
+        """Host forms in CanvasScrollFrame. Parent trees on `tab`, not scroll.content."""
         scroll = CanvasScrollFrame(tab)
-        scroll.grid(row=0, column=0, sticky="nsew", padx=0, pady=0)
+        scroll.grid(row=row, column=0, sticky=sticky, padx=0, pady=0)
         scroll.content.grid_columnconfigure(0, weight=1)
         scroll.content.grid_rowconfigure(0, weight=1)
         self._tab_scrolls[tab] = scroll

@@ -4,20 +4,29 @@ from __future__ import annotations
 
 import customtkinter as ctk
 
+from skyadmin_pro.ui.canvas_scroll import CanvasScrollFrame
 from skyadmin_pro.ui.theme import SURFACE_BG
 from skyadmin_pro.ui.widgets import themed_tabview
 
 
 def install_tabs(view) -> None:
     tabs = themed_tabview(view._detail, command=lambda: view._detail_scroll._on_content_configure())
-    tabs.grid(row=0, column=0, sticky="ew")
+    tabs.grid(row=0, column=0, sticky="nsew")
     view._dash_tabs = tabs
-    view._today = tabs.add("Today")
+    today_tab = tabs.add("Today")
     view._money = tabs.add("Money")
     view._incentive = tabs.add("Incentive")
-    for name, frame in (("Today", view._today), ("Money", view._money), ("Incentive", view._incentive)):
+    for name in ("Today", "Money", "Incentive"):
         tabs.tab(name).configure(fg_color=SURFACE_BG)
-        frame.grid_columnconfigure(0, weight=1)
+    today_tab.grid_columnconfigure(0, weight=1)
+    today_tab.grid_rowconfigure(0, weight=1)
+    view._detail_scroll = CanvasScrollFrame(today_tab)
+    view._detail_scroll.grid(row=0, column=0, sticky="nsew")
+    view._detail_scroll.content.grid_columnconfigure(0, weight=1)
+    view._today = view._detail_scroll.content
+    view._money.grid_columnconfigure(0, weight=1)
+    view._incentive.grid_columnconfigure(0, weight=1)
+    view._incentive.grid_rowconfigure(0, weight=1)
     _stat_cards(view)
 
 

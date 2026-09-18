@@ -7,9 +7,14 @@ from skyadmin_pro.ui.widgets import SectionCard, themed_entry, themed_textbox
 
 
 class SettingsViewMixin4:
-    def _build_business_tab_pricing_form(self, pricing_body):
+    def _build_business_tab_pricing_form(self, scroll) -> int:
+        """Fee edit fields live in the Business tab scroll (below pricing_tree)."""
+        card = SectionCard(scroll, title="Edit fee row", subtitle="Select a matrix row above, then save.")
+        card.grid(row=0, column=0, sticky="ew", pady=(0, 12))
+        pricing_body = card.body
+        pricing_body.grid_columnconfigure(0, weight=1)
         pricing_form = ctk.CTkFrame(pricing_body, fg_color="transparent")
-        pricing_form.grid(row=2, column=0, sticky="ew")
+        pricing_form.grid(row=0, column=0, sticky="ew")
         pricing_form.grid_columnconfigure((1, 3), weight=1, uniform="fee_field")
         self.pricing_range_var = ctk.StringVar()
         self.pricing_monthly_var = ctk.StringVar()
@@ -50,7 +55,7 @@ class SettingsViewMixin4:
         self.pricing_docs_entry.grid(row=2, column=3, sticky="ew", pady=4)
 
         pricing_buttons = ctk.CTkFrame(pricing_body, fg_color="transparent")
-        pricing_buttons.grid(row=3, column=0, sticky="w", pady=(8, 0))
+        pricing_buttons.grid(row=1, column=0, sticky="w", pady=(8, 0))
         ctk.CTkButton(pricing_buttons, text="Save pricing row", width=140, command=self._save_pricing_tier).grid(
             row=0, column=0, padx=(0, 8)
         )
@@ -72,6 +77,7 @@ class SettingsViewMixin4:
             command=self._delete_pricing_charge_line,
         )
         self.pricing_delete_charge_btn.grid(row=0, column=2)
+        return 1
 
     def _build_business_tab_services(self, scroll, row: int) -> int:
         services = SectionCard(

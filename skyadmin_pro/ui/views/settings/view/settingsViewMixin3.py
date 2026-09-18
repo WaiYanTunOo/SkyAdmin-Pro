@@ -8,16 +8,17 @@ from skyadmin_pro.ui.widgets import SectionCard
 
 
 class SettingsViewMixin3:
-    def _build_business_tab_pricing(self, scroll, row: int) -> int:
+    def _build_business_tab_pricing(self, tab) -> None:
+        """Toolbar + pricing_tree on tab (outside CanvasScrollFrame)."""
         pricing = SectionCard(
-            scroll,
+            tab,
             title="Client fee matrix",
             subtitle=(
                 "What this firm charges a client. Not the license price list. "
                 "Accounting uses transaction-volume tiers; other services use named charge lines."
             ),
         )
-        pricing.grid(row=row, column=0, sticky="ew", pady=(0, 12))
+        pricing.grid(row=0, column=0, sticky="ew", pady=(0, 8))
         pricing_body = pricing.body
         pricing_body.grid_columnconfigure(0, weight=1)
 
@@ -50,7 +51,7 @@ class SettingsViewMixin3:
         ).grid(row=0, column=3, padx=(8, 0))
 
         self.pricing_tree = ThemedTreeview(
-            pricing_body,
+            tab,
             columns=(
                 ("range", "Transaction range", 200),
                 ("monthly", "Monthly THB", 100),
@@ -62,6 +63,4 @@ class SettingsViewMixin3:
             on_select=self._on_pricing_row_select,
             showheight=6,
         )
-        self.pricing_tree.grid(row=1, column=0, sticky="ew", pady=(0, 8))
-        self._build_business_tab_pricing_form(pricing_body)
-        return row + 1
+        self.pricing_tree.grid(row=1, column=0, sticky="nsew", pady=(0, 8))

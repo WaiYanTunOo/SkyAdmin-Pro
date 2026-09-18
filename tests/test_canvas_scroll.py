@@ -128,6 +128,13 @@ def test_settings_checklist_not_nested_scroll():
     assert "self.checklist_scroll = ctk.CTkFrame(cl_body" in text
 
 
+def test_settings_pricing_tree_outside_canvas_scroll():
+    text = _pkg_text("skyadmin_pro", "ui", "views", "settings", "view")
+    assert "self.pricing_tree = ThemedTreeview(\n            tab," in text
+    assert "_scroll_tab(tab, row=2" in text
+    assert "ThemedTreeview(\n            pricing_body," not in text
+
+
 def test_wheel_rebind_does_not_stack_handlers():
     import pytest
 

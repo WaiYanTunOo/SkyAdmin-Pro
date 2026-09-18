@@ -98,9 +98,11 @@ class SettingsViewMixin2:
         return row + 1
 
     def _build_business_tab(self, tab) -> None:
-        scroll = self._scroll_tab(tab)
-        row = 0
-        row = self._build_business_tab_pricing(scroll, row)
+        # pricing_tree fills on the tab; form + other cards scroll below.
+        tab.grid_rowconfigure(1, weight=1)
+        self._build_business_tab_pricing(tab)
+        scroll = self._scroll_tab(tab, row=2, sticky="ew")
+        row = self._build_business_tab_pricing_form(scroll)
         row = self._build_business_tab_services(scroll, row)
         row = self._build_business_tab_directory(scroll, row)
         row = self._build_business_tab_checklists(scroll, row)

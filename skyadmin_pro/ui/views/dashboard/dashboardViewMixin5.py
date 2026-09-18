@@ -3,55 +3,19 @@ from __future__ import annotations
 from datetime import date
 
 from skyadmin_pro.services.file_ops import open_in_file_manager
-from skyadmin_pro.services.snippets import effective_text, load_snippet_overrides
 from skyadmin_pro.services.workflow import copy_to_clipboard, create_client_workspace, format_eod_report
 
 
 class DashboardViewMixin5:
     def _copy_overdue_reminder(self) -> None:
-        document_id = self._overdue_selected()
-        if document_id is None:
-            self.workflow_feedback.error("Select an overdue payment row first.")
-            return
-        item = self.app.db.get_document(document_id)
-        if not item:
-            return
-        overrides = load_snippet_overrides(self.app.db.get_setting)
-        template = effective_text("client", "Invoice payment reminder", overrides)
-        if not template:
-            self.workflow_feedback.error("Reminder template not found — add 'Invoice payment reminder' in Utilities.")
-            return
-        client = item.get("client_name") or ""
-        message = (
-            template.replace("[Client Contact Name]", client)
-            .replace("[Client Company Name]", client)
-            .replace("[Amount]", item.get("amount") or "")
-            .replace("[Due Date]", item.get("payment_date") or "")
-        )
-        try:
-            copy_to_clipboard(message, tk_window=self.app)
-        except Exception as exc:
-            self.workflow_feedback.error(str(exc))
-            return
-        self.workflow_feedback.success("Invoice reminder copied — paste into the email.")
+        # Orphaned handler (no overdue_tree). Jump card → Suppliers remains.
+        self.workflow_feedback.info("Open Suppliers from the Overdue payments card to manage payments.")
 
     def _mark_overdue_paid(self) -> None:
-        document_id = self._overdue_selected()
-        if document_id is None:
-            self.workflow_feedback.error("Select an overdue payment row first.")
-            return
-        self.app.db.set_document_paid(document_id, True)
-        self.workflow_feedback.success("Marked as paid.")
-        self.refresh(force=True)
+        self.workflow_feedback.info("Open Suppliers from the Overdue payments card to mark payments paid.")
 
     def _mark_supplier_due_paid(self) -> None:
-        iid = self.supplier_due_tree.selected_iid()
-        if iid is None:
-            self.workflow_feedback.error("Select a pending supplier payment row first.")
-            return
-        self.app.db.set_supplier_payment_paid(int(iid), True)
-        self.workflow_feedback.success("Supplier payment marked as paid.")
-        self.refresh(force=True)
+        self.workflow_feedback.info("Open Suppliers from the Supplier due card to mark payments paid.")
 
     def _open_folder(self, folder) -> None:
         try:

@@ -16,8 +16,9 @@ class DashboardViewMixin13:
             self._build_detail_trees_secondary()
 
         report_card = ctk.CTkFrame(self._incentive, corner_radius=12)
-        report_card.grid(row=0, column=0, sticky="ew", pady=(0, 12))
+        report_card.grid(row=0, column=0, sticky="nsew", pady=(0, 12))
         report_card.grid_columnconfigure(0, weight=1)
+        report_card.grid_rowconfigure(1, weight=1)
         report_header = ctk.CTkFrame(report_card, fg_color="transparent")
         report_header.grid(row=0, column=0, sticky="ew", padx=16, pady=(14, 8))
         report_header.grid_columnconfigure(0, weight=1)
@@ -64,6 +65,6 @@ class DashboardViewMixin13:
                 ("amount", "Amount", 110),
             ),
             on_double_click=lambda iid: open_report_row(self, iid),
-            showheight=1,
+            showheight=8,
         )
         return report_card

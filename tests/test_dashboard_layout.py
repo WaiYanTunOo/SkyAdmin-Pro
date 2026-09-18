@@ -1,4 +1,4 @@
-"""Dashboard layout: detail trees are not inside a page scroll container."""
+"""Dashboard layout: Today scrolls; Incentive report_tree is outside CanvasScrollFrame."""
 
 from pathlib import Path
 
@@ -13,12 +13,15 @@ def _pkg(*parts: str) -> str:
 
 
 def test_dashboard_detail_trees_not_in_canvas_scroll():
-    text = _src("skyadmin_pro", "ui", "views", "dashboard", "dashboardViewMixin0.py")
-    # Header is fixed above scroll; detail is inside CanvasScrollFrame to avoid clipping on 1080p
-    assert "CanvasScrollFrame" in text
-    assert "self._detail_scroll = CanvasScrollFrame(self.body" in text
-    assert "self._detail = ctk.CTkFrame(self._detail_scroll.content" in text
-    assert "self._header = ctk.CTkFrame(self.body" in text
+    shell = _src("skyadmin_pro", "ui", "views", "dashboard", "dashboardViewMixin0.py")
+    tabs = _src("skyadmin_pro", "ui", "views", "dashboard", "tabs.py")
+    heavy = _src("skyadmin_pro", "ui", "views", "dashboard", "dashboardViewMixin13.py")
+    assert "self._detail = ctk.CTkFrame(self.body" in shell
+    assert "self._detail_scroll = CanvasScrollFrame(self.body" not in shell
+    assert "view._detail_scroll = CanvasScrollFrame(today_tab)" in tabs
+    assert "view._today = view._detail_scroll.content" in tabs
+    assert "ThemedTreeview(" in heavy
+    assert "self._incentive" in heavy
 
 
 def test_dashboard_build_defers_header_extras():

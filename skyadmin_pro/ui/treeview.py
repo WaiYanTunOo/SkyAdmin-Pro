@@ -431,7 +431,17 @@ class ThemedTreeview(ctk.CTkFrame):
 
         # Dynamically manage grid weight so empty lists stay one line.
         try:
-            self.tree.configure(height=1 if is_empty else min(20, max(1, len(row_list))))
+            from skyadmin_pro.ui.tree_height import rows_height
+
+            self.tree.configure(
+                height=rows_height(
+                    self,
+                    row_count=len(row_list),
+                    empty=is_empty,
+                    showheight=self._showheight,
+                    visible_rows=self._visible_row_count(),
+                )
+            )
             info = self.grid_info()
             if info and "row" in info:
                 row_idx = info["row"]
