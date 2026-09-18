@@ -49,11 +49,20 @@ SIDEBAR_HOVER_BG = ("gray80", "gray25")
 SIDEBAR_TEXT = ("gray10", "gray90")
 SIDEBAR_ICONS = {
     "dashboard": "◧",
-    "document_hub": "⧉",
+    "tasks": "☑",
     "database_tasks": "▦",
+    "suppliers": "▤",
+    "tax_status": "◷",
+    "pipeline": "▷",
+    "courier": "✈",
+    "document_hub": "⧉",
     "office_hub": "☎",
     "utilities": "✦",
     "settings": "⚙",
+    # Synthetic group keys
+    "group_daily": "☀",
+    "group_finance": "⊞",
+    "group_office": "⊡",
 }
 
 # Surfaces — tab panes, scroll areas, cards (readable in light + dark)

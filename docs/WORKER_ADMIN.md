@@ -42,7 +42,7 @@ Do **not** document this as Bearer-only — cookie+CSRF is live (`auth.ts`, cove
 
 ## Desktop / iPhone coupling
 
-- **Pricing packages** — admin saves → Worker D1 → desktop Settings pricing + `LicenseGenerator_iPhone.html`
+- **Pricing packages** — admin saves → Worker D1 → desktop activation page and `LicenseGenerator_iPhone.html`. Not the desktop Client fee matrix.
 - **App update publish** — admin → `/api/update` → desktop Settings “Check updates”
 - **Generate / revoke** — admin → desktop activation + `control_sample.txt` format
 

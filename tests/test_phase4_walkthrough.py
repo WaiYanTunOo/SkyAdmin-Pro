@@ -9,16 +9,23 @@ pytest.importorskip("customtkinter")
 
 pytestmark = pytest.mark.walkthrough
 
-SIDEBAR_VIEWS = ("dashboard", "document_hub", "database_tasks", "office_hub", "utilities", "settings")
+SIDEBAR_VIEWS = (
+    "dashboard",
+    "tasks",
+    "database_tasks",
+    "suppliers",
+    "tax_status",
+    "pipeline",
+    "courier",
+    "document_hub",
+    "office_hub",
+    "utilities",
+    "settings",
+)
 DB_TABS = (
-    "Tasks",
-    "Courier Tracker",
     "Clients & Expiry",
-    "Monthly Tax Status",
     "Company Details",
     "Renewals",
-    "Service Pipeline",
-    "Suppliers & AP",
 )
 DOC_TABS = (
     "Smart Renamer",
@@ -67,10 +74,9 @@ def app(tmp_path_factory):
     window.geometry("1100x700")
     window.update()
     yield window
-    try:
-        window.destroy()
-    except Exception:
-        pass
+    from helpers_ui import close_test_app
+
+    close_test_app(window)
 
 
 def test_phase4_all_sidebar_views_load(app):

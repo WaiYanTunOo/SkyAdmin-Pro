@@ -90,12 +90,22 @@ from .licensing import (  # noqa: E402
     SETTING_SYNC_LAST_PUSH,
 )
 from .nav import (  # noqa: E402
+    NAV_CHILD_TO_GROUP,
+    NAV_COURIER,
     NAV_DASHBOARD,
     NAV_DATABASE_TASKS,
     NAV_DOCUMENT_HUB,
+    NAV_GROUP_DAILY,
+    NAV_GROUP_FINANCE,
+    NAV_GROUP_OFFICE,
+    NAV_GROUPS,
     NAV_ITEMS,
     NAV_OFFICE_HUB,
+    NAV_PIPELINE,
     NAV_SETTINGS,
+    NAV_SUPPLIERS,
+    NAV_TASKS,
+    NAV_TAX_STATUS,
     NAV_UTILITIES,
 )
 

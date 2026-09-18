@@ -42,6 +42,10 @@ tag pipeline when no certificate is configured — see `packaging/SIGNING.md` fo
 }
 ```
 
+The `env.staging` block uses the literal placeholder `REPLACE_WITH_STAGING_DB_ID`.
+Replace it with a real D1 id from `npx wrangler d1 create skyadmin-db-staging` before any
+`wrangler deploy --env staging` — do not invent an id. Full steps: `skyadmin-worker/DEPLOY.md` § Staging.
+
 ### Deploy
 
 ```bash
@@ -108,7 +112,7 @@ python -c "from cryptography.hazmat.primitives.asymmetric.ed25519 import Ed25519
 2. **Admin account**: Set `ADMIN_PASS` in environment variables. Access admin panel at `/{ADMIN_PATH}`.
 3. **Desktop DB**: SQLite schema auto-applies on first app launch via `skyadmin_pro/db/schema.py` + versioned `skyadmin_pro/db/migrations/`.
 4. **Support note — reinstalls**: activation codes burn strictly one-time (`used_nonces`). A wiped/reinstalled PC cannot re-register with its old code — issue a fresh code from the admin panel (Generate). Sync tokens additionally expire after 30 days idle and rotate on re-register.
-5. **Sync scope — client groups**: `client_groups` syncs by `global_id` (schema v2). Numeric `clients.group_id` is never sent; membership uses `group_global_id`. See `skyadmin_pro/services/data_sync.py`.
+5. **Sync scope — client groups**: `client_groups` syncs by `global_id` (schema v2). Numeric `clients.group_id` is never sent; membership uses `group_global_id`. See `skyadmin_pro/services/data_sync/`.
 
 ## 5. Updates
 

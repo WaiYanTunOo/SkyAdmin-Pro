@@ -1,0 +1,28 @@
+from __future__ import annotations
+
+_BLOCKED_OPEN_SUFFIXES = frozenset(
+    {
+        ".exe",
+        ".bat",
+        ".cmd",
+        ".com",
+        ".msi",
+        ".ps1",
+        ".vbs",
+        ".vbe",
+        ".js",
+        ".jse",
+        ".wsf",
+        ".wsh",
+        ".hta",
+        ".lnk",
+        ".scr",
+        ".pif",
+        ".jar",
+        ".msc",
+        ".reg",
+        ".cpl",
+        ".gadget",
+        ".inf",
+    }
+)

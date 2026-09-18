@@ -1,5 +1,7 @@
 # SkyAdmin Pro — Master Roadmap & Audit
 
+**Historical audit.** §§7.2 and 8.2 list work that has since landed. Do not treat those tables as the backlog. Use [ROADMAP_MASTER.md](ROADMAP_MASTER.md).
+
 Comprehensive analysis of **features, security, code quality, optimization, loading, UI/UX, testing, documentation, and architecture**.
 
 **Current version:** `0.3.3` · **Primary platform:** Windows desktop · **Stack:** Python 3 + CustomTkinter + SQLite + TypeScript Cloudflare Worker
@@ -291,18 +293,7 @@ Comprehensive analysis of **features, security, code quality, optimization, load
 
 ### 7.2 Feature Gaps
 
-| # | Feature | Priority | Effort | Impact |
-|---|---------|----------|--------|--------|
-| F1 | **macOS native build + notarization** | P1 | Medium | Cross-platform reach |
-| F2 | **Linux native build** | P2 | Medium | Cross-platform reach |
-| F3 | **Scheduled auto-backup** (daily/weekly) | P1 | Low | Data safety |
-| F4 | **Bulk client operations** (select multiple, batch status change) | P2 | Medium | Power user productivity |
-| F5 | **Print-ready reports** (PDF generation from dashboard) | P2 | Medium | Client deliverables |
-| F6 | **Dark/light theme toggle** | P3 | Low | User preference |
-| F7 | **Keyboard shortcuts** (Ctrl+S, Ctrl+Z, etc.) | P2 | Low | Power user UX |
-| F8 | **Undo/redo** for form edits | P3 | High | Data safety |
-| F9 | **Client grouping/categorization** | P2 | Medium | Organization |
-| F10 | **Audit log viewer** (tax_cycle_log, sync_conflicts) | P2 | Low | Transparency |
+**Retired.** Auto-backup, bulk ops, PDF reports, theme toggle, shortcuts, undo, grouping, and the audit viewer are in the app. Do not rebuild them from this table. macOS/Linux packaging is optional, not the office workflow.
 
 ### 7.3 Architecture Assessment
 
@@ -365,14 +356,7 @@ Cloudflare Worker (TypeScript + Hono)
 
 ### 8.2 Missing Documentation
 
-| # | Document | Priority | Purpose |
-|---|----------|----------|---------|
-| D1 | **SECURITY.md** | **P0** | Vulnerability reporting process, security policies |
-| D2 | **API Reference** | **P1** | Route-by-route spec for Worker endpoints |
-| D3 | **CONTRIBUTING.md** | **P2** | Contributor guidelines |
-| D4 | **Architecture Diagram** | **P2** | Visual system architecture (mermaid) |
-| D5 | **Database Schema Reference** | **P2** | Table relationships, index purposes |
-| D6 | **Deployment Runbook** | **P2** | Step-by-step production deployment |
+**Retired.** SECURITY.md, API_REFERENCE, CONTRIBUTING, ARCHITECTURE, DB_SCHEMA, and DEPLOYMENT exist. Do not recreate them from this list.
 
 ---
 

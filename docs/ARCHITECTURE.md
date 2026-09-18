@@ -22,7 +22,7 @@ flowchart TB
     end
 
     subgraph Client["Mobile Viewer (PWA)"]
-        PWA["viewer.ts<br/>Read-only sync viewer"]
+        PWA["routes/viewer/<br/>Read-only sync viewer"]
     end
 
     UI --> SVC
@@ -93,7 +93,7 @@ Desktop App                    Cloudflare Worker               D1 Database
 
 ## Sync scope notes
 
-- Tables with `global_id` sync across devices (see `data_sync.py` / `sync_schema.ts`).
+- Tables with `global_id` sync across devices (see `services/data_sync/` / `sync_schema.ts`).
 - **`client_groups` sync** via stable `global_id`; numeric `clients.group_id` stays local and is remapped from `group_global_id` on pull/push.
 - Sync tokens are SHA-256 hashed at rest; missing `expires_at` fails closed.
 

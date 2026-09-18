@@ -106,3 +106,7 @@
    - Follow the established sequence: `company-details` and `ui-widgets` touch `widgets.py` sequentially.
 4. **Git UTF-8 Cleanliness**:
    - `.gitignore` and all text files must be clean UTF-8 without BOM.
+
+## Code Splitting Rule (Wave D7)
+- **Strict 100-Line Limit:** ALL code files must be strictly under 100 lines. If a file (even a split mixin) exceeds 100 lines, it must be recursively subdivided into smaller modules (e.g. crud_reads.py, crud_writes.py) until every single file is wc -l < 100.
+- **No Exceptions:** This applies to db/, ui/views/, services/, and skyadmin-worker/src/routes/.

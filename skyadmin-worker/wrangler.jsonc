@@ -18,6 +18,8 @@
         {
           "binding": "DB",
           "database_name": "skyadmin-db-staging",
+          // Placeholder — replace with a real D1 id from `wrangler d1 create skyadmin-db-staging`
+          // before any `wrangler deploy --env staging`. Do not invent an id. See DEPLOY.md § Staging.
           "database_id": "REPLACE_WITH_STAGING_DB_ID",
           "migrations_dir": "migrations"
         }

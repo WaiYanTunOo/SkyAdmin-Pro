@@ -8,6 +8,7 @@ import pytest
 
 ROOT = Path(__file__).resolve().parents[1]
 sys.path.insert(0, str(ROOT))
+sys.path.insert(0, str(Path(__file__).resolve().parent))  # helpers_ui
 
 # Phase 1 (SQLCipher): the suite uses throwaway DB files, so pin a constant
 # test-only cipher salt. Production never sets this and derives the salt
@@ -56,6 +57,46 @@ def _license_test_sandbox(request, tmp_path, monkeypatch):
     return base
 
 
+@pytest.fixture(autouse=True)
+def _sqlcipher_pool_cleanup(request):
+    """Close SQLCipher pools created during a test (except live module ``app.db``).
+
+    Unclosed pooled connections accumulate VirtualLock pages; Windows then
+    returns LastError=1453 and later Tk roots fail sourcing ttk scripts.
+    """
+    created: list = []
+    orig_init = Database.__init__
+
+    def tracking_init(self, *a, **k):
+        orig_init(self, *a, **k)
+        created.append(self)
+
+    Database.__init__ = tracking_init  # type: ignore[method-assign]
+    try:
+        yield
+    finally:
+        Database.__init__ = orig_init  # type: ignore[method-assign]
+        keep: set[int] = set()
+        funcargs = getattr(request.node, "funcargs", {}) or {}
+        app = funcargs.get("app")
+        if app is not None:
+            owned = getattr(app, "db", None)
+            if owned is not None:
+                keep.add(id(owned))
+        for db in created:
+            if id(db) in keep:
+                continue
+            try:
+                db.shutdown()
+            except Exception:
+                pass
+
+
 @pytest.fixture
 def db(tmp_path) -> Database:
-    return Database(tmp_path / "test.db")
+    database = Database(tmp_path / "test.db")
+    yield database
+    try:
+        database.shutdown()
+    except Exception:
+        pass

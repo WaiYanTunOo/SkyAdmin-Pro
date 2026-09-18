@@ -1,5 +1,7 @@
 # SkyAdmin Pro — Product & Engineering Roadmap
 
+**Historical.** Phases 7–11 are landed. Do not execute the order below, and do not re-split the listed monoliths. Status lives in [ROADMAP_MASTER.md](ROADMAP_MASTER.md).
+
 Living plan after **Phase 5** (release gates, sync conflicts, auto-update, packaging, viewer PWA, Inno Setup).
 
 **Current version:** `0.3.3` · **Primary platform:** Windows desktop
@@ -167,21 +169,7 @@ services/license/           verify.py, online.py, machine.py  (package; monolith
 
 ## Recommended execution order
 
-```mermaid
-flowchart LR
-    QW[Quick wins] --> P7[Phase 7 Stability]
-    P7 --> P8[Phase 8 Security]
-    P8 --> P9[Phase 9 UI split + lazy load]
-    P9 --> P10[Phase 10 DB perf]
-    P10 --> P11[Phase 11 Release ops]
-```
-
-1. **Quick wins + Phase 8.1** — sync register hardening (highest security risk)
-2. **Phase 7.2** — dashboard query storm (worst daily UX pain)
-3. **Phase 9.1–9.4** — lazy tabs + debounce (visible speed)
-4. **Phase 9B** — split `settings.py` then `document_hub.py` (maintainability)
-5. **Phase 10** — FTS5 when client count becomes painful
-6. **Phase 11** — signing + CI artifacts before wide distribution
+**Retired.** Items 1–6 below are done. Do not start them again. Open work is human QA and the office-label fixes, not another dashboard query rewrite.
 
 ---
 

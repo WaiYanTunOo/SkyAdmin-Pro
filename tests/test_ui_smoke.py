@@ -25,10 +25,9 @@ def app(tmp_path_factory):
     window = MainWindow(db=db, paths=paths)
     window.update()
     yield window
-    try:
-        window.destroy()
-    except Exception:
-        pass
+    from helpers_ui import close_test_app
+
+    close_test_app(window)
 
 
 def _open_settings_tab(app, tab_name: str):
@@ -50,7 +49,7 @@ def test_sidebar_toggle_collapses_and_expands(app):
     app.update()
     assert app._sidebar_collapsed
     assert app.sidebar.cget("width") == 56
-    for btn in app._nav_buttons.values():
+    for btn in app.sidebar_widget._buttons.values():
         assert "  " not in btn.cget("text")
     app._toggle_sidebar()
     app.update()
@@ -58,15 +57,20 @@ def test_sidebar_toggle_collapses_and_expands(app):
 
 
 def test_sidebar_has_six_nav_buttons(app):
-    assert len(app._nav_buttons) == 6
-    for _key, btn in app._nav_buttons.items():
+    from skyadmin_pro.config import NAV_GROUPS
+
+    # 6 top-level rows in NAV_GROUPS (standalone + group headers)
+    top_level_keys = [key for key, _label, _children in NAV_GROUPS]
+    for key in top_level_keys:
+        btn = app.sidebar_widget._buttons.get(key)
+        assert btn is not None, f"Missing sidebar button for {key!r}"
         assert btn.cget("text").strip()
 
 
 def test_views_lazy_loaded(app):
     assert len(app._views) == 1
     assert "dashboard" in app._views
-    for key in ("document_hub", "database_tasks", "office_hub", "utilities", "settings"):
+    for key in ("document_hub", "database_tasks", "tasks", "suppliers", "office_hub", "utilities", "settings"):
         assert key not in app._views
         app.show_view(key)
         app.update()

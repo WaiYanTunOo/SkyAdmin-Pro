@@ -6,7 +6,8 @@ from pathlib import Path
 
 
 def test_settings_lazy_tabs_pattern():
-    src = Path("skyadmin_pro/ui/views/settings/view.py").read_text(encoding="utf-8")
+    root = Path("skyadmin_pro/ui/views/settings/view")
+    src = "\n".join(path.read_text(encoding="utf-8") for path in sorted(root.rglob("*.py")))
     assert "self._lazy_tabs" in src
     assert "_ensure_panel" in src
     assert 'self._ensure_panel("General")' in src

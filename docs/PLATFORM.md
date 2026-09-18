@@ -96,5 +96,5 @@ All three tables use ISO date strings and `updated_at` for future sync conflict 
 | `skyadmin_pro/ui/views/office_hub.py` | Office Hub UI |
 | `skyadmin_pro/services/vault.py` | Vault encrypt/decrypt |
 | `skyadmin_pro/services/secret_fields.py` | Shared machine-bound Fernet |
-| `skyadmin_pro/services/data_sync.py` | P4 Worker sync (pull/push) |
+| `skyadmin_pro/services/data_sync/` | P4 Worker sync (pull/push) |
 | `main.py` | Cross-platform single-instance lock |

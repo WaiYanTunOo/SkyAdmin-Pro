@@ -20,7 +20,7 @@ import {
   syncPushHandler,
   syncRegisterHandler,
   syncSchemaHandler,
-} from "./routes/sync";
+} from "./routes/sync/index";
 import { pricingGetHandler, pricingPostHandler } from "./routes/pricing";
 import { purgeLicensesHandler } from "./routes/purge";
 import { signingPublicKeyHandler } from "./routes/signing_info";

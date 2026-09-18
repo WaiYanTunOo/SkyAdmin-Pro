@@ -181,6 +181,55 @@ def test_restore_rewrites_paths_for_cross_machine(tmp_path):
         conn2.close()
 
 
+def test_verify_sqlite_payload_cross_machine_error(tmp_path):
+    """Legacy cipher-encrypted payload on a wrong machine gives a clear error."""
+    from skyadmin_pro.services.crypto.funcs_0 import _verify_sqlite_payload
+
+    # A payload that is >= 16 bytes, not plaintext SQLite → routed to
+    # cipher_connect which fails (wrong key / no SQLCipher driver).
+    bad_db = tmp_path / "cipher_locked.db"
+    bad_db.write_bytes(b"x" * 64)
+
+    with pytest.raises(ValueError, match="another machine"):
+        _verify_sqlite_payload(bad_db)
+
+
+def test_new_backup_inner_db_is_plaintext(tmp_path):
+    """New backups store a plaintext SQLite snapshot inside the archive."""
+    workspace = tmp_path / "workspace"
+    workspace.mkdir()
+
+    db_file = tmp_path / "skyadmin_pro.db"
+    conn = sqlite3.connect(str(db_file))
+    conn.execute("CREATE TABLE test (id INTEGER PRIMARY KEY)")
+    conn.execute("INSERT INTO test VALUES (1)")
+    conn.commit()
+    conn.close()
+
+    archive = tmp_path / "plain_inner.skybackup"
+    crypto.create_encrypted_backup(workspace, db_file, archive)
+
+    # Decrypt and inspect the inner DB.
+    from skyadmin_pro.services.crypto.funcs_4 import _decrypt_backup_zip
+
+    tmp_zip = _decrypt_backup_zip(archive)
+    try:
+        with zipfile.ZipFile(tmp_zip, "r") as zf:
+            payload = zf.read("skyadmin_pro.db")
+            assert payload[:16] == b"SQLite format 3\x00", "inner DB must be plaintext SQLite"
+            # Verify the data survived the round-trip.
+            inner = tmp_path / "inner.db"
+            inner.write_bytes(payload)
+            conn2 = sqlite3.connect(str(inner))
+            row = conn2.execute("SELECT id FROM test WHERE id = 1").fetchone()
+            conn2.close()
+            assert row is not None
+    finally:
+        import os
+
+        os.unlink(tmp_zip)
+
+
 def test_restore_no_path_rewrite_when_same_root(tmp_path):
     """No rewriting when the backup was created with the same workspace root."""
     ws = tmp_path / "workspace"

@@ -49,7 +49,7 @@ Do **not** re-open timing-oracle / sync-TTL / CSP / trees-out-of-scroll / releas
 
 1. Optional polish — Filing history already expandable; further UX only if measured pain
 2. Optional GitHub Environment protection on Worker deploy (concurrency already set)
-3. Wave B product features — see `docs/FEATURES_AND_UPGRADE_PLAN.md`
+3. Office labels and handoffs — not a new engine. Wave B F1 is landed; do not rebuild it.
 4. Defer — deeper SQLite pool rewrite; Qt/Electron unless residual UX still fails
 
 ## Parallel workstreams
@@ -102,3 +102,8 @@ docs/MASTER_ROADMAP.md                  # Audit + backlog
 - Expired sync register covered by Vitest; groups sync via `global_id` / `group_global_id`
 - `pytest` and Worker Vitest pass
 - `python scripts/release_check.py` → RELEASE OK before ship
+
+## Code Splitting Rule (Wave D7)
+- **Strict 100-Line Limit (new edits):** New or touched product files under `db/`, `ui/views/`, `services/`, and `skyadmin-worker/src/routes/` should stay under 100 lines; subdivide further only when editing those files.
+- **Freeze mass-splits:** Root shred/refactor scripts and `scratch/` tooling are frozen/gitignored until the Wave D7 package tree is committed. Do not re-run mass-split/shred scripts against the working tree.
+- Prefer targeted holdout splits after git stabilize (see `docs/FEATURES_AND_UPGRADE_PLAN.md`); do not blind-split `widgets.py` / giant tests first.

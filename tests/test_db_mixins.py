@@ -502,3 +502,31 @@ class TestCourierMixin:
         db.delete_courier_log(log_id)
         logs = db.list_courier_logs()
         assert all(log["id"] != log_id for log in logs)
+
+
+def test_incentive_narrow_update_document_amount_and_date(db):
+    client_id = db.get_or_create_client("Acme Corp")
+    doc_id = db.record_document(
+        client_id=client_id,
+        document_type="Test Service",
+        expiry_date="2028-01-01",
+        amount="1000",
+        payment_date="2028-01-02",
+        file_name="test.pdf",
+        file_path="/dummy/test.pdf",
+    )
+    doc_before = db.get_document(doc_id)
+
+    # Call the narrow update function (set amount and date to NULL, keep type)
+    db.update_document_amount_and_date(doc_id, "Test Service Modified", None, None)
+
+    doc_after = db.get_document(doc_id)
+
+    # Assert type changed
+    assert doc_after["document_type"] == "Test Service Modified"
+    # Assert amount and date are cleared
+    assert doc_after["amount"] is None
+    assert doc_after["payment_date"] is None
+    # Assert other columns were NOT wiped
+    assert doc_after["expiry_date"] == "2028-01-01"
+    assert doc_after["file_name"] == "test.pdf"

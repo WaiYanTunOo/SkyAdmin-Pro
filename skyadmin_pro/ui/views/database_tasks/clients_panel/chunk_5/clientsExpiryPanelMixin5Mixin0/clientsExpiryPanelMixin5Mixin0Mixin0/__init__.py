@@ -1,0 +1,7 @@
+from __future__ import annotations
+
+from .clientsExpiryPanelMixin5Mixin0Mixin0Mixin0 import ClientsExpiryPanelMixin5Mixin0Mixin0Mixin0
+
+
+class ClientsExpiryPanelMixin5Mixin0Mixin0(ClientsExpiryPanelMixin5Mixin0Mixin0Mixin0):
+    pass

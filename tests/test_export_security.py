@@ -87,10 +87,10 @@ def test_monthly_report_export_excludes_secrets(db, tmp_path, fake_app_dir, monk
     import openpyxl
 
     wb = openpyxl.load_workbook(dest)
-    sheet = wb["Pipeline"]
+    sheet = wb["Incentive Report"]
     flat = {str(value) for row in sheet.iter_rows(values_only=True) for value in row if value is not None}
     assert "monthly-report-leak" not in flat
     headers = [str(cell.value or "").strip() for cell in sheet[1]]
-    assert headers == ["No.", "Date", "Client", "Service", "Amount"]
+    assert headers == ["Date", "Client", "Service", "Source", "Amount"]
     assert "ird_password" not in {h.lower() for h in headers}
     assert "password" not in {h.lower() for h in headers}

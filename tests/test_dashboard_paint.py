@@ -23,13 +23,18 @@ def app(tmp_path_factory):
     paths = WorkspacePaths(tmp / "workspace")
     paths.ensure()
     ctk.set_appearance_mode("dark")
-    window = MainWindow(db=db, paths=paths)
-    window.update()
-    yield window
     try:
-        window.destroy()
-    except Exception:
-        pass
+        window = MainWindow(db=db, paths=paths)
+        window.update()
+    except Exception as exc:
+        message = str(exc)
+        if "tk.tcl" in message or "tk wasn't installed properly" in message:
+            pytest.skip(f"Tk unavailable: {exc}")
+        raise
+    yield window
+    from helpers_ui import close_test_app
+
+    close_test_app(window)
 
 
 def _pump(app, view, rounds: int = 40) -> None:

@@ -109,8 +109,6 @@ Treat as **done** unless regressions appear:
 | F1.5 | **Richer audit surfaces** | Tax cycle + sync conflicts in Audit log | `desktop-core` | ✅ |
 | F1.6 | **Print-ready reports** | Dashboard Export PDF + tax overview; export redaction | `desktop-core` | ✅ |
 
-**Gate:** Do not start F1 until A1–A2 are green for the target tag.
-
 ### Wave C — Sync & multi-device · **landed in tree**
 
 | ID | Item | Why | Status |
@@ -119,25 +117,13 @@ Treat as **done** unless regressions appear:
 | C2 | Sync pull pagination UX | Large tenants | ✅ Desktop loops `limit` pages; status shows page count |
 | C3 | Conflict review UI | Operators need to see LWW skips | ✅ Table filter, copy Global ID, refresh |
 
-### Wave D - UI, UX, Database & Tasks Upgrades (Proposed)
+### Removed — do not schedule
 
-| ID | Item | Detail | Owner |
-|----|------|--------|-------|
-| D1 | **Global Command Palette** | Press `Ctrl+K` to search clients, documents, or jump to tabs instantly. | `ui-widgets` |
-| D2 | **Drag-and-Drop Financial Docs** | Bypass the file picker dialog; allow users to drop PDFs directly onto the treeview in the Financial Docs tab. | `company-details` |
-| D3 | **Task Dependencies** | Create multi-step pipelines where Task B cannot be completed until Task A is checked off. | `desktop-core` |
-| D4 | **Cron/Recurring Task Engine** | Automatically generate monthly bookkeeping tasks based on client profiles without manual creation. | `desktop-core` |
-| D5 | **Database WAL Mode Toggle** | Enable `PRAGMA journal_mode=WAL` via settings for concurrent dashboard refresh reads. | `desktop-core` |
-| D6 | **macOS / Linux Polish** | Extend packaging workflow for notarized Mac and AppImage Linux builds. | `packaging-release` |
-| D7 | **Aggressive Code Splitting** | Refactor and split all code files by related functions/tasks/features so that every file is strictly under 100 lines of code. | `desktop-core` |
+These were proposed as next work and conflict with what the app already is. Do not build them as greenfield:
 
-### Wave E — Framework rewrite (**last resort**)
-
-Only if residual CustomTkinter UX still fails after Waves A–B:
-
-- Evaluate Qt / Electron with a **spike**, not a full rewrite
-- Keep Worker + SQLite schema contracts stable
-- See `PLATFORM.md` for historical options
+- Command palette, drag-and-drop, a second pipeline engine, WAL toggle, Qt/Electron, more 100-line splits.
+- “Task dependencies” and “recurring tasks” as new products. Migrations `m013` / `m014` exist; confirm a screen is missing before adding one. Service Pipeline is already the nine-step job.
+- Wave D IDs are reused for unrelated items in `ROADMAP_MASTER.md`. Do not follow an ID across files.
 
 ---
 
@@ -156,27 +142,16 @@ Only if residual CustomTkinter UX still fails after Waves A–B:
 
 ## 5. Suggested execution timeline
 
-```mermaid
-flowchart LR
-    A[Wave A Ship polish] --> B[Wave B F1 features]
-    B --> C[Wave C Sync optional]
-    A --> D[Wave D Ops ongoing]
-    B --> E{UX still failing?}
-    E -->|Yes| F[Wave E framework spike]
-    E -->|No| G[Stay on CustomTkinter]
-```
-
-**Now:** Wave A **human** MANUAL_QA / UI_CHECKLIST, then **tag release** (see §6) when secrets ready.
-**Landed:** Wave B F1.1–F1.6 + Wave C C1–C3 in tree.
-**Next:** Wave D ops / human QA.
-**Avoid:** Re-doing landed security/UI/CI work; baking new columns into applied D1 `0001`.
+**Now:** human MANUAL_QA, then tag when secrets are ready.
+**Landed:** Wave B and Wave C. Stay on CustomTkinter.
+**Avoid:** The removed list above, and re-doing landed security/UI/CI work.
 
 ---
 
 ## 6. Versioning & release cadence
 
 1. Commit the dirty tree (P0–P3 + Waves A–C product work). Exclude `.qa_smoke_shots/`, local profile backups, and secrets.
-2. Bump `pyproject.toml` version if needed (single source of truth) — suggested next tag **`0.3.3`** for Wave C sync schema v2.
+2. Version is already `0.3.3`. Do not treat `0.3.3` as the next unreleased tag.
 3. `python scripts/release_check.py` → RELEASE OK (needs network for Worker smoke).
 4. Ensure GitHub secret `SKYADMIN_API_TOKEN` is set (release job is **fail-closed** if empty).
 5. Tag and push:

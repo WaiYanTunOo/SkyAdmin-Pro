@@ -1,10 +1,19 @@
 """P4 data sync — local apply + HTTP client."""
 
 import json
+import sys
 import uuid
 
 from skyadmin_pro.config import SETTING_DATA_SYNC_ENABLED, SETTING_SYNC_LAST_PULL, SETTING_SYNC_LAST_PUSH
 from skyadmin_pro.services import data_sync as sync
+
+
+def patch_sync(monkeypatch, name, value):
+    monkeypatch.setattr(sync, name, value)
+    for modname, mod in sys.modules.items():
+        if modname.startswith("skyadmin_pro.services.data_sync.chunk_") or modname.endswith("._common"):
+            if hasattr(mod, name):
+                monkeypatch.setattr(mod, name, value)
 
 
 def test_ensure_sync_ids_assigns_global_ids(db):
@@ -117,7 +126,7 @@ def test_log_sync_conflict_dedupes(db):
 
 
 def test_sync_data_disabled_by_default(db, monkeypatch):
-    monkeypatch.setattr(sync, "API_BASE_URL", "https://worker.test")
+    patch_sync(monkeypatch, "API_BASE_URL", "https://worker.test")
     ok, msg = sync.sync_data(db)
     assert ok
     assert "off" in msg.lower() or "disabled" in msg.lower()
@@ -166,7 +175,7 @@ def test_apply_remote_tombstone_marks_deleted(db):
 
 
 def test_sync_data_skips_without_api(db, monkeypatch):
-    monkeypatch.setattr(sync, "API_BASE_URL", "")
+    patch_sync(monkeypatch, "API_BASE_URL", "")
     ok, msg = sync.sync_data(db)
     assert ok
     assert "skipped" in msg.lower()
@@ -197,7 +206,7 @@ def test_register_sync_device_persists_credentials(monkeypatch, fake_app_dir):
             return False
 
     monkeypatch.setattr(urllib.request, "urlopen", lambda req, timeout=0: FakeResp())
-    monkeypatch.setattr(sync, "_license_code", lambda: "fake-license")
+    patch_sync(monkeypatch, "_license_code", lambda: "fake-license")
 
     ok, _msg = sync.register_sync_device()
     assert ok
@@ -318,7 +327,7 @@ def test_collect_and_apply_client_groups_via_global_id(db):
 
 def test_sync_pull_paginates_until_short_page(db, monkeypatch):
     """Large pulls request multiple Worker pages and report page count."""
-    monkeypatch.setattr(sync, "SYNC_PULL_PAGE_SIZE", 2)
+    patch_sync(monkeypatch, "SYNC_PULL_PAGE_SIZE", 2)
     pages = [
         {
             "ok": True,
@@ -384,11 +393,11 @@ def test_sync_pull_paginates_until_short_page(db, monkeypatch):
             }
         return False, "unexpected"
 
-    monkeypatch.setattr(sync, "is_data_sync_enabled", lambda _db: True)
-    monkeypatch.setattr(sync, "ensure_sync_credentials", lambda **_kw: ("MID", "tok"))
-    monkeypatch.setattr(sync, "get_machine_id", lambda: "MID")
-    monkeypatch.setattr(sync, "_sync_request", fake_request)
-    monkeypatch.setattr(sync, "API_BASE_URL", "https://example.test")
+    patch_sync(monkeypatch, "is_data_sync_enabled", lambda _db: True)
+    patch_sync(monkeypatch, "ensure_sync_credentials", lambda **_kw: ("MID", "tok"))
+    patch_sync(monkeypatch, "get_machine_id", lambda: "MID")
+    patch_sync(monkeypatch, "_sync_request", fake_request)
+    patch_sync(monkeypatch, "API_BASE_URL", "https://example.test")
 
     ok, msg = sync.sync_data(db, timeout=5)
     assert ok
@@ -408,7 +417,7 @@ def test_rotate_sync_credentials_after_license_change(monkeypatch, fake_app_dir)
     monkeypatch.setattr(paths_mod, "app_data_dir", lambda: fake_app_dir)
     monkeypatch.setattr(config, "API_BASE_URL", "https://worker.test")
     sync.save_sync_credentials("ABCD1234EFGH5678", "old-token")
-    monkeypatch.setattr(sync, "_license_code", lambda: "fake-license")
+    patch_sync(monkeypatch, "_license_code", lambda: "fake-license")
 
     class FakeResp:
         def __init__(self, token: str):
@@ -445,7 +454,7 @@ def test_rotate_sync_skips_when_no_credentials(monkeypatch, fake_app_dir):
         calls.append("register")
         return False, "should not run"
 
-    monkeypatch.setattr(sync, "register_sync_device", fail_register)
+    patch_sync(monkeypatch, "register_sync_device", fail_register)
     ok, msg = sync.rotate_sync_credentials_after_license_change()
     assert ok
     assert "No sync credentials" in msg
@@ -461,7 +470,7 @@ def test_sync_data_pull_push_updates_cursor(db, monkeypatch, fake_app_dir):
     monkeypatch.setattr(paths_mod, "app_data_dir", lambda: fake_app_dir)
     monkeypatch.setattr(config, "API_BASE_URL", "https://worker.test")
     sync.save_sync_credentials("TESTMACHINE00001", "tok")
-    monkeypatch.setattr(sync, "get_machine_id", lambda: "TESTMACHINE00001")
+    patch_sync(monkeypatch, "get_machine_id", lambda: "TESTMACHINE00001")
 
     gid = uuid.uuid4().hex
     with db.connection() as conn:
@@ -533,9 +542,9 @@ def test_sync_push_paginates_until_drained(db, monkeypatch, fake_app_dir):
 
     monkeypatch.setattr(paths_mod, "app_data_dir", lambda: fake_app_dir)
     monkeypatch.setattr(config, "API_BASE_URL", "https://worker.test")
-    monkeypatch.setattr(sync, "SYNC_PUSH_PAGE_SIZE", 2)
+    patch_sync(monkeypatch, "SYNC_PUSH_PAGE_SIZE", 2)
     sync.save_sync_credentials("TESTMACHINE00001", "tok")
-    monkeypatch.setattr(sync, "get_machine_id", lambda: "TESTMACHINE00001")
+    patch_sync(monkeypatch, "get_machine_id", lambda: "TESTMACHINE00001")
 
     with db.connection() as conn:
         for i in range(5):
@@ -596,7 +605,7 @@ def test_sync_data_push_upgrade_required_prompts_update(db, monkeypatch, fake_ap
     monkeypatch.setattr(paths_mod, "app_data_dir", lambda: fake_app_dir)
     monkeypatch.setattr(config, "API_BASE_URL", "https://worker.test")
     sync.save_sync_credentials("TESTMACHINE00001", "tok")
-    monkeypatch.setattr(sync, "get_machine_id", lambda: "TESTMACHINE00001")
+    patch_sync(monkeypatch, "get_machine_id", lambda: "TESTMACHINE00001")
 
     gid = uuid.uuid4().hex
     with db.connection() as conn:

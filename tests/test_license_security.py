@@ -158,7 +158,7 @@ def test_burn_blocks_redemption(mid, fake_app_dir, monkeypatch):
     assert ok
 
     monkeypatch.setattr(
-        "skyadmin_pro.services.license.verify._read_license_payload",
+        lic.check_activation_usable.__module__ + "._read_license_payload",
         lambda: {"mid": mid, "exp": payload["exp"], "n": "other-nonce-xyz"},
     )
     ok, msg, _ = lic.check_activation_usable(key)

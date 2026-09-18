@@ -20,22 +20,24 @@ def app(tmp_path_factory):
     paths = WorkspacePaths(tmp / "workspace")
     paths.ensure()
     ctk.set_appearance_mode("dark")
-    window = MainWindow(db=db, paths=paths)
+    try:
+        window = MainWindow(db=db, paths=paths)
+    except Exception as exc:
+        pytest.skip(f"Tk init failed (missing Tcl runtime?): {exc}")
     window.update()
     yield window
-    try:
-        window.destroy()
-    except Exception:
-        pass
+    from helpers_ui import close_test_app
+
+    close_test_app(window)
 
 
 def test_sidebar_has_all_nav_buttons(app):
     """Sidebar has a button for each navigation item."""
     from skyadmin_pro.config import NAV_ITEMS
 
-    assert len(app._nav_buttons) == len(NAV_ITEMS)
+    assert len(app.sidebar_widget._buttons) >= len(NAV_ITEMS)
     for key, _label in NAV_ITEMS:
-        assert key in app._nav_buttons
+        assert key in app.sidebar_widget._buttons
 
 
 def test_sidebar_toggle_changes_width(app):

@@ -277,6 +277,7 @@ def bootstrap() -> MainWindow:
     )
     from skyadmin_pro.database import Database
     from skyadmin_pro.paths import WorkspacePaths, default_workspace_root
+    from skyadmin_pro.ui.font_loader import load_fonts
     from skyadmin_pro.ui.main_window import MainWindow
 
     # Portable mode disabled — migrate any legacy portable data first.
@@ -324,6 +325,7 @@ def bootstrap() -> MainWindow:
         )
         raise SystemExit(1) from exc
     db.set_setting(SETTING_WORKSPACE_ROOT, str(paths.root))
+    load_fonts()
     window = MainWindow(db=db, paths=paths)
 
     def _license_killed(why: str) -> None:
@@ -571,8 +573,9 @@ def main() -> None:
 
         threading.Thread(target=_periodic_license_check, daemon=True).start()
 
-﻿        def _run_cron():
+        def _run_cron():
             import time as _time
+
             while True:
                 try:
                     app.db.generate_recurring_tasks()
@@ -581,7 +584,6 @@ def main() -> None:
                 _time.sleep(3600)  # Check every hour
 
         threading.Thread(target=_run_cron, daemon=True).start()
-
 
         try:
             app.mainloop()

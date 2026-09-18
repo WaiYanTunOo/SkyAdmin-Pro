@@ -5,7 +5,6 @@ from __future__ import annotations
 import pytest
 
 from skyadmin_pro.services.export import FORBIDDEN_EXPORT_COLUMNS
-from skyadmin_pro.services.pdf_render import sanitize_pdf_text
 from skyadmin_pro.services.reports import (
     REPORT_TABLE_ROW_CAP,
     _assert_no_forbidden,
@@ -94,9 +93,28 @@ def test_render_produces_readable_pdf(db, tmp_path):
     assert "Tax filing overview" in text
 
 
-def test_sanitize_pdf_text_replaces_non_latin():
-    assert sanitize_pdf_text("Acme Co") == "Acme Co"
-    assert "?" in sanitize_pdf_text("บริษัท ทดสอบ")
+def test_pdf_preserves_multilingual_text(db, tmp_path):
+    from skyadmin_pro.services.pdf_render.funcs_0 import render_report
+
+    # We construct a synthetic model to test font rendering
+    model = {
+        "title": "Acme บริษัท ကုမ္ပဏီ",
+        "generated_at": "2026-01-01",
+        "app_version": "0.0.1",
+        "summary": [("Thai", "บริษัท"), ("Myanmar", "ကုမ္ပဏီ")],
+    }
+    dest = tmp_path / "test.pdf"
+    render_report(model, dest)
+    assert dest.exists()
+
+    from pypdf import PdfReader
+
+    reader = PdfReader(dest)
+    text = reader.pages[0].extract_text()
+    assert "Acme" in text
+    assert "บริษัท" in text
+    assert "ကုမ္ပဏီ" in text
+    assert "?" not in text
 
 
 def test_build_report_never_includes_forbidden_keys(db):

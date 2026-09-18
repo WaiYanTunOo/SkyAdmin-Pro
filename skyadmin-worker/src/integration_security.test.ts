@@ -7,13 +7,16 @@ import type { Env } from "./db";
 import { hashSyncToken } from "./sync_auth";
 
 function mockEnv(overrides: Partial<Env> = {}): Env {
+  const result = {
+    first: async () => null,
+    run: async () => ({ success: true }),
+    all: async () => ({ results: [] }),
+  };
   return {
     DB: {
       prepare: () => ({
-        bind: () => ({
-          first: async () => null,
-          run: async () => ({ success: true }),
-        }),
+        ...result,
+        bind: () => result,
       }),
     } as unknown as D1Database,
     LICENSE_SECRET: "test-license-secret",
@@ -71,24 +74,20 @@ describe("Admin CSP headers", () => {
 
   it("login POST includes CSP header on 429", async () => {
     let attemptCount = 0;
-    const db = {
-      prepare: (sql: string) => ({
-        bind: (...args: unknown[]) => ({
-          first: async () => {
-            if (sql.includes("COUNT")) {
-              return { cnt: attemptCount };
-            }
-            return null;
-          },
-          run: async () => {
-            if (sql.includes("INSERT INTO login_attempts")) {
-              attemptCount++;
-            }
-            return { success: true };
-          },
-        }),
-      }),
-    } as unknown as D1Database;
+    const stmt = (sql: string) => {
+      const result = {
+        first: async () => {
+          if (sql.includes("COUNT")) return { cnt: attemptCount };
+          return null;
+        },
+        run: async () => {
+          if (sql.includes("INSERT INTO login_attempts")) attemptCount++;
+          return { success: true };
+        },
+      };
+      return { ...result, bind: (..._args: unknown[]) => result };
+    };
+    const db = { prepare: (sql: string) => stmt(sql) } as unknown as D1Database;
 
     const env = mockEnv({ DB: db });
     const ADMIN = "admin-test";
@@ -99,8 +98,7 @@ describe("Admin CSP headers", () => {
     const csrfToken = csrfMatch![1];
 
     for (let i = 0; i < 5; i++) {
-      attemptCount = i + 1;
-      await app.request(
+      const fail = await app.request(
         `http://localhost/${ADMIN}/login`,
         {
           method: "POST",
@@ -109,9 +107,10 @@ describe("Admin CSP headers", () => {
         },
         env,
       );
+      expect(fail.status).toBe(401);
     }
+    expect(attemptCount).toBe(5);
 
-    attemptCount = 5;
     const res = await app.request(
       `http://localhost/${ADMIN}/login`,
       {

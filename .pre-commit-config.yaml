@@ -17,4 +17,5 @@ repos:
       - id: check-toml
       - id: check-json
       - id: check-added-large-files
-        args: ["--maxkb=500"]
+        # Noto Sans Regular/Bold TTFs are ~600KB; required for Myanmar/Thai UI fonts.
+        args: ["--maxkb=700"]

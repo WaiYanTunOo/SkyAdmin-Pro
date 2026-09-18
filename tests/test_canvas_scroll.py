@@ -37,12 +37,17 @@ def test_canvas_scroll_frame_hosts_content():
             pass
 
 
-def test_filing_history_outside_form_scroll():
+def _pkg_text(*parts: str) -> str:
     from pathlib import Path
 
-    panel_src = (
-        Path(__file__).resolve().parents[1] / "skyadmin_pro" / "ui" / "views" / "company_details" / "panel.py"
-    ).read_text(encoding="utf-8")
+    root = Path(__file__).resolve().parents[1].joinpath(*parts)
+    if root.is_file():
+        return root.read_text(encoding="utf-8")
+    return "\n".join(path.read_text(encoding="utf-8") for path in sorted(root.rglob("*.py")))
+
+
+def test_filing_history_outside_form_scroll():
+    panel_src = _pkg_text("skyadmin_pro", "ui", "views", "company_details", "panel")
     # Form scrolls; history tree is parented on the tab (outside CanvasScrollFrame).
     assert "filing_scroll = CanvasScrollFrame(tab)" in panel_src
     assert "_build_filing_statuses_form(filing_scroll.content)" in panel_src
@@ -55,11 +60,7 @@ def test_filing_history_outside_form_scroll():
 
 
 def test_general_and_financial_trees_outside_canvas_scroll():
-    from pathlib import Path
-
-    panel_src = (
-        Path(__file__).resolve().parents[1] / "skyadmin_pro" / "ui" / "views" / "company_details" / "panel.py"
-    ).read_text(encoding="utf-8")
+    panel_src = _pkg_text("skyadmin_pro", "ui", "views", "company_details", "panel")
     # Company info, services, and documents all scroll inside the same CanvasScrollFrame.
     assert "general_scroll = CanvasScrollFrame(tab)" in panel_src
     assert "_build_company_info(general_scroll.content)" in panel_src
@@ -72,11 +73,7 @@ def test_general_and_financial_trees_outside_canvas_scroll():
 
 
 def test_accounting_and_vo_csh_setup_trees_outside_canvas_scroll():
-    from pathlib import Path
-
-    panel_src = (
-        Path(__file__).resolve().parents[1] / "skyadmin_pro" / "ui" / "views" / "company_details" / "panel.py"
-    ).read_text(encoding="utf-8")
+    panel_src = _pkg_text("skyadmin_pro", "ui", "views", "company_details", "panel")
     assert "setup_scroll = CanvasScrollFrame(tab)" not in panel_src
     assert "vo_setup_scroll = CanvasScrollFrame(tab)" not in panel_src
     assert "self._accounting_setup_frame = self._build_accounting_setup(tab)" in panel_src
@@ -84,11 +81,7 @@ def test_accounting_and_vo_csh_setup_trees_outside_canvas_scroll():
 
 
 def test_tax_ids_and_vo_tabs_use_canvas_scroll():
-    from pathlib import Path
-
-    panel_src = (
-        Path(__file__).resolve().parents[1] / "skyadmin_pro" / "ui" / "views" / "company_details" / "panel.py"
-    ).read_text(encoding="utf-8")
+    panel_src = _pkg_text("skyadmin_pro", "ui", "views", "company_details", "panel")
     # Tax IDs form scrolls; cred tree is parented on the tab (outside CanvasScrollFrame).
     assert "tax_ids_scroll = CanvasScrollFrame(tab)" in panel_src
     assert "_build_tax_ids(tax_ids_scroll.content, tab)" in panel_src
@@ -102,11 +95,7 @@ def test_tax_ids_and_vo_tabs_use_canvas_scroll():
 
 
 def test_settings_checklist_not_nested_scroll():
-    from pathlib import Path
-
-    text = (Path(__file__).resolve().parents[1] / "skyadmin_pro" / "ui" / "views" / "settings" / "view.py").read_text(
-        encoding="utf-8"
-    )
+    text = _pkg_text("skyadmin_pro", "ui", "views", "settings", "view")
     assert "self.checklist_scroll = themed_scrollable_frame(cl_body" not in text
     assert "self.checklist_scroll = ctk.CTkFrame(cl_body" in text
 

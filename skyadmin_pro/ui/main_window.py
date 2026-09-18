@@ -2,7 +2,6 @@
 
 from __future__ import annotations
 
-import tkinter as tk
 from collections.abc import Callable
 from typing import TYPE_CHECKING
 
@@ -15,23 +14,14 @@ from skyadmin_pro.config import (
     DEFAULT_WINDOW_GEOMETRY,
     MIN_WINDOW_SIZE,
     NAV_DASHBOARD,
-    NAV_ITEMS,
     NAV_OFFICE_HUB,
     SETTING_SIDEBAR_COLLAPSED,
     SETTING_WINDOW_GEOMETRY,
 )
-from skyadmin_pro.services.i18n import tr
 from skyadmin_pro.ui.dnd import dnd_base_class, init_dnd
+from skyadmin_pro.ui.sidebar import SidebarWidget
 from skyadmin_pro.ui.theme import (
-    SIDEBAR_ACTIVE_BG,
-    SIDEBAR_ACTIVE_TEXT,
-    SIDEBAR_BUTTON_HEIGHT,
     SIDEBAR_COLLAPSED_WIDTH,
-    SIDEBAR_HOVER_BG,
-    SIDEBAR_ICONS,
-    SIDEBAR_PADX,
-    SIDEBAR_PADY,
-    SIDEBAR_TEXT,
     SIDEBAR_WIDTH,
     STATUS_BAR_HEIGHT,
     TEXT_FAINT,
@@ -44,49 +34,6 @@ if TYPE_CHECKING:
     from skyadmin_pro.ui.views.base import BaseView
 
 
-class _SidebarTooltip:
-    """Lightweight tooltip for collapsed sidebar buttons."""
-
-    def __init__(self, widget: ctk.CTkButton, text: str) -> None:
-        self._widget = widget
-        self._text = text
-        self._top: tk.Toplevel | None = None
-        widget.bind("<Enter>", self._show, add="+")
-        widget.bind("<Leave>", self._hide, add="+")
-        widget.bind("<ButtonPress>", self._hide, add="+")
-
-    def _show(self, _event=None) -> None:
-        if self._top is not None:
-            return
-        try:
-            x = self._widget.winfo_rootx() + self._widget.winfo_width() + 8
-            y = self._widget.winfo_rooty() + self._widget.winfo_height() // 2 - 12
-            top = tk.Toplevel(self._widget)
-            top.wm_overrideredirect(True)
-            top.wm_geometry(f"+{x}+{y}")
-            label = tk.Label(
-                top,
-                text=self._text,
-                background="#1e1e1e" if ctk.get_appearance_mode() == "Dark" else "#f4f4f5",
-                foreground="#f4f4f5" if ctk.get_appearance_mode() == "Dark" else "#1e1e1e",
-                padx=8,
-                pady=4,
-                font=("Segoe UI", 11),
-            )
-            label.pack()
-            self._top = top
-        except Exception:
-            self._top = None
-
-    def _hide(self, _event=None) -> None:
-        if self._top is not None:
-            try:
-                self._top.destroy()
-            except Exception:
-                pass
-            self._top = None
-
-
 class MainWindow(dnd_base_class()):
     _VIEW_FACTORIES: dict[str, Callable[[MainWindow], BaseView]] = {}
 
@@ -97,6 +44,13 @@ class MainWindow(dnd_base_class()):
         from skyadmin_pro.ui.views.dashboard import DashboardView
         from skyadmin_pro.ui.views.database_tasks import DatabaseTasksView
         from skyadmin_pro.ui.views.document_hub import DocumentHubView
+        from skyadmin_pro.ui.views.menu_panels import (
+            CourierMenuView,
+            PipelineMenuView,
+            SuppliersMenuView,
+            TasksMenuView,
+            TaxStatusMenuView,
+        )
         from skyadmin_pro.ui.views.office_hub import OfficeHubView
         from skyadmin_pro.ui.views.settings import SettingsView
         from skyadmin_pro.ui.views.utilities import UtilitiesView
@@ -105,6 +59,11 @@ class MainWindow(dnd_base_class()):
             "dashboard": lambda app: DashboardView(app.content, app=app),
             "document_hub": lambda app: DocumentHubView(app.content, app=app),
             "database_tasks": lambda app: DatabaseTasksView(app.content, app=app),
+            "tasks": lambda app: TasksMenuView(app.content, app=app),
+            "courier": lambda app: CourierMenuView(app.content, app=app),
+            "tax_status": lambda app: TaxStatusMenuView(app.content, app=app),
+            "pipeline": lambda app: PipelineMenuView(app.content, app=app),
+            "suppliers": lambda app: SuppliersMenuView(app.content, app=app),
             "office_hub": lambda app: OfficeHubView(app.content, app=app),
             "utilities": lambda app: UtilitiesView(app.content, app=app),
             "settings": lambda app: SettingsView(app.content, app=app),
@@ -127,12 +86,9 @@ class MainWindow(dnd_base_class()):
         self.grid_columnconfigure(1, weight=1)
         self.grid_rowconfigure(0, weight=1)
 
-        self._nav_buttons: dict[str, ctk.CTkButton] = {}
-        self._nav_labels: dict[str, str] = dict(NAV_ITEMS)
         self._views: dict[str, ctk.CTkFrame] = {}
         self._active_key: str | None = None
         self._sidebar_collapsed = self.db.get_setting(SETTING_SIDEBAR_COLLAPSED) == "1"
-        self._sidebar_tooltips: dict[str, _SidebarTooltip] = {}
 
         self._build_sidebar()
         self._build_content()
@@ -260,19 +216,20 @@ class MainWindow(dnd_base_class()):
             pass  # non-critical — don't crash on backup scheduler failure
 
     def _build_sidebar(self) -> None:
-        # Plain logical width — CustomTkinter scales it for Windows DPI itself;
-        # do NOT multiply again here or the sidebar balloons at high scale.
+        """Build the outer sidebar frame and hand nav-button management to SidebarWidget."""
+        # Plain logical width — CustomTkinter scales it for Windows DPI itself.
         width = SIDEBAR_COLLAPSED_WIDTH if self._sidebar_collapsed else SIDEBAR_WIDTH
         self.sidebar = ctk.CTkFrame(self, width=width, corner_radius=0)
         self.sidebar.grid(row=0, column=0, rowspan=2, sticky="nsw")
         self.sidebar.grid_propagate(False)
         self.sidebar.grid_columnconfigure(0, weight=1)
-        self.sidebar.grid_rowconfigure(len(NAV_ITEMS) + 2, weight=1)
+        self.sidebar.grid_rowconfigure(2, weight=1)
+
+        from skyadmin_pro.ui.theme import SIDEBAR_HOVER_BG, SIDEBAR_PADX
 
         top_row = ctk.CTkFrame(self.sidebar, fg_color="transparent")
         top_row.grid(row=0, column=0, sticky="ew", padx=8, pady=(12, 4))
         top_row.grid_columnconfigure(0, weight=1)
-
         self.sidebar_toggle_btn = ctk.CTkButton(
             top_row,
             text="»" if self._sidebar_collapsed else "«",
@@ -287,7 +244,6 @@ class MainWindow(dnd_base_class()):
 
         self.brand = ctk.CTkFrame(self.sidebar, fg_color="transparent")
         self.brand.grid(row=1, column=0, sticky="ew", padx=SIDEBAR_PADX, pady=(0, 16))
-
         ctk.CTkLabel(
             self.brand,
             text=APP_NAME,
@@ -303,25 +259,16 @@ class MainWindow(dnd_base_class()):
         )
         self.tagline_label.pack(fill="x", pady=(2, 0))
 
-        for index, (key, label) in enumerate(NAV_ITEMS, start=2):
-            icon = SIDEBAR_ICONS.get(key, "•")
-            button_text = icon if self._sidebar_collapsed else f"{icon}  {tr(label)}"
+        self.nav_host = ctk.CTkScrollableFrame(self.sidebar, fg_color="transparent")
+        self.nav_host.grid(row=2, column=0, sticky="nsew")
+        self.nav_host.grid_columnconfigure(0, weight=1)
 
-            button = ctk.CTkButton(
-                self.sidebar,
-                text=button_text,
-                height=SIDEBAR_BUTTON_HEIGHT,
-                corner_radius=10,
-                anchor="center" if self._sidebar_collapsed else "w",
-                font=ctk.CTkFont(size=14),
-                fg_color="transparent",
-                text_color=SIDEBAR_TEXT,
-                hover_color=SIDEBAR_HOVER_BG,
-                command=lambda k=key: self.show_view(k),
-            )
-            padx = 8 if self._sidebar_collapsed else SIDEBAR_PADX
-            button.grid(row=index, column=0, sticky="ew", padx=padx, pady=SIDEBAR_PADY)
-            self._nav_buttons[key] = button
+        self.sidebar_widget = SidebarWidget(
+            self.nav_host,
+            self.db,
+            self.show_view,
+            collapsed=self._sidebar_collapsed,
+        )
 
         self.version_label = ctk.CTkLabel(
             self.sidebar,
@@ -329,7 +276,7 @@ class MainWindow(dnd_base_class()):
             font=ctk.CTkFont(size=11),
             text_color=TEXT_FAINT,
         )
-        self.version_label.grid(row=len(NAV_ITEMS) + 3, column=0, padx=SIDEBAR_PADX, pady=(0, 2), sticky="sw")
+        self.version_label.grid(row=3, column=0, padx=SIDEBAR_PADX, pady=(0, 2), sticky="sw")
         self.refresh_sidebar_status()
         self.copyright_label = ctk.CTkLabel(
             self.sidebar,
@@ -339,7 +286,7 @@ class MainWindow(dnd_base_class()):
             justify="left",
             anchor="w",
         )
-        self.copyright_label.grid(row=len(NAV_ITEMS) + 4, column=0, padx=SIDEBAR_PADX, pady=(0, 18), sticky="sw")
+        self.copyright_label.grid(row=4, column=0, padx=SIDEBAR_PADX, pady=(0, 18), sticky="sw")
         self._apply_sidebar_layout()
 
     def _toggle_sidebar(self) -> None:
@@ -352,7 +299,6 @@ class MainWindow(dnd_base_class()):
         width = SIDEBAR_COLLAPSED_WIDTH if collapsed else SIDEBAR_WIDTH
         self.sidebar.configure(width=width)
         self.sidebar_toggle_btn.configure(text="»" if collapsed else "«")
-
         if collapsed:
             self.brand.grid_remove()
             self.version_label.grid_remove()
@@ -361,21 +307,7 @@ class MainWindow(dnd_base_class()):
             self.brand.grid()
             self.version_label.grid()
             self.copyright_label.grid()
-
-        for key, button in self._nav_buttons.items():
-            icon = SIDEBAR_ICONS.get(key, "•")
-            if collapsed:
-                button.configure(text=icon, anchor="center")
-                button.grid_configure(padx=8)
-                if key not in self._sidebar_tooltips:
-                    label = self._nav_labels.get(key, key)
-                    self._sidebar_tooltips[key] = _SidebarTooltip(button, label)
-            else:
-                button.configure(text=f"{icon}  {tr(self._nav_labels[key])}", anchor="w")
-                button.grid_configure(padx=SIDEBAR_PADX)
-                tip = self._sidebar_tooltips.pop(key, None)
-                if tip is not None:
-                    tip._hide()
+        self.sidebar_widget.apply_layout(collapsed)
 
     def _get_window_scaling(self) -> float:
         """Pixels-per-point reported by Tk (diagnostic use only)."""
@@ -492,6 +424,7 @@ class MainWindow(dnd_base_class()):
         view.tkraise()
         self._active_key = key
         self._highlight_nav(key)
+        self.sidebar_widget.ensure_group_expanded(key)
 
         on_show = getattr(view, "on_show", None)
         if callable(on_show):
@@ -561,13 +494,7 @@ class MainWindow(dnd_base_class()):
         self.show_view(NAV_DATABASE_TASKS)
 
     def _highlight_nav(self, active_key: str) -> None:
-        for key, button in self._nav_buttons.items():
-            if key == active_key:
-                button.configure(
-                    fg_color=SIDEBAR_ACTIVE_BG, text_color=SIDEBAR_ACTIVE_TEXT, hover_color=SIDEBAR_ACTIVE_BG
-                )
-            else:
-                button.configure(fg_color="transparent", text_color=SIDEBAR_TEXT, hover_color=SIDEBAR_HOVER_BG)
+        self.sidebar_widget.highlight(active_key)
 
     def refresh_sidebar_status(self) -> None:
         """Update sidebar version line (license expiry when active)."""

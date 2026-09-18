@@ -1,17 +1,28 @@
 #!/usr/bin/env python3
 """Pre-release gate for SkyAdmin Pro — run before shipping.
 
+Default (no target) only verifies artifacts already on disk. Rebuild and
+deploy targets are opt-in so CI and packaging scripts cannot recurse.
+
 Usage:
   python scripts/release_check.py
+  python scripts/release_check.py check
   python scripts/release_check.py --skip-pytest
   python scripts/release_check.py --skip-installer   # portable-only builds
   python scripts/release_check.py --exe path/to/SkyAdminPro.exe
+  python scripts/release_check.py exe                # rebuild portable exe
+  python scripts/release_check.py installer          # rebuild exe + installer
+  python scripts/release_check.py worker             # Worker typecheck + Vitest
+  python scripts/release_check.py admin              # worker tests + wrangler deploy
+  python scripts/release_check.py all                # worker, installer, admin, then check
+  python scripts/release_check.py all --skip-deploy  # rebuild without pushing Worker
 """
 
 from __future__ import annotations
 
 import argparse
 import json
+import os
 import subprocess
 import sys
 import urllib.error
@@ -347,6 +358,85 @@ def write_hash_manifest() -> None:
         _ok(f"Wrote {out.name} ({len(hashes)} entries)")
 
 
+def _phase(title: str) -> None:
+    print(f"\n=== {title} ===")
+
+
+def _npm() -> str:
+    return "npm.cmd" if sys.platform == "win32" else "npm"
+
+
+def _run(cmd: list[str], *, cwd: Path | None = None, env: dict[str, str] | None = None) -> list[str]:
+    shown = " ".join(cmd)
+    print(f"\n$ {shown}")
+    try:
+        result = subprocess.run(cmd, cwd=cwd or ROOT, env=env, check=False)
+    except OSError as exc:
+        return [_fail(f"Could not run {shown}: {exc}")]
+    if result.returncode != 0:
+        return [_fail(f"Command failed (exit {result.returncode}): {shown}")]
+    _ok(shown)
+    return []
+
+
+def _require_windows(action: str) -> list[str]:
+    if sys.platform == "win32":
+        return []
+    return [_fail(f"{action} requires Windows (packaging\\build.ps1)")]
+
+
+def _build_env(*, require_signature: bool) -> dict[str, str] | None:
+    if not require_signature:
+        return None
+    env = os.environ.copy()
+    env["SKYADMIN_SIGN_REQUIRED"] = "1"
+    return env
+
+
+def rebuild_portable_exe(*, require_signature: bool = False) -> list[str]:
+    """Rebuild dist/SkyAdminPro.exe via packaging/build.ps1 (includes its own tests)."""
+    errors = _require_windows("Portable exe rebuild")
+    if errors:
+        return errors
+    _phase("Rebuild portable exe")
+    script = ROOT / "packaging" / "build.ps1"
+    return _run(
+        ["powershell", "-NoProfile", "-ExecutionPolicy", "Bypass", "-File", str(script)],
+        env=_build_env(require_signature=require_signature),
+    )
+
+
+def rebuild_installer(*, require_signature: bool = False) -> list[str]:
+    """Rebuild portable exe and the Inno Setup installer (ship path)."""
+    errors = _require_windows("Installer rebuild")
+    if errors:
+        return errors
+    _phase("Rebuild installer")
+    script = ROOT / "packaging" / "build-installer.ps1"
+    return _run(
+        ["powershell", "-NoProfile", "-ExecutionPolicy", "Bypass", "-File", str(script)],
+        env=_build_env(require_signature=require_signature),
+    )
+
+
+def run_worker_tests() -> list[str]:
+    """Typecheck and Vitest the Worker (admin panel source included)."""
+    _phase("Worker typecheck + Vitest")
+    worker = ROOT / "skyadmin-worker"
+    npm = _npm()
+    errors = _run([npm, "run", "typecheck"], cwd=worker)
+    if errors:
+        return errors
+    return _run([npm, "test"], cwd=worker)
+
+
+def deploy_admin_panel() -> list[str]:
+    """Deploy the Worker, which serves the hidden admin panel."""
+    _phase("Deploy Worker admin panel")
+    print("  This runs wrangler deploy (production). Ctrl+C to abort.")
+    return _run([_npm(), "run", "deploy"], cwd=ROOT / "skyadmin-worker")
+
+
 def run_pytest() -> list[str]:
     errors: list[str] = []
     cmd = [
@@ -372,8 +462,37 @@ def run_pytest() -> list[str]:
     return errors
 
 
+def _finish(failures: list[str]) -> int:
+    print()
+    if failures:
+        print(f"RELEASE BLOCKED — {len(failures)} check(s) failed.")
+        return 1
+    print("RELEASE OK — all automated checks passed.")
+    print("Next: run docs/MANUAL_QA.md on a clean PC before shipping.")
+    return 0
+
+
 def main() -> int:
-    parser = argparse.ArgumentParser(description="SkyAdmin Pro pre-release checks")
+    parser = argparse.ArgumentParser(description="SkyAdmin Pro pre-release checks and rebuilds")
+    parser.add_argument(
+        "target",
+        nargs="?",
+        default="check",
+        choices=("check", "exe", "installer", "worker", "admin", "all"),
+        help=(
+            "check (default): verify artifacts. "
+            "exe: rebuild portable exe. "
+            "installer: rebuild exe + Inno Setup installer. "
+            "worker: typecheck + Vitest. "
+            "admin: worker tests + wrangler deploy. "
+            "all: worker tests, installer rebuild, admin deploy, then check."
+        ),
+    )
+    parser.add_argument(
+        "--skip-deploy",
+        action="store_true",
+        help="With admin/all: run Worker tests but do not wrangler deploy",
+    )
     parser.add_argument("--exe", type=Path, default=DEFAULT_EXE, help="Path to SkyAdminPro.exe")
     parser.add_argument(
         "--installer",
@@ -397,9 +516,33 @@ def main() -> int:
     )
     args = parser.parse_args()
 
-    print("SkyAdmin Pro — release checks\n")
+    print(f"SkyAdmin Pro — release {args.target}\n")
 
     failures: list[str] = []
+    if args.target in ("worker", "admin", "all"):
+        failures.extend(run_worker_tests())
+        if failures:
+            return _finish(failures)
+    if args.target == "exe":
+        failures.extend(rebuild_portable_exe(require_signature=args.require_signature))
+        return _finish(failures)
+    if args.target in ("installer", "all"):
+        failures.extend(rebuild_installer(require_signature=args.require_signature))
+        if failures:
+            return _finish(failures)
+        if args.target == "installer":
+            # build-installer.ps1 already ran the ship-path gate.
+            return _finish(failures)
+    if args.target in ("admin", "all") and not args.skip_deploy:
+        failures.extend(deploy_admin_panel())
+        if failures:
+            return _finish(failures)
+    if args.target == "admin":
+        return _finish(failures)
+    if args.target == "worker":
+        return _finish(failures)
+
+    _phase("Release checks")
     failures.extend(check_version_alignment())
     failures.extend(check_embedded_public_key())
     failures.extend(check_db_cipher())
@@ -438,6 +581,10 @@ def main() -> int:
     else:
         print("\n  WARN  API_BASE_URL not configured — skipping Worker checks")
 
+    if args.target == "all" and not args.skip_pytest:
+        print("\n  (pytest already ran inside the installer rebuild — skipping a second full suite)")
+        args.skip_pytest = True
+
     if not args.skip_pytest:
         failures.extend(run_pytest())
 
@@ -447,13 +594,7 @@ def main() -> int:
     except Exception as exc:
         print(f"  WARN  Could not write SHA256SUMS: {exc}")
 
-    print()
-    if failures:
-        print(f"RELEASE BLOCKED — {len(failures)} check(s) failed.")
-        return 1
-    print("RELEASE OK — all automated checks passed.")
-    print("Next: run docs/MANUAL_QA.md on a clean PC before shipping.")
-    return 0
+    return _finish(failures)
 
 
 if __name__ == "__main__":

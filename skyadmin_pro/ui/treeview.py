@@ -65,6 +65,8 @@ def configure_shared_tree_style(
             style.theme_use("clam")
         except ttk.TclError:
             pass
+    from skyadmin_pro.ui.font_loader import FONT_FAMILY
+
     style.configure(
         "Sky.Treeview",
         background=background,
@@ -72,11 +74,7 @@ def configure_shared_tree_style(
         fieldbackground=field_bg,
         rowheight=scaled_row,
         borderwidth=0,
-        font=("Segoe UI", scaled_font)
-        if sys.platform == "win32"
-        else ("SF Pro Text", scaled_font)
-        if sys.platform == "darwin"
-        else ("Ubuntu", scaled_font),
+        font=(FONT_FAMILY, scaled_font),
     )
     style.configure(
         "Sky.Treeview.Heading",
@@ -424,11 +422,29 @@ class ThemedTreeview(ctk.CTkFrame):
         empty_message: str | None = None,
     ) -> None:
         row_list = list(rows)
-        if not row_list and empty_message:
+        is_empty = not row_list
+        if is_empty and empty_message:
             width = max(1, len(self._column_ids))
             row_list = [(empty_message,) + ("",) * (width - 1)]
             iids = ["__empty__"]
             tags = [("empty",)]
+
+        # Dynamically manage grid weight so empty lists stay one line.
+        try:
+            self.tree.configure(height=1 if is_empty else min(20, max(1, len(row_list))))
+            info = self.grid_info()
+            if info and "row" in info:
+                row_idx = info["row"]
+                self.master.grid_rowconfigure(row_idx, weight=0 if is_empty else 1)
+
+            # If our master is a card inside a page that has weight=1, try to toggle that too
+            card_info = self.master.grid_info()
+            if card_info and "row" in card_info:
+                card_row = card_info["row"]
+                self.master.master.grid_rowconfigure(card_row, weight=0 if is_empty else 1)
+        except Exception:
+            pass
+
         if iids is not None and len(row_list) >= _VIRTUAL_THRESHOLD:
             self._set_rows_virtual(row_list, iids=iids, tags=tags)
             return

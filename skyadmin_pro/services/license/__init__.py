@@ -1,6 +1,6 @@
 """Hardware-bound license verification package."""
 
-from skyadmin_pro.services.license.machine import get_machine_id
+from skyadmin_pro.services.license.machine import live_machine_id as get_machine_id
 from skyadmin_pro.services.license.online import (
     _get_last_sync_time,
     get_daily_sync_status,

@@ -62,3 +62,21 @@ desktop.ini
 # One-time scripts and samples
 scripts/split_*.py
 control_sample*.txt
+
+# Wave D7 mass-split / shred tooling (frozen until tree is committed)
+auto_shredder.py
+do_split.py
+refactor_*.py
+fix_syntax*.py
+patch_verify.py
+shred_test.py
+split_script.py
+check_dag.py
+test_mod1.py
+test_mod2.py
+scratch/
+tmp_*.txt
+# Root layout / local test DBs (*.db already covered; shm/wal companions)
+*-shm
+*-wal
+test_layout.db*

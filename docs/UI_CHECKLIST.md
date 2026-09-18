@@ -12,7 +12,7 @@ Manual QA after UI/theme changes. Test at **1100×700** (minimum) and **1920×10
 
 - [ ] Dashboard — stat cards wrap; onboard client field expands
 - [ ] Document Hub — all tabs open
-- [ ] Database & Tasks — Tasks, Courier, Clients, Suppliers forms
+- [ ] Database & Tasks — Tasks, Courier Tracker, Clients & Expiry, Monthly Tax Status, Company Details, Renewals, Service Pipeline, Suppliers & AP (each tab fills the page; Clients and Renewals are not a half-height scroll)
 - [ ] Office Hub — Contacts, Vault, Notebook search/fields
 - [ ] Utilities — translator subtitle wraps
 - [ ] Settings — license/sync row; activation fields

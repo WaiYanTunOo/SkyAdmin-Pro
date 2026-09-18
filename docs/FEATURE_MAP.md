@@ -67,7 +67,7 @@ Clients, tasks, suppliers, pipeline, renewal, courier — active-tab-only refres
 | Renewal | `skyadmin_pro/ui/views/database_tasks/renewal_panel.py` |
 | Courier | `skyadmin_pro/ui/views/database_tasks/courier_panel.py` |
 | Suppliers sub | `skyadmin_pro/ui/views/database_tasks/suppliers/panel.py`, `directory_tab.py`, `payments_tab.py`, `services_tab.py` |
-| DB mixins | `skyadmin_pro/db/clients.py`, `tasks.py`, `suppliers.py`, `courier.py`, `pipeline.py`, `financial.py` |
+| DB mixins | `skyadmin_pro/db/clients/`, `tasks/`, `suppliers/`, `courier.py`, `pipeline/`, `financial/` |
 | Tests | `tests/test_database_tasks_refresh.py`, `test_clients_bulk_ops.py`, `test_supplier_ap.py` |
 | Doc | `docs/ROADMAP.md` Phase 9.1 |
 
@@ -188,14 +188,14 @@ Ed25519 signed keys, machine binding, activation claim, ban/revoke.
 | Online | `skyadmin_pro/services/license/online.py` |
 | Verify | `skyadmin_pro/services/license/verify.py` |
 | Constants | `skyadmin_pro/services/license/_constants.py` |
-| Authoring | `skyadmin_pro/services/license_authoring.py` |
-| Crypto | `skyadmin_pro/services/license_crypto.py` |
+| Authoring | `skyadmin_pro/services/license_authoring/` |
+| Crypto | `skyadmin_pro/services/license_crypto/` |
 | Public | `skyadmin_pro/services/license_public.py` |
 | Activation UI | `skyadmin_pro/ui/activation.py` |
 | Setup rollout | `skyadmin_pro/ui/setup_rollout.py` |
 | Integrity | `main.py:390–435` CRC32 tamper detection |
 | Periodic | `main.py:520–572` 5-min re-verify |
-| Worker routes | `skyadmin-worker/src/routes/generate.ts`, `claim.ts`, `control.ts`, `revoke.ts`, `ban.ts`, `used.ts`, `records.ts` |
+| Worker routes | `skyadmin-worker/src/routes/generate.ts`, `claim/`, `control.ts`, `revoke.ts`, `ban.ts`, `used.ts`, `records/` |
 | Worker core | `skyadmin-worker/src/verification.ts`, `signing.ts`, `license_policy.ts`, `license_status.ts`, `packages.ts` |
 | Tests | `tests/test_license_ed25519.py`, `test_license_security.py`, `test_activation_dialog.py` |
 | Worker tests | `auth.test.ts`, `signing.test.ts`, `verification.test.ts`, `license_policy.test.ts`, `license_status.test.ts`, `packages.test.ts`, `claim.test.ts`, `control.test.ts`, `handlers.test.ts`, `admin.test.ts`, `lifecycle.test.ts` |
@@ -211,17 +211,17 @@ Pull/push, LWW conflicts, encrypted credentials, HLC ordering.
 
 | Layer | File |
 |-------|------|
-| Desktop sync | `skyadmin_pro/services/data_sync.py` |
-| Sync schema | `skyadmin_pro/services/sync_schema.py` |
-| Sync HLC | `skyadmin_pro/services/sync_hlc.py` |
-| Worker sync | `skyadmin-worker/src/routes/sync.ts` |
+| Desktop sync | `skyadmin_pro/services/data_sync/` |
+| Sync schema | `skyadmin_pro/services/sync_schema/` |
+| Sync HLC | `skyadmin_pro/services/sync_hlc/` |
+| Worker sync | `skyadmin-worker/src/routes/sync/` |
 | Worker auth | `skyadmin-worker/src/sync_auth.ts` |
 | Worker eligibility | `skyadmin-worker/src/sync_eligibility.ts` |
-| Worker push | `skyadmin-worker/src/sync_push.ts` |
+| Worker push | `skyadmin-worker/src/sync_push/` |
 | Worker devices | `skyadmin-worker/src/sync_devices_schema.ts` |
 | Worker schema | `skyadmin-worker/src/sync_schema.ts` |
 | Tests | `tests/test_data_sync.py`, `test_sync_hlc.py`, `sync.test.ts`, `sync_push.test.ts` |
-| **Fix** | `data_sync.py:86–91` plaintext fallback; `sync.ts:132` LIMIT interpolation |
+| **Fix** | `data_sync/` plaintext fallback; `routes/sync/` LIMIT interpolation |
 
 → [Full detail](features/data_sync.md)
 
@@ -233,10 +233,10 @@ Excel export with column redaction, PDF reports, data import.
 
 | Layer | File |
 |-------|------|
-| Export | `skyadmin_pro/services/export.py` |
-| Reports | `skyadmin_pro/services/reports.py` |
-| PDF render | `skyadmin_pro/services/pdf_render.py` |
-| Import | `skyadmin_pro/services/importer.py` |
+| Export | `skyadmin_pro/services/export/` |
+| Reports | `skyadmin_pro/services/reports/` |
+| PDF render | `skyadmin_pro/services/pdf_render/` |
+| Import | `skyadmin_pro/services/importer/` |
 | Tests | `tests/test_export_security.py`, `test_export_supplier.py`, `test_export_visible.py`, `test_reports.py`, `test_importer.py` |
 
 → [Full detail](features/export_reports.md)
@@ -249,8 +249,8 @@ Manual + auto-backup, encrypted, retention policy.
 
 | Layer | File |
 |-------|------|
-| Auto backup | `skyadmin_pro/services/auto_backup.py` |
-| DB pool | `skyadmin_pro/db/core.py` |
+| Auto backup | `skyadmin_pro/services/auto_backup/` |
+| DB pool | `skyadmin_pro/db/core/` |
 | Settings UI | `skyadmin_pro/ui/views/settings/backup_mixin.py` |
 | Tests | `tests/test_auto_backup.py`, `test_restore_backup_pool.py` |
 
@@ -266,8 +266,8 @@ Fernet encryption, HMAC integrity, CORS, CSP, rate limiting, timing-safe.
 |-------|------|
 | Secret fields | `skyadmin_pro/services/secret_fields.py` |
 | Vault | `skyadmin_pro/services/vault.py` |
-| Crypto | `skyadmin_pro/services/crypto.py` |
-| DB cipher | `skyadmin_pro/db/cipher.py` |
+| Crypto | `skyadmin_pro/services/crypto/` |
+| DB cipher | `skyadmin_pro/db/cipher/` |
 | Protect core | `skyadmin_pro/services/_protect_core.py` |
 | Secret config | `skyadmin_pro/services/_secret.py` |
 | Tests | `tests/test_secret_fields.py`, `test_vault.py`, `test_crypto.py`, `test_db_cipher.py` |
@@ -306,13 +306,13 @@ SQLite facade, 11 mixins, 12 migrations, FTS5, 40+ indexes.
 | Layer | File |
 |-------|------|
 | Facade | `skyadmin_pro/db/database.py` |
-| Core | `skyadmin_pro/db/core.py` |
-| Schema | `skyadmin_pro/db/schema.py` |
+| Core | `skyadmin_pro/db/core/` |
+| Schema | `skyadmin_pro/db/schema/` |
 | SQL helpers | `skyadmin_pro/db/sql_helpers.py` |
-| Mixins | `skyadmin_pro/db/clients.py`, `tasks.py`, `suppliers.py`, `courier.py`, `pipeline.py`, `financial.py`, `office.py`, `pricing.py`, `settings.py`, `tax.py` |
+| Mixins | `skyadmin_pro/db/clients/`, `tasks/`, `suppliers/`, `courier.py`, `pipeline/`, `financial/`, `office/`, `pricing/`, `settings/`, `tax/` |
 | Migrations | `skyadmin_pro/db/migrations/runner.py`, `m001`–`m012` |
 | Tests | `tests/test_db_migrations.py`, `test_db_mixins.py`, `test_db_pricing.py`, `test_db_settings.py`, `test_db_cipher.py` |
-| **Fix** | `core.py:40–72` no pooling; `core.py:209–395` monolithic `_migrate()` |
+| **Fix** | `db/core/` no pooling (deferred); monolithic `_migrate()` removed — versioned migrations |
 
 → [Full detail](features/database_layer.md)
 
@@ -347,14 +347,14 @@ Hono routes, D1 database, auth, CORS, CSP, admin panel.
 |-------|------|
 | Router | `skyadmin-worker/src/index.ts` |
 | DB/Env | `skyadmin-worker/src/db.ts`, `env_secrets.ts` |
-| Routes | `routes/generate.ts`, `claim.ts`, `revoke.ts`, `ban.ts`, `used.ts`, `records.ts`, `control.ts`, `sync.ts`, `pricing.ts`, `update.ts`, `purge.ts`, `viewer.ts`, `signing_info.ts` |
-| Admin | `routes/admin/handler.ts`, `session.ts`, `pages.ts`, `index.ts` |
+| Routes | `routes/generate.ts`, `claim/`, `revoke.ts`, `ban.ts`, `used.ts`, `records/`, `control.ts`, `sync/`, `pricing.ts`, `update.ts`, `purge/`, `viewer/`, `signing_info.ts` |
+| Admin | `routes/admin/handler/`, `session/`, `pages.ts`, `index.ts` |
 | Core | `auth.ts`, `cors.ts`, `csp.ts`, `signing.ts`, `verification.ts`, `rate_limit.ts`, `timing_safe.ts`, `admin_security.ts` |
-| Sync core | `sync_auth.ts`, `sync_eligibility.ts`, `sync_push.ts`, `sync_devices_schema.ts`, `sync_schema.ts` |
+| Sync core | `sync_auth.ts`, `sync_eligibility.ts`, `sync_push/`, `sync_devices_schema.ts`, `sync_schema.ts` |
 | License core | `license_policy.ts`, `license_status.ts`, `packages.ts` |
 | D1 migrations | `migrations/0001_initial.sql`–`0007_drop_redundant_sync_devices_index.sql` |
 | Tests | 17 test files in `src/` |
-| **Fix** | `records.ts:24–29` full table scan; `generate.ts:25–27` dynamic import |
+| **Fix** | `routes/records/` full table scan; `generate.ts:25–27` dynamic import |
 
 → [Full detail](features/worker_api.md)
 
@@ -426,23 +426,4 @@ Global search, audit log, export filter, utilities view.
 
 ## Pending Fixes (by priority)
 
-| # | Pri | Issue | File:Line | Phase |
-|---|-----|-------|-----------|-------|
-| 1 | P0 | SQLite connection per query | `db/core.py:40–72` | P1.1 |
-| 2 | P0 | Dashboard snapshot 12+ connections | `db/tax.py:158–179` | P1.2 |
-| 3 | P0 | 100+ bare `except Exception: pass` | `widgets.py`, `display.py`, `canvas_scroll.py`, `treeview.py`, `main_window.py` | Q1 |
-| 4 | P1 | Config monolith 301 lines | `config/__init__.py` | Q2 |
-| 5 | P1 | 7-mixin MRO | `company_details/panel.py:57–74` | U8 |
-| 6 | P1 | `_fetch_all`/`_fetch_one` wrong mixin | `db/clients.py:329–337` | Q4 |
-| 7 | P1 | Thread-unsafe `_current_lang` | `services/i18n.py:59` | S19 |
-| 8 | P1 | Worker `recordsHandler` full scan | `routes/records.ts:24–29` | P8 |
-| 9 | P1 | HMAC seal truncated 64 bits | `services/_protect_core.py:78` | S18 |
-| 10 | P2 | Private `_views` across modules | `panel.py:930–932`, `dashboard.py:1092` | U10 |
-| 11 | P2 | String-based tab dispatch | `database_tasks/view.py`, `company_details/panel.py` | U11 |
-| 12 | P2 | `__import__()` inline | `treeview.py:130–133`, 9+ files | Q5–Q6 |
-| 13 | P2 | Dynamic `import()` hot path | `routes/generate.ts:25–27` | P9 |
-| 14 | P2 | License before DB insert | `routes/generate.ts:53–55` | P11 |
-| 15 | P2 | Duplicate license constants | `license/_constants.py` vs `machine.py` | Q3 |
-| 16 | P3 | Plaintext credential fallback | `services/data_sync.py:86–91` | S15 |
-| 17 | P3 | `pyarmor.bug.log` in repo | root | S21 |
-| 18 | P3 | Dead `@ts-ignore` | `worker/src/auth.ts:16–19` | S23 |
+**Retired.** Connection-per-query, the dashboard connection storm, DatePicker `-topmost`, and the file:line table that followed this heading are landed or the paths moved. Do not reopen them. Leftovers that are still engineering, not office workflow, live in [ROADMAP_MASTER.md](ROADMAP_MASTER.md).

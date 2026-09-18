@@ -27,10 +27,9 @@ def app(tmp_path_factory):
     window = MainWindow(db=db, paths=paths)
     window.update()
     yield window
-    try:
-        window.destroy()
-    except Exception:
-        pass
+    from helpers_ui import close_test_app
+
+    close_test_app(window)
 
 
 def test_snap_fingerprint_stable_for_same_snapshot(db):

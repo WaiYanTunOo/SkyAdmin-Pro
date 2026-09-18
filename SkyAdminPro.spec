@@ -12,7 +12,7 @@ import tkinterdnd2
 
 _spec_dir = os.path.dirname(os.path.abspath(SPEC))
 _pyproject = os.path.join(_spec_dir, "pyproject.toml")
-datas = []
+datas = [("skyadmin_pro/assets/fonts", "skyadmin_pro/assets/fonts")]
 if os.path.isfile(_pyproject):
     datas.append((_pyproject, "."))
 for _plat in ("win-x64", "win-arm64", "win32"):
