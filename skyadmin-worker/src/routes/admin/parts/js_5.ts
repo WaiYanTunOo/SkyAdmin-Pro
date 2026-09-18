@@ -64,7 +64,7 @@ function renew(mid,days){
 function purgeOldLicenses(){
   var days=parseInt(document.getElementById('purgeDays').value,10);
   if(!days||days<1||days>365){showStatus('Enter days 1–365');return;}
-  styledConfirm('Archive and delete stale license records older than '+days+' days?\n\nActive licenses are kept.').then(function(ok){if(!ok)return;
+  styledConfirm('Archive and delete stale license records older than '+days+' days?\\n\\nActive licenses are kept.').then(function(ok){if(!ok)return;
   api('POST','/api/purge-licenses',{older_than_days:days}).then(function(d){
     document.getElementById('purgeResult').textContent='Cleared '+d.purged+' record(s), archived '+d.archived+'.';
     showStatus('Purged '+d.purged);
