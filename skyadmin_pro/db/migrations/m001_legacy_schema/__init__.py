@@ -9,6 +9,6 @@ and manual BEGIN/COMMIT instead of db.connection().
 
 from __future__ import annotations
 
-from ._const_0 import VERSION, annotations  # noqa: F403
-from ._const_1 import NAME, annotations  # noqa: F403
+from ._const_0 import VERSION
+from ._const_1 import NAME
 from .funcs import upgrade

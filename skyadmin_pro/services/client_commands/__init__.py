@@ -11,7 +11,7 @@ from __future__ import annotations
 
 from skyadmin_pro.services.undo_manager import Command
 
-from ._const_0 import EDIT_FIELDS, annotations  # noqa: F403
+from ._const_0 import EDIT_FIELDS
 from .addClientCommandMixin0 import AddClientCommandMixin0
 from .archiveClientsCommandMixin0 import ArchiveClientsCommandMixin0
 from .assignGroupCommandMixin0 import AssignGroupCommandMixin0

@@ -2,8 +2,8 @@
 
 from __future__ import annotations
 
-from ._const_0 import _RESERVED, annotations, re  # noqa: F403
-from ._const_1 import _WIN_DEVICES, annotations, re  # noqa: F403
+from ._const_0 import _RESERVED
+from ._const_1 import _WIN_DEVICES
 from .funcs_0 import (  # noqa: F403
     _RESERVED,
     _WIN_DEVICES,
@@ -12,10 +12,8 @@ from .funcs_0 import (  # noqa: F403
     Path,
     _ensure_workspace_subfolders,
     _index_client_folders,
-    annotations,
     client_folder_key,
     create_client_workspace,
-    re,
     resolve_client_folder,
     sanitize_folder_name,
 )
@@ -23,7 +21,6 @@ from .funcs_1 import (  # noqa: F403
     DEFAULT_PORTAL_URL,
     Path,
     _index_client_folders,
-    annotations,
     client_folder_key,
     copy_to_clipboard,
     create_client_workspace,
@@ -34,4 +31,7 @@ from .funcs_1 import (  # noqa: F403
     urlparse,
     webbrowser,
 )
-from .funcs_2 import annotations, date, format_eod_report  # noqa: F403
+from .funcs_2 import (  # noqa: F403
+    date,
+    format_eod_report,
+)

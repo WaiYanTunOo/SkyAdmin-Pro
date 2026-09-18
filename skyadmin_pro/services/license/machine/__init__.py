@@ -2,15 +2,12 @@
 
 from __future__ import annotations
 
-from ._const_0 import _check_debugger, annotations  # noqa: F403
+from ._const_0 import _check_debugger
 from .funcs_0 import (  # noqa: F403
     _check_debugger,
     _legacy_machine_id,
     _windows_stable_id,
-    annotations,
-    hashlib,
     platform,
-    sys,
     uuid,
 )
 from .funcs_1 import (  # noqa: F403
@@ -19,7 +16,6 @@ from .funcs_1 import (  # noqa: F403
     Path,
     _legacy_machine_id,
     _windows_stable_id,
-    annotations,
     get_machine_id,
 )
 

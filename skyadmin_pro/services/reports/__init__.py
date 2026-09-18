@@ -7,9 +7,14 @@ rejects forbidden columns (mirrors export.FORBIDDEN_EXPORT_COLUMNS).
 
 from __future__ import annotations
 
-from ._const_0 import REPORT_TABLE_ROW_CAP, annotations  # noqa: F403
-from ._const_1 import _TAX_OVERVIEW_KEYS, annotations  # noqa: F403
-from .funcs_0 import FORBIDDEN_EXPORT_COLUMNS, _assert_no_forbidden, _cell, _project, annotations  # noqa: F403
+from ._const_0 import REPORT_TABLE_ROW_CAP
+from ._const_1 import _TAX_OVERVIEW_KEYS
+from .funcs_0 import (  # noqa: F403
+    FORBIDDEN_EXPORT_COLUMNS,
+    _assert_no_forbidden,
+    _cell,
+    _project,
+)
 from .funcs_1 import (  # noqa: F403
     _TAX_OVERVIEW_KEYS,
     REPORT_TABLE_ROW_CAP,
@@ -18,9 +23,7 @@ from .funcs_1 import (  # noqa: F403
     _assert_no_forbidden,
     _cell,
     _project,
-    annotations,
     build_status_report,
-    datetime,
     default_report_name,
     write_status_report_pdf,
 )

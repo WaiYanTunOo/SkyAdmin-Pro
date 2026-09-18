@@ -4,11 +4,11 @@ from __future__ import annotations
 
 from dataclasses import dataclass
 
-from ._const_0 import annotations, logger, logging  # noqa: F403
-from ._const_1 import _UNSAFE_CHARS, annotations, re  # noqa: F403
-from ._const_2 import _WHITESPACE, annotations, re  # noqa: F403
-from ._const_3 import _AMOUNT_KEEP, annotations, re  # noqa: F403
-from ._const_4 import _BLOCKED_OPEN_SUFFIXES, annotations  # noqa: F403
+from ._const_0 import logger
+from ._const_1 import _UNSAFE_CHARS
+from ._const_2 import _WHITESPACE
+from ._const_3 import _AMOUNT_KEEP
+from ._const_4 import _BLOCKED_OPEN_SUFFIXES
 from .archiveResultMixin0 import ArchiveResultMixin0
 
 
@@ -22,11 +22,9 @@ from .funcs_0 import (  # noqa: F403
     _UNSAFE_CHARS,
     _WHITESPACE,
     DOC_TYPE_PASSPORT_VISA,
-    annotations,
     build_smart_filename,
     compact_date,
     date,
-    datetime,
     filename_type_token,
     format_thousands,
     parse_flexible_date,
@@ -35,7 +33,6 @@ from .funcs_0 import (  # noqa: F403
 )
 from .funcs_1 import (  # noqa: F403
     Path,
-    annotations,
     backup_file,
     build_invoice_filename,
     copy_file,
@@ -53,13 +50,10 @@ from .funcs_2 import (  # noqa: F403
     PDF_SUFFIX,
     Path,
     _as_rgb,
-    annotations,
     date,
     images_to_pdf,
     open_in_file_manager,
-    os,
     subprocess,
-    sys,
     unique_path,
 )
 from .funcs_3 import (  # noqa: F403
@@ -68,7 +62,6 @@ from .funcs_3 import (  # noqa: F403
     Path,
     WorkspacePaths,
     _move_all,
-    annotations,
     archive_ready_and_clean_staging,
     date,
     is_image,
@@ -77,4 +70,8 @@ from .funcs_3 import (  # noqa: F403
     shutil,
     unique_path,
 )
-from .funcs_4 import PDF_SUFFIX, Path, annotations, is_pdf  # noqa: F403
+from .funcs_4 import (  # noqa: F403
+    PDF_SUFFIX,
+    Path,
+    is_pdf,
+)

@@ -4,9 +4,9 @@ from __future__ import annotations
 
 from skyadmin_pro.ui.views.base import BaseView
 
-from ._const_0 import _SECTION_TITLES, annotations  # noqa: F403
-from ._const_1 import _EDITOR_FONT_CANDIDATES, annotations  # noqa: F403
-from ._const_2 import _EDITOR_FONT_FAMILY, annotations  # noqa: F403
+from ._const_0 import _SECTION_TITLES
+from ._const_1 import _EDITOR_FONT_CANDIDATES
+from ._const_2 import _EDITOR_FONT_FAMILY
 from .funcs import _editor_font
 from .utilitiesViewMixin0 import UtilitiesViewMixin0
 from .utilitiesViewMixin1 import UtilitiesViewMixin1

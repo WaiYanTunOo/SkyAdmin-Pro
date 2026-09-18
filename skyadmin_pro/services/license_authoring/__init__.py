@@ -2,7 +2,7 @@
 
 from __future__ import annotations
 
-from ._const_0 import _DEV_PRIVATE_KEY_B64, annotations  # noqa: F403
+from ._const_0 import _DEV_PRIVATE_KEY_B64
 from .funcs_0 import (  # noqa: F403
     _DEV_PRIVATE_KEY_B64,
     LICENSE_SIGNATURE_ALGORITHM,
@@ -12,16 +12,11 @@ from .funcs_0 import (  # noqa: F403
     _dev_private_key,
     _ed25519_sig_b64url,
     _hmac,
-    annotations,
-    base64,
-    datetime,
     generate_ed25519_license,
     generate_ed25519_passcode,
     get_machine_id,
-    hashlib,
     hmac,
     hmac_hex,
-    json,
     license_payload_string,
     passcode_payload_string,
     serialization,
@@ -34,15 +29,11 @@ from .funcs_1 import (  # noqa: F403
     Ed25519PrivateKey,
     _dev_private_key,
     _ed25519_sig_b64url,
-    annotations,
-    base64,
     build_control_envelope_v2,
-    datetime,
     generate_license,
     generate_passcode,
     get_machine_id,
     hmac_hex,
-    json,
     string,
     timedelta,
     timezone,
