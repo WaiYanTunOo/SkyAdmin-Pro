@@ -13,14 +13,8 @@ from skyadmin_pro.ui.widgets import themed_entry
 class ContactsTabMixinMixin2:
     def _ContactsTabMixin_build_contacts_tab_p1(self, parent):
         parent.grid_columnconfigure(0, weight=1)
-        parent.grid_rowconfigure(0, weight=1)
-        scroll = CanvasScrollFrame(parent)
-        scroll.grid(row=0, column=0, sticky="nsew")
-        scroll.content.grid_columnconfigure(0, weight=1)
-        self._contacts_scroll = scroll
-        body = scroll.content
-
-        toolbar = ctk.CTkFrame(body, fg_color="transparent")
+        parent.grid_rowconfigure(1, weight=1)
+        toolbar = ctk.CTkFrame(parent, fg_color="transparent")
         toolbar.grid(row=0, column=0, sticky="ew", pady=(8, 8))
         toolbar.grid_columnconfigure(1, weight=1)
         self.contact_search_var = ctk.StringVar()
@@ -35,7 +29,7 @@ class ContactsTabMixinMixin2:
         ctk.CTkButton(toolbar, text="New contact", width=110, command=self._new_contact).grid(row=0, column=3)
 
         self.contacts_tree = ThemedTreeview(
-            body,
+            parent,
             columns=(
                 ("name", "Name", 180),
                 ("organization", "Company", 160),
@@ -44,12 +38,16 @@ class ContactsTabMixinMixin2:
                 ("category", "Category", 100),
             ),
             on_select=self._on_contact_select,
-            showheight=8,
+            showheight=10,
         )
         self.contacts_tree.grid(row=1, column=0, sticky="nsew")
 
-        form = ctk.CTkFrame(body, corner_radius=12)
-        form.grid(row=2, column=0, sticky="ew", pady=(10, 8))
+        scroll = CanvasScrollFrame(parent)
+        scroll.grid(row=2, column=0, sticky="ew")
+        scroll.content.grid_columnconfigure(0, weight=1)
+        self._contacts_scroll = scroll
+        form = ctk.CTkFrame(scroll.content, corner_radius=12)
+        form.grid(row=0, column=0, sticky="ew", pady=(10, 8))
         form.grid_columnconfigure(1, weight=1, uniform="contact_field")
         form.grid_columnconfigure(3, weight=1, uniform="contact_field")
         ctk.CTkLabel(form, text="Contact details", font=ctk.CTkFont(size=CARD_TITLE_SIZE, weight="bold")).grid(

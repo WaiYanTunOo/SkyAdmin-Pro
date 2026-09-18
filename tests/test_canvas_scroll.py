@@ -46,17 +46,38 @@ def _pkg_text(*parts: str) -> str:
     return "\n".join(path.read_text(encoding="utf-8") for path in sorted(root.rglob("*.py")))
 
 
-def test_filing_history_outside_form_scroll():
+def test_filing_form_only_no_history_panel():
     panel_src = _pkg_text("skyadmin_pro", "ui", "views", "company_details", "panel")
-    # Form scrolls; history tree is parented on the tab (outside CanvasScrollFrame).
+    filing_src = _pkg_text("skyadmin_pro", "ui", "views", "company_details", "filing_tab")
     assert "filing_scroll = CanvasScrollFrame(tab)" in panel_src
     assert "_build_filing_statuses_form(filing_scroll.content)" in panel_src
-    assert "_build_filing_history(tab)" in panel_src
-    assert "_build_filing_history(filing_scroll.content)" not in panel_src
-    assert "filing_scroll.grid(row=0" in panel_src
-    assert "_filing_history_frame.grid(row=1" in panel_src
-    assert "tab.grid_rowconfigure(1, weight=1)" in panel_src
-    assert 'sticky="nsew", pady=(8, 0)' in panel_src or 'sticky="nsew"' in panel_src
+    assert "_build_filing_history" not in panel_src
+    assert "_filing_history_frame" not in panel_src
+    assert "Recent Changes" not in filing_src
+    assert 'text="Edit"' not in filing_src
+    assert "filing_labels" not in filing_src
+    assert "log_tax_change" in filing_src
+
+
+def test_office_hub_trees_outside_form_scroll():
+    vault = _pkg_text("skyadmin_pro", "ui", "views", "office_hub", "vault_tab")
+    contacts = _pkg_text("skyadmin_pro", "ui", "views", "office_hub", "contacts_tab")
+    notebook = _pkg_text("skyadmin_pro", "ui", "views", "office_hub", "notebook_tab")
+    for src, tree_name in (
+        (vault, "client_cred_tree"),
+        (vault, "office_cred_tree"),
+        (contacts, "contacts_tree"),
+        (notebook, "notes_tree"),
+    ):
+        assert (
+            f"self.{tree_name} = ThemedTreeview(\n            parent," in src
+            or f"self.{tree_name} = ThemedTreeview(\n            parent" in src
+        )
+        assert "CanvasScrollFrame(parent)" in src
+    # Trees must not be parented on scroll.content
+    assert "ThemedTreeview(\n            body," not in vault
+    assert "ThemedTreeview(\n            body," not in contacts
+    assert "ThemedTreeview(\n            body," not in notebook
 
 
 def test_general_and_financial_trees_outside_canvas_scroll():

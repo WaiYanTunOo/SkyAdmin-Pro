@@ -45,24 +45,21 @@ class CompanyDetailsPanelMixin3:
             # Form scrolls; client cred tree stays fixed outside the canvas.
             tab.grid_columnconfigure(0, weight=1)
             tab.grid_rowconfigure(0, weight=1)
-            tab.grid_rowconfigure(2, weight=0)
+            tab.grid_rowconfigure(2, weight=1)
             tax_ids_scroll = CanvasScrollFrame(tab)
             tax_ids_scroll.grid(row=0, column=0, sticky="nsew")
             tax_ids_scroll.content.grid_columnconfigure(0, weight=1)
             self._tax_ids_frame = self._build_tax_ids(tax_ids_scroll.content, tab)
             self._tax_ids_frame.grid(row=0, column=0, sticky="ew")
         elif name == SUBTAB_FILING:
-            # Form scrolls; history tree stays outside canvas with expandable band.
+            # Dropdowns + summary only; change log still written to DB (no history panel).
             tab.grid_columnconfigure(0, weight=1)
-            tab.grid_rowconfigure(0, weight=2)
-            tab.grid_rowconfigure(1, weight=1)
+            tab.grid_rowconfigure(0, weight=1)
             filing_scroll = CanvasScrollFrame(tab)
             filing_scroll.grid(row=0, column=0, sticky="nsew")
             filing_scroll.content.grid_columnconfigure(0, weight=1)
             self._filing_form_frame = self._build_filing_statuses_form(filing_scroll.content)
             self._filing_form_frame.grid(row=0, column=0, sticky="ew")
-            self._filing_history_frame = self._build_filing_history(tab)
-            self._filing_history_frame.grid(row=1, column=0, sticky="nsew", pady=(8, 0))
         elif name == SUBTAB_VO_CSH_SETUP:
             # Tree-first tab: no CanvasScrollFrame so the tree owns the wheel.
             tab.grid_columnconfigure(0, weight=1)

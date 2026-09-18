@@ -64,7 +64,6 @@ class FilingTabMixinMixin2:
             ).grid(row=1, column=idx, sticky="w", padx=(0 if idx == 0 else 16, 0))
             self.filing_summary_labels[key] = lbl
 
-        # Filing status rows
+        # Filing status rows (OptionMenus only — no glyph/Edit/✖)
         self.filing_vars: dict[str, ctk.StringVar] = {}
-        self.filing_labels: dict[str, ctk.CTkLabel] = {}
         return frame

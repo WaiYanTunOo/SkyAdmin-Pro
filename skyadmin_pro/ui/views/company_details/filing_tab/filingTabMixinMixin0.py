@@ -3,14 +3,12 @@ from __future__ import annotations
 import customtkinter as ctk
 
 from skyadmin_pro.config import TAX_FILING_FIELDS, TAX_FILING_LABELS
-from skyadmin_pro.ui.theme import CARD_RADIUS
-from skyadmin_pro.ui.treeview import ThemedTreeview
 from skyadmin_pro.ui.views.company_details.constants import SUBTAB_FILING
 
 
 class FilingTabMixinMixin0:
     def _build_filing_statuses(self, master) -> ctk.CTkFrame:
-        """Build filing form (status rows). History tree is a separate section."""
+        """Build filing form (status rows). History UI removed — logs still persist."""
         self._build_filing_statuses_form(master)
         return master
 
@@ -18,31 +16,6 @@ class FilingTabMixinMixin0:
         frame = self._FilingTabMixin_build_filing_statuses_fo_p1(master)
         self._FilingTabMixin_build_filing_statuses_fo_p2(frame)
         self._FilingTabMixin_build_filing_statuses_fo_p3(frame)
-
-        return frame
-
-    def _build_filing_history(self, master) -> ctk.CTkFrame:
-        frame = ctk.CTkFrame(master, corner_radius=CARD_RADIUS)
-        frame.grid_columnconfigure(0, weight=1)
-        frame.grid_rowconfigure(1, weight=1)
-        ctk.CTkLabel(
-            frame,
-            text="Recent Changes",
-            font=ctk.CTkFont(size=13, weight="bold"),
-        ).grid(row=0, column=0, sticky="w", padx=16, pady=(14, 4))
-        self.filing_history_tree = ThemedTreeview(
-            frame,
-            columns=(
-                ("date", "Date", 140),
-                ("field", "Filing", 130),
-                ("old", "From", 120),
-                ("new", "To", 120),
-            ),
-            showheight=8,
-            table_id="company.filing_history",
-            db=self.app.db,
-        )
-        self.filing_history_tree.grid(row=1, column=0, sticky="nsew", padx=12, pady=(0, 14))
         return frame
 
     def _persist_filing_field(self, field: str, *, refresh: bool = True) -> None:

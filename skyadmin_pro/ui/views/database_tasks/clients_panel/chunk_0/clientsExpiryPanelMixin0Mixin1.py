@@ -36,7 +36,7 @@ class ClientsExpiryPanelMixin0Mixin1:
                 ("email", "Email", 220),
                 ("status", "Status", 90),
             ),
-            showheight=4,
+            showheight=10,
             table_id="clients",
             db=self.app.db,
             selectmode="extended",

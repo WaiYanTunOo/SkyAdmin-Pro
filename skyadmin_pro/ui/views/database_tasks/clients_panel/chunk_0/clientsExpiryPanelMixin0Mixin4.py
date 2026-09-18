@@ -81,7 +81,7 @@ class ClientsExpiryPanelMixin0Mixin4:
                 ("expiry", "Expiry", 100),
                 ("status", "Status", 140),
             ),
-            showheight=3,
+            showheight=8,
             table_id="clients.expiry",
             db=self.app.db,
         )

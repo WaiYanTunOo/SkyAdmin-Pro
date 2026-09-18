@@ -9,8 +9,9 @@ from skyadmin_pro.ui.widgets import themed_entry
 
 class TaxIdsTabMixinMixin3:
     def _TaxIdsTabMixin_build_tax_ids_p2(self, cred_card):
-        cred_card.grid(row=2, column=0, sticky="ew", padx=16, pady=(4, 8))
+        cred_card.grid(row=2, column=0, sticky="nsew", padx=16, pady=(4, 8))
         cred_card.grid_columnconfigure(0, weight=1)
+        cred_card.grid_rowconfigure(2, weight=1)
         self._client_cred_rows: dict[str, dict] = {}
         self._selected_client_cred_id: int | None = None
 
@@ -34,11 +35,11 @@ class TaxIdsTabMixinMixin3:
                 ("portal", "Portal URL", 200),
             ),
             on_select=self._on_client_cred_select,
-            showheight=4,
+            showheight=8,
             table_id="company.tax_ids",
             db=self.app.db,
         )
-        self.client_cred_tree.grid(row=2, column=0, sticky="ew", padx=16, pady=(0, 8))
+        self.client_cred_tree.grid(row=2, column=0, sticky="nsew", padx=16, pady=(0, 8))
 
         cred_detail = ctk.CTkFrame(cred_card, fg_color="transparent")
         cred_detail.grid(row=3, column=0, sticky="ew", padx=16, pady=(0, 8))
