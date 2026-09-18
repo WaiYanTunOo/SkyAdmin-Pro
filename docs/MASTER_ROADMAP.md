@@ -79,7 +79,7 @@ Comprehensive analysis of **features, security, code quality, optimization, load
 | S10 | `rate_limits` table grows unbounded (no cleanup) | `routes/claim.ts`, `routes/sync.ts` | Add periodic cleanup on every Nth request |
 | S11 | `login_attempts` cleanup only on failed login | `admin/session.ts:65-67` | Clean on successful login too |
 | S12 | SQL interpolation of LIMIT in sync pull | `routes/sync.ts:132` | Cast to integer before interpolation; use parameterized query |
-| S13 | `subprocess.Popen` with user-influenced paths | `services/file_ops.py:196-198` | Validate path is a file (not executable/script) before opening |
+| S13 | `subprocess.Popen` with user-influenced paths | `services/file_ops.py:196-198` | ✅ Fixed |
 
 ### 2.3 Medium-Severity Issues
 
@@ -89,8 +89,8 @@ Comprehensive analysis of **features, security, code quality, optimization, load
 | S15 | Sync credentials legacy plaintext fallback | `services/data_sync.py:86-91` | Log warning on plaintext read; re-encrypt immediately |
 | S16 | No HTTPS certificate pinning | `data_sync.py:242`, `license/verify.py:514` | Acceptable for desktop app; document as accepted risk |
 | S17 | CORS allows `*` for null origin (file://) | `worker/src/cors.ts:11-12` | Document as intentional for desktop app |
-| S18 | HMAC integrity seal truncated to 64 bits | `services/_protect_core.py:78` | Use full HMAC; performance impact negligible |
-| S19 | Thread-unsafe `_current_lang` global | `services/i18n.py:59` | Add threading lock |
+| S18 | HMAC integrity seal truncated to 64 bits | `services/_protect_core.py:78` | ✅ Fixed |
+| S19 | Thread-unsafe `_current_lang` global | `services/i18n.py:59` | ✅ Fixed |
 
 ### 2.4 Low-Severity / Hardening
 
@@ -122,7 +122,7 @@ Comprehensive analysis of **features, security, code quality, optimization, load
 | # | Issue | File:Line | Impact | Fix |
 |---|-------|-----------|--------|-----|
 | P8 | **`recordsHandler` full table scan of revocations + used_nonces** | `routes/records.ts:24-29` | **HIGH** — O(N) per request as lists grow | Use JOINs or EXISTS subqueries |
-| P9 | **Dynamic `import()` in hot path** | `routes/generate.ts:25-27` | **MEDIUM** — overhead per generate request | Move to static top-level imports |
+| P9 | **Dynamic `import()` in hot path** | `routes/generate.ts:25-27` | ✅ Fixed |
 | P10 | **`summarizeMachines` hardcoded LIMIT 2000** | `routes/records.ts:54-55` | **LOW** — incomplete summaries for large installs | Make configurable or paginate |
 | P11 | **No D1 query error handling in most routes** | `routes/generate.ts:53-55` | **MEDIUM** — license returned before DB insert confirmed | Move return after DB write succeeds |
 
@@ -211,7 +211,7 @@ Comprehensive analysis of **features, security, code quality, optimization, load
 | Q1 | **100+ bare `except Exception: pass`** across UI code | `widgets.py`, `display.py`, `canvas_scroll.py`, `treeview.py`, `main_window.py` | Narrow to specific exceptions; add logging for crypto/file operations |
 | Q2 | **`config.py` is ~1000 lines** of constants | `config.py` | Split into domain-specific modules (licensing, pricing, UI, service types) |
 | Q3 | **Duplicate constants** across license modules | `license/_constants.py:5-12` vs `license/machine.py:41-48` | Import from `_constants.py` instead of redefining |
-| Q4 | **`_fetch_all`/`_fetch_one` in wrong mixin** | `db/clients.py:329-337` | Move to `CoreMixin` |
+| Q4 | **`_fetch_all`/`_fetch_one` in wrong mixin** | `db/clients.py:329-337` | ✅ Fixed |
 
 ### 5.2 Medium Issues
 

@@ -21,13 +21,18 @@ export async function loadPricingPackages(db: D1Database): Promise<PricingPackag
 export async function pricingGetHandler(c: Context<{ Bindings: Env }>) {
   const limited = await checkRateLimit(c, "pricing-read", { windowSeconds: 60, max: 60 });
   if (limited) return limited;
-  const packages = await loadPricingPackages(c.env.DB);
-  const overYear = (await getMeta(c.env.DB, PRICING_OVER_YEAR_KEY)) || DEFAULT_OVER_YEAR_TEXT;
-  return c.json({
-    ok: true,
-    packages,
-    over_year_text: overYear,
-  });
+  try {
+    const packages = await loadPricingPackages(c.env.DB);
+    const overYear = (await getMeta(c.env.DB, PRICING_OVER_YEAR_KEY)) || DEFAULT_OVER_YEAR_TEXT;
+    return c.json({
+      ok: true,
+      packages,
+      over_year_text: overYear,
+    });
+  } catch (err) {
+    console.error("D1 error loading pricing:", err);
+    return c.json({ ok: false, error: "Failed to load pricing packages." }, 500);
+  }
 }
 
 export async function pricingPostHandler(c: Context<{ Bindings: Env }>) {
@@ -61,9 +66,14 @@ export async function pricingPostHandler(c: Context<{ Bindings: Env }>) {
   if (typeof body.over_year_text === "string" && body.over_year_text.length > 2000) {
     return c.json({ ok: false, error: "over_year_text too long (max 2000 chars)" }, 400);
   }
-  await setMeta(c.env.DB, PRICING_META_KEY, serializePricingPackages(packages));
-  if (typeof body.over_year_text === "string" && body.over_year_text.trim()) {
-    await setMeta(c.env.DB, PRICING_OVER_YEAR_KEY, body.over_year_text.trim());
+  try {
+    await setMeta(c.env.DB, PRICING_META_KEY, serializePricingPackages(packages));
+    if (typeof body.over_year_text === "string" && body.over_year_text.trim()) {
+      await setMeta(c.env.DB, PRICING_OVER_YEAR_KEY, body.over_year_text.trim());
+    }
+  } catch (err) {
+    console.error("D1 error updating pricing:", err);
+    return c.json({ ok: false, error: "Failed to save pricing packages." }, 500);
   }
   return c.json({ ok: true, packages });
 }

@@ -108,7 +108,12 @@ function createMockDb() {
     store,
     db: {
       prepare,
-      batch: async () => [{ success: true }],
+      batch: async (stmts: Array<{ run?: () => Promise<unknown> }> = []) => {
+        for (const s of stmts) {
+          if (s && typeof s.run === "function") await s.run();
+        }
+        return [{ success: true }];
+      },
     } as unknown as D1Database,
     getLastNonce: () => lastInsertedNonce,
   };

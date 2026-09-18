@@ -42,6 +42,12 @@ export function mockEnv(overrides: Partial<Env> = {}): Env {
         };
         return chain;
       },
+      batch: async (stmts: Array<{ run?: () => Promise<unknown> }> = []) => {
+        for (const s of stmts) {
+          if (s && typeof s.run === "function") await s.run();
+        }
+        return [{ success: true }];
+      },
     } as unknown as D1Database,
     LICENSE_SECRET: "test",
     API_TOKEN: TOKEN,

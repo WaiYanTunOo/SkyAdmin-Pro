@@ -24,5 +24,14 @@ _BLOCKED_OPEN_SUFFIXES = frozenset(
         ".cpl",
         ".gadget",
         ".inf",
+        ".url",
+        ".sh",
+        ".bash",
+        ".py",
+        ".pyw",
+        ".scf",
+        ".iso",
+        ".vhd",
+        ".vhdx",
     }
 )

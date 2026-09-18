@@ -22,10 +22,15 @@ export async function usedHandler(c: Context<{ Bindings: Env }>) {
     return c.json({ ok: false, error: "nonce too long (max 256)" }, 400);
   }
 
-  await c.env.DB.prepare(
-    "INSERT OR IGNORE INTO used_nonces (nonce) VALUES (?)"
-  ).bind(nonce.trim()).run();
-  await bumpVersion(c.env.DB);
+  try {
+    await c.env.DB.prepare(
+      "INSERT OR IGNORE INTO used_nonces (nonce) VALUES (?)"
+    ).bind(nonce.trim()).run();
+    await bumpVersion(c.env.DB);
+  } catch (err) {
+    console.error("D1 error during mark used:", err);
+    return c.json({ ok: false, error: "Failed to mark nonce as used." }, 500);
+  }
 
   return c.json({ ok: true, message: `Nonce ${nonce.trim()} marked used.` });
 }
@@ -48,10 +53,15 @@ export async function revokePcHandler(c: Context<{ Bindings: Env }>) {
     return c.json({ ok: false, error: "passcode too long (max 256)" }, 400);
   }
 
-  await c.env.DB.prepare(
-    "INSERT OR IGNORE INTO revoked_passcodes (passcode) VALUES (?)"
-  ).bind(passcode.trim()).run();
-  await bumpVersion(c.env.DB);
+  try {
+    await c.env.DB.prepare(
+      "INSERT OR IGNORE INTO revoked_passcodes (passcode) VALUES (?)"
+    ).bind(passcode.trim()).run();
+    await bumpVersion(c.env.DB);
+  } catch (err) {
+    console.error("D1 error during revoke-pc:", err);
+    return c.json({ ok: false, error: "Failed to revoke passcode." }, 500);
+  }
 
   return c.json({ ok: true, message: `Passcode revoked.` });
 }

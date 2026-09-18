@@ -10,7 +10,14 @@ export async function claimHandler(c: Context<{ Bindings: Env }>) {
   const parsed = await readClaim(c);
   if (!parsed.ok) return parsed.response;
 
-  const { row, alreadyUsed } = await loadClaimRows(c.env.DB, parsed.claim.nonce);
+  let lookup: { row: any; alreadyUsed: boolean };
+  try {
+    lookup = await loadClaimRows(c.env.DB, parsed.claim.nonce);
+  } catch (err) {
+    console.error("D1 error during claim lookup:", err);
+    return c.json({ ok: false, error: "Database error during activation lookup." }, 500);
+  }
+  const { row, alreadyUsed } = lookup;
   if (alreadyUsed) {
     // Idempotent replay: confirm the burn but never re-disclose the license
     // key — anyone presenting the (used) code must not learn the secret.

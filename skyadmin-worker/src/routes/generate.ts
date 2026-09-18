@@ -57,18 +57,29 @@ export async function generateHandler(c: Context<{ Bindings: Env }>) {
   const { key, iat, nonce, exp } = await generateLicenseKey(mid, days, ed25519Key);
   const passcode = await generatePasscode(mid, days, ed25519Key);
 
-  // Store in D1 — return error before returning the license if DB write fails
+  // Store in D1 + bump control version atomically — return error before returning the license if DB write fails
   try {
-    await c.env.DB.prepare(
-      "INSERT INTO issued_licenses (machine_id, license_key, passcode, package_days, expires_at, nonce, issued_at, price_thb) VALUES (?, ?, ?, ?, ?, ?, ?, ?)"
-    ).bind(mid, key, passcode, days, exp, nonce, iat, price).run();
+    if (typeof c.env.DB.batch === "function") {
+      await c.env.DB.batch([
+        c.env.DB.prepare(
+          "INSERT INTO issued_licenses (machine_id, license_key, passcode, package_days, expires_at, nonce, issued_at, price_thb) VALUES (?, ?, ?, ?, ?, ?, ?, ?)"
+        ).bind(mid, key, passcode, days, exp, nonce, iat, price),
+        c.env.DB.prepare(
+          `INSERT INTO control_meta (key, value) VALUES ('control_version', '1')
+           ON CONFLICT(key) DO UPDATE SET value = CAST(CAST(value AS INTEGER) + 1 AS TEXT)`
+        ),
+      ]);
+    } else {
+      await c.env.DB.prepare(
+        "INSERT INTO issued_licenses (machine_id, license_key, passcode, package_days, expires_at, nonce, issued_at, price_thb) VALUES (?, ?, ?, ?, ?, ?, ?, ?)"
+      ).bind(mid, key, passcode, days, exp, nonce, iat, price).run();
+      await bumpVersion(c.env.DB);
+    }
   } catch (err) {
-    console.error("D1 insert failed during generate:", err);
+    console.error("D1 transaction failed during generate:", err);
     return c.json({ ok: false, error: "Failed to record license." }, 500);
   }
 
-  // Bump control version
-  await bumpVersion(c.env.DB);
 
   return c.json({
     ok: true,

@@ -46,8 +46,9 @@ class CanvasScrollFrame(ctk.CTkFrame):
         if self._pending_scroll_update is not None:
             try:
                 self.after_cancel(self._pending_scroll_update)
-            except Exception:  # defensive: Tk teardown/callback
+            except (tk.TclError, ValueError):  # defensive: Tk teardown/callback
                 pass
+            self._pending_scroll_update = None
         self._pending_scroll_update = self.after(100, self._update_scrollregion)
 
     def _update_scrollregion(self) -> None:
@@ -55,11 +56,11 @@ class CanvasScrollFrame(ctk.CTkFrame):
         try:
             if not self.winfo_exists():
                 return
-        except Exception:
+        except tk.TclError:
             return
         try:
             self._canvas.configure(scrollregion=self._canvas.bbox("all"))
-        except Exception:  # defensive: Tk teardown/callback
+        except tk.TclError:  # defensive: Tk teardown/callback
             pass
         # Re-bind wheel for newly added children
         self._bind_wheel_recursive(self.content)
@@ -77,10 +78,10 @@ class CanvasScrollFrame(ctk.CTkFrame):
             for dead in [p for p in self._wheel_bound]:
                 try:
                     self.nametowidget(dead)
-                except Exception:
+                except (KeyError, tk.TclError):
                     self._wheel_bound.discard(dead)
             stack = list(widget.winfo_children())
-        except Exception:
+        except tk.TclError:
             return
         while stack:
             child = stack.pop()
@@ -93,7 +94,7 @@ class CanvasScrollFrame(ctk.CTkFrame):
 
                 try:
                     cls = child.winfo_class()
-                except Exception:
+                except tk.TclError:
                     continue
                 if cls == "Treeview":
                     continue  # Treeview handles its own scrolling
@@ -103,7 +104,7 @@ class CanvasScrollFrame(ctk.CTkFrame):
                     child.bind("<Button-5>", self._on_mousewheel_linux, add="+")
                     self._wheel_bound.add(path)
                 stack.extend(child.winfo_children())
-            except Exception:  # defensive: Tk teardown/callback
+            except tk.TclError:  # defensive: Tk teardown/callback
                 pass
 
     def _bind_mousewheel(self, widget) -> None:
@@ -118,15 +119,15 @@ class CanvasScrollFrame(ctk.CTkFrame):
             while w is not None:
                 try:
                     cls = w.winfo_class()
-                except Exception:
+                except tk.TclError:
                     break
                 if cls == "Treeview":
                     return  # let tree handle
                 try:
                     w = w.master
-                except Exception:
+                except (AttributeError, tk.TclError):
                     break
-        except Exception:  # defensive: Tk teardown/callback
+        except (AttributeError, tk.TclError):  # defensive: Tk teardown/callback
             pass
         if event.delta:
             # Windows: event.delta is multiples of 120 (120 = one notch).
@@ -145,15 +146,15 @@ class CanvasScrollFrame(ctk.CTkFrame):
             while w is not None:
                 try:
                     cls = w.winfo_class()
-                except Exception:
+                except tk.TclError:
                     break
                 if cls == "Treeview":
                     return
                 try:
                     w = w.master
-                except Exception:
+                except (AttributeError, tk.TclError):
                     break
-        except Exception:  # defensive: Tk teardown/callback
+        except (AttributeError, tk.TclError):  # defensive: Tk teardown/callback
             pass
         if event.num == 4:
             self._canvas.yview_scroll(-1, "units")
@@ -165,12 +166,12 @@ class CanvasScrollFrame(ctk.CTkFrame):
         if getattr(self, "_pending_scroll_update", None) is not None:
             try:
                 self.after_cancel(self._pending_scroll_update)
-            except Exception:  # defensive: Tk teardown/callback
+            except (tk.TclError, ValueError):  # defensive: Tk teardown/callback
                 pass
             self._pending_scroll_update = None
         try:
             super().destroy()
-        except Exception:  # defensive: Tk teardown/callback
+        except tk.TclError:  # defensive: Tk teardown/callback
             pass
 
     def winfo_children(self):

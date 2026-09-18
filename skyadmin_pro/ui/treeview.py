@@ -9,6 +9,7 @@ from tkinter import ttk
 
 import customtkinter as ctk
 
+from skyadmin_pro.db.cipher import DB_ERRORS
 from skyadmin_pro.ui.theme import TABLE_FONT_SIZE, TABLE_HEADER_FONT_SIZE, TABLE_ROW_HEIGHT, table_palette
 
 _VIRTUAL_THRESHOLD = 60
@@ -18,6 +19,18 @@ _INCREMENTAL_THRESHOLD = 20
 # global, so reconfiguring them once per (mode, metrics, colors) is enough —
 # per-treeview apply_theme() calls after the first are per-widget only.
 _SHARED_STYLE_KEY: tuple | None = None
+_DPI_MULTIPLIER: float | None = None
+
+
+def _get_dpi_multiplier(tk_root) -> float:
+    global _DPI_MULTIPLIER
+    if _DPI_MULTIPLIER is not None:
+        return _DPI_MULTIPLIER
+    try:
+        _DPI_MULTIPLIER = float(tk_root.call("tk", "scaling")) / (96.0 / 72.0)
+    except (tk.TclError, ValueError):
+        _DPI_MULTIPLIER = 1.0
+    return _DPI_MULTIPLIER
 
 
 def configure_shared_tree_style(
@@ -61,10 +74,7 @@ def configure_shared_tree_style(
         if style.theme_use() != "clam":
             style.theme_use("clam")
     except ttk.TclError:
-        try:
-            style.theme_use("clam")
-        except ttk.TclError:
-            pass
+        pass
     from skyadmin_pro.ui.font_loader import FONT_FAMILY
 
     style.configure(
@@ -160,6 +170,7 @@ class ThemedTreeview(ctk.CTkFrame):
         self._virtual_rows: list[tuple] = []
         self._virtual_iids: list[str] = []
         self._virtual_tags: list[tuple[str, ...]] | None = None
+        self._applied_tree_theme_key: tuple | None = None
 
         self.grid_columnconfigure(0, weight=1)
         self.grid_columnconfigure(1, weight=0)
@@ -226,7 +237,7 @@ class ThemedTreeview(ctk.CTkFrame):
         """Column ids currently shown, in original order."""
         try:
             shown = list(self.tree["displaycolumns"])
-        except Exception:
+        except tk.TclError:
             return list(self._column_ids)
         if not shown or shown == ["#all"]:
             return list(self._column_ids)
@@ -248,7 +259,7 @@ class ThemedTreeview(ctk.CTkFrame):
             return
         try:
             self.tree.configure(displaycolumns=visible)
-        except Exception:
+        except tk.TclError:
             return
         if persist:
             self._persist_column_state()
@@ -277,7 +288,7 @@ class ThemedTreeview(ctk.CTkFrame):
             menu._state_vars = menu_vars  # keep BooleanVars alive with the menu
             self._column_menu = menu
             menu.post(x, y)
-        except Exception:
+        except tk.TclError:
             pass
 
     def _close_column_menu(self) -> None:
@@ -286,7 +297,7 @@ class ThemedTreeview(ctk.CTkFrame):
                 if self._column_menu.winfo_exists():
                     self._column_menu.unpost()
                     self._column_menu.destroy()
-            except Exception:
+            except tk.TclError:
                 pass
             self._column_menu = None
 
@@ -294,7 +305,7 @@ class ThemedTreeview(ctk.CTkFrame):
         self._close_column_menu()
         try:
             self.tree.configure(displaycolumns=self._column_ids)
-        except Exception:
+        except tk.TclError:
             pass
         self._persist_column_state()
 
@@ -302,7 +313,7 @@ class ThemedTreeview(ctk.CTkFrame):
         try:
             if self.tree.identify_region(event.x, event.y) != "heading":
                 return
-        except Exception:
+        except tk.TclError:
             return
         self.show_column_menu(event.x_root, event.y_root)
 
@@ -315,7 +326,7 @@ class ThemedTreeview(ctk.CTkFrame):
 
             for col_id in load_hidden_columns(self._db, self._table_id):
                 self.set_column_hidden(col_id, True, persist=False)
-        except Exception:
+        except (DB_ERRORS, tk.TclError):
             pass
 
     def _persist_column_state(self) -> None:
@@ -326,11 +337,23 @@ class ThemedTreeview(ctk.CTkFrame):
 
             visible = set(self.get_visible_columns())
             save_hidden_columns(self._db, self._table_id, [c for c in self._column_ids if c not in visible])
-        except Exception:
+        except (DB_ERRORS, tk.TclError):
             pass
 
     def apply_theme(self) -> None:
         mode = ctk.get_appearance_mode()
+        try:
+            ui_zoom = ctk.ScalingTracker.get_widget_scaling(self)
+        except (AttributeError, KeyError):
+            ui_zoom = 1.0
+
+        ui_zoom = max(0.5, min(2.0, ui_zoom))
+        dpi_multiplier = _get_dpi_multiplier(self.tk)
+
+        current_key = (mode, ui_zoom, dpi_multiplier)
+        if getattr(self, "_applied_tree_theme_key", None) == current_key:
+            return
+
         palette = table_palette(mode)
         background = palette["background"]
         foreground = palette["foreground"]
@@ -353,20 +376,6 @@ class ThemedTreeview(ctk.CTkFrame):
         trough = palette.get("trough", background)
 
         self.configure(fg_color=background)
-
-        try:
-            ui_zoom = ctk.ScalingTracker.get_widget_scaling(self)
-        except Exception:
-            ui_zoom = 1.0
-
-        ui_zoom = max(0.5, min(2.0, ui_zoom))
-
-        # Tk scaling represents OS DPI (pixels per point). 96 DPI = 1.3333 tk scaling.
-        # We divide by 1.3333 to get the true DPI multiplier (1.0 for 100%, 1.25 for 125%).
-        try:
-            dpi_multiplier = float(self.tk.call("tk", "scaling")) / (96.0 / 72.0)
-        except Exception:
-            dpi_multiplier = 1.0
 
         # Row height is in pixels, so it needs BOTH OS DPI scaling and the user's custom UI zoom.
         scaled_row = int(TABLE_ROW_HEIGHT * dpi_multiplier * ui_zoom)
@@ -407,6 +416,7 @@ class ThemedTreeview(ctk.CTkFrame):
         self.tree.tag_configure("completed", foreground=("#71717a" if mode == "Light" else "#a1a1aa"))
         self.tree.tag_configure("inactive", foreground=("#71717a" if mode == "Light" else "#a1a1aa"))
         self.tree.tag_configure("empty", foreground=("#71717a" if mode == "Light" else "#a1a1aa"))
+        self._applied_tree_theme_key = current_key
 
     def clear(self) -> None:
         self._deactivate_virtual()
@@ -452,7 +462,7 @@ class ThemedTreeview(ctk.CTkFrame):
             if card_info and "row" in card_info:
                 card_row = card_info["row"]
                 self.master.master.grid_rowconfigure(card_row, weight=0 if is_empty else 1)
-        except Exception:
+        except (tk.TclError, AttributeError):
             pass
 
         if iids is not None and len(row_list) >= _VIRTUAL_THRESHOLD:
@@ -493,7 +503,7 @@ class ThemedTreeview(ctk.CTkFrame):
             if h > 40:
                 row_h = TABLE_ROW_HEIGHT or 28
                 return max(1, h // row_h + 1)
-        except Exception:
+        except tk.TclError:
             pass
         return max(1, int(self.tree.cget("height")))
 
@@ -606,7 +616,7 @@ class ThemedTreeview(ctk.CTkFrame):
             try:
                 self.tree.selection_set(restored)
                 self.tree.see(restored[0])
-            except Exception:
+            except tk.TclError:
                 pass
             finally:
                 self.tree.bind("<<TreeviewSelect>>", self._handle_select)
@@ -650,7 +660,7 @@ class ThemedTreeview(ctk.CTkFrame):
                 return w
             try:
                 w = w.master
-            except Exception:
+            except (AttributeError, tk.TclError):
                 break
         return None
 
@@ -671,7 +681,7 @@ class ThemedTreeview(ctk.CTkFrame):
             if delta < 0 and first <= 0.001:
                 return False
             return not (delta > 0 and last >= 0.999)
-        except Exception:
+        except tk.TclError:
             return True
 
     def _scroll_vertical_with_parent_fallback(self, delta: int) -> str:
@@ -682,7 +692,7 @@ class ThemedTreeview(ctk.CTkFrame):
             if parent is not None:
                 try:
                     parent._canvas.yview_scroll(delta, "units")
-                except Exception:
+                except tk.TclError:
                     pass
         return "break"
 

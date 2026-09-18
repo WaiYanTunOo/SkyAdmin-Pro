@@ -7,13 +7,18 @@ import { checkRateLimit, getClientIp, isRateLimited } from "../rate_limit";
 export async function updateGetHandler(c: Context<{ Bindings: Env }>) {
   const limited = await checkRateLimit(c, "update-read", { windowSeconds: 60, max: 60 });
   if (limited) return limited;
-  const version = (await getMeta(c.env.DB, "latest_version")) || "";
-  const url = (await getMeta(c.env.DB, "latest_url")) || "";
-  return c.json({
-    ok: true,
-    version: version.trim() || null,
-    url: url.trim() || null,
-  });
+  try {
+    const version = (await getMeta(c.env.DB, "latest_version")) || "";
+    const url = (await getMeta(c.env.DB, "latest_url")) || "";
+    return c.json({
+      ok: true,
+      version: version.trim() || null,
+      url: url.trim() || null,
+    });
+  } catch (err) {
+    console.error("D1 error reading update info:", err);
+    return c.json({ ok: false, error: "Failed to read update metadata." }, 500);
+  }
 }
 
 export async function updatePostHandler(c: Context<{ Bindings: Env }>) {
@@ -53,9 +58,14 @@ export async function updatePostHandler(c: Context<{ Bindings: Env }>) {
     }
   }
 
-  await setMeta(c.env.DB, "latest_version", version);
-  await setMeta(c.env.DB, "latest_url", url);
-  await bumpVersion(c.env.DB);
+  try {
+    await setMeta(c.env.DB, "latest_version", version);
+    await setMeta(c.env.DB, "latest_url", url);
+    await bumpVersion(c.env.DB);
+  } catch (err) {
+    console.error("D1 error updating version info:", err);
+    return c.json({ ok: false, error: "Failed to update version metadata." }, 500);
+  }
 
   return c.json({
     ok: true,

@@ -21,13 +21,25 @@ export async function controlHandler(c: Context<{ Bindings: Env }>) {
   }
 
   // Defense in depth: db helpers already LIMIT, but never emit unbounded rows here.
-  const revocations = (await listRevocations(db)).slice(-CONTROL_LIST_CAP);
-  const bans = (await listBans(db)).slice(-CONTROL_LIST_CAP);
-  const usedNonces = (await listUsedNonces(db)).slice(-CONTROL_LIST_CAP);
-  const revokedPasscodes = (await listRevokedPasscodes(db)).slice(-CONTROL_LIST_CAP);
-  const latestVersion = await getMeta(db, "latest_version");
-  const latestUrl = await getMeta(db, "latest_url");
-  const version = await getMeta(db, "control_version");
+  let revocations: string[];
+  let bans: string[];
+  let usedNonces: string[];
+  let revokedPasscodes: string[];
+  let latestVersion: string;
+  let latestUrl: string;
+  let version: string;
+  try {
+    revocations = (await listRevocations(db)).slice(-CONTROL_LIST_CAP);
+    bans = (await listBans(db)).slice(-CONTROL_LIST_CAP);
+    usedNonces = (await listUsedNonces(db)).slice(-CONTROL_LIST_CAP);
+    revokedPasscodes = (await listRevokedPasscodes(db)).slice(-CONTROL_LIST_CAP);
+    latestVersion = await getMeta(db, "latest_version");
+    latestUrl = await getMeta(db, "latest_url");
+    version = await getMeta(db, "control_version");
+  } catch (err) {
+    console.error("D1 error loading control list data:", err);
+    return new Response("Failed to load control list data from database.", { status: 500 });
+  }
 
   // Build plaintext control list
   const lines: string[] = [

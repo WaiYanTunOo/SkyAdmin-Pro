@@ -44,6 +44,7 @@ ignore = ["E501", "SIM105", "N999", "N802", "N803", "N806", "N815"]
 "skyadmin_pro/ui/views/anti_gravity.py" = ["N802", "N815", "N803"]
 "tests/test_data_sync.py" = ["SIM102"]
 "tests/test_db_mixins.py" = ["F841"]
+"scripts/*" = ["SIM102", "SIM108", "E501"]
 
 [tool.ruff.lint.isort]
 known-first-party = ["skyadmin_pro"]

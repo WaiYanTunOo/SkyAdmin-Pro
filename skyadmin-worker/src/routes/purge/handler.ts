@@ -15,16 +15,28 @@ export async function purgeLicensesHandler(c: Context<{ Bindings: Env }>) {
 
   const olderThanDays = await parseOlderThanDays(c);
   const cutoff = `-${olderThanDays} days`;
-  const rows = await loadPurgeCandidates(c, cutoff);
+  let rows;
+  try {
+    rows = await loadPurgeCandidates(c, cutoff);
+  } catch (err) {
+    console.error("D1 error querying purge candidates:", err);
+    return c.json({ ok: false, error: "Failed to query purge candidates." }, 500);
+  }
   if (!rows.length) {
     return c.json({ ok: true, purged: 0, archived: 0, older_than_days: olderThanDays });
   }
 
-  const archived = await archiveAndDelete(c.env.DB, rows);
-  // Retention: sync_conflicts is append-only — prune rows older than 90 days
-  // on each purge run so the conflict audit log cannot grow forever.
-  await purgeOldSyncConflicts(c.env.DB);
-  await bumpVersion(c.env.DB);
+  let archived = 0;
+  try {
+    archived = await archiveAndDelete(c.env.DB, rows);
+    // Retention: sync_conflicts is append-only — prune rows older than 90 days
+    // on each purge run so the conflict audit log cannot grow forever.
+    await purgeOldSyncConflicts(c.env.DB);
+    await bumpVersion(c.env.DB);
+  } catch (err) {
+    console.error("D1 error archiving/deleting purge candidates:", err);
+    return c.json({ ok: false, error: "Failed to process purge." }, 500);
+  }
 
   return c.json({
     ok: true,

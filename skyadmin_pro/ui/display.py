@@ -28,9 +28,9 @@ def apply_high_dpi_scaling() -> float:
         # Per-monitor v2 — avoids blurry Tk on 125%/150% displays.
         try:
             ctypes.windll.shcore.SetProcessDpiAwareness(2)
-        except Exception:
+        except (AttributeError, OSError):
             ctypes.windll.user32.SetProcessDPIAware()
-    except Exception:  # defensive: Tk teardown/callback
+    except (AttributeError, OSError, ImportError):
         pass
 
     # CustomTkinter automatically reads system DPI after awareness is set.

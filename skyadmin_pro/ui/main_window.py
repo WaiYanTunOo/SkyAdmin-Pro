@@ -2,6 +2,8 @@
 
 from __future__ import annotations
 
+import logging
+import tkinter as tk
 from collections.abc import Callable
 from typing import TYPE_CHECKING
 
@@ -32,6 +34,8 @@ if TYPE_CHECKING:
     from skyadmin_pro.database import Database
     from skyadmin_pro.paths import WorkspacePaths
     from skyadmin_pro.ui.views.base import BaseView
+
+logger = logging.getLogger(__name__)
 
 
 class MainWindow(dnd_base_class()):
@@ -176,18 +180,18 @@ class MainWindow(dnd_base_class()):
         """True when keyboard focus sits inside an editable text widget."""
         try:
             widget = self.focus_get()
-        except Exception:
+        except tk.TclError:
             return False
         while widget is not None:
             try:
                 cls = widget.winfo_class()
-            except Exception:
+            except tk.TclError:
                 return False
             if cls in ("Entry", "Text", "TCombobox", "CTkEntry", "CTkTextbox", "CTkComboBox"):
                 return True
             try:
                 widget = widget.master
-            except Exception:
+            except (AttributeError, tk.TclError):
                 return False
         return False
 
@@ -212,8 +216,8 @@ class MainWindow(dnd_base_class()):
 
             self._auto_backup = AutoBackupScheduler(self)
             self._auto_backup.start()
-        except Exception:
-            pass  # non-critical — don't crash on backup scheduler failure
+        except (OSError, RuntimeError) as exc:
+            logger.warning("Auto-backup scheduler failed to start: %s", exc)
 
     def _build_sidebar(self) -> None:
         """Build the outer sidebar frame and hand nav-button management to SidebarWidget."""
@@ -313,7 +317,7 @@ class MainWindow(dnd_base_class()):
         """Pixels-per-point reported by Tk (diagnostic use only)."""
         try:
             return float(self.tk.call("tk", "scaling"))
-        except Exception:
+        except (tk.TclError, ValueError):
             return 1.0
 
     def _safe_geometry(self, geometry: str) -> str:
@@ -336,7 +340,7 @@ class MainWindow(dnd_base_class()):
             try:
                 screen_w = int(self.winfo_screenwidth())
                 screen_h = int(self.winfo_screenheight())
-            except Exception:
+            except (tk.TclError, ValueError):
                 return f"{width}x{height}"
             width = max(800, min(width, screen_w))
             height = max(600, min(height, screen_h))
@@ -349,7 +353,7 @@ class MainWindow(dnd_base_class()):
             cx = max(0, (screen_w - width) // 2)
             cy = max(0, (screen_h - height) // 2)
             return f"{width}x{height}+{cx}+{cy}"
-        except Exception:
+        except (ValueError, TypeError):
             return fallback
 
     def _build_content(self) -> None:
@@ -382,7 +386,7 @@ class MainWindow(dnd_base_class()):
         # Scale height with DPI to avoid clipping at 150% (32*1.35=43)
         try:
             scale = float(self.tk.call("tk", "scaling"))
-        except Exception:
+        except (tk.TclError, ValueError):
             scale = 1.0
         scaled_h = int(STATUS_BAR_HEIGHT * max(1.0, min(1.35, scale)))
         self.status_bar = ctk.CTkFrame(self, height=scaled_h, corner_radius=0)
@@ -544,7 +548,7 @@ class MainWindow(dnd_base_class()):
                 import ctypes
 
                 ctypes.windll.shell32.SetCurrentProcessExplicitAppUserModelID("SkyCreation.SkyAdminPro.App.0.3")
-            except Exception:
+            except (AttributeError, OSError):
                 pass
 
         base_dir = (
@@ -564,7 +568,7 @@ class MainWindow(dnd_base_class()):
                 img = Image.open(png_path)
                 self._icon_photo = ImageTk.PhotoImage(img)
                 self.iconphoto(True, self._icon_photo)
-        except Exception:
+        except (tk.TclError, OSError):
             pass
 
     def _on_close(self) -> None:
@@ -575,22 +579,22 @@ class MainWindow(dnd_base_class()):
             if callable(on_hide):
                 try:
                     on_hide()
-                except Exception:
-                    pass
+                except Exception as exc:
+                    logger.debug("Error in view on_hide: %s", exc)
         # Stop the auto-backup timer chain (process exit would reap it anyway).
         scheduler = getattr(self, "_auto_backup", None)
         stop = getattr(scheduler, "stop", None)
         if callable(stop):
             try:
                 stop()
-            except Exception:
-                pass
+            except Exception as exc:
+                logger.warning("Error stopping auto backup: %s", exc)
         for view in self._views.values():
             teardown = getattr(view, "on_hide", None)
             if callable(teardown):
                 try:
                     teardown()
-                except Exception:
-                    pass
+                except Exception as exc:
+                    logger.debug("Error during view teardown: %s", exc)
         self.db.set_setting(SETTING_WINDOW_GEOMETRY, self.geometry())
         self.destroy()

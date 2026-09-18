@@ -40,7 +40,7 @@ def verify_license() -> tuple[bool, str]:
 
             sealed_data = seal_path.read_text(encoding="utf-8").strip()
             extracted = verify_seal(sealed_data)
-            if extracted is not None and extracted != raw.strip():
+            if extracted is None or extracted != raw.strip():
                 return False, "License file was modified — integrity check failed."
         except Exception:
             return False, "License integrity check failed — contact support."

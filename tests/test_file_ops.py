@@ -314,7 +314,18 @@ class TestOpenInFileManagerGuard:
             open_in_file_manager(tmp_path / "nope.pdf")
 
     def test_executable_suffix_rejected(self, tmp_path: Path):
-        for name in ("evil.exe", "run.bat", "click.lnk", "macro.hta", "script.js"):
+        for name in (
+            "evil.exe",
+            "run.bat",
+            "click.lnk",
+            "macro.hta",
+            "script.js",
+            "payload.url",
+            "deploy.sh",
+            "setup.bash",
+            "malicious.py",
+            "image.iso",
+        ):
             target = tmp_path / name
             target.write_bytes(b"x")
             with pytest.raises(RuntimeError, match="executable file type"):

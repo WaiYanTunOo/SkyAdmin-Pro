@@ -111,7 +111,7 @@ def _style_tabview_tabs(tabview: ctk.CTkTabview) -> None:
     for name in getattr(tabview, "_name_list", []):
         try:
             tabview.tab(name).configure(fg_color=SURFACE_BG)
-        except Exception:
+        except (tk.TclError, KeyError, ValueError):
             pass
 
 
@@ -124,23 +124,23 @@ def bind_wrap_label(label: ctk.CTkLabel, parent: ctk.Misc, *, pad: int = 32) -> 
     if old_bind_id is not None:
         try:
             parent.unbind("<Configure>", old_bind_id)
-        except Exception:
+        except (tk.TclError, ValueError):
             pass
     if old_after_id is not None:
         try:
             parent.after_cancel(old_after_id)
-        except Exception:
+        except (tk.TclError, ValueError):
             pass
 
     def _resize(event=None) -> None:
         try:
             width = event.width if event is not None else parent.winfo_width()
-        except Exception:
+        except tk.TclError:
             return
         if width > 1:
             try:
                 label.configure(wraplength=max(120, width - pad))
-            except Exception:
+            except tk.TclError:
                 pass
 
     bind_id = parent.bind("<Configure>", _resize, add="+")
@@ -151,11 +151,11 @@ def bind_wrap_label(label: ctk.CTkLabel, parent: ctk.Misc, *, pad: int = 32) -> 
     def _cleanup(_event=None) -> None:
         try:
             parent.unbind("<Configure>", bind_id)
-        except Exception:
+        except (tk.TclError, ValueError):
             pass
         try:
             parent.after_cancel(after_id)
-        except Exception:
+        except (tk.TclError, ValueError):
             pass
 
     label.bind("<Destroy>", _cleanup, add="+")
@@ -173,48 +173,47 @@ def _apply_input_theme(widget: ctk.CTkBaseClass) -> None:
 
 
 _LAST_THEME_MODE: str | None = None
-_THEMED_WIDGETS: set[int] = set()
-
-
-def _clear_theme_cache() -> None:
-    """Clear the theme cache when appearance mode changes."""
-    global _THEMED_WIDGETS
-    _THEMED_WIDGETS.clear()
 
 
 def apply_form_theme(root: ctk.Misc) -> None:
     """Re-apply input and table styling after appearance mode changes.
 
-    Tracks already-themed widgets per appearance mode to skip redundant walks.
+    Tracks themed state on widgets via GC-safe attributes to skip redundant walks.
     """
     from skyadmin_pro.ui.canvas_scroll import CanvasScrollFrame
 
-    # Skip if already themed for current mode
-    widget_id = id(root)
-    if widget_id in _THEMED_WIDGETS:
-        return
-    _THEMED_WIDGETS.add(widget_id)
+    current_mode = ctk.get_appearance_mode()
 
-    if isinstance(root, ThemedTreeview):
-        root.apply_theme()
-    elif isinstance(root, ctk.CTkTabview):
-        root.configure(**tabview_style_kwargs())
-        _style_tabview_tabs(root)
-    elif isinstance(root, ctk.CTkScrollableFrame):
-        fg = root.cget("fg_color")
-        if fg in ("transparent", "Transparent", None, ""):
-            root.configure(**scrollable_style_kwargs())
-    elif isinstance(root, CanvasScrollFrame):
-        root.refresh_theme()
-    elif isinstance(root, _INPUT_WIDGET_TYPES):
-        _apply_input_theme(root)
+    # Skip entire subtree if already fully themed for this mode
+    if getattr(root, "_subtree_themed_mode", None) == current_mode:
+        return
+
+    # Theme this widget if needed
+    if getattr(root, "_applied_form_theme_mode", None) != current_mode:
+        if isinstance(root, ThemedTreeview):
+            root.apply_theme()
+        elif isinstance(root, ctk.CTkTabview):
+            root.configure(**tabview_style_kwargs())
+            _style_tabview_tabs(root)
+        elif isinstance(root, ctk.CTkScrollableFrame):
+            fg = root.cget("fg_color")
+            if fg in ("transparent", "Transparent", None, ""):
+                root.configure(**scrollable_style_kwargs())
+        elif isinstance(root, CanvasScrollFrame):
+            root.refresh_theme()
+        elif isinstance(root, _INPUT_WIDGET_TYPES):
+            _apply_input_theme(root)
+        root._applied_form_theme_mode = current_mode
 
     try:
         children = root.winfo_children()
-    except Exception:
+    except tk.TclError:
         return
+
     for child in children:
         apply_form_theme(child)
+
+    root._subtree_themed_mode = current_mode
 
 
 def should_apply_theme() -> bool:
@@ -224,7 +223,6 @@ def should_apply_theme() -> bool:
     if current == _LAST_THEME_MODE:
         return False
     _LAST_THEME_MODE = current
-    _clear_theme_cache()
     return True
 
 
@@ -429,12 +427,12 @@ def make_modal(top) -> None:
         try:
             if top.grab_current() in (None, top):
                 top.grab_set()
-        except Exception:
+        except tk.TclError:
             pass
 
     try:
         top.wait_visibility()
-    except Exception:
+    except tk.TclError:
         pass
     _grab()
     bind_escape(top)
@@ -1024,7 +1022,7 @@ class FeedbackLabel(ctk.CTkLabel):
         if self._dismiss_after_id is not None:
             try:
                 self.after_cancel(self._dismiss_after_id)
-            except Exception:
+            except (tk.TclError, ValueError):
                 pass
             self._dismiss_after_id = None
 
@@ -1032,7 +1030,7 @@ class FeedbackLabel(ctk.CTkLabel):
         if self._dismiss_after_id is not None:
             try:
                 self.after_cancel(self._dismiss_after_id)
-            except Exception:
+            except (tk.TclError, ValueError):
                 pass
         self._dismiss_after_id = self.after(self._AUTO_DISMISS_MS, self._auto_dismiss)
 
@@ -1041,7 +1039,7 @@ class FeedbackLabel(ctk.CTkLabel):
         try:
             if self.winfo_exists():
                 self.configure(text="")
-        except Exception:
+        except tk.TclError:
             pass
 
     def success(self, message: str) -> None:
@@ -1060,7 +1058,7 @@ class FeedbackLabel(ctk.CTkLabel):
         if self._dismiss_after_id is not None:
             try:
                 self.after_cancel(self._dismiss_after_id)
-            except Exception:
+            except (tk.TclError, ValueError):
                 pass
             self._dismiss_after_id = None
         self.configure(text="")

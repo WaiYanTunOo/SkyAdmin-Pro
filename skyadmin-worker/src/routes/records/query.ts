@@ -27,12 +27,10 @@ export async function loadRecordTotal(c: Context<{ Bindings: Env }>): Promise<nu
 
 const LIST_SQL = `SELECT l.id, l.machine_id, l.license_key, l.passcode, l.package_days,
               l.expires_at, l.nonce, l.issued_at, l.price_thb,
-              (r.target IS NOT NULL OR r2.target IS NOT NULL) AS revoked,
-              u.nonce IS NOT NULL AS used
+              (EXISTS (SELECT 1 FROM revocations WHERE target = l.nonce) OR
+               EXISTS (SELECT 1 FROM revocations WHERE target = l.machine_id)) AS revoked,
+              EXISTS (SELECT 1 FROM used_nonces WHERE nonce = l.nonce) AS used
        FROM issued_licenses l
-       LEFT JOIN revocations r ON r.target = l.nonce
-       LEFT JOIN revocations r2 ON r2.target = l.machine_id
-       LEFT JOIN used_nonces u ON u.nonce = l.nonce
        ORDER BY l.id DESC
        LIMIT ? OFFSET ?`;
 

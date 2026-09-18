@@ -22,10 +22,15 @@ export async function revokeHandler(c: Context<{ Bindings: Env }>) {
     return c.json({ ok: false, error: "nonce too long (max 256)" }, 400);
   }
 
-  await c.env.DB.prepare(
-    "INSERT OR IGNORE INTO revocations (target) VALUES (?)"
-  ).bind(nonce.trim()).run();
-  await bumpVersion(c.env.DB);
+  try {
+    await c.env.DB.prepare(
+      "INSERT OR IGNORE INTO revocations (target) VALUES (?)"
+    ).bind(nonce.trim()).run();
+    await bumpVersion(c.env.DB);
+  } catch (err) {
+    console.error("D1 error during revoke:", err);
+    return c.json({ ok: false, error: "Failed to revoke nonce." }, 500);
+  }
 
   return c.json({ ok: true, message: `Nonce ${nonce.trim()} revoked.` });
 }
@@ -45,10 +50,15 @@ export async function unrevokeHandler(c: Context<{ Bindings: Env }>) {
   const { nonce } = body;
   if (!nonce?.trim()) return c.json({ ok: false, error: "nonce required" }, 400);
 
-  await c.env.DB.prepare(
-    "DELETE FROM revocations WHERE target = ?"
-  ).bind(nonce.trim()).run();
-  await bumpVersion(c.env.DB);
+  try {
+    await c.env.DB.prepare(
+      "DELETE FROM revocations WHERE target = ?"
+    ).bind(nonce.trim()).run();
+    await bumpVersion(c.env.DB);
+  } catch (err) {
+    console.error("D1 error during unrevoke:", err);
+    return c.json({ ok: false, error: "Failed to un-revoke nonce." }, 500);
+  }
 
   return c.json({ ok: true, message: `Nonce ${nonce.trim()} un-revoked.` });
 }

@@ -51,8 +51,13 @@ export async function finishClaim(
        ON CONFLICT(key) DO UPDATE SET value = CAST(CAST(value AS INTEGER) + 1 AS TEXT)`,
     ),
   );
-  await c.env.DB.batch(writes);
-  await purgeStaleRateLimits(c.env.DB);
+  try {
+    await c.env.DB.batch(writes);
+    await purgeStaleRateLimits(c.env.DB);
+  } catch (err) {
+    console.error("D1 error during claim apply:", err);
+    return c.json({ ok: false, error: "Failed to record activation claim." }, 500);
+  }
 
   return c.json({
     ok: true,

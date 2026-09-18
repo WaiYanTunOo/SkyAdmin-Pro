@@ -23,10 +23,15 @@ export async function banHandler(c: Context<{ Bindings: Env }>) {
     return c.json({ ok: false, error: "mid must be 1-16 uppercase hex characters" }, 400);
   }
 
-  await c.env.DB.prepare(
-    "INSERT OR IGNORE INTO bans (machine_id, reason) VALUES (?, ?)"
-  ).bind(trimmed, reason || "").run();
-  await bumpVersion(c.env.DB);
+  try {
+    await c.env.DB.prepare(
+      "INSERT OR IGNORE INTO bans (machine_id, reason) VALUES (?, ?)"
+    ).bind(trimmed, reason || "").run();
+    await bumpVersion(c.env.DB);
+  } catch (err) {
+    console.error("D1 error during ban:", err);
+    return c.json({ ok: false, error: "Failed to ban machine." }, 500);
+  }
 
   return c.json({ ok: true, message: `Machine ${trimmed} banned.` });
 }
@@ -50,10 +55,15 @@ export async function unbanHandler(c: Context<{ Bindings: Env }>) {
     return c.json({ ok: false, error: "mid must be 1-16 uppercase hex characters" }, 400);
   }
 
-  await c.env.DB.prepare(
-    "DELETE FROM bans WHERE machine_id = ?"
-  ).bind(trimmed).run();
-  await bumpVersion(c.env.DB);
+  try {
+    await c.env.DB.prepare(
+      "DELETE FROM bans WHERE machine_id = ?"
+    ).bind(trimmed).run();
+    await bumpVersion(c.env.DB);
+  } catch (err) {
+    console.error("D1 error during unban:", err);
+    return c.json({ ok: false, error: "Failed to un-ban machine." }, 500);
+  }
 
   return c.json({ ok: true, message: `Machine ${trimmed} un-banned.` });
 }
@@ -62,8 +72,13 @@ export async function unbanHandler(c: Context<{ Bindings: Env }>) {
 export async function listBansHandler(c: Context<{ Bindings: Env }>) {
   const limited = await checkRateLimit(c, "bans", { windowSeconds: 60, max: 30 });
   if (limited) return limited;
-  const { results } = await c.env.DB.prepare(
-    `SELECT machine_id, reason, banned_at FROM bans ORDER BY id DESC LIMIT ?`
-  ).bind(CONTROL_LIST_CAP).all<{ machine_id: string; reason: string; banned_at: string }>();
-  return c.json({ ok: true, bans: results || [] });
+  try {
+    const { results } = await c.env.DB.prepare(
+      `SELECT machine_id, reason, banned_at FROM bans ORDER BY id DESC LIMIT ?`
+    ).bind(CONTROL_LIST_CAP).all<{ machine_id: string; reason: string; banned_at: string }>();
+    return c.json({ ok: true, bans: results || [] });
+  } catch (err) {
+    console.error("D1 error listing bans:", err);
+    return c.json({ ok: false, error: "Failed to list bans." }, 500);
+  }
 }
