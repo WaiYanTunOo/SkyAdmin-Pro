@@ -3,6 +3,18 @@
 All notable changes to SkyAdmin Pro are documented here.
 Format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 
+## [0.3.5] - 2026-09-18
+
+### Fixed
+
+- Company Details General: service/document trees outside form scroll; Tax IDs portal tree denser.
+- Settings pricing matrix and Dashboard incentive report tree outside scroll.
+- ThemedTreeview fill panels grow past the old 20-row height cap.
+
+### Changed
+
+- Version bump to 0.3.5.
+
 ## [0.3.4] - 2026-09-18
 
 ### Added
