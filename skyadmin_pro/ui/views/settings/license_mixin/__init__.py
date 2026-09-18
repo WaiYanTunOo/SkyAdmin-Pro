@@ -8,6 +8,7 @@ from .licenseMixinMixin2 import LicenseMixinMixin2
 from .licenseMixinMixin3 import LicenseMixinMixin3
 from .licenseMixinMixin4 import LicenseMixinMixin4
 from .licenseMixinMixin5 import LicenseMixinMixin5
+from .licenseMixinMixin6 import LicenseMixinMixin6
 
 
 class LicenseMixin(
@@ -17,5 +18,6 @@ class LicenseMixin(
     LicenseMixinMixin3,
     LicenseMixinMixin4,
     LicenseMixinMixin5,
+    LicenseMixinMixin6,
 ):
     pass

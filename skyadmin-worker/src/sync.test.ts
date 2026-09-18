@@ -387,7 +387,7 @@ describe("GET /api/sync/pull HLC", () => {
     expect(res.status).toBe(200);
     const body = await res.json();
     expect(body.ok).toBe(true);
-    expect(body.version).toBe(2);
+    expect(body.version).toBe(4);
     expect(body.proto).toBe(2);
     expect(body.hlc).toBe(true);
   });

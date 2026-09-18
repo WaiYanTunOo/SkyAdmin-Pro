@@ -27,13 +27,14 @@ function renderNotes(){
 }
 
 function render(){
-  const panels={groups:"panel-groups",clients:"panel-clients",tasks:"panel-tasks",contacts:"panel-contacts",notebook:"panel-notebook"};
+  const panels={groups:"panel-groups",clients:"panel-clients",tasks:"panel-tasks",contacts:"panel-contacts",notebook:"panel-notebook",passwords:"panel-passwords"};
   Object.values(panels).forEach(id=>$(id).classList.add("hidden"));
   $(panels[state.tab]||"panel-groups").classList.remove("hidden");
   if(state.tab==="groups")renderGroups();
   else if(state.tab==="clients")renderClients();
   else if(state.tab==="tasks")renderTasks();
   else if(state.tab==="contacts")renderContacts();
+  else if(state.tab==="passwords")renderPasswords();
   else renderNotes();
 }
 
@@ -63,6 +64,8 @@ $("btnActivate").addEventListener("click",async()=>{
     showActivate(String(err.message||err),true);
   }finally{$("btnActivate").disabled=false}
 });
+
+wireVaultUi();
 
 if("serviceWorker" in navigator){navigator.serviceWorker.register("/viewer/sw.js").catch(()=>{})}
 

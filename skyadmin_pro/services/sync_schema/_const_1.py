@@ -6,4 +6,6 @@ SYNC_TABLES: tuple[str, ...] = (
     "tasks",
     "office_contacts",
     "notebook_entries",
+    "client_credentials",
+    "office_credentials",
 )

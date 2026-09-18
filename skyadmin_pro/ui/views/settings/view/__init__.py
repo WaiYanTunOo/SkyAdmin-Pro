@@ -1,4 +1,4 @@
-"""Settings view — appearance, license, portal URL, and local paths."""
+"""Settings view â€” appearance, license, portal URL, and local paths."""
 
 from __future__ import annotations
 
@@ -21,6 +21,7 @@ from .settingsViewMixin8 import SettingsViewMixin8
 from .settingsViewMixin9 import SettingsViewMixin9
 from .settingsViewMixin10 import SettingsViewMixin10
 from .settingsViewMixin11 import SettingsViewMixin11
+from .settingsViewMixin12 import SettingsViewMixin12
 
 
 class SettingsView(
@@ -36,6 +37,7 @@ class SettingsView(
     SettingsViewMixin9,
     SettingsViewMixin10,
     SettingsViewMixin11,
+    SettingsViewMixin12,
     BackupMixin,
     ChecklistMixin,
     LicenseMixin,

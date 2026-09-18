@@ -43,15 +43,15 @@ APP_NAME = "SkyAdmin Pro"
 APP_TAGLINE = "Wai Yan Tun Oo (SKY)"
 APP_VERSION = _resolve_app_version()
 
-# Default appearance — Settings will override from SQLite.
+# Default appearance â€” Settings will override from SQLite.
 DEFAULT_APPEARANCE_MODE = "light"  # "dark" | "light" | "system"
 DEFAULT_COLOR_THEME = "blue"
 
-# ── Re-export everything from sub-modules ────────────────────────────────
+# â”€â”€ Re-export everything from sub-modules â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
 
 # nav
 # documents
-# ── Checklist / renewal data (modularized in config/checklists.py) ─────
+# â”€â”€ Checklist / renewal data (modularized in config/checklists.py) â”€â”€â”€â”€â”€
 from skyadmin_pro.config.checklists import (  # noqa: E402
     CHECKLIST_TEMPLATES,
     COMPANY_SETUP_CHECKLIST_ITEMS,
@@ -86,6 +86,9 @@ from .licensing import (  # noqa: E402
     PRICING_TIERS,
     REVOCATION_URL,
     SETTING_DATA_SYNC_ENABLED,
+    SETTING_MOBILE_VAULT_KEY,
+    SETTING_MOBILE_VAULT_SALT,
+    SETTING_MOBILE_VAULT_VERIFIER,
     SETTING_SYNC_LAST_PULL,
     SETTING_SYNC_LAST_PUSH,
 )

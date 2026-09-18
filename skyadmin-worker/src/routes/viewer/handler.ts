@@ -7,8 +7,10 @@ import { getJsPart0 } from "./parts/js_0";
 import { getJsPart1 } from "./parts/js_1";
 import { getJsPart2 } from "./parts/js_2";
 import { getJsPart3 } from "./parts/js_3";
+import { getJsPart4 } from "./parts/js_4";
 
-const VIEWER_TABLES = "client_groups,clients,tasks,office_contacts,notebook_entries";
+const VIEWER_TABLES =
+  "client_groups,clients,tasks,office_contacts,notebook_entries,client_credentials,office_credentials";
 
 export function viewerHandler(_c: Context) {
   const nonce = randomCspNonce();
@@ -30,6 +32,7 @@ ${viewerHtml}
 ${getJsPart0(VIEWER_TABLES)}
 ${getJsPart1()}
 ${getJsPart2()}
+${getJsPart4()}
 ${getJsPart3()}
 </script>
 </body>

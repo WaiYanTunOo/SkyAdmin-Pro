@@ -1,4 +1,4 @@
-export const getJsPart1 = () => `
+﻿export const getJsPart1 = () => `
 async function register(code){
   const res=await fetch("/api/sync/register",{method:"POST",headers:{"Content-Type":"application/json"},body:JSON.stringify({code:code.trim()})});
   const data=await res.json();
@@ -40,6 +40,8 @@ async function syncNow(){
     });
     state.contacts=activeRows(changes,"office_contacts").sort((a,b)=>(a.name||"").localeCompare(b.name||""));
     state.notes=activeRows(changes,"notebook_entries").sort((a,b)=>(b.entry_date||"").localeCompare(a.entry_date||""));
+    state.clientCreds=activeRows(changes,"client_credentials").sort((a,b)=>(a.credential_type||"").localeCompare(b.credential_type||""));
+    state.officeCreds=activeRows(changes,"office_credentials").sort((a,b)=>(a.account_label||"").localeCompare(b.account_label||""));
     const when=data.server_time||new Date().toISOString();
     saveLastSync(when);
     $("machineLabel").textContent="Machine "+creds.machine_id+" · read-only";

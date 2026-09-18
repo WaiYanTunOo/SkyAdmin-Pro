@@ -50,6 +50,8 @@ class SettingsViewMixin6:
             from skyadmin_pro.config import SETTING_DATA_SYNC_ENABLED
 
             self.data_sync_var.set((self.app.db.get_setting(SETTING_DATA_SYNC_ENABLED) or "0").strip() == "1")
+            if hasattr(self, "_refresh_mobile_vault_status"):
+                self._refresh_mobile_vault_status()
 
         if "Business" in self._lazy_tabs:
             self.services_text.delete("1.0", "end")

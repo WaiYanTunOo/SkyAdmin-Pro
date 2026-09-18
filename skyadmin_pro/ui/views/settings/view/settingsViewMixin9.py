@@ -45,6 +45,8 @@ class SettingsViewMixin9:
             command=self._on_data_sync_toggle,
         ).pack(anchor="w")
 
+        self._SettingsView_build_mobile_vault(body)
+
         ctk.CTkButton(body, text="Activate / Manage License…", command=self._open_activation).grid(
-            row=5, column=0, sticky="ew", pady=(12, 0)
+            row=6, column=0, sticky="ew", pady=(12, 0)
         )

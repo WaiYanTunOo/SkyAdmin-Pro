@@ -1,8 +1,8 @@
-export const viewerHtml = `
+﻿export const viewerHtml = `
 <div id="activate">
   <header style="position:static;border:0;background:transparent;padding:0 0 16px">
     <h1>SkyAdmin Viewer</h1>
-    <p>Read-only groups, clients, tasks, contacts, and notebook. Paste your activation code from the desktop app.</p>
+    <p>Read-only groups, clients, tasks, contacts, notebook, and passwords. Paste your activation code from the desktop app.</p>
   </header>
   <label for="code">License key or passcode</label>
   <textarea id="code" placeholder="Paste SKYPASS1:… or license key"></textarea>
@@ -29,6 +29,7 @@ export const viewerHtml = `
     <button class="tab" data-tab="tasks" type="button">Tasks</button>
     <button class="tab" data-tab="contacts" type="button">Contacts</button>
     <button class="tab" data-tab="notebook" type="button">Notebook</button>
+    <button class="tab" data-tab="passwords" type="button">Passwords</button>
   </div>
   <main>
     <div id="panel-groups"></div>
@@ -36,6 +37,20 @@ export const viewerHtml = `
     <div id="panel-tasks" class="hidden"></div>
     <div id="panel-contacts" class="hidden"></div>
     <div id="panel-notebook" class="hidden"></div>
+    <div id="panel-passwords" class="hidden"></div>
   </main>
+</div>
+
+<div id="vaultUnlock" class="modal hidden" role="dialog" aria-modal="true">
+  <div class="modal-card">
+    <h2>Unlock Mobile Vault</h2>
+    <p class="meta">Enter the Mobile Vault Passphrase from desktop Settings. Sync token alone cannot decrypt passwords.</p>
+    <input id="vaultPhrase" type="password" placeholder="Passphrase" autocomplete="current-password">
+    <div class="toolbar" style="margin-top:12px">
+      <button id="btnVaultUnlock" type="button">Unlock</button>
+      <button id="btnVaultCancel" type="button" class="secondary">Cancel</button>
+    </div>
+    <p id="vaultUnlockStatus" class="status"></p>
+  </div>
 </div>
 `;

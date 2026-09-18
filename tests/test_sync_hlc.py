@@ -244,4 +244,4 @@ def test_data_sync_module_exports():
     assert "SYNC_SCHEMA_VERSION" in data_sync.__all__
     from skyadmin_pro.services.sync_schema import SYNC_SCHEMA_VERSION
 
-    assert SYNC_SCHEMA_VERSION == 3
+    assert SYNC_SCHEMA_VERSION == 4

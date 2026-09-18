@@ -15,7 +15,7 @@ def db_path(tmp_path):
 def test_fresh_database_records_all_migrations(db_path):
     db = Database(db_path)
     rows = db._fetch_all("SELECT version, name FROM schema_migrations ORDER BY version")
-    assert [int(row["version"]) for row in rows] == [1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15]
+    assert [int(row["version"]) for row in rows] == [1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15, 16]
     assert rows[0]["name"] == "legacy_schema"
     assert rows[11]["name"] == "sync_hlc"
     # m009 owns the group index (kept out of SCHEMA_SQL replay) — fresh DBs get it via migration.
@@ -32,7 +32,7 @@ def test_migrations_are_idempotent_on_reopen(db_path):
     Database(db_path)
     db = Database(db_path)
     count = db._fetch_one("SELECT COUNT(*) AS n FROM schema_migrations")["n"]
-    assert count == 15
+    assert count == 16
 
 
 def test_new_migration_file_pattern(db_path):
@@ -147,6 +147,16 @@ def test_m015_adds_pnd_monthly_annual_columns(db_path):
     assert {"pnd1_status", "pnd3_status", "pnd90_status", "pnd91_status"} <= cols
     row = db._fetch_one("SELECT name FROM schema_migrations WHERE version = 15")
     assert row["name"] == "pnd_monthly_annual"
+
+
+def test_m016_adds_credential_sync_columns(db_path):
+    """Wave E — client/office credentials gain global_id, deleted_at, hlc."""
+    db = Database(db_path)
+    for table in ("client_credentials", "office_credentials"):
+        cols = {row["name"] for row in db._fetch_all(f"PRAGMA table_info({table})")}
+        assert {"global_id", "deleted_at", "hlc"} <= cols
+    row = db._fetch_one("SELECT name FROM schema_migrations WHERE version = 16")
+    assert row["name"] == "credentials_sync"
 
 
 def test_run_monthly_cycle_flips_only_monthly_fields(db_path):

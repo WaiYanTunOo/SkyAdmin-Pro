@@ -118,7 +118,7 @@ ACCOUNTING_SERVICE_INFER_PRIORITY: tuple[str, ...] = (
     "Annual Audit",
 )
 
-# Tax filing constants live in tax_filing.py (re-exported below for callers).
+# Tax filing constants live in tax_filing.py (re-exported for callers).
 
 # ---------------------------------------------------------------------------
 # Transaction ranges

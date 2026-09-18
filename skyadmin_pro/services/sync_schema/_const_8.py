@@ -6,4 +6,6 @@ SYNC_EXCLUDED_COLUMNS: dict[str, frozenset[str]] = {
     "tasks": frozenset({"id"}),
     "office_contacts": frozenset({"id"}),
     "notebook_entries": frozenset({"id"}),
+    "client_credentials": frozenset({"id", "client_id"}),
+    "office_credentials": frozenset({"id", "contact_id"}),
 }

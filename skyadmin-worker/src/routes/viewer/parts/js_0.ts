@@ -1,16 +1,19 @@
-export const getJsPart0 = (tables: string) => `
+﻿export const getJsPart0 = (tables: string) => `
 const STORAGE_KEY="skyadmin_viewer_creds";
 const LAST_SYNC_KEY="skyadmin_viewer_last_sync";
 const VIEWER_TABLES=${JSON.stringify(tables)};
 const NOTE_TYPES={daily_report:"Daily report",weekly_report:"Weekly report",customer_instruction:"Customer instruction",senior_note:"Senior note",general:"General"};
 const TASK_STATUS={pending:"Pending",completed:"Done"};
+const VAULT_PREFIX="vsk1:";
+const VAULT_IDLE_MS=60000;
+const PBKDF2_ITERS=210000;
 
-let state={groups:[],clients:[],tasks:[],contacts:[],notes:[],tab:"groups"};
+let state={groups:[],clients:[],tasks:[],contacts:[],notes:[],clientCreds:[],officeCreds:[],tab:"groups",vaultKey:null,vaultTimer:null,vaultFail:0};
 
 function $(id){return document.getElementById(id)}
 function loadCreds(){try{return JSON.parse(localStorage.getItem(STORAGE_KEY)||"null")}catch{return null}}
 function saveCreds(c){localStorage.setItem(STORAGE_KEY,JSON.stringify(c))}
-function clearCreds(){localStorage.removeItem(STORAGE_KEY);localStorage.removeItem(LAST_SYNC_KEY)}
+function clearCreds(){localStorage.removeItem(STORAGE_KEY);localStorage.removeItem(LAST_SYNC_KEY);lockVault()}
 function loadLastSync(){return localStorage.getItem(LAST_SYNC_KEY)||""}
 function saveLastSync(t){if(t)localStorage.setItem(LAST_SYNC_KEY,t)}
 

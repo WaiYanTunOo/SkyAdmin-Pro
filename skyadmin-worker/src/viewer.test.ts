@@ -1,17 +1,20 @@
-/** Wave D — viewer PWA covers all SYNC_TABLES (read-only). */
+/** Wave E — viewer PWA covers SYNC_TABLES + Passwords vault unlock UI. */
 
 import { describe, expect, it } from "vitest";
 import app from "./index";
 import { SYNC_TABLES } from "./sync_schema";
 
 describe("viewer routes", () => {
-  it("serves the PWA shell at /viewer with all SYNC_TABLES", async () => {
+  it("serves the PWA shell at /viewer with all SYNC_TABLES and Passwords tab", async () => {
     const res = await app.request("http://localhost/viewer");
     expect(res.status).toBe(200);
     const html = await res.text();
     expect(html).toContain("SkyAdmin Viewer");
     expect(html).toContain('data-tab="groups"');
-    expect(html).toContain("panel-groups");
+    expect(html).toContain('data-tab="passwords"');
+    expect(html).toContain("panel-passwords");
+    expect(html).toContain("Unlock Mobile Vault");
+    expect(html).toContain("vsk1:");
     expect(html).toContain("Last synced");
     for (const table of SYNC_TABLES) {
       expect(html).toContain(table);
@@ -27,7 +30,7 @@ describe("viewer routes", () => {
 
     const sw = await app.request("http://localhost/viewer/sw.js");
     expect(sw.status).toBe(200);
-    expect(await sw.text()).toContain("skyadmin-viewer-v3");
+    expect(await sw.text()).toContain("skyadmin-viewer-v4");
   });
 
   it("allows its inline script via per-response CSP nonce", async () => {

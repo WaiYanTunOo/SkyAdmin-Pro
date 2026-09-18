@@ -40,6 +40,13 @@ export function preparePushChanges(changes: PushChange[]): {
     for (const col of SYNC_EXCLUDED_COLUMNS[table]) {
       delete row[col];
     }
+    // Wave E: never persist credential plaintext in D1 — only vsk1: envelopes.
+    if (table === "client_credentials" || table === "office_credentials") {
+      const secret = row.secret_value;
+      if (typeof secret === "string" && secret && !secret.startsWith("vsk1:")) {
+        delete row.secret_value;
+      }
+    }
 
     const rowJson = JSON.stringify(row);
     if (new TextEncoder().encode(rowJson).length > MAX_ROW_JSON_BYTES) {

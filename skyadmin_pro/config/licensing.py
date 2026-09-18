@@ -182,6 +182,11 @@ SETTING_SYNC_LAST_PULL = "sync_last_pull_at"
 SETTING_SYNC_LAST_PUSH = "sync_last_push_at"
 SETTING_DATA_SYNC_ENABLED = "data_sync_enabled"
 
+# Wave E — Mobile Vault (salt/verifier/key local only; never sync passphrase)
+SETTING_MOBILE_VAULT_SALT = "mobile_vault_salt"
+SETTING_MOBILE_VAULT_VERIFIER = "mobile_vault_verifier"
+SETTING_MOBILE_VAULT_KEY = "mobile_vault_key_blob"
+
 # ---------------------------------------------------------------------------
 # Pricing tiers (activation dialog)
 # ---------------------------------------------------------------------------

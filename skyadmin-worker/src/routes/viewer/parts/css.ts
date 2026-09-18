@@ -31,4 +31,13 @@ main{padding:12px 16px 24px;padding-bottom:max(24px,env(safe-area-inset-bottom))
 #activate textarea{width:100%;min-height:120px;padding:12px;border:1px solid var(--border);border-radius:12px;background:#0b1220;color:var(--text);resize:vertical}
 #activate label{display:block;font-size:13px;color:var(--muted);margin:12px 0 6px}
 .hidden{display:none!important}
+.modal{position:fixed;inset:0;background:#00000099;display:flex;align-items:center;justify-content:center;padding:16px;z-index:40}
+.modal-card{background:var(--card);border:1px solid var(--border);border-radius:14px;padding:18px;width:100%;max-width:400px}
+.modal-card h2{margin:0 0 8px;font-size:17px}
+.modal-card input{width:100%;margin-top:10px;padding:10px 12px;border:1px solid var(--border);border-radius:10px;background:#0b1220;color:var(--text)}
+.secret{font-family:ui-monospace,Consolas,monospace;letter-spacing:.04em}
+.btn-row{display:flex;gap:8px;margin-top:8px;flex-wrap:wrap}
+.btn-row button{padding:8px 12px;font-size:12px}
+.lockbar{display:flex;gap:8px;align-items:center;margin-bottom:10px;flex-wrap:wrap}
+.lockbar .status{margin:0}
 `;

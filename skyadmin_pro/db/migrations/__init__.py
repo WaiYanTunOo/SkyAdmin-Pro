@@ -18,6 +18,7 @@ from skyadmin_pro.db.migrations import (
     m013_task_dependencies,
     m014_recurring_tasks,
     m015_pnd_monthly_annual,
+    m016_credentials_sync,
 )
 from skyadmin_pro.db.migrations.runner import register_migrations, run_pending_migrations
 
@@ -69,6 +70,11 @@ register_migrations(
             m015_pnd_monthly_annual.VERSION,
             m015_pnd_monthly_annual.NAME,
             m015_pnd_monthly_annual.upgrade,
+        ),
+        (
+            m016_credentials_sync.VERSION,
+            m016_credentials_sync.NAME,
+            m016_credentials_sync.upgrade,
         ),
     ]
 )
