@@ -53,7 +53,9 @@ jobs:
 
       - name: Audit Python dependencies
         if: matrix.python-version == '3.12'
-        run: pip-audit --strict
+        # PYSEC-2022-252: historical PyPI account takeover of deep-translator;
+        # no fixed release exists; 1.11.4 is the current upstream line.
+        run: pip-audit --strict --ignore-vuln PYSEC-2022-252
 
       - name: Security scan with bandit
         if: matrix.python-version == '3.12'
@@ -98,7 +100,9 @@ jobs:
           SKYADMIN_PROCESS_OFFLOAD: "0"
 
       - name: Audit Python dependencies
-        run: pip-audit --strict
+        # PYSEC-2022-252: historical PyPI account takeover of deep-translator;
+        # no fixed release exists; 1.11.4 is the current upstream line.
+        run: pip-audit --strict --ignore-vuln PYSEC-2022-252
 
       - name: Security scan with bandit
         run: bandit -r skyadmin_pro/ --severity-level medium

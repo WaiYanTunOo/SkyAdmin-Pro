@@ -72,6 +72,8 @@ You should receive a response within 48 hours.
 - `pip-audit` checks Python dependencies for known vulnerabilities
 - `npm audit` checks Worker dependencies
 - CI pipeline runs both checks on every push
+- `PYSEC-2022-252` (deep-translator) is ignored in CI: historical PyPI
+  compromise with no fixed release; pin stays on current `1.11.4`
 
 ## Updates
 
