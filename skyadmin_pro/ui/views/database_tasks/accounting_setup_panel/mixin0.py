@@ -1,10 +1,12 @@
+"""Accounting Setup rollout — Companies main tab (not Company Details)."""
+
 from __future__ import annotations
 
 from skyadmin_pro.services.tax_ids_rollout import list_accounting_setup_rows, parse_document_types
 from skyadmin_pro.ui.setup_rollout import RolloutAction, SetupRolloutPanel
 
 
-class AccountingSetupTabMixinMixin0:
+class AccountingSetupPanelMixin0:
     def _build_accounting_setup(self, master) -> SetupRolloutPanel:
         panel = SetupRolloutPanel(
             master,
@@ -64,10 +66,11 @@ class AccountingSetupTabMixinMixin0:
         )
 
     def refresh_accounting_setup(self) -> None:
-        if hasattr(self, "_ensure_panel"):
-            self._ensure_panel("Accounting Setup")
         if hasattr(self, "_accounting_setup_panel"):
             self._accounting_setup_panel.refresh()
+
+    def refresh(self) -> None:
+        self.refresh_accounting_setup()
 
     def _selected_accounting_setup_row(self) -> dict | None:
         if not hasattr(self, "_accounting_setup_panel"):
@@ -80,6 +83,6 @@ class AccountingSetupTabMixinMixin0:
             self.feedback.error("Select an accounting client first.")
             return
         name = (row.get("name") or "").strip()
-        self.select_client(name)
-        self.tabs.set("Tax IDs")
-        self.refresh()
+        view = self.app.get_view("database_tasks")
+        if view is not None and hasattr(view, "open_company_tax_ids"):
+            view.open_company_tax_ids(name)

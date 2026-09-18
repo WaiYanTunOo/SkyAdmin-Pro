@@ -469,7 +469,7 @@ class MainWindow(dnd_base_class()):
         self.open_office_hub_client_credentials(client_name, credential_type="RD")
 
     def open_accounting_setup(self) -> None:
-        """Navigate to Company Details → Accounting Setup rollout queue."""
+        """Navigate to Companies → Accounting Setup rollout queue."""
         from skyadmin_pro.config import NAV_DATABASE_TASKS
 
         view = self._ensure_view(NAV_DATABASE_TASKS)

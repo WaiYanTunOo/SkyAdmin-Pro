@@ -10,6 +10,7 @@ from ._const_4 import TAB_COMPANY
 from ._const_5 import TAB_RENEWALS
 from ._const_6 import TAB_PIPELINE
 from ._const_7 import TAB_SUPPLIERS
+from ._const_9 import TAB_ACCOUNTING
 
 DEFAULT = "Office workspace for this firm. Company Details is a tab here, not a sidebar item."
 
@@ -24,6 +25,7 @@ HINTS = {
     TAB_COMPANY: (
         "The file for the company you picked. Dates are edited here. Renewals is the checklist, not the date."
     ),
+    TAB_ACCOUNTING: "Accounting clients rollout — infer service type and Tax IDs readiness. Not month close.",
     TAB_RENEWALS: ("Checklist countdown (due N days before expiry). The date itself is on the company document."),
     TAB_PIPELINE: "Nine steps for a new job, from appointment to done. Not the daily to-do list.",
     TAB_SUPPLIERS: "Vendors and bills this firm owes. Not Office Hub contacts, and not message snippets.",

@@ -8,6 +8,7 @@ from ._const_4 import TAB_COMPANY
 from ._const_5 import TAB_RENEWALS
 from ._const_6 import TAB_PIPELINE
 from ._const_7 import TAB_SUPPLIERS
+from ._const_9 import TAB_ACCOUNTING
 
 # Tab names — single source of truth for tabview / lazy loader / refresh.
 TAB_NAMES: tuple[str, ...] = (
@@ -16,6 +17,7 @@ TAB_NAMES: tuple[str, ...] = (
     TAB_CLIENTS,
     TAB_MONTH,
     TAB_COMPANY,
+    TAB_ACCOUNTING,
     TAB_RENEWALS,
     TAB_PIPELINE,
     TAB_SUPPLIERS,

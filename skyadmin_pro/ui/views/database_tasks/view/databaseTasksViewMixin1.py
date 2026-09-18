@@ -8,6 +8,7 @@ from ._const_4 import TAB_COMPANY
 from ._const_5 import TAB_RENEWALS
 from ._const_6 import TAB_PIPELINE
 from ._const_7 import TAB_SUPPLIERS
+from ._const_9 import TAB_ACCOUNTING
 from .expand_tabs import FILL_TABS, mount_fill_panel
 from .tab_hints import tab_hint
 
@@ -53,6 +54,8 @@ class DatabaseTasksViewMixin1:
             self.month_panel.refresh()
         elif tab_name == TAB_COMPANY and self.company_panel is not None:
             self.company_panel.refresh()
+        elif tab_name == TAB_ACCOUNTING and self.accounting_setup_panel is not None:
+            self.accounting_setup_panel.refresh()
         elif tab_name == TAB_RENEWALS and self.renewals_panel is not None:
             self.renewals_panel.refresh()
         elif tab_name == TAB_PIPELINE and self.pipeline_panel is not None:

@@ -2,6 +2,8 @@
 
 from __future__ import annotations
 
+from skyadmin_pro.config import TAX_FILING_FIELDS
+
 
 class FilingMixinA:
     def log_tax_change(self, client_id: int, field: str, old_value: str | None, new_value: str | None) -> None:
@@ -18,24 +20,10 @@ class FilingMixinA:
         client = self.get_client(client_id)
         if client is None:
             return {}
-        return {
-            "fs_status": client.get("fs_status") or "Not Applicable",
-            "pnd53_status": client.get("pnd53_status") or "Not Applicable",
-            "pp30_status": client.get("pp30_status") or "Not Applicable",
-            "pnd51_status": client.get("pnd51_status") or "Not Applicable",
-            "pnd50_status": client.get("pnd50_status") or "Not Applicable",
-            "audit_status": client.get("audit_status") or "Not Applicable",
-        }
+        return {f: client.get(f) or "Not Applicable" for f in TAX_FILING_FIELDS}
 
     def list_clients_by_filing_status(self, field: str, status: str) -> list[dict]:
-        if field not in {
-            "fs_status",
-            "pnd53_status",
-            "pp30_status",
-            "pnd51_status",
-            "pnd50_status",
-            "audit_status",
-        }:
+        if field not in TAX_FILING_FIELDS:
             return []
         return self._fetch_all(
             f"SELECT id, name FROM clients WHERE {field} = ? ORDER BY name COLLATE NOCASE",

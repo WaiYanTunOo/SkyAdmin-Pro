@@ -60,7 +60,20 @@ def build_status_report(db: Database) -> dict:
     )
     add_section(
         "Tax filing overview",
-        ["Client", "FS", "PND53", "PP30", "PND51", "PND50", "Audit", "Payment"],
+        [
+            "Client",
+            "PND1",
+            "PND3",
+            "PND53",
+            "PP30",
+            "PND90",
+            "PND91",
+            "PND50",
+            "PND51",
+            "FS",
+            "Audit",
+            "Payment",
+        ],
         [_project(r, _TAX_OVERVIEW_KEYS) for r in snap.get("accounting_clients", [])],
     )
     clients = db.search_clients("")

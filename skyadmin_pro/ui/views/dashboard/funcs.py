@@ -26,12 +26,21 @@ def snap_fingerprint(snap: dict) -> tuple:
         sorted(
             (
                 c.get("id"),
-                c.get("fs_status"),
-                c.get("pnd53_status"),
-                c.get("pp30_status"),
-                c.get("pnd51_status"),
-                c.get("pnd50_status"),
-                c.get("audit_status"),
+                *(
+                    c.get(f)
+                    for f in (
+                        "pnd1_status",
+                        "pnd3_status",
+                        "pnd53_status",
+                        "pp30_status",
+                        "pnd90_status",
+                        "pnd91_status",
+                        "pnd51_status",
+                        "pnd50_status",
+                        "fs_status",
+                        "audit_status",
+                    )
+                ),
                 c.get("payment_status"),
                 c.get("service_fee"),
             )

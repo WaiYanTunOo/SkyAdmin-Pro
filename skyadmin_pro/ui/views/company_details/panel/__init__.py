@@ -3,9 +3,7 @@ import customtkinter as ctk
 from skyadmin_pro.services.file_ops import copy_file
 from skyadmin_pro.services.snippets import effective_text, load_snippet_overrides
 from skyadmin_pro.services.workflow import copy_to_clipboard, create_client_workspace
-from skyadmin_pro.ui.views.company_details.accounting_setup_tab import AccountingSetupTabMixin
 from skyadmin_pro.ui.views.company_details.constants import (
-    SUBTAB_ACCOUNTING,
     SUBTAB_FILING,
     SUBTAB_FINANCIAL_DOCS,
     SUBTAB_GENERAL,
@@ -65,7 +63,6 @@ class CompanyDetailsPanel(
     CompanyDetailsPanelMixin17,
     CompanyDetailsPanelMixin18,
     GeneralTabMixin,
-    AccountingSetupTabMixin,
     TaxIdsTabMixin,
     FilingTabMixin,
     VoCshSetupTabMixin,

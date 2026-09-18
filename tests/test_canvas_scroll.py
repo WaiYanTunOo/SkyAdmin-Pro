@@ -93,12 +93,21 @@ def test_general_and_financial_trees_outside_canvas_scroll():
     assert "_build_financial_docs(fin_tab)" in panel_src
 
 
-def test_accounting_and_vo_csh_setup_trees_outside_canvas_scroll():
+def test_vo_csh_setup_tree_outside_canvas_scroll():
     panel_src = _pkg_text("skyadmin_pro", "ui", "views", "company_details", "panel")
-    assert "setup_scroll = CanvasScrollFrame(tab)" not in panel_src
     assert "vo_setup_scroll = CanvasScrollFrame(tab)" not in panel_src
-    assert "self._accounting_setup_frame = self._build_accounting_setup(tab)" in panel_src
     assert "self._vo_csh_setup_frame = self._build_vo_csh_setup(tab)" in panel_src
+
+
+def test_accounting_setup_is_companies_main_tab():
+    expand_src = _pkg_text("skyadmin_pro", "ui", "views", "database_tasks", "view")
+    assert "TAB_ACCOUNTING" in expand_src
+    assert "AccountingSetupPanel" in expand_src
+    from skyadmin_pro.ui.views.company_details.constants import SUBTAB_NAMES
+
+    assert "Accounting Setup" not in SUBTAB_NAMES
+    panel_src = _pkg_text("skyadmin_pro", "ui", "views", "company_details", "panel")
+    assert "_build_accounting_setup" not in panel_src
 
 
 def test_tax_ids_and_vo_tabs_use_canvas_scroll():
@@ -109,8 +118,6 @@ def test_tax_ids_and_vo_tabs_use_canvas_scroll():
     # VO/CSH has no tree; form stays inside CanvasScrollFrame.
     assert "vo_scroll = CanvasScrollFrame(tab)" in panel_src
     assert "_build_vo_csh(vo_scroll.content)" in panel_src
-    # Accounting Setup tree is outside CanvasScrollFrame now.
-    assert "setup_scroll = CanvasScrollFrame(tab)" not in panel_src
     assert "vo_setup_scroll = CanvasScrollFrame(tab)" not in panel_src
     assert "themed_scrollable_frame(tab)" not in panel_src
 

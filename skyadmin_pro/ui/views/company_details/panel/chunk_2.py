@@ -2,10 +2,7 @@
 
 from __future__ import annotations
 
-# Sub-tab names — single source of truth for the tab bar, lazy loader,
-# refresh dispatcher, and cross-module callers (database_tasks/view.py).
 from skyadmin_pro.ui.views.company_details.constants import (
-    SUBTAB_ACCOUNTING,
     SUBTAB_FILING,
     SUBTAB_GENERAL,
     SUBTAB_TAX_IDS,
@@ -18,7 +15,7 @@ class CompanyDetailsPanelMixin2:
         try:
             return self.tabs.get()
         except Exception:
-            return SUBTAB_ACCOUNTING
+            return SUBTAB_GENERAL
 
     def _on_shortcut_save(self) -> bool:
         """Ctrl+S: save the primary form for the visible Company Details sub-tab."""

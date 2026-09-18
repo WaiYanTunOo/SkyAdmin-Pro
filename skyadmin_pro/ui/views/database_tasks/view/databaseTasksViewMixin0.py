@@ -45,4 +45,5 @@ class DatabaseTasksViewMixin0:
         self.renewals_panel = None
         self.pipeline_panel = None
         self.company_panel = None
+        self.accounting_setup_panel = None
         self.suppliers_panel = None

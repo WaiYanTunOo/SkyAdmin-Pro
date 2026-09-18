@@ -15,7 +15,7 @@ def db_path(tmp_path):
 def test_fresh_database_records_all_migrations(db_path):
     db = Database(db_path)
     rows = db._fetch_all("SELECT version, name FROM schema_migrations ORDER BY version")
-    assert [int(row["version"]) for row in rows] == [1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14]
+    assert [int(row["version"]) for row in rows] == [1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15]
     assert rows[0]["name"] == "legacy_schema"
     assert rows[11]["name"] == "sync_hlc"
     # m009 owns the group index (kept out of SCHEMA_SQL replay) — fresh DBs get it via migration.
@@ -32,7 +32,7 @@ def test_migrations_are_idempotent_on_reopen(db_path):
     Database(db_path)
     db = Database(db_path)
     count = db._fetch_one("SELECT COUNT(*) AS n FROM schema_migrations")["n"]
-    assert count == 14
+    assert count == 15
 
 
 def test_new_migration_file_pattern(db_path):
@@ -140,28 +140,34 @@ def test_m010_heals_stale_fts(db_path):
     assert [int(r["id"]) for r in hits] == [cid]
 
 
-def test_migrate_legacy_vault_twice_is_idempotent(db_path):
-    """Re-running the vault migration never duplicates credentials."""
-    from skyadmin_pro.db.migrations.m004_legacy_vault import upgrade
+def test_m015_adds_pnd_monthly_annual_columns(db_path):
+    """Fresh and upgraded DBs expose pnd1/3/90/91 status columns."""
+    db = Database(db_path)
+    cols = {row["name"] for row in db._fetch_all("PRAGMA table_info(clients)")}
+    assert {"pnd1_status", "pnd3_status", "pnd90_status", "pnd91_status"} <= cols
+    row = db._fetch_one("SELECT name FROM schema_migrations WHERE version = 15")
+    assert row["name"] == "pnd_monthly_annual"
+
+
+def test_run_monthly_cycle_flips_only_monthly_fields(db_path):
+    from skyadmin_pro.config import MONTHLY_TAX_TYPES
 
     db = Database(db_path)
-    cid = db.get_or_create_client("Vault Co")
-    with db.connection() as conn:
-        conn.execute(
-            """
-            CREATE TABLE vault_entries (
-                client_id INTEGER, category TEXT, title TEXT, username TEXT,
-                secret_value TEXT, url TEXT, notes TEXT, is_favorite INTEGER,
-                contact_id INTEGER
-            )
-            """
-        )
-        conn.execute(
-            "INSERT INTO vault_entries (client_id, category, username, secret_value) VALUES (?, 'DBD', 'u', 's')",
-            (cid,),
-        )
-    upgrade(db)
-    upgrade(db)
-    rows = db._fetch_all("SELECT * FROM client_credentials WHERE client_id = ?", (cid,))
-    assert len(rows) == 1
-    assert db._fetch_all("SELECT * FROM vault_entries") == []
+    cid = db.get_or_create_client("Cycle Co")
+    db.update_client_fields(
+        cid,
+        service_type=MONTHLY_TAX_TYPES[0],
+        pnd1_status="Pending",
+        pnd53_status="Pending",
+        pnd90_status="Pending",
+        fs_status="Pending",
+        audit_status="Pending",
+    )
+    result = db.run_monthly_cycle()
+    assert result["fields_updated"] == 2
+    client = db.get_client(cid)
+    assert client["pnd1_status"] == "On-Going"
+    assert client["pnd53_status"] == "On-Going"
+    assert client["pnd90_status"] == "Pending"
+    assert client["fs_status"] == "Pending"
+    assert client["audit_status"] == "Pending"

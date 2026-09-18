@@ -13,6 +13,7 @@ from ._const_5 import TAB_RENEWALS
 from ._const_6 import TAB_PIPELINE
 from ._const_7 import TAB_SUPPLIERS
 from ._const_8 import TAB_NAMES
+from ._const_9 import TAB_ACCOUNTING
 from .databaseTasksViewMixin0 import DatabaseTasksViewMixin0
 from .databaseTasksViewMixin1 import DatabaseTasksViewMixin1
 from .databaseTasksViewMixin2 import DatabaseTasksViewMixin2
@@ -35,6 +36,7 @@ class DatabaseTasksView(
 
 
 __all__ = [
+    "TAB_ACCOUNTING",
     "TAB_CLIENTS",
     "TAB_COMPANY",
     "TAB_COURIER",

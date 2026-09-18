@@ -2,7 +2,6 @@ from __future__ import annotations
 
 from skyadmin_pro.ui.views.company_details import CompanyDetailsPanel
 from skyadmin_pro.ui.views.company_details.panel import (
-    SUBTAB_ACCOUNTING,
     SUBTAB_TAX_IDS,
     SUBTAB_VO_CSH,
     SUBTAB_VO_CSH_SETUP,
@@ -11,6 +10,7 @@ from skyadmin_pro.ui.views.company_details.panel import (
 from ._const_2 import TAB_CLIENTS
 from ._const_4 import TAB_COMPANY
 from ._const_5 import TAB_RENEWALS
+from ._const_9 import TAB_ACCOUNTING
 from .funcs import service_menu_panel_key
 
 
@@ -42,10 +42,9 @@ class DatabaseTasksViewMixin2:
         self.refresh_active_tab(TAB_COMPANY)
 
     def open_accounting_setup(self) -> None:
-        self.tabs.set(TAB_COMPANY)
-        panel = self._require_company_panel()
-        panel.tabs.set(SUBTAB_ACCOUNTING)
-        self.refresh_active_tab(TAB_COMPANY)
+        self._ensure_panel(TAB_ACCOUNTING)
+        self.tabs.set(TAB_ACCOUNTING)
+        self.refresh_active_tab(TAB_ACCOUNTING)
 
     def open_vo_csh_setup(self) -> None:
         self.tabs.set(TAB_COMPANY)

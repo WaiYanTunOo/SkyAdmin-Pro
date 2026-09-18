@@ -3,11 +3,7 @@
 from __future__ import annotations
 
 from skyadmin_pro.ui.canvas_scroll import CanvasScrollFrame
-
-# Sub-tab names — single source of truth for the tab bar, lazy loader,
-# refresh dispatcher, and cross-module callers (database_tasks/view.py).
 from skyadmin_pro.ui.views.company_details.constants import (
-    SUBTAB_ACCOUNTING,
     SUBTAB_FILING,
     SUBTAB_FINANCIAL_DOCS,
     SUBTAB_GENERAL,
@@ -22,13 +18,7 @@ class CompanyDetailsPanelMixin3:
         if name in self._lazy_tabs:
             return
         tab = self.tabs.tab(name)
-        if name == SUBTAB_ACCOUNTING:
-            # Tree-first tab: no CanvasScrollFrame so the tree owns the wheel.
-            tab.grid_columnconfigure(0, weight=1)
-            tab.grid_rowconfigure(0, weight=1)
-            self._accounting_setup_frame = self._build_accounting_setup(tab)
-            self._accounting_setup_frame.grid(row=0, column=0, sticky="nsew")
-        elif name == SUBTAB_GENERAL:
+        if name == SUBTAB_GENERAL:
             tab.grid_columnconfigure(0, weight=1)
             tab.grid_rowconfigure(0, weight=1)
             general_scroll = CanvasScrollFrame(tab)
@@ -82,5 +72,3 @@ class CompanyDetailsPanelMixin3:
             self._fin_frame = self._build_financial_docs(fin_tab)
             self._fin_frame.grid(row=0, column=0, sticky="nsew")
         self._lazy_tabs.add(name)
-
-    # --- shared client selection & refresh ---

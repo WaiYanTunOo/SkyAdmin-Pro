@@ -2,9 +2,8 @@
 
 from __future__ import annotations
 
-from skyadmin_pro.db.sql_helpers import (
-    _in_clause,
-)
+from skyadmin_pro.config import TAX_FILING_FIELDS
+from skyadmin_pro.db.sql_helpers import _in_clause
 
 
 class FilingMixinB:
@@ -43,13 +42,24 @@ class FilingMixinB:
 
     def list_accounting_clients(self) -> list[dict]:
         """Clients with service_type set (accounting service clients)."""
+        cols = ", ".join(
+            (
+                "id",
+                "name",
+                "service_type",
+                "num_transactions",
+                "service_fee",
+                "payment_status",
+                "sla",
+                "headcount",
+                *TAX_FILING_FIELDS,
+                "vo_renewal_date",
+                "csh_renewal_date",
+            )
+        )
         return self._fetch_all(
-            """
-            SELECT id, name, service_type, num_transactions, service_fee,
-                   payment_status, sla, headcount,
-                   fs_status, pnd53_status, pp30_status,
-                   pnd51_status, pnd50_status, audit_status,
-                   vo_renewal_date, csh_renewal_date
+            f"""
+            SELECT {cols}
             FROM clients
             WHERE service_type IS NOT NULL AND service_type != ''
             ORDER BY name COLLATE NOCASE
@@ -58,13 +68,7 @@ class FilingMixinB:
 
     def count_pending_filings(self) -> int:
         """Count of clients where any filing status = 'Pending'."""
+        where = " OR ".join(f"{f} = 'Pending'" for f in TAX_FILING_FIELDS)
         with self.connection() as conn:
-            row = conn.execute(
-                """
-                SELECT COUNT(*) AS n FROM clients
-                WHERE fs_status = 'Pending' OR pnd53_status = 'Pending'
-                   OR pp30_status = 'Pending' OR pnd51_status = 'Pending'
-                   OR pnd50_status = 'Pending' OR audit_status = 'Pending'
-                """
-            ).fetchone()
+            row = conn.execute(f"SELECT COUNT(*) AS n FROM clients WHERE {where}").fetchone()
         return int(row["n"])

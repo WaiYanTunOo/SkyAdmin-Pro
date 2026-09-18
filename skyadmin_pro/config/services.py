@@ -118,33 +118,7 @@ ACCOUNTING_SERVICE_INFER_PRIORITY: tuple[str, ...] = (
     "Annual Audit",
 )
 
-# ---------------------------------------------------------------------------
-# Tax filing
-# ---------------------------------------------------------------------------
-TAX_FILING_STATUSES: tuple[str, ...] = (
-    "Complete",
-    "Pending",
-    "On-Going",
-    "Not Applicable",
-)
-
-TAX_FILING_FIELDS: tuple[str, ...] = (
-    "fs_status",
-    "pnd53_status",
-    "pp30_status",
-    "pnd51_status",
-    "pnd50_status",
-    "audit_status",
-)
-
-TAX_FILING_LABELS: dict[str, str] = {
-    "fs_status": "Financial Statement",
-    "pnd53_status": "PND53",
-    "pp30_status": "PP30",
-    "pnd51_status": "PND51",
-    "pnd50_status": "PND50",
-    "audit_status": "Audit",
-}
+# Tax filing constants live in tax_filing.py (re-exported below for callers).
 
 # ---------------------------------------------------------------------------
 # Transaction ranges

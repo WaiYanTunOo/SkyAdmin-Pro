@@ -2,10 +2,7 @@
 
 from __future__ import annotations
 
-# Sub-tab names — single source of truth for the tab bar, lazy loader,
-# refresh dispatcher, and cross-module callers (database_tasks/view.py).
 from skyadmin_pro.ui.views.company_details.constants import (
-    SUBTAB_ACCOUNTING,
     SUBTAB_FILING,
     SUBTAB_FINANCIAL_DOCS,
     SUBTAB_GENERAL,
@@ -25,9 +22,7 @@ class CompanyDetailsPanelMixin6:
         services: list | None = None,
         documents: list | None = None,
     ) -> None:
-        if tab_name == SUBTAB_ACCOUNTING:
-            self.refresh_accounting_setup()
-        elif tab_name == SUBTAB_GENERAL:
+        if tab_name == SUBTAB_GENERAL:
             if services is None:
                 services = self.app.db.list_client_services(client_id) if client_id is not None else []
             if documents is None:

@@ -17,6 +17,7 @@ from skyadmin_pro.db.migrations import (
     m012_sync_hlc,
     m013_task_dependencies,
     m014_recurring_tasks,
+    m015_pnd_monthly_annual,
 )
 from skyadmin_pro.db.migrations.runner import register_migrations, run_pending_migrations
 
@@ -63,6 +64,11 @@ register_migrations(
             m014_recurring_tasks.VERSION,
             m014_recurring_tasks.NAME,
             m014_recurring_tasks.upgrade,
+        ),
+        (
+            m015_pnd_monthly_annual.VERSION,
+            m015_pnd_monthly_annual.NAME,
+            m015_pnd_monthly_annual.upgrade,
         ),
     ]
 )
