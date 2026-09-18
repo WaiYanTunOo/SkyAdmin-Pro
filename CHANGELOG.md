@@ -3,6 +3,24 @@
 All notable changes to SkyAdmin Pro are documented here.
 Format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 
+## [0.3.4] - 2026-09-18
+
+### Added
+
+- Mobile Vault Passphrase + `/viewer` Passwords tab (ciphertext sync for portal/office credentials).
+- `/viewer` Groups tab and richer client/task cards (all `SYNC_TABLES`).
+- PND filing fields 1/3/90/91; monthly vs annual cycle split; Accounting Setup as Companies tab.
+
+### Fixed
+
+- Admin dashboard JS parse error (purge confirm newlines) blocking packages + Generate.
+- Admin CSP URL-safe nonces; Office Hub trees outside scroll; Filing dropdowns-only UI.
+- Clients & Expiry / Tax IDs table density.
+
+### Changed
+
+- Version bump to 0.3.4.
+
 ## [0.3.3] - 2026-09-05
 
 ### Added
