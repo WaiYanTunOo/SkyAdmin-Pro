@@ -57,15 +57,14 @@ function renderBans(){
 
 function copyEl(id){navigator.clipboard.writeText(document.getElementById(id).textContent);showStatus('Copied');}
 
-_packages=DEFAULT_PACKAGES.slice();
-updatePackageViews();
-loadPricing().then(function(){
-  setMachFilter('all');setRecFilter('all');
-  loadUpdateInfo();
-  loadRecords();loadBans();checkSigningKey();checkWorkerConfig();
-});
-
-document.addEventListener('DOMContentLoaded',function(){
+function initDashboard(){
+  _packages=DEFAULT_PACKAGES.slice();
+  updatePackageViews();
+  loadPricing().then(function(){
+    setMachFilter('all');setRecFilter('all');
+    loadUpdateInfo();
+    loadRecords();loadBans();checkSigningKey();checkWorkerConfig();
+  });
   document.getElementById('addPkgBtn').addEventListener('click',function(){addPackageRow();});
   document.getElementById('savePkgBtn').addEventListener('click',function(){savePricing();});
   document.getElementById('reloadPkgBtn').addEventListener('click',function(){loadPricing(true);});

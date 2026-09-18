@@ -72,8 +72,12 @@ export function registerCspTests(): void {
       const html = await res.text();
       const match = html.match(/<script nonce="([^"]+)">/);
       expect(match).not.toBeNull();
+      const nonce = match![1];
+      expect(nonce).toMatch(/^[A-Za-z0-9_-]+$/);
+      expect(nonce).not.toMatch(/[+/=]/);
       const csp = res.headers.get("Content-Security-Policy") || "";
-      expect(csp).toContain(`script-src 'nonce-${match![1]}'`);
+      expect(csp).toContain(`script-src 'nonce-${nonce}'`);
+      expect(csp).not.toContain("script-src 'self'");
     });
   });
 }

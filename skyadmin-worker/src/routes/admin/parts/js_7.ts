@@ -9,5 +9,10 @@ export const getJsPart7 = (csrfToken: string) => `
   for(var i=0;i<rfBtns.length;i++){
     rfBtns[i].addEventListener('click',function(){setRecFilter(this.getAttribute('data-rf'));});
   }
-});
+}
+if(document.readyState==='loading'){
+  document.addEventListener('DOMContentLoaded',initDashboard);
+}else{
+  initDashboard();
+}
 `;

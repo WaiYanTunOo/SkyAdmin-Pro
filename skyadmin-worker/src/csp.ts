@@ -1,10 +1,15 @@
 /** Content-Security-Policy helpers — per-response nonces for inline scripts. */
 
+/**
+ * URL-safe nonce (base64url, no + / =). Standard btoa can emit +/= which
+ * mismatch between the CSP header and the HTML nonce attribute in some
+ * agents, blocking the entire admin dashboard script.
+ */
 export function randomCspNonce(): string {
   const bytes = crypto.getRandomValues(new Uint8Array(16));
   let s = "";
   for (const b of bytes) s += String.fromCharCode(b);
-  return btoa(s);
+  return btoa(s).replace(/\+/g, "-").replace(/\//g, "_").replace(/=+$/, "");
 }
 
 /**
