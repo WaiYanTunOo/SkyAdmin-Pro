@@ -119,6 +119,14 @@ ACCOUNTING_SERVICE_INFER_PRIORITY: tuple[str, ...] = (
 )
 
 # Tax filing constants live in tax_filing.py (re-exported for callers).
+from .tax_filing import (  # noqa: E402, F401
+    ANNUAL_FILING_FIELDS,
+    FILING_FIELD_GROUPS,
+    MONTHLY_FILING_FIELDS,
+    TAX_FILING_FIELDS,
+    TAX_FILING_LABELS,
+    TAX_FILING_STATUSES,
+)
 
 # ---------------------------------------------------------------------------
 # Transaction ranges
