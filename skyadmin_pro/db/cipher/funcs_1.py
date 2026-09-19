@@ -1,6 +1,5 @@
 from __future__ import annotations
 
-import os
 import sqlite3
 from pathlib import Path
 
@@ -15,6 +14,7 @@ def migrate_plaintext_to_cipher(path: str | Path, *, key_hex: str | None = None)
     cipher/new (nothing to do). Raises on failure with the original file
     untouched.
     """
+    from skyadmin_pro.db.replace_db import replace_sqlite_db
     from skyadmin_pro.paths import remove_sqlite_sidecars
 
     p = Path(path)
@@ -26,13 +26,14 @@ def migrate_plaintext_to_cipher(path: str | Path, *, key_hex: str | None = None)
         tmp.unlink()
     cipher_conn = connect(tmp, key_hex=key)
     try:
-        cipher_conn.execute(f"ATTACH DATABASE '{p}' AS plaintext KEY ''")
+        # Forward slashes avoid Windows path escaping issues in SQL.
+        plain = str(p.resolve()).replace("\\", "/")
+        cipher_conn.execute(f"ATTACH DATABASE '{plain}' AS plaintext KEY ''")
         try:
             cipher_conn.execute("SELECT sqlcipher_export('main', 'plaintext')")
         finally:
             cipher_conn.execute("DETACH DATABASE plaintext")
         cipher_conn.commit()
-        # Verify the migrated copy before it touches the live path.
         row = cipher_conn.execute("PRAGMA quick_check").fetchone()
         if not row or row[0] != "ok":
             raise ValueError("migrated database failed integrity check")
@@ -45,7 +46,7 @@ def migrate_plaintext_to_cipher(path: str | Path, *, key_hex: str | None = None)
     finally:
         cipher_conn.close()
     try:
-        os.replace(tmp, p)
+        replace_sqlite_db(tmp, p)
     finally:
         try:
             tmp.unlink(missing_ok=True)

@@ -54,18 +54,34 @@ class BackupMixinMixin2:
                 restore_encrypted_backup,
             )
 
+            db = self.app.db
+            ok = False
             try:
-                self.app.db.shutdown()
-            except Exception:
-                pass
-
-            backup_dir = self.app.db.db_file.parent / "backups"
-            backup_dir.mkdir(parents=True, exist_ok=True)
-            stamp = _dt.now().strftime("%Y%m%d_%H%M%S")
-            safety_path = backup_dir / f"pre_restore_{stamp}.skybackup"
-            create_encrypted_backup(self.app.paths.root, self.app.db.db_file, safety_path)
-            summary = restore_encrypted_backup(src_path, self.app.paths.root, self.app.db.db_file)
-            return safety_path, summary
+                backup_dir = db.db_file.parent / "backups"
+                backup_dir.mkdir(parents=True, exist_ok=True)
+                stamp = _dt.now().strftime("%Y%m%d_%H%M%S")
+                safety_path = backup_dir / f"pre_restore_{stamp}.skybackup"
+                # Safety snapshot while the live DB may still be open — do this
+                # BEFORE lockout so we never reopen the live file for replace.
+                create_encrypted_backup(self.app.paths.root, db.db_file, safety_path)
+                try:
+                    db.begin_restore_lockout()
+                except Exception:
+                    try:
+                        db.shutdown()
+                    except Exception:
+                        pass
+                    db._restore_lockout = True
+                    db._close_pooled_conn()
+                summary = restore_encrypted_backup(src_path, self.app.paths.root, db.db_file)
+                ok = True
+                return safety_path, summary
+            finally:
+                if not ok:
+                    try:
+                        db.end_restore_lockout()
+                    except Exception:
+                        db._restore_lockout = False
 
         self._BackupMixin_restore_encrypted_p3(run_background, work)
 

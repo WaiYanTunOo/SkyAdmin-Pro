@@ -4,6 +4,15 @@ from __future__ import annotations
 
 
 class ShutdownMixin:
+    def begin_restore_lockout(self) -> None:
+        """Checkpoint, close pools, then block reconnects for DB file replace."""
+        self.shutdown()
+        self._restore_lockout = True
+        self._close_pooled_conn()
+
+    def end_restore_lockout(self) -> None:
+        self._restore_lockout = False
+
     def shutdown(self) -> None:
         """Fold the WAL back into the main file and update query planner stats.
 
@@ -11,11 +20,13 @@ class ShutdownMixin:
         self-contained single files.
         """
         try:
-            with self.connection() as conn:
-                conn.execute("PRAGMA optimize")
-                conn.execute("PRAGMA wal_checkpoint(TRUNCATE)")
+            if not getattr(self, "_restore_lockout", False):
+                with self.connection() as conn:
+                    conn.execute("PRAGMA optimize")
+                    conn.execute("PRAGMA wal_checkpoint(TRUNCATE)")
         except Exception:
-            self._log.warning("Shutdown checkpoint failed", exc_info=True)
+            if not getattr(self, "_restore_lockout", False):
+                self._log.warning("Shutdown checkpoint failed", exc_info=True)
         finally:
             self._close_pooled_conn()
 
@@ -30,10 +41,6 @@ class ShutdownMixin:
             self._bundle_owner = None
             self._bundle_depth = 0
             self._pool_epoch += 1
-            # Close while holding the lock so a background thread cannot
-            # _track_bg_conn() a pre-close handle back into the fresh pool.
-            # (Stale thread-local handles are additionally rejected by the
-            # epoch check in _track_bg_conn/_get_bg_conn.)
             for c in ([conn] if conn is not None else []) + bg:
                 try:
                     c.close()

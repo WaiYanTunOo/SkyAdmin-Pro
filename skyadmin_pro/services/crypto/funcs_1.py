@@ -16,20 +16,28 @@ def _rewrite_db_paths(db_file: Path, new_workspace: Path) -> int:
 
     new_root = str(new_workspace.resolve())
 
-    # Open the restored DB — try SQLCipher first, fall back to plaintext.
+    # Open by header type — never probe plaintext with SQLCipher (HMAC noise + fail).
+    from skyadmin_pro.db.cipher import db_state
+
     conn = None
     try:
-        from skyadmin_pro.db.cipher import connect as cipher_connect
+        state = db_state(db_file)
+        if state == "plaintext":
+            import sqlite3 as _sqlite3
 
-        conn = cipher_connect(str(db_file))
-        # Verify the cipher connection can actually read the DB.
-        conn.execute("SELECT 1 FROM sqlite_master LIMIT 1")
+            conn = _sqlite3.connect(str(db_file))
+        else:
+            from skyadmin_pro.db.cipher import connect as cipher_connect
+
+            conn = cipher_connect(str(db_file))
+            conn.execute("SELECT 1 FROM sqlite_master LIMIT 1")
     except Exception:
         if conn is not None:
             try:
                 conn.close()
             except Exception:
-                logger.debug("Failed to close cipher connection", exc_info=True)
+                logger.debug("Failed to close DB connection", exc_info=True)
+            conn = None
         try:
             import sqlite3 as _sqlite3
 

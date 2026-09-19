@@ -1,0 +1,241 @@
+\n=== git branch -vv ===\n  cursor/phase-8-code-quality                   73cf298 [origin/cursor/phase-8-code-quality] Split database module, add worker tests, and expand UI smoke coverage.
+* main                                          6a47555 [origin/main] chore: bump version to 0.3.6
++ subagent-Fonts-workstream-agent-self-f7df025f e159155 (C:/Users/waiya/.gemini/antigravity/brain/ea4b1555-5776-4a30-b900-7970156a65a1/.system_generated/worktrees/subagent-Fonts-workstream-agent-self-f7df025f) fix: BOM cleanup and remaining D3-D5 changes
++ subagent-Incentive-report-agent-self-9ba79f81 e159155 (C:/Users/waiya/.gemini/antigravity/brain/ea4b1555-5776-4a30-b900-7970156a65a1/.system_generated/worktrees/subagent-Incentive-report-agent-self-9ba79f81) fix: BOM cleanup and remaining D3-D5 changes
+\n=== git log -8 --oneline ===\n6a47555 chore: bump version to 0.3.6
+2fad301 chore: fix wrangler deploy environment warning
+3fcc5b0 fix: harden security, D1 errors, UI caching, tab layout & lint
+a43aec6 chore: bump version to 0.3.5 for UI density release
+5e0ace0 fix(ui): move Settings/Dashboard trees outside scroll and grow fill panels
+cc06942 fix(company-details): move General trees outside scroll and densify Tax IDs
+51b6c5b chore: bump version to 0.3.4 for installer release
+4957936 fix(worker): escape purge confirm newlines so admin JS parses
+\n=== git diff --stat HEAD ===\n docs/UI_CHECKLIST.md                               |   8 +-
+ main.py                                            |  17 ++-
+ skyadmin-worker/schema.sql                         |  23 +++-
+ skyadmin-worker/src/index.ts                       |   3 +
+ skyadmin-worker/src/migrations.test.ts             |  41 +++++-
+ skyadmin-worker/src/rate_limit.ts                  |   4 +-
+ skyadmin-worker/src/routes/admin/parts/css.ts      |   3 +
+ skyadmin-worker/src/routes/admin/parts/html.ts     |  55 +-------
+ skyadmin-worker/src/routes/admin/parts/js_4.ts     |  15 +++
+ skyadmin-worker/src/routes/admin/parts/js_5.ts     |   8 +-
+ skyadmin-worker/src/routes/generate.ts             |  59 ++++----
+ .../src/routes/rate_limit_parts/pull.ts            |   3 +
+ skyadmin-worker/src/routes/sync/pull.ts            |  65 ++++-----
+ skyadmin-worker/src/routes/sync/push.ts            |  22 ++-
+ skyadmin-worker/src/routes/sync/register.ts        |  47 ++++---
+ skyadmin-worker/src/routes/viewer/handler.ts       |   4 +-
+ skyadmin-worker/src/sync.test.ts                   |  44 +++++-
+ skyadmin-worker/src/sync_auth.ts                   |  63 +++++++--
+ skyadmin-worker/src/sync_push.test.ts              |  10 +-
+ skyadmin-worker/src/sync_push/fetch.ts             |  16 +--
+ skyadmin-worker/src/sync_push/sql.ts               |  14 +-
+ skyadmin-worker/src/sync_push/write.ts             |  32 +++--
+ skyadmin-worker/src/sync_schema.ts                 |  26 +++-
+ skyadmin_pro/config/__init__.py                    |   7 +
+ skyadmin_pro/config/licensing.py                   |   9 ++
+ skyadmin_pro/config/nav.py                         |   4 +-
+ skyadmin_pro/db/clients/batch_a.py                 | 149 ++++++++++-----------
+ skyadmin_pro/db/clients/batch_b.py                 |  57 +++++---
+ skyadmin_pro/db/clients/crud_a.py                  |   2 +-
+ skyadmin_pro/db/clients/crud_d.py                  |  28 ++--
+ skyadmin_pro/db/clients/doc_list.py                |   2 +-
+ skyadmin_pro/db/clients/documents_c.py             |   4 +-
+ skyadmin_pro/db/clients/incentives.py              |   3 +-
+ skyadmin_pro/db/core/context_a.py                  |   6 +
+ skyadmin_pro/db/core/context_b.py                  |   6 +
+ skyadmin_pro/db/courier.py                         |   9 +-
+ skyadmin_pro/db/financial/financialMixinMixin0.py  |  18 ++-
+ skyadmin_pro/db/financial/financialMixinMixin1.py  |  13 +-
+ skyadmin_pro/db/migrations/__init__.py             |  18 +++
+ skyadmin_pro/db/office/officeMixinMixin0.py        |  11 +-
+ skyadmin_pro/db/office/officeMixinMixin1.py        |   7 +-
+ skyadmin_pro/db/office/officeMixinMixin2.py        |  11 +-
+ skyadmin_pro/db/office/officeMixinMixin3.py        |   4 +-
+ skyadmin_pro/db/office/officeMixinMixin4.py        |   7 +-
+ skyadmin_pro/db/office/officeMixinMixin5.py        |   4 +-
+ skyadmin_pro/db/pipeline/pipelineMixinMixin0.py    |  21 ++-
+ skyadmin_pro/db/settings/settingsMixinMixin1.py    |  18 ++-
+ skyadmin_pro/db/settings/settingsMixinMixin3.py    |  10 +-
+ skyadmin_pro/db/settings/settingsMixinMixin4.py    |  35 +++--
+ skyadmin_pro/db/suppliers/__init__.py              |   9 +-
+ skyadmin_pro/db/suppliers/suppliersMixinMixin0.py  |  61 ++++-----
+ skyadmin_pro/db/suppliers/suppliersMixinMixin1.py  |  10 +-
+ skyadmin_pro/db/suppliers/suppliersMixinMixin2.py  |  31 -----
+ skyadmin_pro/db/suppliers/suppliersMixinMixin3.py  |   5 +-
+ skyadmin_pro/db/tasks/tasksMixinMixin0.py          |  12 +-
+ skyadmin_pro/db/tasks/tasksMixinMixin2.py          |  25 ++--
+ skyadmin_pro/db/tasks/tasksMixinMixin3.py          |  11 +-
+ skyadmin_pro/db/tasks/tasksMixinMixin4.py          |  22 +--
+ skyadmin_pro/db/tasks/tasksMixinMixin6.py          |   3 +-
+ skyadmin_pro/db/tax/dashboard_a.py                 |  14 +-
+ skyadmin_pro/db/tax/dashboard_b.py                 |   3 +-
+ skyadmin_pro/db/tax/operations_a.py                |   3 +-
+ skyadmin_pro/db/tax/operations_c.py                |  16 ++-
+ skyadmin_pro/db/tax/operations_d.py                |  49 ++++---
+ skyadmin_pro/db/tax/renewal_a.py                   |  10 +-
+ skyadmin_pro/db/tax/status_a.py                    |   5 +-
+ skyadmin_pro/db/tax/status_b.py                    |   9 +-
+ skyadmin_pro/services/auto_backup/__init__.py      |  16 +++
+ .../auto_backup/autoBackupSchedulerMixin0.py       |   2 +-
+ skyadmin_pro/services/auto_backup/funcs.py         |  23 +++-
+ skyadmin_pro/services/client_commands/__init__.py  |  92 ++++++-------
+ .../client_commands/deleteClientsCommandMixin0.py  |  99 ++++----------
+ .../client_commands/deleteClientsCommandMixin1.py  | 105 +++++++--------
+ skyadmin_pro/services/data_sync/__init__.py        |  10 ++
+ skyadmin_pro/services/data_sync/chunk_1.py         |  30 +++--
+ skyadmin_pro/services/data_sync/chunk_2.py         |   5 +-
+ skyadmin_pro/services/data_sync/chunk_3.py         |  51 +------
+ skyadmin_pro/services/data_sync/chunk_4.py         |  58 +++++++-
+ skyadmin_pro/services/data_sync/chunk_4_collect.py |  81 +++++------
+ skyadmin_pro/services/data_sync/chunk_5_write.py   |   9 +-
+ skyadmin_pro/services/data_sync/chunk_7.py         |  92 +++++--------
+ skyadmin_pro/services/i18n.py                      |   4 +
+ skyadmin_pro/services/storage_backend.py           |  45 ++++---
+ skyadmin_pro/services/sync_hlc/__init__.py         |  14 +-
+ skyadmin_pro/services/sync_hlc/funcs.py            |   6 +
+ skyadmin_pro/services/sync_schema/__init__.py      |  12 ++
+ skyadmin_pro/services/sync_schema/_const_0.py      |   2 +-
+ skyadmin_pro/services/sync_schema/_const_1.py      |  11 ++
+ skyadmin_pro/services/sync_schema/_const_8.py      |  11 ++
+ .../sync_schema/_const_9/_const_0/_const_0.py      |  10 +-
+ skyadmin_pro/ui/display.py                         | 147 ++++++++++++++++++--
+ skyadmin_pro/ui/main_window.py                     | 146 +++++++++++++++++---
+ skyadmin_pro/ui/theme.py                           |  10 ++
+ skyadmin_pro/ui/tree_height.py                     |   6 +-
+ skyadmin_pro/ui/treeview.py                        |  64 ++++++---
+ .../financialDocsTabMixinMixin1.py                 |  20 +--
+ .../ui/views/dashboard/dashboardViewMixin0.py      |   2 +-
+ .../ui/views/dashboard/dashboardViewMixin6.py      |   4 +-
+ .../courier_panel/courierPanelMixin0.py            |   1 +
+ .../courier_panel/courierPanelMixin2.py            |   5 +-
+ .../courier_panel/courierPanelMixin3.py            |  17 ++-
+ .../database_tasks/task_panel/taskPanelMixin3.py   |  15 ++-
+ .../database_tasks/task_panel/taskPanelMixin5.py   |   6 +-
+ .../ui/views/database_tasks/view/__init__.py       |  14 +-
+ .../ui/views/database_tasks/view/_const_8.py       |  14 +-
+ .../database_tasks/view/databaseTasksViewMixin0.py |   8 +-
+ .../database_tasks/view/databaseTasksViewMixin1.py |  22 +--
+ .../database_tasks/view/databaseTasksViewMixin2.py |  18 +--
+ .../database_tasks/view/databaseTasksViewMixin3.py |   4 -
+ .../database_tasks/view/databaseTasksViewMixin4.py |  43 ++----
+ .../database_tasks/view/databaseTasksViewMixin5.py |  46 +------
+ .../ui/views/database_tasks/view/expand_tabs.py    |  40 +-----
+ skyadmin_pro/ui/views/database_tasks/view/funcs.py |   4 +-
+ .../ui/views/database_tasks/view/tab_hints.py      |  16 +--
+ .../financial/financialDocsPanelMixin0.py          |  20 ++-
+ .../financial/financialDocsPanelMixin1.py          |   2 +-
+ skyadmin_pro/ui/views/menu_panels/__init__.py      |   2 +
+ .../contacts_tab/contactsTabMixinMixin2.py         |  20 +--
+ .../contacts_tab/contactsTabMixinMixin3.py         |  88 +++++++-----
+ .../notebook_tab/notebookTabMixinMixin1.py         |  12 +-
+ .../notebook_tab/notebookTabMixinMixin2.py         |  59 ++++----
+ .../ui/views/settings/backup_mixin/__init__.py     |  13 +-
+ .../settings/backup_mixin/backupMixinMixin0.py     |  10 +-
+ .../settings/backup_mixin/backupMixinMixin1.py     |   8 ++
+ .../settings/backup_mixin/backupMixinMixin2.py     |   2 +-
+ .../ui/views/settings/license_mixin/__init__.py    |   2 +
+ .../settings/license_mixin/licenseMixinMixin3.py   |  18 ---
+ .../settings/license_mixin/licenseMixinMixin4.py   |   2 +-
+ .../settings/license_mixin/licenseMixinMixin5.py   |  30 +++--
+ .../funcs_0/funcs/build_conflict_tree.py           |  41 ++++--
+ .../sync_conflicts_dialog/funcs_0/funcs/funcs.py   |  11 +-
+ skyadmin_pro/ui/views/settings/view/__init__.py    |   4 +
+ .../ui/views/settings/view/settingsViewMixin1.py   |   2 +-
+ .../ui/views/settings/view/settingsViewMixin11.py  |  53 ++++----
+ .../ui/views/settings/view/settingsViewMixin5.py   |   1 +
+ .../ui/views/settings/view/settingsViewMixin6.py   |   9 +-
+ .../ui/views/settings/view/settingsViewMixin9.py   |  23 +++-
+ .../ui/views/utilities/utilitiesViewMixin0.py      |   2 +-
+ .../ui/views/utilities/utilitiesViewMixin10.py     |  10 +-
+ skyadmin_pro/ui/widgets.py                         |   2 +-
+ tests/test_auto_backup.py                          |  12 ++
+ tests/test_canvas_scroll.py                        |  18 ++-
+ tests/test_data_sync.py                            |   2 +-
+ tests/test_database_tasks_refresh.py               |  25 ++--
+ tests/test_db_migrations.py                        |  55 +++++++-
+ tests/test_db_mixins.py                            |   6 +-
+ tests/test_display_scaling.py                      |  57 +++++++-
+ tests/test_sync_hlc.py                             |   2 +-
+ tests/test_treeview_empty_message.py               |  18 ++-
+ tests/test_undo.py                                 |  22 ++-
+ tests/test_visual_regression.py                    |  16 ++-
+ 151 files changed, 2105 insertions(+), 1377 deletions(-)
+warning: in the working copy of 'docs/UI_CHECKLIST.md', LF will be replaced by CRLF the next time Git touches it
+warning: in the working copy of 'skyadmin-worker/schema.sql', LF will be replaced by CRLF the next time Git touches it
+warning: in the working copy of 'skyadmin-worker/src/index.ts', LF will be replaced by CRLF the next time Git touches it
+warning: in the working copy of 'skyadmin-worker/src/migrations.test.ts', LF will be replaced by CRLF the next time Git touches it
+warning: in the working copy of 'skyadmin-worker/src/rate_limit.ts', LF will be replaced by CRLF the next time Git touches it
+warning: in the working copy of 'skyadmin-worker/src/routes/generate.ts', LF will be replaced by CRLF the next time Git touches it
+warning: in the working copy of 'skyadmin-worker/src/routes/rate_limit_parts/pull.ts', LF will be replaced by CRLF the next time Git touches it
+warning: in the working copy of 'skyadmin-worker/src/routes/sync/pull.ts', LF will be replaced by CRLF the next time Git touches it
+warning: in the working copy of 'skyadmin-worker/src/routes/sync/push.ts', LF will be replaced by CRLF the next time Git touches it
+warning: in the working copy of 'skyadmin-worker/src/routes/sync/register.ts', LF will be replaced by CRLF the next time Git touches it
+warning: in the working copy of 'skyadmin-worker/src/routes/viewer/handler.ts', LF will be replaced by CRLF the next time Git touches it
+warning: in the working copy of 'skyadmin-worker/src/sync.test.ts', LF will be replaced by CRLF the next time Git touches it
+warning: in the working copy of 'skyadmin-worker/src/sync_auth.ts', LF will be replaced by CRLF the next time Git touches it
+warning: in the working copy of 'skyadmin-worker/src/sync_push.test.ts', LF will be replaced by CRLF the next time Git touches it
+warning: in the working copy of 'skyadmin-worker/src/sync_schema.ts', LF will be replaced by CRLF the next time Git touches it
+warning: in the working copy of 'skyadmin_pro/config/__init__.py', LF will be replaced by CRLF the next time Git touches it
+warning: in the working copy of 'skyadmin_pro/config/licensing.py', LF will be replaced by CRLF the next time Git touches it
+warning: in the working copy of 'skyadmin_pro/config/nav.py', LF will be replaced by CRLF the next time Git touches it
+warning: in the working copy of 'skyadmin_pro/db/financial/financialMixinMixin0.py', LF will be replaced by CRLF the next time Git touches it
+warning: in the working copy of 'skyadmin_pro/db/migrations/__init__.py', LF will be replaced by CRLF the next time Git touches it
+warning: in the working copy of 'skyadmin_pro/db/settings/settingsMixinMixin1.py', LF will be replaced by CRLF the next time Git touches it
+warning: in the working copy of 'skyadmin_pro/db/settings/settingsMixinMixin3.py', LF will be replaced by CRLF the next time Git touches it
+warning: in the working copy of 'skyadmin_pro/db/settings/settingsMixinMixin4.py', LF will be replaced by CRLF the next time Git touches it
+warning: in the working copy of 'skyadmin_pro/db/tasks/tasksMixinMixin0.py', LF will be replaced by CRLF the next time Git touches it
+warning: in the working copy of 'skyadmin_pro/db/tasks/tasksMixinMixin2.py', LF will be replaced by CRLF the next time Git touches it
+warning: in the working copy of 'skyadmin_pro/db/tasks/tasksMixinMixin3.py', LF will be replaced by CRLF the next time Git touches it
+warning: in the working copy of 'skyadmin_pro/db/tasks/tasksMixinMixin4.py', LF will be replaced by CRLF the next time Git touches it
+warning: in the working copy of 'skyadmin_pro/db/tasks/tasksMixinMixin6.py', LF will be replaced by CRLF the next time Git touches it
+warning: in the working copy of 'skyadmin_pro/services/auto_backup/autoBackupSchedulerMixin0.py', LF will be replaced by CRLF the next time Git touches it
+warning: in the working copy of 'skyadmin_pro/services/auto_backup/funcs.py', LF will be replaced by CRLF the next time Git touches it
+warning: in the working copy of 'skyadmin_pro/services/data_sync/__init__.py', LF will be replaced by CRLF the next time Git touches it
+warning: in the working copy of 'skyadmin_pro/services/data_sync/chunk_3.py', LF will be replaced by CRLF the next time Git touches it
+warning: in the working copy of 'skyadmin_pro/services/data_sync/chunk_4.py', LF will be replaced by CRLF the next time Git touches it
+warning: in the working copy of 'skyadmin_pro/services/data_sync/chunk_4_collect.py', LF will be replaced by CRLF the next time Git touches it
+warning: in the working copy of 'skyadmin_pro/services/data_sync/chunk_5_write.py', LF will be replaced by CRLF the next time Git touches it
+warning: in the working copy of 'skyadmin_pro/services/i18n.py', LF will be replaced by CRLF the next time Git touches it
+warning: in the working copy of 'skyadmin_pro/services/storage_backend.py', LF will be replaced by CRLF the next time Git touches it
+warning: in the working copy of 'skyadmin_pro/services/sync_hlc/funcs.py', LF will be replaced by CRLF the next time Git touches it
+warning: in the working copy of 'skyadmin_pro/services/sync_schema/_const_0.py', LF will be replaced by CRLF the next time Git touches it
+warning: in the working copy of 'skyadmin_pro/services/sync_schema/_const_1.py', LF will be replaced by CRLF the next time Git touches it
+warning: in the working copy of 'skyadmin_pro/services/sync_schema/_const_8.py', LF will be replaced by CRLF the next time Git touches it
+warning: in the working copy of 'skyadmin_pro/services/sync_schema/_const_9/_const_0/_const_0.py', LF will be replaced by CRLF the next time Git touches it
+warning: in the working copy of 'skyadmin_pro/ui/main_window.py', LF will be replaced by CRLF the next time Git touches it
+warning: in the working copy of 'skyadmin_pro/ui/theme.py', LF will be replaced by CRLF the next time Git touches it
+warning: in the working copy of 'skyadmin_pro/ui/views/company_details/financial_docs_tab/financialDocsTabMixinMixin1.py', LF will be replaced by CRLF the next time Git touches it
+warning: in the working copy of 'skyadmin_pro/ui/views/database_tasks/courier_panel/courierPanelMixin0.py', LF will be replaced by CRLF the next time Git touches it
+warning: in the working copy of 'skyadmin_pro/ui/views/database_tasks/courier_panel/courierPanelMixin2.py', LF will be replaced by CRLF the next time Git touches it
+warning: in the working copy of 'skyadmin_pro/ui/views/database_tasks/courier_panel/courierPanelMixin3.py', LF will be replaced by CRLF the next time Git touches it
+warning: in the working copy of 'skyadmin_pro/ui/views/database_tasks/task_panel/taskPanelMixin3.py', LF will be replaced by CRLF the next time Git touches it
+warning: in the working copy of 'skyadmin_pro/ui/views/database_tasks/task_panel/taskPanelMixin5.py', LF will be replaced by CRLF the next time Git touches it
+warning: in the working copy of 'skyadmin_pro/ui/views/database_tasks/view/__init__.py', LF will be replaced by CRLF the next time Git touches it
+warning: in the working copy of 'skyadmin_pro/ui/views/database_tasks/view/_const_8.py', LF will be replaced by CRLF the next time Git touches it
+warning: in the working copy of 'skyadmin_pro/ui/views/database_tasks/view/databaseTasksViewMixin0.py', LF will be replaced by CRLF the next time Git touches it
+warning: in the working copy of 'skyadmin_pro/ui/views/database_tasks/view/databaseTasksViewMixin1.py', LF will be replaced by CRLF the next time Git touches it
+warning: in the working copy of 'skyadmin_pro/ui/views/database_tasks/view/databaseTasksViewMixin2.py', LF will be replaced by CRLF the next time Git touches it
+warning: in the working copy of 'skyadmin_pro/ui/views/database_tasks/view/databaseTasksViewMixin3.py', LF will be replaced by CRLF the next time Git touches it
+warning: in the working copy of 'skyadmin_pro/ui/views/database_tasks/view/funcs.py', LF will be replaced by CRLF the next time Git touches it
+warning: in the working copy of 'skyadmin_pro/ui/views/document_hub/financial/financialDocsPanelMixin0.py', LF will be replaced by CRLF the next time Git touches it
+warning: in the working copy of 'skyadmin_pro/ui/views/office_hub/contacts_tab/contactsTabMixinMixin2.py', LF will be replaced by CRLF the next time Git touches it
+warning: in the working copy of 'skyadmin_pro/ui/views/settings/backup_mixin/__init__.py', LF will be replaced by CRLF the next time Git touches it
+warning: in the working copy of 'skyadmin_pro/ui/views/settings/license_mixin/__init__.py', LF will be replaced by CRLF the next time Git touches it
+warning: in the working copy of 'skyadmin_pro/ui/views/settings/license_mixin/licenseMixinMixin3.py', LF will be replaced by CRLF the next time Git touches it
+warning: in the working copy of 'skyadmin_pro/ui/views/settings/view/__init__.py', LF will be replaced by CRLF the next time Git touches it
+warning: in the working copy of 'skyadmin_pro/ui/views/settings/view/settingsViewMixin5.py', LF will be replaced by CRLF the next time Git touches it
+warning: in the working copy of 'skyadmin_pro/ui/views/settings/view/settingsViewMixin9.py', LF will be replaced by CRLF the next time Git touches it
+warning: in the working copy of 'skyadmin_pro/ui/views/utilities/utilitiesViewMixin0.py', LF will be replaced by CRLF the next time Git touches it
+warning: in the working copy of 'skyadmin_pro/ui/views/utilities/utilitiesViewMixin10.py', LF will be replaced by CRLF the next time Git touches it
+warning: in the working copy of 'skyadmin_pro/ui/widgets.py', LF will be replaced by CRLF the next time Git touches it
+warning: in the working copy of 'tests/test_auto_backup.py', LF will be replaced by CRLF the next time Git touches it
+warning: in the working copy of 'tests/test_canvas_scroll.py', LF will be replaced by CRLF the next time Git touches it
+warning: in the working copy of 'tests/test_database_tasks_refresh.py', LF will be replaced by CRLF the next time Git touches it
+warning: in the working copy of 'tests/test_db_migrations.py', LF will be replaced by CRLF the next time Git touches it
+warning: in the working copy of 'tests/test_db_mixins.py', LF will be replaced by CRLF the next time Git touches it
+warning: in the working copy of 'tests/test_display_scaling.py', LF will be replaced by CRLF the next time Git touches it
+warning: in the working copy of 'tests/test_sync_hlc.py', LF will be replaced by CRLF the next time Git touches it
+warning: in the working copy of 'tests/test_treeview_empty_message.py', LF will be replaced by CRLF the next time Git touches it
+warning: in the working copy of 'tests/test_undo.py', LF will be replaced by CRLF the next time Git touches it

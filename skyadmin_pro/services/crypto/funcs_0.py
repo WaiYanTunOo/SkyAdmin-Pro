@@ -25,7 +25,8 @@ def _snapshot_db_for_backup(db_file: Path, staging_dir: Path) -> Path:
         snapshot.write_bytes(Path(db_file).read_bytes())
         return snapshot
     try:
-        src.execute(f"ATTACH DATABASE '{snapshot}' AS plaintext KEY ''")
+        snap = str(snapshot.resolve()).replace("\\", "/")
+        src.execute(f"ATTACH DATABASE '{snap}' AS plaintext KEY ''")
         src.execute("SELECT sqlcipher_export('plaintext', 'main')")
         src.execute("DETACH DATABASE plaintext")
     finally:
@@ -48,6 +49,26 @@ def _copy_fallback(db_file: Path, snapshot: Path) -> Path:
 
 def _looks_like_sqlite(payload: bytes) -> bool:
     return payload[:16] == b"SQLite format 3\x00"
+
+
+def _verify_sqlite_bytes(payload: bytes) -> None:
+    """Verify DB bytes using a disposable temp file (never locks the swap path)."""
+    import gc
+    import tempfile
+
+    if not payload:
+        return
+    with tempfile.NamedTemporaryFile(delete=False, suffix=".db") as tmp:
+        path = Path(tmp.name)
+        tmp.write(payload)
+    try:
+        _verify_sqlite_payload(path)
+    finally:
+        try:
+            path.unlink(missing_ok=True)
+        except OSError:
+            pass
+        gc.collect()
 
 
 def _verify_sqlite_payload(tmp_db: Path) -> None:

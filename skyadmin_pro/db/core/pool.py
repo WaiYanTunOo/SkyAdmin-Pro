@@ -16,6 +16,8 @@ class PoolMixin:
         Main thread uses the historic ``_pooled_conn``; any other thread
         uses its own thread-local handle. Validates liveness first.
         """
+        if getattr(self, "_restore_lockout", False):
+            raise RuntimeError("Database is locked for restore — reopen the app after restore finishes.")
         if threading.get_ident() == getattr(self, "_main_ident", threading.get_ident()):
             with self._lock:
                 conn = self._pooled_conn

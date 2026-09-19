@@ -33,6 +33,13 @@ class BackupMixinMixin3:
             except Exception:
                 pass
 
+        def _on_error(err) -> None:
+            try:
+                self.app.db.end_restore_lockout()
+            except Exception:
+                self.app.db._restore_lockout = False
+            self.feedback.error(f"Restore failed: {err}")
+
         def _enable_backup_buttons() -> None:
             self.configure(cursor="")
             if getattr(self, "backup_action_btn", None) is not None:
@@ -44,7 +51,7 @@ class BackupMixinMixin3:
             self,
             work=work,
             on_success=on_success,
-            on_error=lambda err: self.feedback.error(f"Restore failed: {err}"),
+            on_error=_on_error,
             finally_fn=_enable_backup_buttons,
             feedback=self.feedback,
         )

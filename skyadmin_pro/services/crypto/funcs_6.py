@@ -3,12 +3,13 @@ from __future__ import annotations
 import zipfile
 from pathlib import Path
 
+from skyadmin_pro.db.replace_db import replace_sqlite_db
 from skyadmin_pro.paths import remove_sqlite_sidecars
 
 from ._const_0 import logger
 from ._const_2 import WORKSPACE_PREFIX
 from ._types import RestoreSummary
-from .funcs_0 import _verify_sqlite_payload
+from .funcs_0 import _verify_sqlite_bytes
 from .funcs_1 import _rewrite_db_paths
 from .funcs_2 import _resolve_member_under
 from .funcs_4 import _decrypt_backup_zip
@@ -44,18 +45,21 @@ def restore_encrypted_backup(archive: Path, workspace_root: Path, db_file: Path)
 
             db_info = archive_zip.getinfo("skyadmin_pro.db")
             db_payload = archive_zip.read("skyadmin_pro.db")
+            # Verify on a disposable temp — never open the swap path with SQLite
+            # (Windows keeps a lock on memory-mapped DB files after close).
+            _verify_sqlite_bytes(db_payload)
             db_file = Path(db_file)
             db_file.parent.mkdir(parents=True, exist_ok=True)
-            # Atomic DB swap: stage to temp, verify, then replace live file.
-            import os
-
             staged_db = db_file.with_suffix(db_file.suffix + ".new")
             staged_db.write_bytes(db_payload)
             try:
-                _verify_sqlite_payload(staged_db)
-                os.replace(staged_db, db_file)
-            finally:
-                pass
+                replace_sqlite_db(staged_db, db_file)
+            except Exception:
+                try:
+                    staged_db.unlink(missing_ok=True)
+                except OSError:
+                    pass
+                raise
 
             remove_sqlite_sidecars(db_file)
 
@@ -68,17 +72,25 @@ def restore_encrypted_backup(archive: Path, workspace_root: Path, db_file: Path)
                 target.parent.mkdir(parents=True, exist_ok=True)
                 staged = target.with_name(target.name + ".new")
                 staged.write_bytes(archive_zip.read(info.filename))
-                import os as _os
-
-                _os.replace(staged, target)
+                try:
+                    replace_sqlite_db(staged, target)
+                except OSError:
+                    target.write_bytes(staged.read_bytes())
+                    staged.unlink(missing_ok=True)
                 restored_files += 1
 
-        # Rewrite stale absolute paths after the ZIP is closed (avoids
-        # Windows file-locking issues with SQLite).
         try:
             paths_rewritten = _rewrite_db_paths(db_file, ws)
         except Exception:
             logger.warning("Path rewriting failed", exc_info=True)
+
+        # Backups ship plaintext — encrypt after rewrite so next app open is cipher.
+        try:
+            from skyadmin_pro.db.cipher import migrate_plaintext_to_cipher
+
+            migrate_plaintext_to_cipher(db_file)
+        except Exception:
+            logger.warning("Post-restore cipher migration failed", exc_info=True)
 
         return RestoreSummary(
             database_bytes=db_info.file_size,

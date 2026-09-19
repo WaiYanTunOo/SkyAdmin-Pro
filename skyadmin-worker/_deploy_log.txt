@@ -1,0 +1,99 @@
+\n>>> npm run typecheck\n
+> skyadmin-worker@1.0.0 typecheck
+> tsc --noEmit
+
+\n>>> npm test\n
+> skyadmin-worker@1.0.0 test
+> vitest run
+
+
+ RUN  v3.2.7 D:/StudioProjects/SkyAdmin-Pro-main/skyadmin-worker
+
+ ✓ src/auth.test.ts (7 tests) 35ms
+ ✓ src/routes/control.test.ts (1 test) 48ms
+ ✓ src/integration_security.test.ts (16 tests) 47ms
+ ✓ src/sync.test.ts (13 tests) 60ms
+ ✓ src/routes/rate_limit.test.ts (6 tests) 65ms
+ ✓ src/routes/handlers.test.ts (27 tests) 60ms
+ ✓ src/routes/admin.test.ts (25 tests) 161ms
+ ✓ src/signing.test.ts (7 tests) 30ms
+ ✓ src/sync_org.test.ts (5 tests) 44ms
+ ✓ src/sku_entitlements.test.ts (5 tests) 54ms
+ ✓ src/lifecycle.test.ts (10 tests) 56ms
+ ✓ src/sku_max_devices.test.ts (8 tests) 37ms
+ ✓ src/routes/claim.test.ts (3 tests) 32ms
+ ✓ src/generate_sku.test.ts (4 tests) 37ms
+ ✓ src/purge.test.ts (3 tests) 25ms
+ ✓ src/integration.test.ts (6 tests) 51ms
+ ✓ src/routes/pricing.test.ts (7 tests) 36ms
+ ✓ src/update.test.ts (3 tests) 19ms
+ ✓ src/sync_push.test.ts (21 tests) 23ms
+ ✓ src/cors.test.ts (7 tests) 21ms
+ ✓ src/viewer.test.ts (3 tests) 19ms
+ ✓ src/migrations.test.ts (10 tests) 14ms
+ ✓ src/verification.test.ts (3 tests) 28ms
+ ✓ src/routes/web/token.test.ts (2 tests) 22ms
+ ✓ src/csp.test.ts (3 tests) 10ms
+ ✓ src/packages.test.ts (4 tests) 8ms
+ ✓ src/license_status.test.ts (8 tests) 7ms
+ ✓ src/rate_limit.test.ts (6 tests) 5ms
+ ✓ src/license_policy.test.ts (2 tests) 4ms
+
+ Test Files  29 passed (29)
+      Tests  225 passed (225)
+   Start at  14:18:10
+   Duration  4.30s (transform 1.80s, setup 0ms, collect 14.06s, tests 1.06s, environment 7ms, prepare 4.38s)
+
+stderr | src/routes/handlers.test.ts > records > returns a clean 500 and writes an audit entry when the count query fails
+D1 error during records (COUNT): Error: db boom
+    at Object.first (D:\StudioProjects\SkyAdmin-Pro-main\skyadmin-worker\src\routes\handlers\records_count_fail.ts:26:19)
+    at loadRecordTotal (D:\StudioProjects\SkyAdmin-Pro-main\skyadmin-worker\src\routes\records\query.ts:21:7)
+    at recordsHandler (D:\StudioProjects\SkyAdmin-Pro-main\skyadmin-worker\src\routes\records\handler.ts:16:23)
+    at processTicksAndRejections (node:internal/process/task_queues:104:5)
+    at dispatch (file:///D:/StudioProjects/SkyAdmin-Pro-main/skyadmin-worker/node_modules/hono/dist/compose.js:22:17)
+    at authMiddleware (D:\StudioProjects\SkyAdmin-Pro-main\skyadmin-worker\src\auth.ts:21:5)
+    at dispatch (file:///D:/StudioProjects/SkyAdmin-Pro-main/skyadmin-worker/node_modules/hono/dist/compose.js:22:17)
+    at corsMiddleware (D:\StudioProjects\SkyAdmin-Pro-main\skyadmin-worker\src\cors.ts:33:3)
+    at dispatch (file:///D:/StudioProjects/SkyAdmin-Pro-main/skyadmin-worker/node_modules/hono/dist/compose.js:22:17)
+    at file:///D:/StudioProjects/SkyAdmin-Pro-main/skyadmin-worker/node_modules/hono/dist/hono-base.js:307:25
+
+stderr | src/routes/handlers.test.ts > records > returns a clean 500 when the paginated list query fails
+D1 error during records (LIST): Error: db boom
+    at Object.all (D:\StudioProjects\SkyAdmin-Pro-main\skyadmin-worker\src\routes\handlers\records_list_fail.ts:16:53)
+    at loadPageRows (D:\StudioProjects\SkyAdmin-Pro-main\skyadmin-worker\src\routes\records\query.ts:43:78)
+    at recordsHandler (D:\StudioProjects\SkyAdmin-Pro-main\skyadmin-worker\src\routes\records\handler.ts:19:26)
+    at processTicksAndRejections (node:internal/process/task_queues:104:5)
+    at dispatch (file:///D:/StudioProjects/SkyAdmin-Pro-main/skyadmin-worker/node_modules/hono/dist/compose.js:22:17)
+    at authMiddleware (D:\StudioProjects\SkyAdmin-Pro-main\skyadmin-worker\src\auth.ts:21:5)
+    at dispatch (file:///D:/StudioProjects/SkyAdmin-Pro-main/skyadmin-worker/node_modules/hono/dist/compose.js:22:17)
+    at corsMiddleware (D:\StudioProjects\SkyAdmin-Pro-main\skyadmin-worker\src\cors.ts:33:3)
+    at dispatch (file:///D:/StudioProjects/SkyAdmin-Pro-main/skyadmin-worker/node_modules/hono/dist/compose.js:22:17)
+    at file:///D:/StudioProjects/SkyAdmin-Pro-main/skyadmin-worker/node_modules/hono/dist/hono-base.js:307:25
+
+\n>>> npm run db:migrate\n
+> skyadmin-worker@1.0.0 db:migrate
+> wrangler d1 migrations apply skyadmin-db --remote
+
+
+ ⛅️ wrangler 4.134.0 (update available 4.135.0)
+───────────────────────────────────────────────
+Resource location: remote 
+
+✅ No migrations to apply!
+\n>>> npm run deploy\n
+> skyadmin-worker@1.0.0 deploy
+> wrangler deploy --env=""
+
+
+ ⛅️ wrangler 4.134.0 (update available 4.135.0)
+───────────────────────────────────────────────
+Total Upload: 230.07 KiB / gzip: 56.99 KiB
+Your Worker has access to the following bindings:
+Binding                   Resource         
+env.DB (skyadmin-db)      D1 Database      
+
+Uploaded skyadmin-worker (8.89 sec)
+Deployed skyadmin-worker triggers (3.86 sec)
+  https://skyadmin-worker.skyadmin-pro.workers.dev
+Current Version ID: 7466df6c-5b96-482d-992f-986c3f21ec03
+\nCODES [('typecheck', 0), ('test', 0), ('migrate', 0), ('deploy', 0)]\n

@@ -1,0 +1,222 @@
+ M docs/UI_CHECKLIST.md
+ M main.py
+ M skyadmin-worker/schema.sql
+ M skyadmin-worker/src/index.ts
+ M skyadmin-worker/src/migrations.test.ts
+ M skyadmin-worker/src/rate_limit.ts
+ M skyadmin-worker/src/routes/admin/parts/css.ts
+ M skyadmin-worker/src/routes/admin/parts/html.ts
+ M skyadmin-worker/src/routes/admin/parts/js_4.ts
+ M skyadmin-worker/src/routes/admin/parts/js_5.ts
+ M skyadmin-worker/src/routes/generate.ts
+ M skyadmin-worker/src/routes/rate_limit_parts/pull.ts
+ M skyadmin-worker/src/routes/sync/pull.ts
+ M skyadmin-worker/src/routes/sync/push.ts
+ M skyadmin-worker/src/routes/sync/register.ts
+ M skyadmin-worker/src/routes/viewer/handler.ts
+ M skyadmin-worker/src/sync.test.ts
+ M skyadmin-worker/src/sync_auth.ts
+ M skyadmin-worker/src/sync_push.test.ts
+ M skyadmin-worker/src/sync_push/fetch.ts
+ M skyadmin-worker/src/sync_push/sql.ts
+ M skyadmin-worker/src/sync_push/write.ts
+ M skyadmin-worker/src/sync_schema.ts
+ M skyadmin_pro/config/__init__.py
+ M skyadmin_pro/config/licensing.py
+ M skyadmin_pro/config/nav.py
+ M skyadmin_pro/db/clients/batch_a.py
+ M skyadmin_pro/db/clients/batch_b.py
+ M skyadmin_pro/db/clients/crud_a.py
+ M skyadmin_pro/db/clients/crud_d.py
+ M skyadmin_pro/db/clients/doc_list.py
+ M skyadmin_pro/db/clients/documents_c.py
+ M skyadmin_pro/db/clients/incentives.py
+ M skyadmin_pro/db/core/context_a.py
+ M skyadmin_pro/db/core/context_b.py
+ M skyadmin_pro/db/courier.py
+ M skyadmin_pro/db/financial/financialMixinMixin0.py
+ M skyadmin_pro/db/financial/financialMixinMixin1.py
+ M skyadmin_pro/db/migrations/__init__.py
+ M skyadmin_pro/db/office/officeMixinMixin0.py
+ M skyadmin_pro/db/office/officeMixinMixin1.py
+ M skyadmin_pro/db/office/officeMixinMixin2.py
+ M skyadmin_pro/db/office/officeMixinMixin3.py
+ M skyadmin_pro/db/office/officeMixinMixin4.py
+ M skyadmin_pro/db/office/officeMixinMixin5.py
+ M skyadmin_pro/db/pipeline/pipelineMixinMixin0.py
+ M skyadmin_pro/db/settings/settingsMixinMixin1.py
+ M skyadmin_pro/db/settings/settingsMixinMixin3.py
+ M skyadmin_pro/db/settings/settingsMixinMixin4.py
+ M skyadmin_pro/db/suppliers/__init__.py
+ M skyadmin_pro/db/suppliers/suppliersMixinMixin0.py
+ M skyadmin_pro/db/suppliers/suppliersMixinMixin1.py
+ M skyadmin_pro/db/suppliers/suppliersMixinMixin2.py
+ M skyadmin_pro/db/suppliers/suppliersMixinMixin3.py
+ M skyadmin_pro/db/tasks/tasksMixinMixin0.py
+ M skyadmin_pro/db/tasks/tasksMixinMixin2.py
+ M skyadmin_pro/db/tasks/tasksMixinMixin3.py
+ M skyadmin_pro/db/tasks/tasksMixinMixin4.py
+ M skyadmin_pro/db/tasks/tasksMixinMixin6.py
+ M skyadmin_pro/db/tax/dashboard_a.py
+ M skyadmin_pro/db/tax/dashboard_b.py
+ M skyadmin_pro/db/tax/operations_a.py
+ M skyadmin_pro/db/tax/operations_c.py
+ M skyadmin_pro/db/tax/operations_d.py
+ M skyadmin_pro/db/tax/renewal_a.py
+ M skyadmin_pro/db/tax/status_a.py
+ M skyadmin_pro/db/tax/status_b.py
+ M skyadmin_pro/services/auto_backup/__init__.py
+ M skyadmin_pro/services/auto_backup/autoBackupSchedulerMixin0.py
+ M skyadmin_pro/services/auto_backup/funcs.py
+ M skyadmin_pro/services/client_commands/__init__.py
+ M skyadmin_pro/services/client_commands/deleteClientsCommandMixin0.py
+ M skyadmin_pro/services/client_commands/deleteClientsCommandMixin1.py
+ M skyadmin_pro/services/data_sync/__init__.py
+ M skyadmin_pro/services/data_sync/chunk_1.py
+ M skyadmin_pro/services/data_sync/chunk_2.py
+ M skyadmin_pro/services/data_sync/chunk_3.py
+ M skyadmin_pro/services/data_sync/chunk_4.py
+ M skyadmin_pro/services/data_sync/chunk_4_collect.py
+ M skyadmin_pro/services/data_sync/chunk_5_write.py
+ M skyadmin_pro/services/data_sync/chunk_7.py
+ M skyadmin_pro/services/i18n.py
+ M skyadmin_pro/services/storage_backend.py
+ M skyadmin_pro/services/sync_hlc/__init__.py
+ M skyadmin_pro/services/sync_hlc/funcs.py
+ M skyadmin_pro/services/sync_schema/__init__.py
+ M skyadmin_pro/services/sync_schema/_const_0.py
+ M skyadmin_pro/services/sync_schema/_const_1.py
+ M skyadmin_pro/services/sync_schema/_const_8.py
+ M skyadmin_pro/services/sync_schema/_const_9/_const_0/_const_0.py
+ M skyadmin_pro/ui/display.py
+ M skyadmin_pro/ui/main_window.py
+ M skyadmin_pro/ui/theme.py
+ M skyadmin_pro/ui/tree_height.py
+ M skyadmin_pro/ui/treeview.py
+ M skyadmin_pro/ui/views/company_details/financial_docs_tab/financialDocsTabMixinMixin1.py
+ M skyadmin_pro/ui/views/dashboard/dashboardViewMixin0.py
+ M skyadmin_pro/ui/views/dashboard/dashboardViewMixin6.py
+ M skyadmin_pro/ui/views/database_tasks/courier_panel/courierPanelMixin0.py
+ M skyadmin_pro/ui/views/database_tasks/courier_panel/courierPanelMixin2.py
+ M skyadmin_pro/ui/views/database_tasks/courier_panel/courierPanelMixin3.py
+ M skyadmin_pro/ui/views/database_tasks/task_panel/taskPanelMixin3.py
+ M skyadmin_pro/ui/views/database_tasks/task_panel/taskPanelMixin5.py
+ M skyadmin_pro/ui/views/database_tasks/view/__init__.py
+ M skyadmin_pro/ui/views/database_tasks/view/_const_8.py
+ M skyadmin_pro/ui/views/database_tasks/view/databaseTasksViewMixin0.py
+ M skyadmin_pro/ui/views/database_tasks/view/databaseTasksViewMixin1.py
+ M skyadmin_pro/ui/views/database_tasks/view/databaseTasksViewMixin2.py
+ M skyadmin_pro/ui/views/database_tasks/view/databaseTasksViewMixin3.py
+ M skyadmin_pro/ui/views/database_tasks/view/databaseTasksViewMixin4.py
+ M skyadmin_pro/ui/views/database_tasks/view/databaseTasksViewMixin5.py
+ M skyadmin_pro/ui/views/database_tasks/view/expand_tabs.py
+ M skyadmin_pro/ui/views/database_tasks/view/funcs.py
+ M skyadmin_pro/ui/views/database_tasks/view/tab_hints.py
+ M skyadmin_pro/ui/views/document_hub/financial/financialDocsPanelMixin0.py
+ M skyadmin_pro/ui/views/document_hub/financial/financialDocsPanelMixin1.py
+ M skyadmin_pro/ui/views/menu_panels/__init__.py
+ M skyadmin_pro/ui/views/office_hub/contacts_tab/contactsTabMixinMixin2.py
+ M skyadmin_pro/ui/views/office_hub/contacts_tab/contactsTabMixinMixin3.py
+ M skyadmin_pro/ui/views/office_hub/notebook_tab/notebookTabMixinMixin1.py
+ M skyadmin_pro/ui/views/office_hub/notebook_tab/notebookTabMixinMixin2.py
+ M skyadmin_pro/ui/views/settings/backup_mixin/__init__.py
+ M skyadmin_pro/ui/views/settings/backup_mixin/backupMixinMixin0.py
+ M skyadmin_pro/ui/views/settings/backup_mixin/backupMixinMixin1.py
+ M skyadmin_pro/ui/views/settings/backup_mixin/backupMixinMixin2.py
+ M skyadmin_pro/ui/views/settings/license_mixin/__init__.py
+ M skyadmin_pro/ui/views/settings/license_mixin/licenseMixinMixin3.py
+ M skyadmin_pro/ui/views/settings/license_mixin/licenseMixinMixin4.py
+ M skyadmin_pro/ui/views/settings/license_mixin/licenseMixinMixin5.py
+ M skyadmin_pro/ui/views/settings/sync_conflicts_dialog/funcs_0/funcs/build_conflict_tree.py
+ M skyadmin_pro/ui/views/settings/sync_conflicts_dialog/funcs_0/funcs/funcs.py
+ M skyadmin_pro/ui/views/settings/view/__init__.py
+ M skyadmin_pro/ui/views/settings/view/settingsViewMixin1.py
+ M skyadmin_pro/ui/views/settings/view/settingsViewMixin11.py
+ M skyadmin_pro/ui/views/settings/view/settingsViewMixin5.py
+ M skyadmin_pro/ui/views/settings/view/settingsViewMixin6.py
+ M skyadmin_pro/ui/views/settings/view/settingsViewMixin9.py
+ M skyadmin_pro/ui/views/utilities/utilitiesViewMixin0.py
+ M skyadmin_pro/ui/views/utilities/utilitiesViewMixin10.py
+ M skyadmin_pro/ui/widgets.py
+ M tests/test_auto_backup.py
+ M tests/test_canvas_scroll.py
+ M tests/test_data_sync.py
+ M tests/test_database_tasks_refresh.py
+ M tests/test_db_migrations.py
+ M tests/test_db_mixins.py
+ M tests/test_display_scaling.py
+ M tests/test_sync_hlc.py
+ M tests/test_treeview_empty_message.py
+ M tests/test_undo.py
+ M tests/test_visual_regression.py
+?? collect_order.txt
+?? docs/MULTI_PLATFORM.md
+?? docs/plans/
+?? pytest_audit_out.txt
+?? pytest_err.txt
+?? pytest_err1.txt
+?? pytest_err2.txt
+?? pytest_full_err.txt
+?? pytest_full_out.txt
+?? pytest_out.txt
+?? scripts/repair_d7_reexports.py
+?? skyadmin-worker/migrations/0008_org_scoped_sync.sql
+?? skyadmin-worker/migrations/0009_sku_entitlements.sql
+?? skyadmin-worker/migrations/0010_max_devices.sql
+?? skyadmin-worker/src/generate_sku.test.ts
+?? skyadmin-worker/src/routes/admin/parts/html_generate.ts
+?? skyadmin-worker/src/routes/admin/parts/html_lists.ts
+?? skyadmin-worker/src/routes/generate_flags.ts
+?? skyadmin-worker/src/routes/generate_insert.ts
+?? skyadmin-worker/src/routes/web/
+?? skyadmin-worker/src/sku_entitlements.test.ts
+?? skyadmin-worker/src/sku_entitlements.ts
+?? skyadmin-worker/src/sku_entitlements_legacy.ts
+?? skyadmin-worker/src/sku_max_devices.test.ts
+?? skyadmin-worker/src/sku_max_devices.ts
+?? skyadmin-worker/src/sync_org.test.ts
+?? skyadmin-worker/src/sync_org.ts
+?? skyadmin_pro/db/migrations/m017_documents_sync.py
+?? skyadmin_pro/db/migrations/m018_wave2b_sync.py
+?? skyadmin_pro/db/migrations/m019_sync_conflict_actors.py
+?? skyadmin_pro/db/soft_delete.py
+?? skyadmin_pro/db/soft_delete_cascade.py
+?? skyadmin_pro/db/suppliers/suppliers_delete.py
+?? skyadmin_pro/services/auto_backup/_const_5.py
+?? skyadmin_pro/services/data_sync/auto_job.py
+?? skyadmin_pro/services/data_sync/chunk_7_push.py
+?? skyadmin_pro/services/data_sync/device_limit.py
+?? skyadmin_pro/services/data_sync/dirty.py
+?? skyadmin_pro/services/data_sync/entitlements.py
+?? skyadmin_pro/services/data_sync/fk_lookup.py
+?? skyadmin_pro/services/data_sync/fk_pull.py
+?? skyadmin_pro/services/data_sync/fk_push.py
+?? skyadmin_pro/services/data_sync/gid_maps.py
+?? skyadmin_pro/services/data_sync/interval.py
+?? skyadmin_pro/services/data_sync/refresh.py
+?? skyadmin_pro/services/data_sync/row_payload.py
+?? skyadmin_pro/services/data_sync/scheduler.py
+?? skyadmin_pro/services/drive/
+?? skyadmin_pro/services/sync_schema/_const_11.py
+?? skyadmin_pro/services/sync_schema/_const_9/_const_0/_allowed_d.py
+?? skyadmin_pro/services/sync_schema/_const_9/_const_0/_allowed_e.py
+?? skyadmin_pro/ui/tree_empty.py
+?? skyadmin_pro/ui/tree_scroll.py
+?? skyadmin_pro/ui/views/menu_panels/accounting_view.py
+?? skyadmin_pro/ui/views/settings/backup_mixin/backupMixinMixin4.py
+?? skyadmin_pro/ui/views/settings/backup_mixin/backupMixinMixin5.py
+?? skyadmin_pro/ui/views/settings/backup_mixin/backupMixinMixin6.py
+?? skyadmin_pro/ui/views/settings/license_mixin/licenseMixinMixin7.py
+?? skyadmin_pro/ui/views/settings/view/settingsViewMixin13.py
+?? skyadmin_pro/ui/views/settings/view/settingsViewMixin14.py
+?? tests/test_auto_sync.py
+?? tests/test_device_limit_sync.py
+?? tests/test_drive_backend.py
+?? tests/test_drive_backfill.py
+?? tests/test_sku_entitlements_desktop.py
+?? tests/test_soft_delete_clients_office_renewal.py
+?? tests/test_soft_delete_tasks_docs_creds.py
+?? tests/test_sync_conflict_actors.py
+?? tests/test_sync_documents.py
+?? tests/test_sync_wave2b.py
+?? tests/test_sync_wave2b_soft_delete.py

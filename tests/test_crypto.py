@@ -155,9 +155,13 @@ def test_restore_rewrites_paths_for_cross_machine(tmp_path):
     target_db = tmp_path / "restored.db"
     summary = crypto.restore_encrypted_backup(archive, new_ws, target_db)
 
-    # Verify paths were rewritten.
+    # Verify paths were rewritten (DB is re-encrypted after restore).
     assert summary.paths_rewritten > 0
-    conn2 = sqlite3.connect(str(target_db))
+    from skyadmin_pro.db.cipher import connect as cipher_connect
+    from skyadmin_pro.db.cipher import db_state
+
+    assert db_state(target_db) == "cipher"
+    conn2 = cipher_connect(str(target_db))
     try:
         # workspace_root setting updated.
         row = conn2.execute("SELECT value FROM settings WHERE key = 'workspace_root'").fetchone()
