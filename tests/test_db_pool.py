@@ -82,3 +82,68 @@ def test_bundle_active_tracking(tmp_path):
     # _bundle_conn is None by default on a fresh database
     assert db._bundle_conn is None
     db.shutdown()
+
+
+def test_dashboard_snapshot_uses_one_connection(tmp_path, monkeypatch):
+    """dashboard_snapshot runs across a single pooled connection."""
+    from skyadmin_pro.database import Database
+
+    db = Database(tmp_path / "pool_test.db")
+    calls = []
+    real_connect = db._connect
+
+    def counting_connect():
+        calls.append(1)
+        return real_connect()
+
+    monkeypatch.setattr(db, "_connect", counting_connect)
+    snapshot = db.dashboard_snapshot()
+    assert snapshot is not None
+    assert len(calls) <= 1, f"dashboard_snapshot opened {len(calls)} connections"
+    db.shutdown()
+
+
+def test_background_conns_closed_on_shutdown(tmp_path):
+    """Deterministic cleanup: _close_pooled_conn closes every bg connection.
+
+    Each background thread acquires its own handle and parks; after the main
+    thread closes the pool, each parked thread probes its own handle. A
+    closed SQLite connection raises when used, so a successful probe means
+    the handle survived the close (the leak we are guarding against).
+    """
+    from skyadmin_pro.database import Database
+
+    db = Database(tmp_path / "pool_test.db")
+    release = threading.Event()
+    acquired: list = []
+    results: list = []
+
+    def worker():
+        conn = db._get_bg_conn()
+        acquired.append(conn)
+        if not release.wait(15):
+            return
+        try:
+            conn.execute("SELECT 1")
+            results.append(False)
+        except Exception:
+            results.append(True)
+
+    threads = [threading.Thread(target=worker) for _ in range(3)]
+    for t in threads:
+        t.start()
+    for _ in range(150):
+        if len(acquired) == 3:
+            break
+        threading.Event().wait(0.1)
+
+    assert len(db._bg_conns) == 3
+    assert len(acquired) == 3
+    db._close_pooled_conn()
+    release.set()
+    for t in threads:
+        t.join()
+
+    assert db._bg_conns == []
+    assert db._pooled_conn is None
+    assert results == [True, True, True]

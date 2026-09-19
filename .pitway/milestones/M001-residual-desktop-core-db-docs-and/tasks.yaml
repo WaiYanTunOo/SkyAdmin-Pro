@@ -4,19 +4,22 @@ tasks:
     name: DB pool connection audit + single-connection dashboard_snapshot
     objective: Audit remaining raw _connect() call sites so every data path uses the
       pool; collapse dashboard_snapshot to a single pooled connection; ensure
-      background-thread connections are closed deterministically.
-    status: ready
+      background-thread connections are closed deterministically (fix
+      cross-thread close so _close_pooled_conn can actually release them).
+    status: completed
     depends_on: []
     acceptance_criteria:
       - No stray raw _connect() call sites remain outside the pool's own opener;
         every consumer path uses _get_pooled_conn().
       - dashboard_snapshot performs its reads over one pooled connection.
-      - Background-thread connection scopes close deterministically and the pool
-        regression tests still pass.
+      - "Background-thread connection scopes close deterministically:
+        _close_pooled_conn() from the main thread provably closes
+        background-thread handles; pool tests pass."
     context_files:
       - skyadmin_pro/db/core/pool.py
       - skyadmin_pro/db/core/connect_a.py
       - skyadmin_pro/db/core/connect_b.py
+      - skyadmin_pro/db/cipher/funcs_0.py
       - skyadmin_pro/db/core/bg_conn_a.py
       - skyadmin_pro/db/core/bg_conn_b.py
       - skyadmin_pro/db/core/context_a.py
@@ -25,6 +28,8 @@ tasks:
       - tests/test_db_pool.py
     write_scope:
       - skyadmin_pro/db/core/bg_conn_b.py
+      - skyadmin_pro/db/core/connect_b.py
+      - skyadmin_pro/db/cipher/funcs_0.py
       - skyadmin_pro/db/core/context_a.py
       - skyadmin_pro/db/core/context_b.py
       - skyadmin_pro/db/tax/dashboard_b.py
@@ -33,14 +38,22 @@ tasks:
       strategy: command
       detail: python -m pytest tests/test_db_pool.py tests/test_db_mixins.py -q
       timeout_ms: 600000
-    result: null
+    result:
+      summary: "[truncated] () openers remain), dashboard_snapshot runs on a single
+        bundle-pinned connection, and shutdown() deterministically closes
+        tracked background connections. Added two regression tests
+        (single-connection snapshot; deterministic bg-close) to
+        tests/test_db_pool.py. No production change needed."
+      evidence: .....................................................................    [100%]
+        | 69 passed in 43.81s
+    attempts: 1
     usage: null
   - id: T002
     name: Narrow non-defensive bare excepts in db/services/config
     objective: Replace remaining bare `except Exception` handlers in db/, services/
       (non-UI), and config/ with specific exception types or an explicit
       re-raise justification, leaving Tk-teardown defensive handlers untouched.
-    status: waiting
+    status: ready
     depends_on:
       - T001
     acceptance_criteria:
@@ -295,4 +308,47 @@ tasks:
       strategy: manual
       detail: Review roadmap diffs against the landed commit list.
     result: null
+    usage: null
+  - id: T012
+    name: Fix bg-thread connection close (D-03)
+    objective: Make _close_pooled_conn() deterministically release background-thread
+      sqlcipher handles. The pool opener currently opens connections with the
+      driver default check_same_thread=True, so the main thread's close() raises
+      ProgrammingError that shutdown.py swallows — the handle stays open and
+      usable on the owner thread (real D-03 leak), breaking shutdown()/restore
+      semantics.
+    status: completed
+    depends_on:
+      - T001
+    acceptance_criteria:
+      - Pooled connections open with check_same_thread=False so the pool owner
+        (main thread) can close background-thread handles.
+      - "_close_pooled_conn() provably renders each tracked background handle
+        unusable: the regression probe in tests/test_db_pool.py passes."
+      - Pool and mixin regression tests pass.
+    context_files:
+      - skyadmin_pro/db/cipher/funcs_0.py
+      - skyadmin_pro/db/core/connect_b.py
+      - skyadmin_pro/db/core/bg_conn_b.py
+      - skyadmin_pro/db/core/shutdown.py
+      - skyadmin_pro/db/core/pool.py
+      - tests/test_db_pool.py
+    write_scope:
+      - skyadmin_pro/db/cipher/funcs_0.py
+      - skyadmin_pro/db/core/connect_b.py
+      - tests/test_db_pool.py
+    verification:
+      strategy: command
+      detail: python -m pytest tests/test_db_pool.py tests/test_db_mixins.py -q
+      timeout_ms: 600000
+    result:
+      summary: "[truncated] the pool opener (connect_b._connect) opens with
+        check_same_thread=False so the pool owner can release bg handles
+        deterministically. Regression test
+        test_background_conns_closed_on_shutdown probes each parked worker
+        handle after _close_pooled_conn() and requires all three to raise on
+        use."
+      evidence: .....................................................................    [100%]
+        | 69 passed in 44.92s
+    attempts: 1
     usage: null
