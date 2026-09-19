@@ -2,8 +2,10 @@
 
 import os
 import sys
+import tkinter as tk
 from pathlib import Path
 
+import customtkinter as ctk
 import pytest
 
 ROOT = Path(__file__).resolve().parents[1]
@@ -99,4 +101,20 @@ def db(tmp_path) -> Database:
     try:
         database.shutdown()
     except Exception:
+        pass
+
+
+@pytest.fixture
+def tk_root():
+    """Create a withdrawn CTk root for a test, properly destroyed afterwards."""
+    root = ctk.CTk()
+    root.withdraw()
+    yield root
+    from skyadmin_pro.ui.widgets import DatePickerField
+
+    DatePickerField._close_all_open()
+    try:
+        root.after(100, root.destroy)
+        root.mainloop()
+    except tk.TclError:
         pass

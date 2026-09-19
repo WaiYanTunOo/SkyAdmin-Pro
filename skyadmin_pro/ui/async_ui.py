@@ -5,6 +5,7 @@ from __future__ import annotations
 import logging
 import queue
 import threading
+import tkinter as tk
 from collections.abc import Callable
 from typing import Any
 
@@ -39,7 +40,7 @@ def _drain_queue() -> None:
         try:
             try:
                 exists = target.winfo_exists()
-            except Exception:
+            except tk.TclError:
                 continue
             if not exists:
                 continue
@@ -64,13 +65,13 @@ def _pump(widget) -> None:
     if active or pending:
         try:
             exists = widget.winfo_exists()
-        except Exception:
+        except tk.TclError:
             return
         if not exists:
             return
         try:
             widget._async_pump_after = widget.after(50, lambda: _pump(widget))
-        except Exception:
+        except tk.TclError:
             widget._async_pump_after = None
 
 
@@ -81,11 +82,11 @@ def cancel_pump(widget) -> None:
         return
     try:
         widget._async_pump_after = None
-    except Exception:  # defensive: Tk teardown/callback
+    except tk.TclError:  # defensive: Tk teardown/callback
         pass
     try:
         widget.after_cancel(after_id)
-    except Exception:  # defensive: Tk teardown/callback
+    except tk.TclError:  # defensive: Tk teardown/callback
         pass
 
 
@@ -101,7 +102,7 @@ def run_on_main(widget, fn: Callable[[], None], *, feedback=None) -> None:
         try:
             try:
                 exists = widget.winfo_exists()
-            except Exception:
+            except tk.TclError:
                 return
             if not exists:
                 return
@@ -112,7 +113,7 @@ def run_on_main(widget, fn: Callable[[], None], *, feedback=None) -> None:
             if target is not None and hasattr(target, "error"):
                 try:
                     target.error(str(exc))
-                except Exception:  # defensive: Tk teardown/callback
+                except tk.TclError:  # defensive: Tk teardown/callback
                     _log.exception("UI callback target error handler failed")
 
     try:
@@ -150,7 +151,7 @@ def run_background(
             try:
                 try:
                     exists = widget.winfo_exists()
-                except Exception:
+                except tk.TclError:
                     return
                 if not exists:
                     return
@@ -168,14 +169,14 @@ def run_background(
                 if on_error:
                     try:
                         on_error(str(exc))
-                    except Exception:  # defensive: Tk teardown/callback
+                    except tk.TclError:  # defensive: Tk teardown/callback
                         _log.exception("Background UI fallback error handler failed")
                 else:
                     target = feedback if feedback is not None else _feedback_for(widget)
                     if target is not None and hasattr(target, "error"):
                         try:
                             target.error(str(exc))
-                        except Exception:  # defensive: Tk teardown/callback
+                        except tk.TclError:  # defensive: Tk teardown/callback
                             _log.exception("Background UI fallback target error handler failed")
             finally:
                 if finally_fn:
@@ -201,7 +202,7 @@ def run_background(
         _log.exception("Failed to schedule UI pump")
         try:
             widget._async_pump_after = None
-        except Exception:  # defensive: Tk teardown/callback
+        except tk.TclError:  # defensive: Tk teardown/callback
             pass
         with _ACTIVE_LOCK:
             _ACTIVE -= 1

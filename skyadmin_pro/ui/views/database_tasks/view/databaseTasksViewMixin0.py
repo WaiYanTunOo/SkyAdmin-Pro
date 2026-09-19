@@ -2,9 +2,8 @@ from __future__ import annotations
 
 import customtkinter as ctk
 
+from skyadmin_pro.ui.views.database_tasks.tab_names import TAB_NAMES
 from skyadmin_pro.ui.widgets import FeedbackLabel, themed_tabview
-
-from ._const_8 import TAB_NAMES
 
 
 class DatabaseTasksViewMixin0:

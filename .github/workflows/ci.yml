@@ -62,6 +62,13 @@ jobs:
         # B608: f-string SQL with bound ? placeholders (IN-clause builders), not user SQL.
         run: bandit -r skyadmin_pro/ --severity-level medium --skip B608
 
+      - name: Security scan with semgrep
+        if: matrix.python-version == '3.12'
+        uses: semgrep/semgrep-action@v1
+        with:
+          config: p/python
+          generatingCode: false
+
   python-windows:
     # Windows CI job: catches Windows-only issues on every PR (previously only at release).
     runs-on: windows-latest
@@ -101,13 +108,22 @@ jobs:
           SKYADMIN_PROCESS_OFFLOAD: "0"
 
       - name: Audit Python dependencies
+        if: matrix.python-version == '3.12'
         # PYSEC-2022-252: historical PyPI account takeover of deep-translator;
         # no fixed release exists; 1.11.4 is the current upstream line.
         run: pip-audit --strict --ignore-vuln PYSEC-2022-252
 
       - name: Security scan with bandit
+        if: matrix.python-version == '3.12'
         # B608: f-string SQL with bound ? placeholders (IN-clause builders), not user SQL.
         run: bandit -r skyadmin_pro/ --severity-level medium --skip B608
+
+      - name: Security scan with semgrep
+        if: matrix.python-version == '3.12'
+        uses: semgrep/semgrep-action@v1
+        with:
+          config: p/python
+          generatingCode: false
 
   perf:
     # Dedicated performance gate: budget tests block the build, and per-test
@@ -134,7 +150,7 @@ jobs:
           pip install -r requirements.txt -r requirements-dev.txt
 
       - name: Run performance budgets
-        run: pytest tests/test_performance_clients.py tests/test_performance_stress.py -q --tb=short --durations=15 --junitxml=perf-results.xml
+        run: pytest tests/test_performance_clients.py tests/test_performance_stress.py -q --tb=short --durations=15 --timeout=120 --junitxml=perf-results.xml
         env:
           SKYADMIN_SKIP_DAILY_CHECK: "1"
 

@@ -3,7 +3,6 @@
 from __future__ import annotations
 
 from skyadmin_pro.db.cipher import (
-    OPERATIONAL_ERRORS,
     DBConnection,
 )
 
@@ -13,7 +12,7 @@ class BgConnMixinA:
         try:
             conn.execute("SELECT 1")
             return True
-        except OPERATIONAL_ERRORS:
+        except Exception:  # connection is dead — replace it
             return False
 
     def _track_bg_conn(self, conn: DBConnection) -> None:

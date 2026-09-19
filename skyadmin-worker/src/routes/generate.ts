@@ -66,32 +66,31 @@ export async function generateHandler(c: Context<{ Bindings: Env }>) {
   const { key, iat, nonce, exp } = await generateLicenseKey(mid, days, ed25519Key);
   const passcode = await generatePasscode(mid, days, ed25519Key);
 
-  try {
-    await insertIssuedLicense(c.env, {
-      mid, key, passcode, days, exp, nonce, iat, price, orgId,
-      syncEnabled: flags.syncEnabled,
-      webEnabled: flags.webEnabled,
-      driveFilesEnabled: flags.driveFilesEnabled,
-      maxDevices: flags.maxDevices,
-    });
-  } catch (err) {
-    console.error("D1 transaction failed during generate:", err);
-    return c.json({ ok: false, error: "Failed to record license." }, 500);
-  }
-
-  return c.json({
-    ok: true,
-    license_key: key,
-    passcode,
-    nonce,
-    expires_at: exp,
-    issued_at: iat,
-    package_days: days,
-    price_thb: price,
-    org_id: orgId,
-    sync_enabled: flags.syncEnabled,
-    web_enabled: flags.webEnabled,
-    drive_files_enabled: flags.driveFilesEnabled,
-    max_devices: flags.maxDevices,
-  });
+   try {
+     await insertIssuedLicense(c.env, {
+       mid, key, passcode, days, exp, nonce, iat, price, orgId,
+       syncEnabled: flags.syncEnabled,
+       webEnabled: flags.webEnabled,
+       driveFilesEnabled: flags.driveFilesEnabled,
+       maxDevices: flags.maxDevices,
+     });
+     return c.json({
+       ok: true,
+       license_key: key,
+       passcode,
+       nonce,
+       expires_at: exp,
+       issued_at: iat,
+       package_days: days,
+       price_thb: price,
+       org_id: orgId,
+       sync_enabled: flags.syncEnabled,
+       web_enabled: flags.webEnabled,
+       drive_files_enabled: flags.driveFilesEnabled,
+       max_devices: flags.maxDevices,
+     });
+   } catch (err) {
+     console.error("D1 transaction failed during generate:", err);
+     return c.json({ ok: false, error: "Failed to record license." }, 500);
+   }
 }

@@ -173,6 +173,11 @@ def _apply_input_theme(widget: ctk.CTkBaseClass) -> None:
 
 
 _LAST_THEME_MODE: str | None = None
+# Theme name -> set of widget id() values that have already been themed.
+# When apply_form_theme() is called and the current mode matches a cached
+# mode, widgets already in the set are skipped, avoiding redundant walks.
+_THEMED_WIDGET_CACHE: dict[str, set[int]] = {}
+_THEMED_WIDGET_CACHE_SIZE_LIMIT = 5000
 
 
 def apply_form_theme(root: ctk.Misc) -> None:
@@ -188,8 +193,12 @@ def apply_form_theme(root: ctk.Misc) -> None:
     if getattr(root, "_subtree_themed_mode", None) == current_mode:
         return
 
-    # Theme this widget if needed
-    if getattr(root, "_applied_form_theme_mode", None) != current_mode:
+    # Check theme-level cache: if mode unchanged and this widget is cached, skip
+    if current_mode in _THEMED_WIDGET_CACHE and id(root) in _THEMED_WIDGET_CACHE[current_mode]:
+        # Still need to recurse into children in case they aren't cached
+        pass
+    else:
+        # Theme this widget if needed
         if isinstance(root, ThemedTreeview):
             root.apply_theme()
         elif isinstance(root, ctk.CTkTabview):
@@ -204,6 +213,14 @@ def apply_form_theme(root: ctk.Misc) -> None:
         elif isinstance(root, _INPUT_WIDGET_TYPES):
             _apply_input_theme(root)
         root._applied_form_theme_mode = current_mode
+
+        # Add to cache
+        if current_mode not in _THEMED_WIDGET_CACHE:
+            _THEMED_WIDGET_CACHE[current_mode] = set()
+        _THEMED_WIDGET_CACHE[current_mode].add(id(root))
+        # Prune cache if it grows too large
+        if len(_THEMED_WIDGET_CACHE[current_mode]) > _THEMED_WIDGET_CACHE_SIZE_LIMIT:
+            _THEMED_WIDGET_CACHE[current_mode] = set()
 
     try:
         children = root.winfo_children()
@@ -223,6 +240,8 @@ def should_apply_theme() -> bool:
     if current == _LAST_THEME_MODE:
         return False
     _LAST_THEME_MODE = current
+    # Mode changed — clear the per-mode cache so widgets get re-themed
+    _THEMED_WIDGET_CACHE.clear()
     return True
 
 
@@ -331,7 +350,7 @@ class FormField(ctk.CTkFrame):
                     self.widget.insert("1.0", value)
                 return
             self.widget.set(value)
-        except Exception:
+        except (tk.TclError, ValueError):
             return
 
     def clear(self) -> None:
@@ -669,13 +688,13 @@ class DatePickerField(ctk.CTkFrame):
     _open_fields: ClassVar[set[DatePickerField]] = set()
     _root_click_binds: ClassVar[dict[int, str]] = {}
     _root_escape_binds: ClassVar[dict[int, str]] = {}
+    _last_opened: ClassVar[DatePickerField | None] = None
 
     def __init__(self, master, *, var: ctk.StringVar | None = None, **kwargs) -> None:
         super().__init__(master, fg_color="transparent", **kwargs)
         self.grid_columnconfigure(0, weight=1)
         self.var = var if var is not None else ctk.StringVar()
         self._calendar_top: ctk.CTkToplevel | None = None
-        self._grab_after_id: str | None = None
         self._entry = ctk.CTkEntry(self, textvariable=self.var, placeholder_text="YYYY-MM-DD", **entry_style_kwargs())
         self._entry.grid(row=0, column=0, sticky="ew")
         ctk.CTkButton(
@@ -698,16 +717,6 @@ class DatePickerField(ctk.CTkFrame):
             return widget is not None and bool(widget.winfo_exists())
         except tk.TclError:
             return False
-
-    def _cancel_grab_retry(self) -> None:
-        after_id = self._grab_after_id
-        self._grab_after_id = None
-        if after_id is None:
-            return
-        try:
-            self.after_cancel(after_id)
-        except (tk.TclError, ValueError):
-            pass
 
     def _safe_focus_calendar(self, top: ctk.CTkToplevel) -> None:
         try:
@@ -765,8 +774,12 @@ class DatePickerField(ctk.CTkFrame):
 
     @classmethod
     def _on_root_escape(cls, _event=None) -> None:
-        for field in list(cls._open_fields):
-            field._close_calendar()
+        target = cls._last_opened
+        if target is not None and cls._widget_alive(target._calendar_top):
+            target._close_calendar()
+        else:
+            for field in list(cls._open_fields):
+                field._close_calendar()
 
     @classmethod
     def _close_all_open(cls) -> None:
@@ -803,7 +816,6 @@ class DatePickerField(ctk.CTkFrame):
                 pass
 
     def _close_calendar(self) -> None:
-        self._cancel_grab_retry()
         top = self._calendar_top
         self._calendar_top = None
         root = None
@@ -812,7 +824,10 @@ class DatePickerField(ctk.CTkFrame):
                 root = self.winfo_toplevel()
         except tk.TclError:
             root = None
-        self._open_fields.discard(self)
+        cls = type(self)
+        if self is cls._last_opened:
+            cls._last_opened = None
+        cls._open_fields.discard(self)
         if top is not None:
             try:
                 if self._widget_alive(top):
@@ -830,15 +845,13 @@ class DatePickerField(ctk.CTkFrame):
                 pass
 
     def _register_open(self, top: ctk.CTkToplevel) -> None:
-        # Defensive: only this field should remain tracked as open.
-        for other in list(self._open_fields):
-            if other is not self:
-                other._close_calendar()
-        self._open_fields.add(self)
+        cls = type(self)
+        cls._open_fields.add(self)
+        cls._last_opened = self
         root = self.winfo_toplevel()
-        self._ensure_root_binds(root)
+        cls._ensure_root_binds(root)
         try:
-            if self._widget_alive(top):
+            if cls._widget_alive(top):
                 top.bind("<Escape>", lambda _e: self._close_calendar())
         except tk.TclError:
             pass
@@ -851,6 +864,7 @@ class DatePickerField(ctk.CTkFrame):
         except tk.TclError:
             return
         try:
+            self.update()
             screen_w = self.winfo_screenwidth()
             screen_h = self.winfo_screenheight()
         except tk.TclError:
@@ -876,11 +890,9 @@ class DatePickerField(ctk.CTkFrame):
 
     def _grab_calendar(self, top: ctk.CTkToplevel) -> None:
         """Grab after the popup is mapped — prefer update() over delayed retry."""
-        self._cancel_grab_retry()
         try:
             if self._calendar_top is not top or not self._widget_alive(top):
                 return
-            # Flush geometry/map so grab_set succeeds without a delayed retry race.
             top.update_idletasks()
             top.update()
             if self._calendar_top is not top or not self._widget_alive(top):
@@ -890,10 +902,9 @@ class DatePickerField(ctk.CTkFrame):
             pass
 
     def _open_calendar(self) -> None:
-        # Close every open calendar *before* creating a new CTkToplevel.
-        # CTk schedules delayed focus restore after titlebar setup; destroying
-        # another popup afterwards races focus_set on a dead path.
-        self._close_all_open()
+        # Close this field's own popup before creating a new one.
+        if self._calendar_top is not None:
+            self._close_calendar()
         today = date.today()
         view = self._initial_date().replace(day=1)
 

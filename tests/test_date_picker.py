@@ -70,9 +70,9 @@ def test_datepicker_class_tracks_open_fields():
     assert "-topmost" not in class_src
     assert "grab_set" in class_src
     assert "transient" in class_src
-    assert "_close_all_open()" in class_src
+    assert "_close_calendar()" in class_src
     assert "tk.TclError" in class_src
-    assert "_grab_after_id" in class_src
+    assert "_last_opened" in class_src
     # U2: map via update/update_idletasks, not a fragile delayed grab retry.
     grab_src = class_src.split("def _grab_calendar")[1].split("def _open_calendar")[0]
     assert "after(" not in grab_src
@@ -80,15 +80,14 @@ def test_datepicker_class_tracks_open_fields():
     assert ".update()" in grab_src or "top.update()" in grab_src
 
 
-def test_datepicker_rapid_multi_instance_switch_no_tcl_error():
+def test_datepicker_rapid_multi_instance_switch_no_tcl_error(tk_root) -> None:
     """Opening field B while A is open must not raise on destroyed focus/grab."""
     errors: list[BaseException] = []
+    root = tk_root
 
     def _report(exc, val, tb):
         errors.append(val if isinstance(val, BaseException) else exc)
 
-    root = ctk.CTk()
-    root.withdraw()
     prev = root.report_callback_exception
     root.report_callback_exception = _report
     try:
@@ -103,20 +102,22 @@ def test_datepicker_rapid_multi_instance_switch_no_tcl_error():
         assert f1._calendar_top is not None
         assert DatePickerField._widget_alive(f1._calendar_top)
 
-        # Rapid switch: close-before-create must leave only f2 open.
+        # Field B opens its own popup; field A's popup stays open.
         f2._open_calendar()
         root.update()
         root.update_idletasks()
-        # Flush CTk titlebar after(10)/after(200) callbacks that used to
-        # call focus_set on the destroyed first popup.
-        root.after(250, root.quit)
-        root.mainloop()
-
-        assert f1._calendar_top is None
+        assert f1._calendar_top is not None
         assert f2._calendar_top is not None
         assert DatePickerField._widget_alive(f2._calendar_top)
-        assert sum(1 for f in DatePickerField._open_fields) == 1
+        assert len(DatePickerField._open_fields) == 2
+        assert f1 in DatePickerField._open_fields
         assert f2 in DatePickerField._open_fields
+
+        f1._close_calendar()
+        root.update()
+        assert f1._calendar_top is None
+        assert f2._calendar_top is not None
+        assert len(DatePickerField._open_fields) == 1
 
         f2._close_calendar()
         root.update()
@@ -124,8 +125,3 @@ def test_datepicker_rapid_multi_instance_switch_no_tcl_error():
         assert not any(isinstance(err, tk.TclError) for err in errors), errors
     finally:
         root.report_callback_exception = prev
-        DatePickerField._close_all_open()
-        try:
-            root.destroy()
-        except tk.TclError:
-            pass

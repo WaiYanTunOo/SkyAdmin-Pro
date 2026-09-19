@@ -76,8 +76,8 @@ export async function syncRegisterHandler(c: Context<{ Bindings: Env }>) {
 
   const orgId = await lookupLicenseOrgId(c.env.DB, claim.mid);
   const flags = await lookupSkuFlags(c.env.DB, claim.mid);
-  const maxDevices = effectiveMaxDevices(flags);
-  const seatOk = await checkOrgDeviceLimit(c.env.DB, orgId, claim.mid, maxDevices);
+   const maxDevices = Math.floor(effectiveMaxDevices(flags));
+   const seatOk = await checkOrgDeviceLimit(c.env.DB, orgId, claim.mid, maxDevices);
   if (!seatOk.ok) return c.json({ ok: false, error: seatOk.error }, 403);
 
   const token = await upsertSyncDevice(c.env.DB, claim.mid, orgId);

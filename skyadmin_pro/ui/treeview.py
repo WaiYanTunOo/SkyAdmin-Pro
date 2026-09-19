@@ -20,6 +20,15 @@ _INCREMENTAL_THRESHOLD = 20
 # per-treeview apply_theme() calls after the first are per-widget only.
 _SHARED_STYLE_KEY: tuple | None = None
 _DPI_MULTIPLIER: float | None = None
+# Class-level flag: True when theme has been applied this cycle.
+# Reset via _reset_theme_cycle() before a new refresh cycle begins.
+_APPLIED_THEME_THIS_CYCLE: bool = False
+
+
+def _reset_theme_cycle() -> None:
+    """Mark that a new theme refresh cycle has begun."""
+    global _APPLIED_THEME_THIS_CYCLE
+    _APPLIED_THEME_THIS_CYCLE = False
 
 
 def _get_dpi_multiplier(tk_root) -> float:
@@ -137,10 +146,15 @@ def configure_shared_tree_style(
         arrowcolor=[("active", "#ffffff"), ("!active", foreground)],
     )
     _SHARED_STYLE_KEY = key
+    global _APPLIED_THEME_THIS_CYCLE
+    _APPLIED_THEME_THIS_CYCLE = True
+    ThemedTreeview._theme_applied_this_cycle = True
     return True
 
 
 class ThemedTreeview(ctk.CTkFrame):
+    _theme_applied_this_cycle: bool = False
+
     def __init__(
         self,
         master,
@@ -390,6 +404,19 @@ class ThemedTreeview(ctk.CTkFrame):
 
         current_key = (mode, ui_zoom, dpi_multiplier)
         if getattr(self, "_applied_tree_theme_key", None) == current_key:
+            return
+
+        # If theme already applied this cycle and shared styles match,
+        # skip expensive per-widget tag configuration
+        if self._theme_applied_this_cycle and _SHARED_STYLE_KEY is not None:
+            self.configure(fg_color=None)  # minimal widget-level update only
+            self.tree.configure(style="Sky.Treeview")
+            try:
+                self._vscroll.configure(style="Sky.Vertical.TScrollbar")
+                self.hscrollbar.configure(style="Sky.Horizontal.TScrollbar")
+            except tk.TclError:
+                pass
+            self._applied_tree_theme_key = current_key
             return
 
         palette = table_palette(mode)

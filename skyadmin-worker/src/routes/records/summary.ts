@@ -4,11 +4,14 @@ import { recordsDbError } from "./errors";
 import { IssuedLicenseRow, SummarySourceRow } from "./types";
 
 const SUMMARY_SQL = `SELECT l.machine_id, l.expires_at, l.issued_at, l.package_days, l.nonce,
-                (EXISTS (SELECT 1 FROM revocations WHERE target = l.nonce) OR
-                 EXISTS (SELECT 1 FROM revocations WHERE target = l.machine_id)) AS revoked,
-                EXISTS (SELECT 1 FROM used_nonces WHERE nonce = l.nonce) AS used
-         FROM issued_licenses l
-         ORDER BY l.id DESC LIMIT ?`;
+                 MAX(CASE WHEN r.target IS NOT NULL THEN 1 ELSE 0 END) AS revoked,
+                 MAX(CASE WHEN u.nonce IS NOT NULL THEN 1 ELSE 0 END) AS used
+          FROM issued_licenses l
+          LEFT JOIN revocations r ON r.target = l.nonce
+          LEFT JOIN revocations rm ON rm.target = l.machine_id
+          LEFT JOIN used_nonces u ON u.nonce = l.nonce
+          GROUP BY l.id
+          ORDER BY l.id DESC LIMIT ?`;
 
 export async function loadSummarySource(
   c: Context<{ Bindings: Env }>,

@@ -251,8 +251,8 @@ class MainWindow(dnd_base_class()):
         if callable(on_focus):
             try:
                 on_focus()
-            except Exception:
-                logger.debug("Auto-sync focus pull failed", exc_info=True)
+            except Exception as exc:
+                logger.debug("Auto-sync focus pull failed: %s", exc)
 
     def _on_window_map(self, event) -> None:
         if event.widget is not self:
@@ -262,8 +262,8 @@ class MainWindow(dnd_base_class()):
         if callable(on_focus):
             try:
                 on_focus()
-            except Exception:
-                logger.debug("Auto-sync map pull failed", exc_info=True)
+            except Exception as exc:
+                logger.debug("Auto-sync map pull failed: %s", exc)
 
     def _build_sidebar(self) -> None:
         """Build the outer sidebar frame and hand nav-button management to SidebarWidget."""

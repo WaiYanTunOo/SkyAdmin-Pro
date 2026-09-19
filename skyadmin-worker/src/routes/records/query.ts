@@ -26,13 +26,16 @@ export async function loadRecordTotal(c: Context<{ Bindings: Env }>): Promise<nu
 }
 
 const LIST_SQL = `SELECT l.id, l.machine_id, l.license_key, l.passcode, l.package_days,
-              l.expires_at, l.nonce, l.issued_at, l.price_thb,
-              (EXISTS (SELECT 1 FROM revocations WHERE target = l.nonce) OR
-               EXISTS (SELECT 1 FROM revocations WHERE target = l.machine_id)) AS revoked,
-              EXISTS (SELECT 1 FROM used_nonces WHERE nonce = l.nonce) AS used
-       FROM issued_licenses l
-       ORDER BY l.id DESC
-       LIMIT ? OFFSET ?`;
+               l.expires_at, l.nonce, l.issued_at, l.price_thb,
+               MAX(CASE WHEN r.target IS NOT NULL THEN 1 ELSE 0 END) AS revoked,
+               MAX(CASE WHEN u.nonce IS NOT NULL THEN 1 ELSE 0 END) AS used
+        FROM issued_licenses l
+        LEFT JOIN revocations r ON r.target = l.nonce
+        LEFT JOIN revocations rm ON rm.target = l.machine_id
+        LEFT JOIN used_nonces u ON u.nonce = l.nonce
+        GROUP BY l.id
+        ORDER BY l.id DESC
+        LIMIT ? OFFSET ?`;
 
 export async function loadPageRows(
   c: Context<{ Bindings: Env }>,

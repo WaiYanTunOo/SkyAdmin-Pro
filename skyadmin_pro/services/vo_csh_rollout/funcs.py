@@ -92,11 +92,15 @@ def _infer_for_client(db: Database, client_id: int, row: dict, *, only_missing: 
     return vo_updated, csh_updated
 
 
-def infer_vo_csh_renewal_dates(db: Database, *, only_missing: bool = True) -> dict[str, int]:
+def infer_vo_csh_renewal_dates(
+    db: Database, *, only_missing: bool = True, client_id: int | None = None
+) -> dict[str, int]:
     """Copy latest document expiry into client VO/CSH renewal fields."""
     vo_total = 0
     csh_total = 0
     for row in db.list_vo_csh_setup_candidates():
+        if client_id is not None and int(row["id"]) != client_id:
+            continue
         vo, csh = _infer_for_client(db, int(row["id"]), row, only_missing=only_missing)
         vo_total += vo
         csh_total += csh
@@ -105,8 +109,4 @@ def infer_vo_csh_renewal_dates(db: Database, *, only_missing: bool = True) -> di
 
 def infer_client_vo_csh_renewal_dates(db: Database, client_id: int, *, only_missing: bool = True) -> dict[str, int]:
     """Infer renewal dates for one client."""
-    row = db.get_client(client_id)
-    if not row:
-        return {"vo": 0, "csh": 0}
-    vo, csh = _infer_for_client(db, client_id, row, only_missing=only_missing)
-    return {"vo": vo, "csh": csh}
+    return infer_vo_csh_renewal_dates(db, only_missing=only_missing, client_id=client_id)

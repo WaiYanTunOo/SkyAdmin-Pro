@@ -49,7 +49,7 @@ class CanvasScrollFrame(ctk.CTkFrame):
             except (tk.TclError, ValueError):  # defensive: Tk teardown/callback
                 pass
             self._pending_scroll_update = None
-        self._pending_scroll_update = self.after(100, self._update_scrollregion)
+        self._pending_scroll_update = self.after(50, self._update_scrollregion)
 
     def _update_scrollregion(self) -> None:
         self._pending_scroll_update = None
@@ -62,11 +62,37 @@ class CanvasScrollFrame(ctk.CTkFrame):
             self._canvas.configure(scrollregion=self._canvas.bbox("all"))
         except tk.TclError:  # defensive: Tk teardown/callback
             pass
-        # Re-bind wheel for newly added children
+        # Debounce wheel rebind: rapid scroll events don't trigger full walks
+        if getattr(self, "_bind_wheel_pending", False):
+            return
+        self._bind_wheel_pending = True
+        self.after(30, self._do_bind_wheel)
+
+    def _do_bind_wheel(self) -> None:
+        self._bind_wheel_pending = False
         self._bind_wheel_recursive(self.content)
 
     def _on_canvas_configure(self, event) -> None:
         self._canvas.itemconfig(self._window_id, width=event.width)
+
+    def _prune_caches(self) -> None:
+        """Remove dead widget paths from _widget_cache and _wheel_bound."""
+        alive_cache: set[str] = set()
+        for path in self._widget_cache:
+            try:
+                self.nametowidget(path)
+                alive_cache.add(path)
+            except (KeyError, tk.TclError):
+                pass
+        self._widget_cache = alive_cache
+        alive_wheel: set[str] = set()
+        for path in self._wheel_bound:
+            try:
+                self.nametowidget(path)
+                alive_wheel.add(path)
+            except (KeyError, tk.TclError):
+                pass
+        self._wheel_bound = alive_wheel
 
     def _bind_wheel_recursive(self, widget) -> None:
         # Bind wheel to widget and all current descendants; called on content changes.
@@ -74,7 +100,9 @@ class CanvasScrollFrame(ctk.CTkFrame):
         # passes don't stack duplicate handlers on the same widget.
         # Skip Treeview widgets — they handle their own scrolling.
         # Uses _widget_cache to avoid re-walking already-seen subtrees.
+        # Aggressive debouncing: skip if a bind pass is already scheduled.
         try:
+            self._prune_caches()
             for dead in [p for p in self._wheel_bound]:
                 try:
                     self.nametowidget(dead)

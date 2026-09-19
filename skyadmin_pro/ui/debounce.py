@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import tkinter as tk
 from collections.abc import Callable
 
 
@@ -13,12 +14,12 @@ def debounced_after(widget, callback: Callable[[], None], delay_ms: int = 300) -
         if after_id[0] is not None:
             try:
                 widget.after_cancel(after_id[0])
-            except Exception:  # defensive: Tk teardown/callback
+            except tk.TclError:  # defensive: Tk teardown/callback
                 pass
             after_id[0] = None
         try:
             after_id[0] = widget.after(delay_ms, _run)
-        except Exception:
+        except tk.TclError:
             after_id[0] = None
 
     def _run() -> None:
@@ -26,7 +27,7 @@ def debounced_after(widget, callback: Callable[[], None], delay_ms: int = 300) -
         try:
             if not widget.winfo_exists():
                 return
-        except Exception:
+        except tk.TclError:
             return
         callback()
 
@@ -34,7 +35,7 @@ def debounced_after(widget, callback: Callable[[], None], delay_ms: int = 300) -
         if after_id[0] is not None:
             try:
                 widget.after_cancel(after_id[0])
-            except Exception:  # defensive: Tk teardown/callback
+            except tk.TclError:  # defensive: Tk teardown/callback
                 pass
             after_id[0] = None
 

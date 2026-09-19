@@ -20,7 +20,7 @@ try:
     DND_FILES = _DND_FILES
     TkinterDnD = _TkinterDnD
     DND_AVAILABLE = True
-except Exception:  # defensive: Tk teardown/callback
+except ImportError:  # defensive: tkinterdnd2 not installed
     pass
 
 

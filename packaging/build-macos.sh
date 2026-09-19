@@ -10,6 +10,32 @@ if [[ "$(uname -s)" != "Darwin" ]]; then
     exit 1
 fi
 
+# ── Docker-based testing option (CI-03) ──────────────────────────
+# To run tests in a reproducible Docker environment instead of the
+# host system, set USE_DOCKER=1 before invoking this script:
+#
+#   USE_DOCKER=1 ./packaging/build-macos.sh
+#
+# This spins up a python:3.12-slim container, installs dependencies,
+# runs the test suite inside it, then proceeds with the build.
+# Useful for CI parity checks and verifying that the build works
+# from a clean environment.
+# ──────────────────────────────────────────────────────────────────
+
+if [[ "${USE_DOCKER:-0}" == "1" ]]; then
+    if ! command -v docker &>/dev/null; then
+        echo "USE_DOCKER=1 requires Docker but it is not installed." >&2
+        exit 1
+    fi
+    echo "Running tests in Docker container..."
+    docker run --rm -v "$ROOT:$ROOT" -w "$ROOT" python:3.12-slim bash -c '
+        python -m pip install --upgrade pip
+        pip install -r requirements.txt -r requirements-dev.txt
+        xvfb-run pytest tests/ -q --tb=short --ignore=tests/test_performance_clients.py --ignore=tests/test_performance_stress.py
+    '
+    echo "Docker test pass."
+fi
+
 VENV_PY="$ROOT/.venv/bin/python"
 if [[ ! -x "$VENV_PY" ]]; then
     echo "Run ./packaging/setup-macos.sh first."

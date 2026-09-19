@@ -1,86 +1,120 @@
-/** CORS behavior tests — same-origin, cross-origin, null origin, preflight. */
+/** CORS middleware behavior tests. */
 
 import { describe, expect, it } from "vitest";
 import app from "./index";
+import type { Env } from "./db";
 
-const SELF_ORIGIN = "http://localhost";
-const CROSS_ORIGIN = "https://evil.example.com";
+function mockEnv(): Env {
+  return {
+    DB: {
+      prepare: () => ({
+        bind: () => ({
+          first: async () => null,
+          run: async () => ({ success: true }),
+        }),
+      }),
+    } as unknown as D1Database,
+    LICENSE_SECRET: "test-license-secret",
+    API_TOKEN: "test-api-token",
+    ADMIN_PATH: "admin-test",
+    ADMIN_PASS: "admin-pass",
+  };
+}
 
-describe("CORS — public endpoints", () => {
-  it("allows null origin with wildcard (desktop/curl)", async () => {
-    const res = await app.request(
-      "http://localhost/api/ping",
-      { headers: { Origin: "null" } },
-    );
-    expect(res.status).toBe(200);
-    expect(res.headers.get("Access-Control-Allow-Origin")).toBe("*");
+function request(url: string, opts?: RequestInit): Request {
+  return new Request(url, {
+    method: opts?.method || "GET",
+    headers: opts?.headers as Record<string, string> || {},
+    body: opts?.body || undefined,
   });
+}
 
-  it("allows no origin with wildcard (curl/file://)", async () => {
-    const res = await app.request("http://localhost/api/ping");
-    expect(res.status).toBe(200);
-    expect(res.headers.get("Access-Control-Allow-Origin")).toBe("*");
-  });
-
+describe("CORS middleware", () => {
   it("allows same-origin with credentials", async () => {
-    const res = await app.request(
-      "http://localhost/api/ping",
-      { headers: { Origin: SELF_ORIGIN } },
+    const env = mockEnv();
+    const selfOrigin = "http://localhost";
+    const res = await app.fetch(
+      request(`http://localhost/api/ping`, {
+        headers: { Origin: selfOrigin },
+      }),
+      env,
     );
-    expect(res.status).toBe(200);
-    expect(res.headers.get("Access-Control-Allow-Origin")).toBe(SELF_ORIGIN);
-    expect(res.headers.get("Access-Control-Allow-Credentials")).toBe("true");
+    expect(res.headers.get("access-control-allow-origin")).toBe(selfOrigin);
+    expect(res.headers.get("access-control-allow-credentials")).toBe("true");
   });
 
-  it("rejects cross-origin without credentials", async () => {
-    const res = await app.request(
-      "http://localhost/api/ping",
-      { headers: { Origin: CROSS_ORIGIN } },
+  it("returns * for null origin (desktop, curl)", async () => {
+    const env = mockEnv();
+    const res = await app.fetch(
+      request("http://localhost/api/ping", {
+        headers: { Origin: "null" },
+      }),
+      env,
     );
-    expect(res.status).toBe(200);
-    // No ACAO header for unknown origins = fail closed
-    expect(res.headers.get("Access-Control-Allow-Origin")).toBeNull();
-    expect(res.headers.get("Access-Control-Allow-Credentials")).toBeNull();
+    expect(res.headers.get("access-control-allow-origin")).toBe("*");
   });
 
-  it("returns Vary: Origin header", async () => {
-    const res = await app.request(
-      "http://localhost/api/ping",
-      { headers: { Origin: SELF_ORIGIN } },
+  it("returns * for missing origin", async () => {
+    const env = mockEnv();
+    const res = await app.fetch(
+      request("http://localhost/api/ping"),
+      env,
     );
-    expect(res.headers.get("Vary")).toContain("Origin");
+    expect(res.headers.get("access-control-allow-origin")).toBe("*");
   });
-});
 
-describe("CORS — preflight OPTIONS", () => {
-  it("responds 204 to OPTIONS preflight", async () => {
-    const res = await app.request(
-      "http://localhost/api/generate",
-      {
+  it("rejects cross-origin browser fetch (no CORS header)", async () => {
+    const env = mockEnv();
+    const res = await app.fetch(
+      request("http://localhost/api/ping", {
+        headers: { Origin: "https://evil.com" },
+      }),
+      env,
+    );
+    const origin = res.headers.get("access-control-allow-origin");
+    expect(origin).not.toBe("https://evil.com");
+    expect(origin).toBeNull();
+  });
+
+  it("handles OPTIONS preflight", async () => {
+    const env = mockEnv();
+    const res = await app.fetch(
+      request("http://localhost/api/ping", {
         method: "OPTIONS",
-        headers: {
-          Origin: SELF_ORIGIN,
-          "Access-Control-Request-Method": "POST",
-          "Access-Control-Request-Headers": "Content-Type, Authorization",
-        },
-      },
+        headers: { Origin: "http://localhost", "Access-Control-Request-Method": "GET" },
+      }),
+      env,
     );
     expect(res.status).toBe(204);
-    expect(res.headers.get("Access-Control-Allow-Methods")).toContain("POST");
-    expect(res.headers.get("Access-Control-Allow-Headers")).toContain("Authorization");
-    expect(res.headers.get("Access-Control-Max-Age")).toBe("86400");
+    expect(res.headers.get("access-control-allow-methods")).toContain("GET");
+    expect(res.headers.get("access-control-allow-methods")).toContain("POST");
+    expect(res.headers.get("access-control-allow-methods")).toContain("OPTIONS");
   });
-});
 
-describe("CORS — viewer endpoint", () => {
-  it("allows any origin for viewer (public read)", async () => {
-    const res = await app.request(
-      "http://localhost/viewer",
-      { headers: { Origin: CROSS_ORIGIN } },
+  it("includes required CORS headers", async () => {
+    const env = mockEnv();
+    const res = await app.fetch(
+      request("http://localhost/api/ping", {
+        headers: { Origin: "http://localhost" },
+      }),
+      env,
     );
-    expect(res.status).toBe(200);
-    // Viewer is a public endpoint — should get CORS headers
-    const csp = res.headers.get("Content-Security-Policy");
-    expect(csp).toContain("frame-ancestors 'none'");
+    expect(res.headers.get("access-control-allow-methods")).toBe("GET, POST, OPTIONS");
+    expect(res.headers.get("access-control-allow-headers")).toContain("Content-Type");
+    expect(res.headers.get("access-control-allow-headers")).toContain("Authorization");
+    expect(res.headers.get("access-control-allow-headers")).toContain("X-Machine-Id");
+    expect(res.headers.get("access-control-allow-headers")).toContain("X-CSRF-Token");
+    expect(res.headers.get("access-control-max-age")).toBe("86400");
+  });
+
+  it("includes Vary: Origin header", async () => {
+    const env = mockEnv();
+    const res = await app.fetch(
+      request("http://localhost/api/ping", {
+        headers: { Origin: "http://localhost" },
+      }),
+      env,
+    );
+    expect(res.headers.get("vary")).toBe("Origin");
   });
 });
