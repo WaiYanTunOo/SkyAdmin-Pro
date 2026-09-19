@@ -17,21 +17,23 @@ def report_activation_claim(
     *,
     allow_already_claimed: bool = False,
     timeout: float = 8.0,
-) -> tuple[bool, str, str | None]:
+) -> tuple[bool, str, str | None, dict]:
     """Report a successful activation to the Worker (global one-time-use burn).
 
-    Returns (ok, message, license_key_to_save). When the server re-signs the
-    license after claim, ``license_key_to_save`` is the full-period key.
+    Returns (ok, message, license_key_to_save, claim_data). When the server
+    re-signs the license after claim, ``license_key_to_save`` is the full-period
+    key. ``claim_data`` contains SKU flags (drive_files_enabled, sync_enabled, etc.)
+    so the caller can apply entitlements immediately without a sync register.
     """
     from skyadmin_pro.config import API_BASE_URL
     from skyadmin_pro.services.net import require_https_api_url
 
     if not (API_BASE_URL or "").strip():
-        return True, "No API configured.", None
+        return True, "No API configured.", None, {}
     try:
         api_url = require_https_api_url(API_BASE_URL or "")
     except RuntimeError as exc:
-        return False, f"Claim refused: {exc}", None
+        return False, f"Claim refused: {exc}", None, {}
 
     import urllib.request
 
@@ -48,16 +50,16 @@ def report_activation_claim(
             raw = resp.read(64 * 1024).decode("utf-8", errors="replace")
             data = json.loads(raw)
     except Exception as exc:
-        return False, f"Could not report activation to server: {exc}", None
+        return False, f"Could not report activation to server: {exc}", None, {}
 
     if not isinstance(data, dict) or not data.get("ok"):
-        return False, str((data or {}).get("error") or "Claim rejected by server."), None
+        return False, str((data or {}).get("error") or "Claim rejected by server."), None, {}
     license_key = str(data.get("license_key") or "").strip() or None
     if data.get("already_used"):
         if allow_already_claimed:
-            return True, "Already claimed on server.", license_key
-        return False, "This activation code has already been used on another machine.", None
-    return True, str(data.get("message") or "Activation claimed."), license_key
+            return True, "Already claimed on server.", license_key, data
+        return False, "This activation code has already been used on another machine.", None, {}
+    return True, str(data.get("message") or "Activation claimed."), license_key, data
 
 
 def check_activation_usable(text: str) -> tuple[bool, str, str | None]:

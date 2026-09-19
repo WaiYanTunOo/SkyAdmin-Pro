@@ -49,6 +49,7 @@ class ActivationDialog(ctk.CTkToplevel):
         self,
         master=None,
         *,
+        db=None,
         on_activated=None,
         allow_quit: bool = True,
         on_close_request=None,
@@ -64,6 +65,7 @@ class ActivationDialog(ctk.CTkToplevel):
         self.configure(fg_color=("gray94", "gray12"))
         if master is not None:
             self.transient(master.winfo_toplevel())
+        self._db = db
         self._on_activated = on_activated
         self._on_close_request = on_close_request
         self._activated = False
@@ -431,13 +433,27 @@ class ActivationDialog(ctk.CTkToplevel):
                         if not ok2:
                             result_msg = msg2
                         else:
-                            claim_ok, claim_msg, license_key = report_activation_claim(
+                            claim_ok, claim_msg, license_key, claim_data = report_activation_claim(
                                 content,
                                 allow_already_claimed=_is_repair_activation(content),
                             )
                             if not claim_ok:
                                 result_msg = claim_msg
                             else:
+                                # Apply SKU flags (drive, sync, web) immediately from
+                                # the claim response — so Drive unlocks without needing
+                                # a separate sync register step.
+                                if claim_data:
+                                    try:
+                                        from skyadmin_pro.services.data_sync.entitlements import (
+                                            apply_sku_flags_from_response,
+                                        )
+
+                                        apply_sku_flags_from_response(self._db, claim_data)
+                                    except Exception:
+                                        logging.getLogger(__name__).debug(
+                                            "SKU flag apply skipped (no db)", exc_info=True
+                                        )
                                 result_ok, result_msg, result_nonce, result_license_key = (
                                     ok2,
                                     msg2,

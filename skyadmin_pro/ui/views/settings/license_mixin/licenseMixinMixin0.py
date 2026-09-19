@@ -86,6 +86,7 @@ class LicenseMixinMixin0:
 
         ActivationDialog(
             self,
+            db=self.db,
             allow_quit=False,
             on_activated=self._refresh_license_label,
         )
