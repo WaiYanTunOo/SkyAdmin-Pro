@@ -30,6 +30,17 @@ export const getAdminHtml = (adminPath: string, csrfToken: string) => `
 
 ${getGenerateHtml()}
 
+<h2>System Setup</h2>
+<div class="hint">Generate a new Ed25519 keypair for the Worker and Desktop apps. This happens entirely in your browser.</div>
+<button type="button" id="genKeysBtn" class="sm gray">Generate Keypair</button>
+<div id="sysKeysOut" style="display:none; margin-top:12px;">
+<label>Worker Secret (LICENSE_ED25519_PRIVATE_KEY_B64)</label>
+<textarea id="privKeyOut" class="out" readonly style="width:100%;height:80px;resize:none;font-size:11px;font-family:monospace;margin-bottom:8px;"></textarea>
+<label>Desktop Public Key (ED25519_PUBLIC_KEY_HEX)</label>
+<div id="pubKeyOut" class="out" style="font-family:monospace;"></div>
+<div class="hint">Set the Private Key in Cloudflare Secrets. Copy the Public Key into <code>skyadmin_pro/services/license_public.py</code>.</div>
+</div>
+
 <h2>App Update</h2>
 <div class="hint">URL must be the installer <code>SkyAdminPro-Setup-*.exe</code>, not a portable exe. Desktop apps show Settings → Download.</div>
 <label>Version (e.g. 0.3.1)</label>
