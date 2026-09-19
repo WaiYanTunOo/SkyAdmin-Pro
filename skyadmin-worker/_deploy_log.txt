@@ -77,7 +77,7 @@ D1 error during records (LIST): Error: db boom
 
  ⛅️ wrangler 4.134.0 (update available 4.135.0)
 ───────────────────────────────────────────────
-Resource location: remote 
+Resource location: remote
 
 ✅ No migrations to apply!
 \n>>> npm run deploy\n
@@ -89,8 +89,8 @@ Resource location: remote
 ───────────────────────────────────────────────
 Total Upload: 230.07 KiB / gzip: 56.99 KiB
 Your Worker has access to the following bindings:
-Binding                   Resource         
-env.DB (skyadmin-db)      D1 Database      
+Binding                   Resource
+env.DB (skyadmin-db)      D1 Database
 
 Uploaded skyadmin-worker (8.89 sec)
 Deployed skyadmin-worker triggers (3.86 sec)
