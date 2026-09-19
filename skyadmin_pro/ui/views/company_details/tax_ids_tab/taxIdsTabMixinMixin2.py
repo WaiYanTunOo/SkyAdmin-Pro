@@ -8,8 +8,7 @@ from skyadmin_pro.ui.widgets import DatePickerField, themed_entry
 
 
 class TaxIdsTabMixinMixin2:
-    def _TaxIdsTabMixin_build_tax_ids_p1(self, master, tree_master):
-        tree_master = tree_master or master
+    def _TaxIdsTabMixin_build_tax_ids_p1(self, master, tree_master=None):
         frame = ctk.CTkFrame(master, corner_radius=CARD_RADIUS)
         frame.grid_columnconfigure(0, weight=1)
         ctk.CTkLabel(
@@ -60,5 +59,7 @@ class TaxIdsTabMixinMixin2:
         ctk.CTkLabel(form, text="Headcount").grid(row=8, column=1, sticky="w", pady=(6, 2))
         themed_entry(form, textvariable=self.headcount_var).grid(row=9, column=1, sticky="ew", pady=(0, 4))
 
-        cred_card = ctk.CTkFrame(tree_master, corner_radius=12)
-        return cred_card, frame
+        # Portal logins tree lives in the same scroll frame as the tax form.
+        _ = tree_master
+        tree_card = ctk.CTkFrame(frame, corner_radius=CARD_RADIUS)
+        return tree_card, frame

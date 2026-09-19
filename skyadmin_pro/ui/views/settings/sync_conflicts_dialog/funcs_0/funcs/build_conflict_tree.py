@@ -23,6 +23,8 @@ def build_conflict_tree(
         ),
         showheight=16,
         on_double_click=_copy_gid,
+        table_id="settings.sync_conflicts",
+        db=db,
     )
     tree.grid(row=2, column=0, sticky="nsew", padx=16, pady=(0, 8))
 

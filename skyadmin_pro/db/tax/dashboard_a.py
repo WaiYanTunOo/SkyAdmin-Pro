@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+from skyadmin_pro.config import PIPELINE_MAX_STEP
 from skyadmin_pro.db.sql_helpers import (
     _in_clause,
 )
@@ -60,14 +61,17 @@ class DashboardMixinA:
                   AND date(due_date) < date('now', 'localtime')
                 """
             ).fetchone()["n"]
-            ongoing_clause, ongoing_params = _in_clause("document_type", service_types)
+            # Ongoing services = Service Pipeline items not yet at Completed step.
             ongoing = conn.execute(
-                f"""
-                SELECT COUNT(*) AS n FROM documents
-                WHERE deleted_at IS NULL AND client_id IS NOT NULL AND progress = 'Ongoing'
-                  AND {ongoing_clause}
+                """
+                SELECT COUNT(*) AS n FROM pipeline_items p
+                LEFT JOIN clients c ON c.id = p.client_id
+                WHERE p.deleted_at IS NULL AND p.step < ?
+                  AND (c.id IS NULL OR (
+                      c.deleted_at IS NULL AND COALESCE(c.status, 'active') != 'inactive'
+                  ))
                 """,
-                tuple(ongoing_params),
+                (PIPELINE_MAX_STEP,),
             ).fetchone()["n"]
         return {
             "pending": int(pending),

@@ -34,21 +34,13 @@ class GeneralTabMixinMixin0:
         self.feedback.success("Company info saved.")
         self._refresh_after_mutation(SUBTAB_GENERAL)
 
-    def _build_services(self, master) -> ctk.CTkFrame:
-        form, frame = self._GeneralTabMixin_build_services_p1(master)
+    def _build_services(self, master, tree_master=None) -> ctk.CTkFrame:
+        form, frame = self._GeneralTabMixin_build_services_p1(master, tree_master)
         renew_buttons = self._GeneralTabMixin_build_services_p2(form)
         self._GeneralTabMixin_build_services_p3(renew_buttons)
         return frame
 
-    def _show_service_columns_menu(self) -> None:
-        try:
-            x = self.svc_columns_btn.winfo_rootx()
-            y = self.svc_columns_btn.winfo_rooty() + self.svc_columns_btn.winfo_height()
-        except Exception:
-            return
-        self.service_tree.show_column_menu(x, y)
-
-    def _build_documents(self, master) -> ctk.CTkFrame:
-        file_row, form, frame = self._GeneralTabMixin_build_documents_p1(master)
+    def _build_documents(self, master, tree_master=None) -> ctk.CTkFrame:
+        file_row, form, frame = self._GeneralTabMixin_build_documents_p1(master, tree_master)
         self._GeneralTabMixin_build_documents_p2(file_row, form)
         return frame

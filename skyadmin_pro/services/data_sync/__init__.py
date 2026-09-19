@@ -31,7 +31,7 @@ from .chunk_2 import (
     _sync_request,
     _sync_request_with_retry,
 )
-from .chunk_3 import _filter_sync_row, _parse_updated_at, _row_to_sync_payload, _sync_ident, _unique_group_name
+from .chunk_3 import _filter_sync_row, _parse_updated_at, _sync_ident, _unique_group_name
 from .chunk_4 import is_data_sync_enabled, log_sync_conflict
 from .chunk_4_collect import collect_local_changes
 from .chunk_5 import _apply_remote_change
@@ -39,6 +39,7 @@ from .chunk_6 import apply_remote_changes, ensure_sync_ids
 from .chunk_7 import sync_data
 from .dirty import clear_dirty, is_dirty, mark_dirty, suppress_dirty
 from .interval import normalize_sync_auto_interval, parse_sync_auto_interval_seconds
+from .row_payload import row_to_sync_payload as _row_to_sync_payload
 from .scheduler import AutoSyncScheduler
 
 __all__ = [

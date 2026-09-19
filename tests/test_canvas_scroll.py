@@ -57,6 +57,22 @@ def test_filing_form_only_no_history_panel():
     assert 'text="Edit"' not in filing_src
     assert "filing_labels" not in filing_src
     assert "log_tax_change" in filing_src
+    # Monthly | Annual side-by-side columns (not stacked group headers only).
+    assert 'uniform="filing"' in filing_src or 'uniform="filing"' in filing_src
+    assert "FILING_FIELD_GROUPS" in filing_src
+
+
+def test_general_tax_ids_whole_page_scroll_fills_tab():
+    """General and Tax IDs use one full-tab CanvasScrollFrame (not form strip + fixed trees)."""
+    panel_src = _pkg_text("skyadmin_pro", "ui", "views", "company_details", "panel")
+    assert "tab.grid_rowconfigure(0, weight=1)" in panel_src
+    # Prior partial-scroll split must not return.
+    assert "tab.grid_rowconfigure(0, weight=2)" not in panel_src
+    assert "tab.grid_rowconfigure(1, weight=1, minsize=120)" not in panel_src
+    assert "tab.grid_rowconfigure(2, weight=1, minsize=120)" not in panel_src
+    assert "tab.grid_rowconfigure(2, weight=1, minsize=160)" not in panel_src
+    assert "tab.grid_rowconfigure(1, weight=2, minsize=160)" not in panel_src
+    assert "tab.grid_rowconfigure(2, weight=2, minsize=160)" not in panel_src
 
 
 def test_office_hub_trees_outside_form_scroll():
@@ -80,23 +96,43 @@ def test_office_hub_trees_outside_form_scroll():
     assert "ThemedTreeview(\n            body," not in notebook
 
 
-def test_general_and_financial_trees_outside_canvas_scroll():
+def test_general_whole_page_scroll_and_financial_tree_first():
     panel_src = _pkg_text("skyadmin_pro", "ui", "views", "company_details", "panel")
-    # Company form scrolls; service/doc trees are parented on the tab (outside CanvasScrollFrame).
+    general_src = _pkg_text("skyadmin_pro", "ui", "views", "company_details", "general_tab")
+    # Whole-page scroll: company + services + documents (trees included) on scroll.content.
     assert "general_scroll = CanvasScrollFrame(tab)" in panel_src
     assert "_build_company_info(general_scroll.content)" in panel_src
-    assert "_build_services(tab)" in panel_src
-    assert "_build_documents(tab)" in panel_src
-    assert "_build_services(general_scroll.content)" not in panel_src
-    assert "_build_documents(general_scroll.content)" not in panel_src
+    assert "_build_services(general_scroll.content)" in panel_src
+    assert "_build_documents(general_scroll.content)" in panel_src
+    # Must not parent trees on the tab outside the scroll frame.
+    assert "_build_services(general_scroll.content, tab)" not in panel_src
+    assert "_build_documents(general_scroll.content, tab)" not in panel_src
+    assert "_build_services(tab)" not in panel_src
+    assert "_build_documents(tab)" not in panel_src
+    assert "ThemedTreeview(\n            tree_card," in general_src
+    # Financial Docs stays tree-first (no CanvasScrollFrame).
     assert "fin_scroll = CanvasScrollFrame(fin_tab)" not in panel_src
     assert "_build_financial_docs(fin_tab)" in panel_src
 
 
-def test_vo_csh_setup_tree_outside_canvas_scroll():
+def test_vo_csh_setup_is_companies_tab():
+    from skyadmin_pro.ui.views.company_details.constants import SUBTAB_NAMES
+    from skyadmin_pro.ui.views.database_tasks.view import TAB_NAMES, TAB_VO_CSH_SETUP
+
+    assert TAB_VO_CSH_SETUP in TAB_NAMES
+    assert "VO/CSH Setup" not in SUBTAB_NAMES
+
     panel_src = _pkg_text("skyadmin_pro", "ui", "views", "company_details", "panel")
-    assert "vo_setup_scroll = CanvasScrollFrame(tab)" not in panel_src
-    assert "self._vo_csh_setup_frame = self._build_vo_csh_setup(tab)" in panel_src
+    assert "_build_vo_csh_setup" not in panel_src
+
+    from skyadmin_pro.config import NAV_GROUP_FINANCE, NAV_GROUPS
+
+    finance = next(g for g in NAV_GROUPS if g[0] == NAV_GROUP_FINANCE)
+    assert "vo_csh_setup" not in finance[2]
+
+    menu_src = _pkg_text("skyadmin_pro", "ui", "views", "menu_panels")
+    assert "VoCshSetupMenuView" not in menu_src
+    assert "VoCshSetupPanel" in _pkg_text("skyadmin_pro", "ui", "views", "database_tasks", "vo_csh_setup_panel")
 
 
 def test_accounting_setup_is_finance_menu_page():
@@ -122,9 +158,12 @@ def test_accounting_setup_is_finance_menu_page():
 
 def test_tax_ids_and_vo_tabs_use_canvas_scroll():
     panel_src = _pkg_text("skyadmin_pro", "ui", "views", "company_details", "panel")
-    # Tax IDs form scrolls; cred tree is parented on the tab (outside CanvasScrollFrame).
+    tax_src = _pkg_text("skyadmin_pro", "ui", "views", "company_details", "tax_ids_tab")
+    # Tax IDs whole-page scroll: tax form + portal tree + edit fields in one frame.
     assert "tax_ids_scroll = CanvasScrollFrame(tab)" in panel_src
-    assert "_build_tax_ids(tax_ids_scroll.content, tab)" in panel_src
+    assert "_build_tax_ids(tax_ids_scroll.content)" in panel_src
+    assert "_build_tax_ids(tax_ids_scroll.content, tab)" not in panel_src
+    assert "tree_card = ctk.CTkFrame(frame, corner_radius=CARD_RADIUS)" in tax_src
     # VO/CSH has no tree; form stays inside CanvasScrollFrame.
     assert "vo_scroll = CanvasScrollFrame(tab)" in panel_src
     assert "_build_vo_csh(vo_scroll.content)" in panel_src

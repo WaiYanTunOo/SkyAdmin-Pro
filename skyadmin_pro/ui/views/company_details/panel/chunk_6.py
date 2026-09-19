@@ -8,7 +8,6 @@ from skyadmin_pro.ui.views.company_details.constants import (
     SUBTAB_GENERAL,
     SUBTAB_TAX_IDS,
     SUBTAB_VO_CSH,
-    SUBTAB_VO_CSH_SETUP,
 )
 
 
@@ -32,8 +31,6 @@ class CompanyDetailsPanelMixin6:
             self._refresh_tax_ids_subtab(client_id, client)
         elif tab_name == SUBTAB_FILING:
             self._refresh_filing_subtab(client_id, client)
-        elif tab_name == SUBTAB_VO_CSH_SETUP:
-            self.refresh_vo_csh_setup()
         elif tab_name == SUBTAB_VO_CSH:
             self._refresh_vo_csh_subtab(client)
         elif tab_name == SUBTAB_FINANCIAL_DOCS:

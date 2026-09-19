@@ -4,7 +4,7 @@ from __future__ import annotations
 
 from datetime import date
 
-from skyadmin_pro.config import ANNUAL_DEC31_SERVICE_MARKERS
+from skyadmin_pro.config import ANNUAL_DEC31_SERVICE_MARKERS, EXPIRY_ALERT_DAYS
 
 
 def days_until(iso_date: str | None) -> int | None:
@@ -40,21 +40,35 @@ def effective_expiry_date(expiry_date: str | None, document_type: str | None = N
 def classify_expiry(days_left: int) -> str:
     """Return a treeview tag for the fixed expiry-alert color bands:
     red at 7 or fewer days left, dark orange at 14 or fewer, yellow at 30
-    or fewer, green at 45 or fewer; otherwise empty (no alert)."""
+    or fewer, green at EXPIRY_ALERT_DAYS or fewer; otherwise empty (no alert)."""
     if days_left <= 7:
         return "red"
     if days_left <= 14:
         return "orange"
     if days_left <= 30:
         return "yellow"
-    if days_left <= 45:
+    if days_left <= EXPIRY_ALERT_DAYS:
         return "green"
     return ""
 
 
 def expiry_label(days_left: int) -> str:
+    """Status column text: Expired / near Expiry under 45 days / Ongoing."""
+    from skyadmin_pro.services.i18n import tr
+
     if days_left < 0:
-        return f"Expired {abs(days_left)} day(s) ago"
+        return tr("Expired")
+    if days_left <= EXPIRY_ALERT_DAYS:
+        return tr("near Expiry under 45 days")
+    return tr("Ongoing")
+
+
+def days_left_label(days_left: int | None) -> str:
+    """Human-readable countdown for the Expiry tab Days left column."""
+    if days_left is None:
+        return "—"
+    if days_left < 0:
+        return f"{abs(days_left)} day(s) ago"
     if days_left == 0:
         return "Expires today"
     return f"{days_left} day(s) left"

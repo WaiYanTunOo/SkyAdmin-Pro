@@ -39,5 +39,7 @@ class DatabaseTasksViewMixin0:
             tab.grid_rowconfigure(0, weight=1)
 
         self.clients_panel = None
+        self.expiry_panel = None
+        self.vo_csh_setup_panel = None
         self.renewals_panel = None
         self.company_panel = None

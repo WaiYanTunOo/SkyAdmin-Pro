@@ -10,7 +10,7 @@ export const getGenerateHtml = () => `
 </select>
 <div id="cWrap" style="display:none"><label>Custom days</label><input id="cDays" type="number" min="1" max="36500"></div>
 <label>Org ID (optional)</label>
-<input id="orgId" placeholder="firm:acme — blank = solo m:MACHINE" autocomplete="off" spellcheck="false">
+<input id="orgId" placeholder="leave blank for solo, or firm:acme for team" autocomplete="off" spellcheck="false">
 <div class="sku-row">
 <label class="sku"><input type="checkbox" id="skuSync" checked> Sync</label>
 <label class="sku"><input type="checkbox" id="skuWeb"> Web</label>
@@ -18,7 +18,7 @@ export const getGenerateHtml = () => `
 </div>
 <label>Max devices (0 = unlimited)</label>
 <input id="skuMaxDevices" type="number" min="0" max="10000" value="1" title="Fail-closed default 1; 0 = unlimited">
-<div class="hint">Blank Org ID → solo silo <code>m:MACHINE</code>. Default max_devices=1 (solo). 0 = unlimited seats.</div>
+<div class="hint">Org ID: leave blank for solo (<code>m:MACHINE</code>). Same string (e.g. <code>firm:acme</code>) for every seat that should share team sync. Sync is on by default; tick Web / Drive only if needed. max_devices default 1; 0 = unlimited.</div>
 <button type="button" id="genBtn">Generate</button>
 
 <div id="result" style="display:none">

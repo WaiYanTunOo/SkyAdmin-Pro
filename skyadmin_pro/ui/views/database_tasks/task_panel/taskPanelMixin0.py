@@ -13,14 +13,6 @@ class TaskPanelMixin0:
         form, row = self._TaskPanel__init__p3(pager)
         self._TaskPanel__init__p4(form, row)
 
-    def _show_columns_menu(self) -> None:
-        try:
-            x = self.columns_btn.winfo_rootx()
-            y = self.columns_btn.winfo_rooty() + self.columns_btn.winfo_height()
-        except Exception:
-            return
-        self.tree.show_column_menu(x, y)
-
     def refresh(self) -> None:
         """Non-blocking refresh: DB work off the Tk thread, Treeview on it."""
         from skyadmin_pro.ui.async_ui import run_background

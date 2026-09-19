@@ -13,6 +13,9 @@ from skyadmin_pro.config import (
 
 class CompanyDetailsPanelMixin9:
     def _refresh_filing_subtab(self, client_id: int | None, client: dict | None) -> None:
+        # Lazy tab: skip until Monthly|Annual form has been built.
+        if not getattr(self, "filing_vars", None):
+            return
         if client_id is None:
             for field in TAX_FILING_FIELDS:
                 if field in self.filing_vars:
@@ -26,6 +29,8 @@ class CompanyDetailsPanelMixin9:
         self._filing_suspend_save = True
         try:
             for field in TAX_FILING_FIELDS:
+                if field not in self.filing_vars:
+                    continue
                 val = (client or {}).get(field) or "Not Applicable"
                 if val not in TAX_FILING_STATUSES:
                     val = "Not Applicable"

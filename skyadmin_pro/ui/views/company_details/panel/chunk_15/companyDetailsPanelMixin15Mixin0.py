@@ -40,9 +40,11 @@ class CompanyDetailsPanelMixin15Mixin0:
                 ("docs", "Documents", 100),
                 ("note", "Note", 180),
             ),
+            table_id="company.renewal_history",
+            db=self.app.db,
+            showheight=8,
         )
         tree.grid(row=1, column=0, sticky="nsew", padx=12, pady=(0, 8))
-        tree.tree.configure(height=8)
 
         def redraw() -> None:
             rows = self.app.db.list_service_renewals(int(iid))

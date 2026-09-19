@@ -20,6 +20,7 @@ def test_dashboard_detail_trees_not_in_canvas_scroll():
     assert "self._detail_scroll = CanvasScrollFrame(self.body" not in shell
     assert "view._detail_scroll = CanvasScrollFrame(today_tab)" in tabs
     assert "view._today = view._detail_scroll.content" in tabs
+    assert 'tabs.add("Calendar")' in tabs or 'add("Calendar")' in tabs
     assert "ThemedTreeview(" in heavy
     assert "self._incentive" in heavy
 

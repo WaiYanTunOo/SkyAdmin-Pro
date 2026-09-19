@@ -162,7 +162,7 @@ class ThemedTreeview(ctk.CTkFrame):
         # Persistence identity: trees with table_id+db remember hidden columns
         # across restarts; without them the column menu is session-only.
         self._table_id = table_id
-        self._db = db
+        self._db = db if db is not None else self._resolve_db_from_parents(master)
         self._column_menu: tk.Menu | None = None
         self._showheight = showheight
         self._virtual_active = False
@@ -170,12 +170,15 @@ class ThemedTreeview(ctk.CTkFrame):
         self._virtual_rows: list[tuple] = []
         self._virtual_iids: list[str] = []
         self._virtual_tags: list[tuple[str, ...]] | None = None
+        # Kept in sync by _visible_row_count(); getattr-safe for wheel handlers.
+        self._virtual_page_size = max(1, int(showheight))
         self._applied_tree_theme_key: tuple | None = None
 
         self.grid_columnconfigure(0, weight=1)
         self.grid_columnconfigure(1, weight=0)
-        self.grid_rowconfigure(0, weight=1)
-        self.grid_rowconfigure(1, weight=0)
+        self.grid_rowconfigure(0, weight=0)
+        self.grid_rowconfigure(1, weight=1)
+        self.grid_rowconfigure(2, weight=0)
 
         mode = selectmode if selectmode in {"browse", "extended", "none"} else "browse"
         self.tree = ttk.Treeview(
@@ -192,7 +195,18 @@ class ThemedTreeview(ctk.CTkFrame):
             self, orient="horizontal", command=self.tree.xview, style="Sky.Horizontal.TScrollbar"
         )
         self.tree.configure(yscrollcommand=self._yscroll_command, xscrollcommand=self._xscroll_command)
-        self.tree.grid(row=0, column=0, sticky="nsew")
+        # Discoverable column hide/show (header right-click also works).
+        self.columns_btn = ctk.CTkButton(
+            self,
+            text="⋮ Columns",
+            width=90,
+            height=24,
+            fg_color="transparent",
+            border_width=1,
+            command=self._on_columns_button,
+        )
+        self.columns_btn.grid(row=0, column=0, columnspan=2, sticky="e", pady=(0, 2))
+        self.tree.grid(row=1, column=0, sticky="nsew")
         # Scrollbars start hidden; _x/_yscroll_command grids them when needed.
         # Excel-like: smooth wheel scrolling (Shift+wheel for horizontal)
         self.tree.bind("<MouseWheel>", self._on_mousewheel)
@@ -224,11 +238,28 @@ class ThemedTreeview(ctk.CTkFrame):
             self.tree.bind("<Double-1>", lambda _e: on_double_click(self.selected_iid()))
         self.tree.bind("<Return>", self._on_tree_activate)
         self.tree.bind("<space>", self._on_tree_activate)
-        # Excel-like column menu (hide/show); header click stays sort.
-        self.tree.bind("<Button-3>", self._on_header_right_click)
+        # Column hide/show: ⋮ Columns button, or right-click anywhere on the table.
+        self.tree.bind("<Button-3>", self._on_tree_right_click)
 
         self.apply_theme()
         self._apply_column_state()
+
+    @staticmethod
+    def _resolve_db_from_parents(master) -> object | None:
+        """Walk up the widget tree for ``app.db`` or ``db`` (column persistence)."""
+        widget = master
+        for _ in range(16):
+            if widget is None:
+                break
+            app = getattr(widget, "app", None)
+            db = getattr(app, "db", None) if app is not None else None
+            if db is not None:
+                return db
+            db = getattr(widget, "db", None)
+            if db is not None and hasattr(db, "get_setting"):
+                return db
+            widget = getattr(widget, "master", None)
+        return None
 
     # -- Column visibility -------------------------------------------------
 
@@ -290,6 +321,14 @@ class ThemedTreeview(ctk.CTkFrame):
         except tk.TclError:
             pass
 
+    def _on_columns_button(self) -> None:
+        try:
+            x = self.columns_btn.winfo_rootx()
+            y = self.columns_btn.winfo_rooty() + self.columns_btn.winfo_height()
+        except tk.TclError:
+            return
+        self.show_column_menu(x, y)
+
     def _close_column_menu(self) -> None:
         if self._column_menu is not None:
             try:
@@ -308,13 +347,13 @@ class ThemedTreeview(ctk.CTkFrame):
             pass
         self._persist_column_state()
 
-    def _on_header_right_click(self, event) -> None:
-        try:
-            if self.tree.identify_region(event.x, event.y) != "heading":
-                return
-        except tk.TclError:
-            return
+    def _on_tree_right_click(self, event) -> None:
+        """Right-click anywhere opens the column checklist (header or body)."""
         self.show_column_menu(event.x_root, event.y_root)
+
+    def _on_header_right_click(self, event) -> None:
+        # Kept for tests / callers; same as full-tree right-click.
+        self._on_tree_right_click(event)
 
     def _apply_column_state(self) -> None:
         """Restore persisted hidden columns (best effort — never breaks construction)."""
@@ -522,10 +561,14 @@ class ThemedTreeview(ctk.CTkFrame):
             h = self.tree.winfo_height()
             if h > 40:
                 row_h = TABLE_ROW_HEIGHT or 28
-                return max(1, h // row_h + 1)
+                count = max(1, h // row_h + 1)
+                self._virtual_page_size = count
+                return count
         except tk.TclError:
             pass
-        return max(1, int(self.tree.cget("height")))
+        count = max(1, int(self.tree.cget("height")))
+        self._virtual_page_size = count
+        return count
 
     def _set_rows_virtual(
         self,
@@ -570,14 +613,15 @@ class ThemedTreeview(ctk.CTkFrame):
     def _update_virtual_scrollbar(self) -> None:
         from skyadmin_pro.ui.tree_scroll import apply_scrollbar_visibility
 
+        # Must match _yscroll_command: tree is row 1 (row 0 is Columns button).
         total = len(self._virtual_rows)
         visible = self._visible_row_count()
         if total <= visible:
-            apply_scrollbar_visibility(self._vscroll, 0.0, 1.0, row=0, column=1, sticky="ns")
+            apply_scrollbar_visibility(self._vscroll, 0.0, 1.0, row=1, column=1, sticky="ns")
             return
         first = self._virtual_offset / total
         last = (self._virtual_offset + visible) / total
-        apply_scrollbar_visibility(self._vscroll, first, last, row=0, column=1, sticky="ns")
+        apply_scrollbar_visibility(self._vscroll, first, last, row=1, column=1, sticky="ns")
 
     def _virtual_scroll_to_fraction(self, fraction: float) -> None:
         total = len(self._virtual_rows)
@@ -609,12 +653,12 @@ class ThemedTreeview(ctk.CTkFrame):
             return
         from skyadmin_pro.ui.tree_scroll import apply_scrollbar_visibility
 
-        apply_scrollbar_visibility(self._vscroll, first, last, row=0, column=1, sticky="ns")
+        apply_scrollbar_visibility(self._vscroll, first, last, row=1, column=1, sticky="ns")
 
     def _xscroll_command(self, first, last) -> None:
         from skyadmin_pro.ui.tree_scroll import apply_scrollbar_visibility
 
-        apply_scrollbar_visibility(self.hscrollbar, first, last, row=1, column=0, sticky="ew")
+        apply_scrollbar_visibility(self.hscrollbar, first, last, row=2, column=0, sticky="ew")
 
     def _set_rows_incremental(
         self,
@@ -695,12 +739,15 @@ class ThemedTreeview(ctk.CTkFrame):
         return None
 
     def _can_scroll_vertical(self, delta: int) -> bool:
-        if self._virtual_active:
-            if len(self._virtual_rows) <= self._virtual_page_size:
+        if getattr(self, "_virtual_active", False):
+            page = getattr(self, "_virtual_page_size", None) or self._visible_row_count()
+            rows = getattr(self, "_virtual_rows", None) or []
+            offset = getattr(self, "_virtual_offset", 0)
+            if len(rows) <= page:
                 return False
-            if delta < 0 and self._virtual_offset <= 0:
+            if delta < 0 and offset <= 0:
                 return False
-            return not (delta > 0 and self._virtual_offset + self._virtual_page_size >= len(self._virtual_rows))
+            return not (delta > 0 and offset + page >= len(rows))
         try:
             yv = self.tree.yview()
             if not yv or len(yv) < 2:

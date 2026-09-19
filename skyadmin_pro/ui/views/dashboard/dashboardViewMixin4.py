@@ -1,6 +1,6 @@
 from __future__ import annotations
 
-from .jumps import follow_next, open_company, open_pipeline
+from .jumps import follow_next, open_pipeline
 
 
 class DashboardViewMixin4:
@@ -52,14 +52,8 @@ class DashboardViewMixin4:
     def _ongoing_selected(self, iid: str | None) -> None:
         if iid is None:
             return
-        tree = getattr(self, "ongoing_tree", None)
-        if tree is None:
-            open_pipeline(self.app)
-            return
-        values = tree.tree.item(iid, "values")
-        if not values or values[0] in ("", "—"):
-            return
-        open_company(self.app, values[0])
+        raw = iid.split("-", 1)[-1] if iid.startswith("ongoing-") else ""
+        open_pipeline(self.app, raw)
 
     def _overdue_selected(self) -> int | None:
         # Orphaned: overdue_tree was never rebuilt; use Suppliers jump card instead.

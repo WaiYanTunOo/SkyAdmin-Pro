@@ -2,10 +2,10 @@
 <div id="activate">
   <header style="position:static;border:0;background:transparent;padding:0 0 16px">
     <h1>SkyAdmin Viewer</h1>
-    <p>Read-only groups, clients, tasks, contacts, notebook, and passwords. Paste your activation code from the desktop app.</p>
+    <p>Read-only groups, clients, tasks, contacts, notebook, and passwords. Paste a client passcode only (not a license key).</p>
   </header>
-  <label for="code">License key or passcode</label>
-  <textarea id="code" placeholder="Paste SKYPASS1:… or license key"></textarea>
+  <label for="code">Client passcode</label>
+  <textarea id="code" placeholder="Paste SKYPASS1:… passcode"></textarea>
   <div class="toolbar" style="margin-top:12px">
     <button id="btnActivate" type="button">Activate</button>
   </div>

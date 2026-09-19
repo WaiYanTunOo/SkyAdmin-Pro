@@ -87,6 +87,8 @@ class FinancialDocsPanelMixin0:
             ),
             showheight=12,
             on_double_click=self._on_tree_double,
+            table_id="document_hub.financial",
+            db=self.app.db,
         )
         self.tree.grid(row=1, column=0, sticky="nsew", padx=4, pady=4)
 

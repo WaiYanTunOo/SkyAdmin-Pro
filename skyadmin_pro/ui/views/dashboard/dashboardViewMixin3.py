@@ -83,6 +83,11 @@ class DashboardViewMixin3:
             self._build_header_extras()
 
         self._refresh_tax_overview(snap.get("accounting_clients"))
+        if getattr(self, "_calendar_built", False):
+            from .calendar_tab import refresh_calendar
+
+            # Count label only — avoid destroying the month grid on every snap.
+            refresh_calendar(self, snap, reload_grid=False)
         if not self._visible:
             return
         seq = int(getattr(self, "_snap_seq", 0))

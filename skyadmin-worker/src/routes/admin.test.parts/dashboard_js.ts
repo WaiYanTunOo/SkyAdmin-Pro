@@ -32,5 +32,16 @@ export function registerDashboardJsSmokeTests(): void {
       expect(js).toMatch(/days\?\\n\\nActive licenses are kept/);
       expect(js).not.toMatch(/days\?\n\nActive licenses are kept/);
     });
+
+    it("Generate SKU checkboxes restore native appearance (not global -webkit-appearance:none)", () => {
+      const html = buildAdminPage("/admin-test", "csrf-test-token", "nonceSku1");
+      expect(html).toContain('id="skuSync" checked');
+      expect(html).toContain('id="skuWeb"');
+      expect(html).toContain('id="skuDrive"');
+      expect(html).toMatch(/\.sku-row \.sku input\[type=checkbox\][^}]*appearance:auto/);
+      expect(html).toMatch(/\.sku-row \.sku input\[type=checkbox\][^}]*-webkit-appearance:checkbox/);
+      expect(html).toMatch(/leave blank for solo/i);
+      expect(html).toMatch(/team sync/i);
+    });
   });
 }

@@ -16,7 +16,7 @@ class VaultTabMixinMixin3:
         parent.grid_rowconfigure(2, weight=1)
         ctk.CTkLabel(
             parent,
-            text="Encrypted portal logins — not supplier bills.",
+            text="Read-only view — edit portal logins in Company Details → Tax IDs.",
             text_color=TEXT_MUTED,
             anchor="w",
         ).grid(row=0, column=0, sticky="ew", pady=(8, 0))
@@ -37,7 +37,9 @@ class VaultTabMixinMixin3:
             width=130,
         )
         self.client_cred_type_menu.grid(row=0, column=1, padx=(0, 8))
-        ctk.CTkButton(toolbar, text="New", width=70, command=self._new_client_credential).grid(row=0, column=2)
+        ctk.CTkButton(
+            toolbar, text="Open Company Details", width=160, command=self._open_client_cred_company_details
+        ).grid(row=0, column=2)
 
         self.client_cred_tree = ThemedTreeview(
             parent,
@@ -49,6 +51,8 @@ class VaultTabMixinMixin3:
             ),
             on_select=self._on_client_cred_select,
             showheight=9,
+            table_id="office.client_creds",
+            db=self.app.db,
         )
         self.client_cred_tree.grid(row=2, column=0, sticky="nsew")
 
@@ -62,7 +66,7 @@ class VaultTabMixinMixin3:
         form.grid_columnconfigure(3, weight=1, uniform="vault_field")
         ctk.CTkLabel(
             form,
-            text="Client portal login (encrypted)",
+            text="Client portal login (read-only)",
             font=ctk.CTkFont(size=CARD_TITLE_SIZE, weight="bold"),
         ).grid(row=0, column=0, columnspan=4, sticky="w", padx=16, pady=(10, 6))
 

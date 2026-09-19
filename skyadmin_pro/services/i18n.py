@@ -21,11 +21,13 @@ _TRANSLATIONS = {
         "Tasks": "လုပ်ငန်းများ",
         "Finance": "ဘဏ္ဍာရေး",
         "Suppliers & AP": "ပေးသွင်းသူနှင့်ဘေလ်",
-        "Monthly Tax Status": "လစဉ်အခွန်",
+        "Monthly Service Close": "လစဉ်ဝန်ဆောင်မှုပိတ်",
         "Accounting Setup": "စာရင်းကိုင်ဆက်တင်",
+        "VO/CSH Setup": "VO/CSH စနစ်ထည့်သွင်း",
         "Service Pipeline": "ဝန်ဆောင်မှုအဆင့်",
         "Courier Tracker": "ပို့ဆောင်မှတ်တမ်း",
         "Office Hub": "ရုံးဆက်သွယ်ရန်",
+        "Clients Login Data": "ကုမ္ပဏီဝင်ရောက်မှုဒေတာ",
         "Utilities": "ကိရိယာများ",
         "Settings": "ဆက်တင်များ",
         # Common actions
@@ -41,6 +43,10 @@ _TRANSLATIONS = {
         # Status
         "Active": "အသုံးပြုနေသည်",
         "Expired": "သက်တမ်းကုန်",
+        "Ongoing": "ဆက်လက်အကျုံးဝင်",
+        "near Expiry under 45 days": "၄၅ ရက်အတွင်းသက်တမ်းကုန်နီး",
+        "Clients": "ကုမ္ပဏီစာရင်း",
+        "Expiry": "သက်တမ်းကုန်ရက်",
     },
     "th": {
         # Navigation
@@ -51,11 +57,13 @@ _TRANSLATIONS = {
         "Tasks": "งานวันนี้",
         "Finance": "การเงิน",
         "Suppliers & AP": "ซัพพลายเออร์และบิล",
-        "Monthly Tax Status": "ปิดเดือนภาษี",
+        "Monthly Service Close": "ปิดบริการรายเดือน",
         "Accounting Setup": "ตั้งค่าบัญชี",
+        "VO/CSH Setup": "ตั้งค่า VO/CSH",
         "Service Pipeline": "งานใหม่",
         "Courier Tracker": "บันทึกส่งของ",
         "Office Hub": "สำนักงานและบันทึก",
+        "Clients Login Data": "ข้อมูลเข้าสู่ระบบลูกค้า",
         "Utilities": "เครื่องมือ",
         "Settings": "ตั้งค่า",
         # Common actions
@@ -71,6 +79,10 @@ _TRANSLATIONS = {
         # Status
         "Active": "ใช้งานอยู่",
         "Expired": "หมดอายุ",
+        "Ongoing": "ยังไม่หมดอายุ",
+        "near Expiry under 45 days": "ใกล้หมดอายุภายใน 45 วัน",
+        "Clients": "รายชื่อบริษัท",
+        "Expiry": "วันหมดอายุ",
     },
 }
 

@@ -33,6 +33,7 @@ class DashboardMixinB:
                 "revenue": self.get_revenue_summary(today.year, today.month),
                 "vo_csh_expiring": self.count_vo_csh_expiring(30),
                 "accounting_clients": self.list_accounting_clients(),
+                "upcoming_appointments": self.count_upcoming_appointments(30),
             }
 
     def list_overdue_services(self) -> list[dict]:

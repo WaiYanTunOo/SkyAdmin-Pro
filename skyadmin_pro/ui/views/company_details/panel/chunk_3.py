@@ -9,7 +9,6 @@ from skyadmin_pro.ui.views.company_details.constants import (
     SUBTAB_GENERAL,
     SUBTAB_TAX_IDS,
     SUBTAB_VO_CSH,
-    SUBTAB_VO_CSH_SETUP,
 )
 
 
@@ -19,45 +18,37 @@ class CompanyDetailsPanelMixin3:
             return
         tab = self.tabs.tab(name)
         if name == SUBTAB_GENERAL:
-            # Company form scrolls; service/doc trees stay fixed outside the canvas.
+            # Whole-tab scroll: company info + services + documents (trees included).
             tab.grid_columnconfigure(0, weight=1)
             tab.grid_rowconfigure(0, weight=1)
-            tab.grid_rowconfigure(1, weight=1)
-            tab.grid_rowconfigure(2, weight=1)
             general_scroll = CanvasScrollFrame(tab)
             general_scroll.grid(row=0, column=0, sticky="nsew")
             general_scroll.content.grid_columnconfigure(0, weight=1)
             self._company_frame = self._build_company_info(general_scroll.content)
             self._company_frame.grid(row=0, column=0, sticky="ew", pady=(0, 8))
-            self._services_frame = self._build_services(tab)
-            self._services_frame.grid(row=1, column=0, sticky="nsew", pady=(0, 8))
-            self._docs_frame = self._build_documents(tab)
-            self._docs_frame.grid(row=2, column=0, sticky="nsew")
+            self._services_frame = self._build_services(general_scroll.content)
+            self._services_frame.grid(row=1, column=0, sticky="ew", pady=(0, 8))
+            self._docs_frame = self._build_documents(general_scroll.content)
+            self._docs_frame.grid(row=2, column=0, sticky="ew")
         elif name == SUBTAB_TAX_IDS:
-            # Form scrolls; client cred tree stays fixed outside the canvas.
+            # Whole-tab scroll: tax form + portal logins tree + edit fields.
             tab.grid_columnconfigure(0, weight=1)
             tab.grid_rowconfigure(0, weight=1)
-            tab.grid_rowconfigure(2, weight=2)
             tax_ids_scroll = CanvasScrollFrame(tab)
             tax_ids_scroll.grid(row=0, column=0, sticky="nsew")
             tax_ids_scroll.content.grid_columnconfigure(0, weight=1)
-            self._tax_ids_frame = self._build_tax_ids(tax_ids_scroll.content, tab)
+            self._tax_ids_frame = self._build_tax_ids(tax_ids_scroll.content)
             self._tax_ids_frame.grid(row=0, column=0, sticky="ew")
         elif name == SUBTAB_FILING:
-            # Dropdowns + summary only; change log still written to DB (no history panel).
+            # Monthly | Annual side-by-side; change log still written to DB (no history panel).
             tab.grid_columnconfigure(0, weight=1)
             tab.grid_rowconfigure(0, weight=1)
             filing_scroll = CanvasScrollFrame(tab)
             filing_scroll.grid(row=0, column=0, sticky="nsew")
             filing_scroll.content.grid_columnconfigure(0, weight=1)
+            filing_scroll.content.grid_rowconfigure(0, weight=1)
             self._filing_form_frame = self._build_filing_statuses_form(filing_scroll.content)
-            self._filing_form_frame.grid(row=0, column=0, sticky="ew")
-        elif name == SUBTAB_VO_CSH_SETUP:
-            # Tree-first tab: no CanvasScrollFrame so the tree owns the wheel.
-            tab.grid_columnconfigure(0, weight=1)
-            tab.grid_rowconfigure(0, weight=1)
-            self._vo_csh_setup_frame = self._build_vo_csh_setup(tab)
-            self._vo_csh_setup_frame.grid(row=0, column=0, sticky="nsew")
+            self._filing_form_frame.grid(row=0, column=0, sticky="nsew")
         elif name == SUBTAB_VO_CSH:
             tab.grid_columnconfigure(0, weight=1)
             tab.grid_rowconfigure(0, weight=1)

@@ -4,6 +4,7 @@ from __future__ import annotations
 
 from skyadmin_pro.services.tracking import (
     classify_expiry,
+    days_left_label,
     days_until,
     effective_expiry_date,
     expiry_label,
@@ -64,6 +65,7 @@ class ClientsExpiryPanelMixin1:
                         item.get("client_name") or "—",
                         item.get("document_type") or "—",
                         eff or "—",
+                        days_left_label(left),
                         status,
                     )
                 )

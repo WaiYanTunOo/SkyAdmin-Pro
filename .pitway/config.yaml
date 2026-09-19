@@ -1,0 +1,10 @@
+schema_version: 1
+git:
+  # Each confirmed milestone works on its own pitway/<id>-<slug> branch;
+  # integrate with 'pitway milestone-merge <id>'. Use 'main' to commit
+  # milestones directly to the current branch instead.
+  branch_strategy: milestone
+execution:
+  # Independent tasks with disjoint write scopes dispatch concurrently into
+  # temporary worktrees. Use 'sequential' to run one task at a time.
+  strategy: parallel_worktrees

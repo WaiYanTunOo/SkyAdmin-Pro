@@ -1,8 +1,9 @@
 from __future__ import annotations
 
-from ._const_2 import TAB_CLIENTS
+from ._const_2 import TAB_CLIENTS, TAB_EXPIRY
 from ._const_4 import TAB_COMPANY
 from ._const_5 import TAB_RENEWALS
+from ._const_6 import TAB_VO_CSH_SETUP
 from .expand_tabs import FILL_TABS, mount_fill_panel
 from .tab_hints import tab_hint
 
@@ -40,7 +41,11 @@ class DatabaseTasksViewMixin1:
         self._refresh_service_menus(tab_name)
         if tab_name == TAB_CLIENTS and self.clients_panel is not None:
             self.clients_panel.refresh()
+        elif tab_name == TAB_EXPIRY and self.expiry_panel is not None:
+            self.expiry_panel.refresh()
         elif tab_name == TAB_COMPANY and self.company_panel is not None:
             self.company_panel.refresh()
+        elif tab_name == TAB_VO_CSH_SETUP and self.vo_csh_setup_panel is not None:
+            self.vo_csh_setup_panel.refresh()
         elif tab_name == TAB_RENEWALS and self.renewals_panel is not None:
             self.renewals_panel.refresh()

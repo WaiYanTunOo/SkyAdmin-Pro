@@ -23,8 +23,10 @@ SIDEBAR_VIEWS = (
     "settings",
 )
 DB_TABS = (
-    "Clients & Expiry",
+    "Clients",
+    "Expiry",
     "Company Details",
+    "VO/CSH Setup",
     "Renewals",
 )
 DOC_TABS = (

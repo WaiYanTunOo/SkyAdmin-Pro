@@ -43,6 +43,8 @@ class AccountingSetupPanelMixin0:
             showheight=10,
             tree_sticky="nsew",
             tree_row_weight=1,
+            table_id="accounting.setup",
+            db=self.app.db,
         )
         panel.configure_data(
             list_rows=lambda: list_accounting_setup_rows(self.app.db),

@@ -84,6 +84,6 @@ class GeneralTabMixinMixin1:
         )
         ctk.CTkLabel(
             buttons,
-            text="Company name is managed in the Clients & Expiry tab.",
+            text="Company name is managed in the Clients tab.",
             text_color=TEXT_MUTED,
         ).grid(row=0, column=1, sticky="e", padx=(12, 0))

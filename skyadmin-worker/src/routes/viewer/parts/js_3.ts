@@ -52,7 +52,8 @@ $("btnRefresh").addEventListener("click",syncNow);
 $("btnLogout").addEventListener("click",()=>{clearCreds();showActivate("Signed out.")});
 $("btnActivate").addEventListener("click",async()=>{
   const code=$("code").value.trim();
-  if(!code)return showActivate("Paste your activation code.",true);
+  if(!code)return showActivate("Paste your client passcode (SKYPASS1:…).",true);
+  if(!code.startsWith("SKYPASS1:"))return showActivate("Use a client passcode only (SKYPASS1:…). License keys are not accepted here.",true);
   $("btnActivate").disabled=true;
   showActivate("Activating…");
   try{

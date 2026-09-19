@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 from skyadmin_pro.config import NOTEBOOK_ENTRY_TYPES
+from skyadmin_pro.ui.views.office_hub.vault_tab.vaultTabMixinMixin0 import CLIENTS_LOGIN_TAB
 
 
 class OfficeHubViewMixin1:
@@ -11,13 +12,13 @@ class OfficeHubViewMixin1:
         credential_type: str | None = None,
         credential_id: int | None = None,
     ) -> None:
-        """Open Client DBD/RD tab for one client (all types or a specific credential)."""
+        """Open Clients Login Data tab for one client (read-only detail)."""
         clean = (client_name or "").strip()
         if not clean:
             return
         self._ensure_panel("Passwords")
         self.tabs.set("Passwords")
-        self._password_subtabs.set("Client DBD / RD")
+        self._password_subtabs.set(CLIENTS_LOGIN_TAB)
         type_filter = credential_type if credential_type else "All"
         self.client_cred_type_menu.set(type_filter)
         self.client_cred_search_var.set(clean)
@@ -34,7 +35,7 @@ class OfficeHubViewMixin1:
         elif rows:
             pick = str(rows[0]["id"])
         else:
-            self._new_client_credential()
+            self._clear_client_cred_readonly()
             self.cc_client.set(clean)
             if credential_type:
                 self.cc_type.set(credential_type)

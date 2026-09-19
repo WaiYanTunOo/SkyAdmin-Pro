@@ -78,10 +78,10 @@ class FinancialDocsTabMixinMixin2:
                 ("amount", "Amount", 100),
                 ("desc", "Description", 180),
             ),
+            showheight=8,
             table_id="company.fin_docs",
             db=self.app.db,
         )
-        self.fin_doc_tree.tree.configure(height=8)
         self.fin_doc_tree.grid(row=3, column=0, sticky="nsew", padx=12, pady=(0, 8))
 
         from skyadmin_pro.ui.dnd import enable_drop

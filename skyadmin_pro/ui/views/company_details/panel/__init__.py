@@ -10,13 +10,11 @@ from skyadmin_pro.ui.views.company_details.constants import (
     SUBTAB_NAMES,
     SUBTAB_TAX_IDS,
     SUBTAB_VO_CSH,
-    SUBTAB_VO_CSH_SETUP,
 )
 from skyadmin_pro.ui.views.company_details.filing_tab import FilingTabMixin
 from skyadmin_pro.ui.views.company_details.financial_docs_tab import FinancialDocsTabMixin
 from skyadmin_pro.ui.views.company_details.general_tab import GeneralTabMixin
 from skyadmin_pro.ui.views.company_details.tax_ids_tab import TaxIdsTabMixin
-from skyadmin_pro.ui.views.company_details.vo_csh_setup_tab import VoCshSetupTabMixin
 from skyadmin_pro.ui.views.company_details.vo_csh_tab import VoCshTabMixin
 
 from .chunk_0 import CompanyDetailsPanelMixin0
@@ -65,7 +63,6 @@ class CompanyDetailsPanel(
     GeneralTabMixin,
     TaxIdsTabMixin,
     FilingTabMixin,
-    VoCshSetupTabMixin,
     VoCshTabMixin,
     FinancialDocsTabMixin,
     ctk.CTkFrame,

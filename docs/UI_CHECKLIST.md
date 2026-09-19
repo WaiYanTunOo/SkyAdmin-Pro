@@ -13,11 +13,16 @@ Manual QA after UI/theme changes. Test at **1100×700** (minimum), **1920×1080*
 ## Navigation (each sidebar view)
 
 - [ ] Dashboard — stat cards wrap; onboard client field expands
-- [ ] Companies — Clients & Expiry, Company Details, Renewals (each tab fills the page; not a half-height scroll)
+- [ ] Dashboard → **Calendar** — full-width month grid (prev/next, today highlight); click day → popup list/form; click chip to edit; Escape/Close dismisses; count shows upcoming (30 days)
+- [ ] Companies — Clients, Expiry, Company Details, VO/CSH Setup, Renewals (each tab fills the page; not a half-height scroll)
+- [ ] Companies → Expiry — Status shows Expired / Ongoing / near Expiry under 45 days; Days left shows countdown
+- [ ] Tables — every ThemedTreeview has ⋮ Columns (also right-click); hide/show persists; Excel “visible columns only” follows matching sheets
+- [ ] Finance → Suppliers & AP / Payments (AP) — form and table span full content width
 - [ ] Daily Work — Tasks, Service Pipeline, Courier Tracker (sidebar pages, not Companies tabs)
-- [ ] Finance — Suppliers & AP, Monthly Tax Status, Accounting Setup
+- [ ] Finance — Suppliers & AP, Monthly Service Close, Accounting Setup
 - [ ] Document Hub — all tabs open
-- [ ] Office Hub — Contacts, Vault, Notebook search/fields
+- [ ] Company Details → Tax IDs — edit DBD/RD/other portal logins (New/Save/Delete); Show/Copy password
+- [ ] Office Hub → Passwords → Clients Login Data — read-only company logins; Open Company Details jumps to Tax IDs; Office accounts still editable
 - [ ] Utilities — translator subtitle wraps
 - [ ] Settings — license/sync row; activation fields
 

@@ -32,7 +32,7 @@ class ExportFilterDialogMixin1:
         ctk.CTkLabel(
             columns_frame,
             text="Off = every sheet exports all columns (auditable). "
-            "On = sheets follow hidden columns in Database & Tasks tables.",
+            "On = each sheet follows Columns (⋮) / hidden columns on matching tables.",
             font=ctk.CTkFont(size=10),
             text_color=TEXT_MUTED,
             wraplength=360,

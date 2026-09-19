@@ -66,5 +66,7 @@ class DashboardViewMixin13:
             ),
             on_double_click=lambda iid: open_report_row(self, iid),
             showheight=8,
+            table_id="dashboard.incentive_report",
+            db=self.app.db,
         )
         return report_card

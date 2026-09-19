@@ -46,6 +46,8 @@ class SetupRolloutPanel(ctk.CTkFrame):
         use_card: bool = True,
         tree_sticky: str = "ew",
         tree_row_weight: int = 0,
+        table_id: str | None = None,
+        db=None,
     ) -> None:
         super().__init__(master, fg_color="transparent")
         container = self
@@ -102,6 +104,8 @@ class SetupRolloutPanel(ctk.CTkFrame):
             on_select=self._on_tree_select,
             on_double_click=on_double_click,
             showheight=showheight,
+            table_id=table_id,
+            db=db,
         )
         sticky = tree_sticky
         if tree_row_weight:

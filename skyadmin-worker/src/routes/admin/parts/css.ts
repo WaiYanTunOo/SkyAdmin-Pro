@@ -53,6 +53,6 @@ button.sm{width:auto;padding:7px 12px;font-size:12px;border-radius:8px;margin-to
 .housekeeping{display:flex;align-items:center;gap:8px;flex-wrap:wrap;margin-top:8px}
 .filt button.on{background:#2563eb;color:#fff;border-color:#2563eb}
 .sku-row{display:flex;flex-wrap:wrap;gap:12px;margin:10px 0 4px}
-.sku-row .sku{display:inline-flex;align-items:center;gap:6px;font-weight:600;font-size:13px;color:#d1d5db;margin:0}
-.sku-row .sku input{width:auto;margin:0;padding:0}
+.sku-row .sku{display:inline-flex;align-items:center;gap:6px;font-weight:600;font-size:13px;color:#d1d5db;margin:0;cursor:pointer}
+.sku-row .sku input[type=checkbox]{width:16px;height:16px;margin:0;padding:0;border:0;border-radius:0;background:transparent;-webkit-appearance:checkbox;appearance:auto;accent-color:#2563eb;cursor:pointer;flex-shrink:0}
 `;

@@ -35,18 +35,20 @@ class DashboardViewMixin19:
             self._next_targets[iid] = ("supplier", str(item["id"]))
         for item in ongoing:
             client = item.get("client_name") or ""
+            service = item.get("service") or item.get("document_type") or "pipeline"
+            step = item.get("step")
+            when = f"step {step}" if step is not None else "in progress"
             iid = f"ongoing-{item['id']}"
             actions.append(
                 (
                     3,
                     "watch",
                     (
-                        f"Continue: {item.get('document_type')}",
+                        f"Continue: {service}",
                         client or "—",
-                        "ongoing work — mark Completed when done",
+                        f"{when} — advance until Completed",
                     ),
                     iid,
                 )
             )
-            if client:
-                self._next_targets[iid] = ("company", client)
+            self._next_targets[iid] = ("pipeline", str(item["id"]))

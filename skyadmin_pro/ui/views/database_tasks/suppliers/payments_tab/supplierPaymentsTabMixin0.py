@@ -13,14 +13,6 @@ class SupplierPaymentsTabMixin0:
         pay_card = self._SupplierPaymentsTab__init__p1(host, master)
         self._SupplierPaymentsTab__init__p2(pay_card)
 
-    def _show_columns_menu(self) -> None:
-        try:
-            x = self.columns_btn.winfo_rootx()
-            y = self.columns_btn.winfo_rooty() + self.columns_btn.winfo_height()
-        except Exception:
-            return
-        self.pay_tree.show_column_menu(x, y)
-
     def refresh(self, suppliers: list[dict] | None = None) -> None:
         from skyadmin_pro.ui.async_ui import run_background
 

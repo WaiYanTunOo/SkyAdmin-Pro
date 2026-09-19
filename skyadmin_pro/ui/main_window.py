@@ -569,7 +569,7 @@ class MainWindow(dnd_base_class()):
         credential_type: str | None = None,
         credential_id: int | None = None,
     ) -> None:
-        """Navigate to Office Hub → Client DBD/RD for the given company."""
+        """Navigate to Office Hub → Clients Login Data for the given company."""
         view = self._ensure_view(NAV_OFFICE_HUB)
         if view is not None:
             view._pending_client_credentials = (
@@ -598,7 +598,7 @@ class MainWindow(dnd_base_class()):
         self.show_view(NAV_OFFICE_HUB)
 
     def open_vo_csh_setup(self) -> None:
-        """Navigate to Company Details → VO/CSH Setup rollout queue."""
+        """Navigate to Companies → VO/CSH Setup rollout queue."""
         from skyadmin_pro.config import NAV_DATABASE_TASKS
 
         view = self._ensure_view(NAV_DATABASE_TASKS)

@@ -4,12 +4,12 @@ from skyadmin_pro.ui.views.company_details import CompanyDetailsPanel
 from skyadmin_pro.ui.views.company_details.panel import (
     SUBTAB_TAX_IDS,
     SUBTAB_VO_CSH,
-    SUBTAB_VO_CSH_SETUP,
 )
 
 from ._const_2 import TAB_CLIENTS
 from ._const_4 import TAB_COMPANY
 from ._const_5 import TAB_RENEWALS
+from ._const_6 import TAB_VO_CSH_SETUP
 from .funcs import service_menu_panel_key
 
 
@@ -48,10 +48,9 @@ class DatabaseTasksViewMixin2:
         open_menu_view(self.app, NAV_ACCOUNTING, "on_show")
 
     def open_vo_csh_setup(self) -> None:
-        self.tabs.set(TAB_COMPANY)
-        panel = self._require_company_panel()
-        panel.tabs.set(SUBTAB_VO_CSH_SETUP)
-        self.refresh_active_tab(TAB_COMPANY)
+        self.tabs.set(TAB_VO_CSH_SETUP)
+        self._ensure_panel(TAB_VO_CSH_SETUP)
+        self.refresh_active_tab(TAB_VO_CSH_SETUP)
 
     def open_company_vo_csh(self, client_name: str) -> None:
         self.tabs.set(TAB_COMPANY)
@@ -99,10 +98,10 @@ class DatabaseTasksViewMixin2:
                 return
             panels = [panel_key]
         else:
-            panels = ["clients", "company"]
+            panels = ["expiry", "company"]
         for key in panels:
-            if key == "clients" and self.clients_panel is not None:
-                combo = self.clients_panel.expiry_type
+            if key == "expiry" and self.expiry_panel is not None:
+                combo = self.expiry_panel.expiry_type
                 combo.configure(values=types)
                 if combo.get() not in types:
                     combo.set(types[0] if types else "")

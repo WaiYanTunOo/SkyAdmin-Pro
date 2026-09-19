@@ -7,14 +7,29 @@ from skyadmin_pro.ui.widgets import FeedbackLabel, themed_entry
 
 
 class ClientsExpiryPanelMixin0Mixin0:
-    def __init__(self, master, app, feedback: FeedbackLabel) -> None:
+    def __init__(self, master, app, feedback: FeedbackLabel, *, mode: str = "both") -> None:
         super().__init__(master, fg_color="transparent")
+        self._panel_mode = mode if mode in ("clients", "expiry", "both") else "both"
         left, title_row = self._ClientsExpiryPanelMixin0__init__p1(app, feedback)
         client_pager = self._ClientsExpiryPanelMixin0__init__p2(title_row, left)
         actions = self._ClientsExpiryPanelMixin0__init__p3(client_pager, left)
         batch_row = self._ClientsExpiryPanelMixin0__init__p4(actions, left)
         form, right = self._ClientsExpiryPanelMixin0__init__p5(batch_row)
         self._ClientsExpiryPanelMixin0__init__p6(form, right)
+        self._apply_panel_mode(left, right)
+
+    def _apply_panel_mode(self, left, right) -> None:
+        """Show only the Clients list, only Expiry, or both (legacy split)."""
+        mode = getattr(self, "_panel_mode", "both")
+        if mode == "clients":
+            right.grid_remove()
+            self.grid_columnconfigure(1, weight=0, minsize=0)
+            left.grid(row=0, column=0, sticky="nsew", padx=0)
+        elif mode == "expiry":
+            left.grid_remove()
+            self.grid_columnconfigure(1, weight=0, minsize=0)
+            right.grid(row=0, column=0, sticky="nsew")
+        # mode == "both": leave the default left/right grid from init.
 
     def _ClientsExpiryPanelMixin0__init__p1(self, app, feedback):
         self.app = app

@@ -321,15 +321,18 @@ class FormField(ctk.CTkFrame):
         return str(self.widget.get()).strip()
 
     def set(self, value: str) -> None:
-        if self.kind == "date":
-            self.var.set(value)
+        try:
+            if self.kind == "date":
+                self.var.set(value)
+                return
+            if isinstance(self.widget, ctk.CTkTextbox):
+                self.widget.delete("1.0", "end")
+                if value:
+                    self.widget.insert("1.0", value)
+                return
+            self.widget.set(value)
+        except Exception:
             return
-        if isinstance(self.widget, ctk.CTkTextbox):
-            self.widget.delete("1.0", "end")
-            if value:
-                self.widget.insert("1.0", value)
-            return
-        self.widget.set(value)
 
     def clear(self) -> None:
         self.set("")
@@ -457,7 +460,7 @@ _STATUS_CYCLE = (
 
 
 class MonthStatusPanel(ctk.CTkFrame):
-    """Per-client monthly tax-close tracker: mark each client-month Open /
+    """Per-client monthly service-close tracker: mark each client-month Open /
     In progress / Closed, with month navigation and a live summary."""
 
     def __init__(
@@ -466,11 +469,13 @@ class MonthStatusPanel(ctk.CTkFrame):
         app,
         *,
         showheight: int = 8,
-        title: str = "Client month closes",
+        title: str = "Monthly service close",
+        on_open_filing=None,
         **kwargs,
     ) -> None:
         super().__init__(master, corner_radius=12, **kwargs)
         self.app = app
+        self._on_open_filing = on_open_filing
         self._refresh_seq = 0
         today = date.today()
         self._year = today.year
@@ -501,6 +506,8 @@ class MonthStatusPanel(ctk.CTkFrame):
                 ("updated", "Updated", 150),
             ),
             on_double_click=self._advance,
+            table_id="tax.month_status",
+            db=app.db,
         )
         self.tree.tree.configure(height=showheight)
         self.tree.grid(row=1, column=0, sticky="nsew", padx=16, pady=(0, 4))
@@ -513,6 +520,10 @@ class MonthStatusPanel(ctk.CTkFrame):
         ctk.CTkButton(controls, text="Apply to selected", width=140, command=self._apply_selected).pack(
             side="left", padx=(10, 0)
         )
+        if on_open_filing is not None:
+            ctk.CTkButton(controls, text="Open Filing Statuses", width=160, command=self._open_filing_statuses).pack(
+                side="left", padx=(10, 0)
+            )
         ctk.CTkLabel(
             controls,
             text="Double-click a row to advance its status",
@@ -587,8 +598,23 @@ class MonthStatusPanel(ctk.CTkFrame):
         label = self.status_menu.get()
         status = next(key for key, value in _STATUS_LABEL.items() if value == label)
         self.app.db.set_client_month_status(client_id, self._month_key(), status)
-        self.app.set_status(f"Month close set to '{label}' for this client ({self.month_label.cget('text')}).")
+        self.app.set_status(
+            f"Monthly service close set to '{label}' for this client ({self.month_label.cget('text')})."
+        )
         self.refresh()
+
+    def _open_filing_statuses(self) -> None:
+        client_id = self._selected_client_id()
+        if client_id is None:
+            self.app.set_status("Select a client row first.")
+            return
+        values = self.tree.tree.item(str(client_id), "values")
+        name = str(values[0]).strip() if values else ""
+        if not name or name == "—":
+            self.app.set_status("Select a client row first.")
+            return
+        if callable(self._on_open_filing):
+            self._on_open_filing(name)
 
     def _advance(self, iid: str | None) -> None:
         if iid is None:

@@ -1,7 +1,7 @@
 from __future__ import annotations
 
 from skyadmin_pro.config import EXPIRY_ALERT_DAYS
-from skyadmin_pro.db.sql_helpers import _expiry_type_condition, _expiry_window_condition, _in_clause
+from skyadmin_pro.db.sql_helpers import _expiry_type_condition, _expiry_window_condition
 from skyadmin_pro.services.tracking import days_until, effective_expiry_date
 
 
@@ -59,18 +59,20 @@ class TasksMixinMixin3:
         return filtered
 
     def list_ongoing_services(self) -> list[dict]:
-        """Every service currently marked Ongoing, newest started first."""
-        clause, params = _in_clause("d.document_type", tuple(self.list_service_types()))
+        """Service Pipeline rows not Completed (step < max), newest first."""
+        from skyadmin_pro.config import PIPELINE_MAX_STEP
+
         return self._fetch_all(
-            f"""
-            SELECT d.id, d.client_id, d.document_type, d.expiry_date, d.amount,
-                   d.payment_date, d.start_date, d.progress, d.paid,
-                   d.created_at, c.name AS client_name
-            FROM documents d
-            LEFT JOIN clients c ON c.id = d.client_id
-            WHERE d.deleted_at IS NULL AND d.client_id IS NOT NULL AND d.progress = 'Ongoing'
-              AND {clause}
-            ORDER BY d.start_date IS NULL, d.start_date DESC, d.id DESC
+            """
+            SELECT p.id, p.client_id, p.service AS document_type, p.service,
+                   p.step, p.step_date AS start_date, p.notes,
+                   p.created_at, c.name AS client_name
+            FROM pipeline_items p
+            LEFT JOIN clients c ON c.id = p.client_id
+            WHERE p.deleted_at IS NULL AND p.step < ?
+              AND (c.id IS NULL OR (c.deleted_at IS NULL
+                   AND COALESCE(c.status, 'active') != 'inactive'))
+            ORDER BY p.updated_at DESC, p.id DESC
             """,
-            tuple(params),
+            (PIPELINE_MAX_STEP,),
         )

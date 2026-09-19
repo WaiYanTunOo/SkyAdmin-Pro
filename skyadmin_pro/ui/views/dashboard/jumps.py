@@ -5,6 +5,16 @@ from __future__ import annotations
 from skyadmin_pro.config import NAV_DATABASE_TASKS, NAV_PIPELINE, NAV_SUPPLIERS, NAV_TASKS, NAV_TAX_STATUS
 from skyadmin_pro.ui.views.database_tasks.view.funcs import open_menu_view
 
+from .jumps_companies import (  # noqa: F401 — re-export for card commands
+    open_calendar_tab,
+    open_clients_tab,
+    open_company_details_tab,
+    open_expiry,
+    open_filing_statuses,
+    open_money_tab,
+    open_vo_csh_setup,
+)
+
 
 def follow_next(app, kind: str, value: str, iid: str) -> None:
     if kind == "task":
@@ -40,7 +50,7 @@ def open_company(app, name: str) -> None:
     if name:
         _companies(app, "open_company_details", name)
     else:
-        app.show_view(NAV_DATABASE_TASKS)
+        open_company_details_tab(app)
 
 
 def open_tax_status(app) -> None:
@@ -52,11 +62,12 @@ def open_suppliers(app) -> None:
 
 
 def _companies(app, method: str, value: str) -> None:
-    view = app._ensure_view(NAV_DATABASE_TASKS)
-    app.show_view(NAV_DATABASE_TASKS)
-    opener = getattr(view, method, None) if view is not None else None
-    if callable(opener) and value:
-        opener(value)
+    if value:
+        from .jumps_companies import _call_companies
+
+        _call_companies(app, method, value)
+    else:
+        app.show_view(NAV_DATABASE_TASKS)
 
 
 def _int_id(raw: str) -> int | None:

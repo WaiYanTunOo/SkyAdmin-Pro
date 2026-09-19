@@ -4,24 +4,33 @@ import customtkinter as ctk
 
 from skyadmin_pro.config import FILING_FIELD_GROUPS, TAX_FILING_LABELS, TAX_FILING_STATUSES
 from skyadmin_pro.ui.debounce import debounced_after
-from skyadmin_pro.ui.theme import TEXT_MUTED
+from skyadmin_pro.ui.theme import CARD_RADIUS, TEXT_MUTED
 
 
 class FilingTabMixinMixin3:
     def _FilingTabMixin_build_filing_statuses_fo_p2(self, frame):
         self._filing_save_schedulers: dict[str, object] = {}
-        row = 2
-        for group_title, fields in FILING_FIELD_GROUPS:
+        cols = ctk.CTkFrame(frame, fg_color="transparent")
+        cols.grid(row=2, column=0, sticky="nsew", padx=16, pady=(0, 4))
+        cols.grid_columnconfigure((0, 1), weight=1, uniform="filing")
+        cols.grid_rowconfigure(0, weight=1)
+        for col_idx, (group_title, fields) in enumerate(FILING_FIELD_GROUPS):
+            panel = ctk.CTkFrame(cols, corner_radius=CARD_RADIUS)
+            panel.grid(
+                row=0,
+                column=col_idx,
+                sticky="nsew",
+                padx=(0 if col_idx == 0 else 6, 6 if col_idx == 0 else 0),
+            )
+            panel.grid_columnconfigure(1, weight=1)
             ctk.CTkLabel(
-                frame,
+                panel,
                 text=group_title,
-                font=ctk.CTkFont(size=12, weight="bold"),
-                text_color=TEXT_MUTED,
-            ).grid(row=row, column=0, columnspan=2, sticky="w", padx=16, pady=(10, 2))
-            row += 1
-            for field in fields:
-                ctk.CTkLabel(frame, text=TAX_FILING_LABELS[field], font=ctk.CTkFont(size=13)).grid(
-                    row=row, column=0, sticky="w", padx=16, pady=(4, 2)
+                font=ctk.CTkFont(size=13, weight="bold"),
+            ).grid(row=0, column=0, columnspan=2, sticky="w", padx=12, pady=(12, 6))
+            for row_idx, field in enumerate(fields, start=1):
+                ctk.CTkLabel(panel, text=TAX_FILING_LABELS[field], font=ctk.CTkFont(size=13)).grid(
+                    row=row_idx, column=0, sticky="w", padx=12, pady=(4, 2)
                 )
                 var = ctk.StringVar(value="Not Applicable")
                 self.filing_vars[field] = var
@@ -33,18 +42,16 @@ class FilingTabMixinMixin3:
 
                 self._filing_save_schedulers[field] = debounced_after(self, _schedule_save, delay_ms=300)
                 var.trace_add("write", lambda *_a, f=field: self._filing_save_schedulers[f]())
-                ctk.CTkOptionMenu(frame, values=list(TAX_FILING_STATUSES), variable=var).grid(
-                    row=row, column=1, sticky="ew", padx=(0, 16), pady=(4, 2)
+                ctk.CTkOptionMenu(panel, values=list(TAX_FILING_STATUSES), variable=var).grid(
+                    row=row_idx, column=1, sticky="ew", padx=(0, 12), pady=(4, 2)
                 )
-                row += 1
-        self._filing_form_next_row = row
+        self._filing_form_next_row = 3
 
     def _FilingTabMixin_build_filing_statuses_fo_p3(self, frame):
         btn_row = ctk.CTkFrame(frame, fg_color="transparent")
         btn_row.grid(
-            row=getattr(self, "_filing_form_next_row", 20),
+            row=getattr(self, "_filing_form_next_row", 3),
             column=0,
-            columnspan=2,
             sticky="w",
             padx=16,
             pady=(12, 8),

@@ -184,16 +184,70 @@ class TestTaxMixin:
         assert statuses[cid]["status"] == "closed"
 
     def test_month_close_summary(self, db):
-        cid = db.get_or_create_client("Acme Corp")
-        db.set_client_month_status(cid, "2026-01", "closed")
-        summary = db.month_close_summary("2026-01")
-        assert summary["clients"] >= 1
-        assert summary["closed"] >= 1
+        closed_id = db.get_or_create_client("Closed Co")
+        progress_id = db.get_or_create_client("Progress Co")
+        open_id = db.get_or_create_client("Open Co")
+        db.set_client_month_status(closed_id, "2026-01", "closed")
+        db.set_client_month_status(progress_id, "2026-01", "in_progress")
+        db.set_client_month_status(open_id, "2026-01", "open")
+        scope = [closed_id, progress_id, open_id]
+        summary = db.month_close_summary("2026-01", client_ids=scope)
+        assert summary["clients"] == 3
+        assert summary["closed"] == 1
+        assert summary["in_progress"] == 1
+        assert summary["open"] == 1  # excludes closed and in_progress
+        assert summary["incomplete"] == 2  # open + in_progress only
+
+    def test_dashboard_counts_ongoing_is_pipeline(self, db):
+        from skyadmin_pro.config import PIPELINE_MAX_STEP
+
+        cid = db.get_or_create_client("Pipeline Co")
+        open_id = db.add_pipeline_item(client_id=cid, service="Visa", step=1)
+        done_id = db.add_pipeline_item(client_id=cid, service="Work Permit", step=PIPELINE_MAX_STEP)
+        counts = db.dashboard_counts(expiring_total=0)
+        assert counts["ongoing"] == 1
+        rows = db.list_ongoing_services()
+        ids = {int(r["id"]) for r in rows}
+        assert open_id in ids
+        assert done_id not in ids
+
+    def test_count_pending_filings_closed_month_unfinished(self, db):
+        from datetime import date
+
+        month_key = date.today().strftime("%Y-%m")
+        unfinished = db.get_or_create_client("Tax Open Co")
+        finished = db.get_or_create_client("Tax Done Co")
+        not_closed = db.get_or_create_client("Tax Not Closed")
+        db.update_client_fields(
+            unfinished,
+            pnd1_status="Pending",
+            pnd3_status="Complete",
+            pnd53_status="Not Applicable",
+            pp30_status="Not Applicable",
+        )
+        db.update_client_fields(
+            finished,
+            pnd1_status="Complete",
+            pnd3_status="Complete",
+            pnd53_status="Complete",
+            pp30_status="Complete",
+        )
+        db.update_client_fields(not_closed, pnd1_status="On-Going")
+        db.set_client_month_status(unfinished, month_key, "closed")
+        db.set_client_month_status(finished, month_key, "closed")
+        db.set_client_month_status(not_closed, month_key, "in_progress")
+        assert db.count_pending_filings() == 1
+
+        ongoing_closed = db.get_or_create_client("Tax Ongoing Closed")
+        db.update_client_fields(ongoing_closed, pp30_status="On-Going")
+        db.set_client_month_status(ongoing_closed, month_key, "closed")
+        assert db.count_pending_filings() == 2
 
     def test_dashboard_counts(self, db):
         counts = db.dashboard_counts()
         assert "pending" in counts
         assert "clients" in counts
+        assert "ongoing" in counts
 
     def test_get_client_tax_summary(self, db):
         cid = db.get_or_create_client("Acme Corp")

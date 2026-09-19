@@ -49,6 +49,8 @@ class VaultTabMixinMixin5:
             ),
             on_select=self._on_office_cred_select,
             showheight=9,
+            table_id="office.office_creds",
+            db=self.app.db,
         )
         self.office_cred_tree.grid(row=2, column=0, sticky="nsew")
 

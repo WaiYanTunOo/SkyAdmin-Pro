@@ -26,7 +26,7 @@ NAV_ITEMS: tuple[tuple[str, str], ...] = (
     (NAV_TASKS, "Tasks"),
     (NAV_DATABASE_TASKS, "Companies"),
     (NAV_SUPPLIERS, "Suppliers & AP"),
-    (NAV_TAX_STATUS, "Monthly Tax Status"),
+    (NAV_TAX_STATUS, "Monthly Service Close"),
     (NAV_ACCOUNTING, "Accounting Setup"),
     (NAV_PIPELINE, "Service Pipeline"),
     (NAV_COURIER, "Courier Tracker"),

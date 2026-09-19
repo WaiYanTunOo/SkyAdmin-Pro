@@ -14,6 +14,15 @@ class SupplierServicesTabMixin0:
 
     def refresh(self) -> None:
         self.supplier_svc_tree.apply_theme()
+        try:
+            company = self.svc_company.get()
+        except Exception:
+            company = ""
+        try:
+            service = self.svc_service.get()
+        except Exception:
+            service = ""
+        self._refresh_svc_combos(company, service)
         self._refresh_supplier_services()
 
     def _selected_supplier_id(self) -> int | None:
@@ -44,11 +53,12 @@ class SupplierServicesTabMixin0:
         if supplier_id is None:
             self.feedback.error("Select a supplier first (Suppliers tab).")
             return
-        company = self.svc_company.get().strip()
-        service = self.svc_service.get().strip()
+        company = (self.svc_company.get() or "").strip()
+        service = (self.svc_service.get() or "").strip()
         if not company or not service:
-            self.feedback.error("Enter company and service name.")
+            self.feedback.error("Choose company and service from the lists.")
             return
+
         expiry = parse_flexible_date(self.svc_expiry_var.get().strip())
         if self.svc_expiry_var.get().strip() and expiry is None:
             self.feedback.error("Enter a valid expiry date (YYYY-MM-DD or DD/MM/YYYY).")
@@ -81,7 +91,6 @@ class SupplierServicesTabMixin0:
 
     def _clear_svc_form(self) -> None:
         self._editing_svc_id = None
-        self.svc_company.delete(0, "end")
-        self.svc_service.delete(0, "end")
+        self._refresh_svc_combos()
         self.svc_expiry_var.set("")
         self.svc_notes.delete(0, "end")

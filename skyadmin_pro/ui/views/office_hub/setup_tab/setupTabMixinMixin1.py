@@ -10,6 +10,22 @@ from skyadmin_pro.services.office_hub_rollout import (
 
 
 class SetupTabMixinMixin1:
+    def _open_selected_office_credentials(self, _iid: str | None = None) -> None:
+        row = self._selected_office_setup_row()
+        if not row:
+            self.feedback.error("Select a client first.")
+            return
+        name = (row.get("name") or "").strip()
+        if not name:
+            self.feedback.error("Select a client first.")
+            return
+        from skyadmin_pro.config import NAV_DATABASE_TASKS
+
+        view = self.app._ensure_view(NAV_DATABASE_TASKS)
+        if view is not None and hasattr(view, "open_company_tax_ids"):
+            view.open_company_tax_ids(name)
+        self.app.show_view(NAV_DATABASE_TASKS)
+
     def _import_selected_liaison_contact(self) -> None:
         row = self._selected_office_setup_row()
         if not row:
@@ -51,7 +67,7 @@ class SetupTabMixinMixin1:
             return
         if not messagebox.askyesno(
             "Migrate IRD passwords",
-            f"Import {pending} legacy IRD password(s) into Office Hub RD credentials?",
+            f"Import {pending} legacy IRD password(s) into client portal logins (RD)?",
             parent=self.winfo_toplevel(),
         ):
             return

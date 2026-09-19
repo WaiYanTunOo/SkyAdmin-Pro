@@ -39,6 +39,8 @@ class ContactsTabMixinMixin2:
             ),
             on_select=self._on_contact_select,
             showheight=10,
+            table_id="office.contacts",
+            db=self.app.db,
         )
         self.contacts_tree.grid(row=1, column=0, sticky="nsew")
 

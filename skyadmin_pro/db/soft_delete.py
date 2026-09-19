@@ -21,6 +21,7 @@ _TABLES = frozenset(
         "client_months",
         "tax_cycle_log",
         "recurring_tasks",
+        "appointments",
     }
 )
 

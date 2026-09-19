@@ -16,8 +16,9 @@ from skyadmin_pro.ui.theme import (
 class FilingTabMixinMixin2:
     def _FilingTabMixin_build_filing_statuses_fo_p1(self, master):
         frame = ctk.CTkFrame(master, corner_radius=CARD_RADIUS)
-        frame.grid(row=0, column=0, sticky="ew")
+        frame.grid(row=0, column=0, sticky="nsew")
         frame.grid_columnconfigure(0, weight=1)
+        frame.grid_rowconfigure(2, weight=1)
 
         # Title row
         title_row = ctk.CTkFrame(frame, fg_color="transparent")
@@ -25,7 +26,7 @@ class FilingTabMixinMixin2:
         title_row.grid_columnconfigure(0, weight=1)
         ctk.CTkLabel(
             title_row,
-            text="Statutory returns — not month close",
+            text="Form checklist — use Monthly Service Close for the month package",
             font=ctk.CTkFont(size=CARD_TITLE_SIZE, weight="bold"),
         ).grid(row=0, column=0, sticky="w")
         self.filing_last_changed_label = ctk.CTkLabel(

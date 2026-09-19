@@ -1,28 +1,31 @@
 from __future__ import annotations
 
-from tkinter import messagebox
-
 from skyadmin_pro.config import OFFICE_SYSTEM_TYPES
 from skyadmin_pro.services.workflow import copy_to_clipboard
 
 
 class VaultTabMixinMixin1:
-    def _delete_client_credential(self) -> None:
-        if self._selected_client_cred_id is None:
-            self.feedback.error("Select a client credential first.")
+    def _open_client_cred_company_details(self) -> None:
+        name = (self.cc_client.get() or "").strip()
+        if not name:
+            name = (self.client_cred_search_var.get() or "").strip()
+        if not name:
+            self.feedback.error("Select a client login first.")
             return
-        if not messagebox.askyesno("Delete", "Delete this client credential?", parent=self.winfo_toplevel()):
-            return
-        self.app.db.delete_client_credential(self._selected_client_cred_id)
-        self._new_client_credential()
-        self.feedback.success("Client credential deleted.")
-        self._refresh_client_credentials()
+        from skyadmin_pro.config import NAV_DATABASE_TASKS
+
+        view = self.app._ensure_view(NAV_DATABASE_TASKS)
+        if view is not None and hasattr(view, "open_company_tax_ids"):
+            view.open_company_tax_ids(name)
+        self.app.show_view(NAV_DATABASE_TASKS)
 
     def _toggle_client_pw(self) -> None:
         if self.cc_pw_entry is None:
             return
         self._client_pw_visible = not self._client_pw_visible
-        self.cc_pw_entry.configure(show="" if self._client_pw_visible else "*")
+        show = "" if self._client_pw_visible else "*"
+        self.cc_pw_entry.configure(state="normal", show=show)
+        self.cc_pw_entry.configure(state="disabled")
 
     def _copy_client_pw(self) -> None:
         if not self.cc_password.get():

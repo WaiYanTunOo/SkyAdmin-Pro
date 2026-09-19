@@ -19,7 +19,9 @@ class MonthCloseHost:
             summary = self.app.db.month_close_summary(key, client_ids=ids)
         except Exception:
             return
-        text = f"{summary['open']} open · {summary['in_progress']} in progress · {summary['closed']} closed"
+        # Actionable = Open + In progress (exclude Closed).
+        not_closed = int(summary["open"]) + int(summary["in_progress"])
+        text = f"{not_closed} not closed ({summary['open']} open · {summary['in_progress']} in progress)"
         try:
             self.summary.configure(text=text)
         except Exception:

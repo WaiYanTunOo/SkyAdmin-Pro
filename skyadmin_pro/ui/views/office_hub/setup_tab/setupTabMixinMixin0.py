@@ -16,7 +16,7 @@ class SetupTabMixinMixin0:
             title="Office Hub rollout — contacts & portal logins per client",
             description=(
                 "Import director contacts from Company Details, migrate legacy IRD passwords "
-                "to Client DBD/RD, then add DBD/RD portal logins per company."
+                "into Clients Login Data, then add DBD/RD portal logins in Company Details → Tax IDs."
             ),
             columns=(
                 ("company", "Company", 220),
@@ -27,7 +27,7 @@ class SetupTabMixinMixin0:
                 ("director", "Director / contact", 180),
             ),
             actions=(
-                RolloutAction("Open portal logins", self._open_selected_office_credentials, width=140),
+                RolloutAction("Open Tax IDs logins", self._open_selected_office_credentials, width=150),
                 RolloutAction("Open contacts", self._open_selected_office_contacts, width=120),
                 RolloutAction("Import liaison contact", self._import_selected_liaison_contact, width=160),
                 RolloutAction(
@@ -50,6 +50,8 @@ class SetupTabMixinMixin0:
             use_card=False,
             tree_sticky="nsew",
             tree_row_weight=1,
+            table_id="office.setup",
+            db=self.app.db,
         )
         self._office_setup_panel.grid(row=0, column=0, sticky="nsew")
         self._office_setup_panel.configure_data(
@@ -78,13 +80,6 @@ class SetupTabMixinMixin0:
         if not hasattr(self, "_office_setup_panel"):
             return None
         return self._office_setup_panel.selected_row()
-
-    def _open_selected_office_credentials(self, _iid: str | None = None) -> None:
-        row = self._selected_office_setup_row()
-        if not row:
-            self.feedback.error("Select a client first.")
-            return
-        self.focus_client_credentials((row.get("name") or "").strip())
 
     def _open_selected_office_contacts(self) -> None:
         row = self._selected_office_setup_row()

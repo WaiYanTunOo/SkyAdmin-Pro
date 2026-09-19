@@ -107,3 +107,12 @@ docs/MASTER_ROADMAP.md                  # Audit + backlog
 - **Strict 100-Line Limit (new edits):** New or touched product files under `db/`, `ui/views/`, `services/`, and `skyadmin-worker/src/routes/` should stay under 100 lines; subdivide further only when editing those files.
 - **Freeze mass-splits:** Root shred/refactor scripts and `scratch/` tooling are frozen/gitignored until the Wave D7 package tree is committed. Do not re-run mass-split/shred scripts against the working tree.
 - Prefer targeted holdout splits after git stabilize (see `docs/FEATURES_AND_UPGRADE_PLAN.md`); do not blind-split `widgets.py` / giant tests first.
+
+<!-- pitway:managed:start -->
+- This project uses [PitWay](https://github.com/thixpin/pitway) to control the engineering workflow.
+- Run `pitway resume` before starting or resuming any work.
+- Never edit `.pitway/` directly.
+- Work only within a confirmed task boundary.
+- Obtain a task's bounded context via `pitway task-status <id> --context`.
+- The driver protocol is split into roles: `protocol-driver.md` (Main Agent: developer conversation and every approval gate), `protocol-orchestrator.md` (Orchestrator: task execution), and `protocol-worker.md` (Worker: one bounded task) in the installed driver directory.
+<!-- pitway:managed:end -->

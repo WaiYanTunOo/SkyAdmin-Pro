@@ -66,6 +66,8 @@ class NotebookTabMixinMixin1:
             ),
             on_select=self._on_note_select,
             showheight=10,
+            table_id="office.notebook",
+            db=self.app.db,
         )
         self.notes_tree.grid(row=2, column=0, sticky="nsew")
 

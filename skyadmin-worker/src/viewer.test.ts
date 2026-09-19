@@ -10,6 +10,9 @@ describe("viewer routes", () => {
     expect(res.status).toBe(200);
     const html = await res.text();
     expect(html).toContain("SkyAdmin Viewer");
+    expect(html).toContain("Client passcode");
+    expect(html).toContain("SKYPASS1:");
+    expect(html).not.toContain("License key or passcode");
     expect(html).toContain('data-tab="groups"');
     expect(html).toContain('data-tab="passwords"');
     expect(html).toContain("panel-passwords");
@@ -30,7 +33,7 @@ describe("viewer routes", () => {
 
     const sw = await app.request("http://localhost/viewer/sw.js");
     expect(sw.status).toBe(200);
-    expect(await sw.text()).toContain("skyadmin-viewer-v4");
+    expect(await sw.text()).toContain("skyadmin-viewer-v5");
   });
 
   it("allows its inline script via per-response CSP nonce", async () => {

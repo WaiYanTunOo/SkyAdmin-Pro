@@ -27,7 +27,6 @@ def _panel_with_tabs(current_tab: str) -> CompanyDetailsPanel:
     panel._refresh_filing_subtab = MagicMock()
     panel._refresh_vo_csh_subtab = MagicMock()
     panel._refresh_financial_docs = MagicMock()
-    panel.refresh_vo_csh_setup = MagicMock()
     # Don't mock _refresh_after_mutation - we want to test the real method
     panel.app.invalidate_dashboard = MagicMock()
     panel._selected_client_id = MagicMock(return_value=1)

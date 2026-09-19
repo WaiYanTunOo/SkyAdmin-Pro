@@ -62,5 +62,7 @@ class SettingsViewMixin3:
             ),
             on_select=self._on_pricing_row_select,
             showheight=6,
+            table_id="settings.pricing",
+            db=self.app.db,
         )
         self.pricing_tree.grid(row=1, column=0, sticky="nsew", pady=(0, 8))

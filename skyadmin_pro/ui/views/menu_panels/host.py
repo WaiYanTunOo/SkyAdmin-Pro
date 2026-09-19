@@ -10,6 +10,9 @@ from skyadmin_pro.ui.widgets import FeedbackLabel
 
 
 class PanelHostView(BaseView):
+    # Nested inset inside the page card. Subclasses may set 0 for edge-to-edge tabs.
+    panel_inset = CARD_CONTENT_PADX
+
     def build(self) -> None:
         self.body.grid_columnconfigure(0, weight=1)
         self.body.grid_rowconfigure(0, weight=0)
@@ -23,12 +26,13 @@ class PanelHostView(BaseView):
         card.grid_rowconfigure(0, weight=1)
         self.panel_parent = card
         self.panel = self._make_panel()
+        inset = int(getattr(self, "panel_inset", CARD_CONTENT_PADX) or 0)
         self.panel.grid(
             row=0,
             column=0,
             sticky="nsew",
-            padx=CARD_CONTENT_PADX,
-            pady=CARD_CONTENT_PADX,
+            padx=inset,
+            pady=inset,
         )
 
     def _make_panel(self) -> ctk.CTkFrame:

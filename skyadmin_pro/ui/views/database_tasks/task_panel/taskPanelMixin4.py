@@ -8,16 +8,8 @@ from skyadmin_pro.ui.treeview import ThemedTreeview
 
 class TaskPanelMixin4:
     def _TaskPanel__init__p2(self, top):
-        self.columns_btn = ctk.CTkButton(
-            top,
-            text="⋮ Columns",
-            width=90,
-            fg_color="transparent",
-            border_width=1,
-            command=self._show_columns_menu,
-        )
-        self.columns_btn.pack(side="right")
-
+        # Column hide/show: ThemedTreeview built-in ⋮ Columns only (no duplicate button).
+        _ = top
         tree_card = ctk.CTkFrame(self, corner_radius=CARD_RADIUS)
         tree_card.grid(row=1, column=0, sticky="nsew", padx=(0, 10))
         tree_card.grid_columnconfigure(0, weight=1)

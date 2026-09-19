@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+from skyadmin_pro.db.appointments import AppointmentsMixin
 from skyadmin_pro.db.clients import ClientsMixin
 from skyadmin_pro.db.core import CoreMixin
 from skyadmin_pro.db.courier import CourierMixin
@@ -27,6 +28,7 @@ class Database(
     PricingMixin,
     FinancialMixin,
     OfficeMixin,
+    AppointmentsMixin,
 ):
     """SQLite persistence for SkyAdmin Pro."""
 

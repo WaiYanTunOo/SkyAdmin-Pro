@@ -1,18 +1,19 @@
+"""VO/CSH Setup rollout table and open-selected action."""
+
 from __future__ import annotations
 
-from skyadmin_pro.services.vo_csh_rollout import infer_client_vo_csh_renewal_dates, list_vo_csh_setup_rows
+from skyadmin_pro.services.vo_csh_rollout import list_vo_csh_setup_rows
 from skyadmin_pro.ui.setup_rollout import RolloutAction, SetupRolloutPanel
-from skyadmin_pro.ui.views.company_details.constants import SUBTAB_VO_CSH
 
 
-class VoCshSetupTabMixinMixin0:
+class VoCshSetupPanelMixin0:
     def _build_vo_csh_setup(self, master) -> SetupRolloutPanel:
         panel = SetupRolloutPanel(
             master,
             title="Virtual office & Thai shareholder",
             description=(
-                "Clients with a virtual-office or Thai-shareholder rental. Infer renewal dates "
-                "from document expiry, then review providers on the VO & CSH tab."
+                "Firm-wide VO/CSH queue. Infer renewal dates from document expiry, "
+                "then open Company Details → VO & CSH for providers."
             ),
             columns=(
                 ("company", "Company", 200),
@@ -39,6 +40,8 @@ class VoCshSetupTabMixinMixin0:
             showheight=10,
             tree_sticky="nsew",
             tree_row_weight=1,
+            table_id="vo_csh.setup",
+            db=self.app.db,
         )
         panel.configure_data(
             list_rows=lambda: list_vo_csh_setup_rows(self.app.db),
@@ -61,10 +64,11 @@ class VoCshSetupTabMixinMixin0:
         )
 
     def refresh_vo_csh_setup(self) -> None:
-        if hasattr(self, "_ensure_panel"):
-            self._ensure_panel("VO/CSH Setup")
         if hasattr(self, "_vo_csh_setup_panel"):
             self._vo_csh_setup_panel.refresh()
+
+    def refresh(self) -> None:
+        self.refresh_vo_csh_setup()
 
     def _selected_vo_csh_setup_row(self) -> dict | None:
         if not hasattr(self, "_vo_csh_setup_panel"):
@@ -76,24 +80,7 @@ class VoCshSetupTabMixinMixin0:
         if not row:
             self.feedback.error("Select a client first.")
             return
-        self.select_client((row.get("name") or "").strip())
-        self.tabs.set("VO & CSH")
-        self.refresh()
-
-    def _infer_selected_vo_csh_dates(self) -> None:
-        row = self._selected_vo_csh_setup_row()
-        if not row:
-            self.feedback.error("Select a client first.")
-            return
-        if not row.get("can_infer_vo") and not row.get("can_infer_csh"):
-            self.feedback.error("No document expiry dates available to infer.")
-            return
-        result = infer_client_vo_csh_renewal_dates(self.app.db, int(row["id"]))
-        total = int(result["vo"]) + int(result["csh"])
-        if not total:
-            self.feedback.info("Nothing to infer for this client.")
-            return
-        self.feedback.success(f"Inferred {result['vo']} VO and {result['csh']} CSH renewal date(s).")
-        self.refresh_vo_csh_setup()
-        if self._selected_client_id() == int(row["id"]) and self._current_subtab() == SUBTAB_VO_CSH:
-            self._refresh_after_mutation(SUBTAB_VO_CSH)
+        name = (row.get("name") or "").strip()
+        view = self.app.get_view("database_tasks")
+        if view is not None and hasattr(view, "open_company_vo_csh"):
+            view.open_company_vo_csh(name)

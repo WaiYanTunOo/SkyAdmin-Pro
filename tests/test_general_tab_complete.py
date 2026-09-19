@@ -75,7 +75,6 @@ def fake_panel():
     panel.service_paid.get.return_value = 1
     panel.service_status_label = MagicMock()
     panel.service_tree = MagicMock()
-    panel.svc_columns_btn = MagicMock()
 
     # Document vars
     panel.doc_type = MagicMock()

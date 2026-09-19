@@ -18,6 +18,7 @@ _CLIENT_CASCADE = (
     "client_months",
     "tax_cycle_log",
     "recurring_tasks",
+    "appointments",
 )
 
 

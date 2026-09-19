@@ -52,6 +52,7 @@ def snap_fingerprint(snap: dict) -> tuple:
         snap.get("pending_filings"),
         snap.get("revenue"),
         snap.get("vo_csh_expiring"),
+        snap.get("upcoming_appointments"),
         row_ids(snap["expiring"]),
         row_ids(snap["supplier_expiring"]),
         row_ids(snap["overdue"]),

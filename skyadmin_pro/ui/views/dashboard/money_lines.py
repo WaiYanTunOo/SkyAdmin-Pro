@@ -1,57 +1,107 @@
-"""Month close and tax overview as a count plus Open — not embedded trees."""
+"""Money tab: Monthly Service Close + Tax overview (one purpose per card)."""
 
 from __future__ import annotations
 
 import customtkinter as ctk
 
-from skyadmin_pro.ui.theme import CARD_TITLE_SIZE, TEXT_MUTED
+from skyadmin_pro.ui.theme import (
+    ACCENT,
+    CARD_BG,
+    CARD_RADIUS,
+    CARD_TITLE_SIZE,
+    FONT_SIZE_SM,
+    SECTION_GAP,
+    STAT_SUCCESS,
+    TEXT_MUTED,
+    TEXT_SUBTLE,
+)
 
-from .jumps import open_tax_status
+from .jumps import open_filing_statuses, open_tax_status
 from .month_host import MonthCloseHost
 
 
 def build_money_lines(view) -> None:
     view._detail_stage = 1
-    month = ctk.CTkFrame(view._money, corner_radius=12)
-    month.grid(row=0, column=0, sticky="ew", pady=(0, 12))
-    month.grid_columnconfigure(1, weight=1)
-    ctk.CTkLabel(month, text="Month close", font=ctk.CTkFont(size=CARD_TITLE_SIZE, weight="bold"), anchor="w").grid(
-        row=0, column=0, sticky="w", padx=16, pady=14
-    )
-    month_count = ctk.CTkLabel(month, text="—", text_color=TEXT_MUTED, anchor="w")
-    month_count.grid(row=0, column=1, sticky="w", padx=(8, 8), pady=14)
+    view._money.grid_columnconfigure(0, weight=1)
+    _month_close_card(view)
+    _tax_overview_card(view)
+
+
+def _month_close_card(view) -> None:
+    card = ctk.CTkFrame(view._money, corner_radius=CARD_RADIUS, fg_color=CARD_BG)
+    card.grid(row=0, column=0, sticky="ew", pady=(0, SECTION_GAP))
+    card.grid_columnconfigure(0, weight=1)
+    ctk.CTkLabel(
+        card,
+        text="Monthly Service Close",
+        font=ctk.CTkFont(size=CARD_TITLE_SIZE, weight="bold"),
+        anchor="w",
+    ).grid(row=0, column=0, sticky="w", padx=18, pady=(16, 4))
+    ctk.CTkLabel(
+        card,
+        text="Clients whose month is still Open or In progress",
+        text_color=TEXT_SUBTLE,
+        font=ctk.CTkFont(size=FONT_SIZE_SM),
+        anchor="w",
+    ).grid(row=1, column=0, sticky="w", padx=18, pady=(0, 8))
+    row = ctk.CTkFrame(card, fg_color="transparent")
+    row.grid(row=2, column=0, sticky="ew", padx=18, pady=(0, 16))
+    row.grid_columnconfigure(0, weight=1)
+    month_count = ctk.CTkLabel(row, text="—", text_color=TEXT_MUTED, anchor="w")
+    month_count.grid(row=0, column=0, sticky="w")
     view.month_panel = MonthCloseHost(view.app, month_count)
-    ctk.CTkButton(month, text="Open", width=90, command=lambda: open_tax_status(view.app)).grid(
-        row=0, column=2, sticky="e", padx=(0, 16), pady=14
+    ctk.CTkButton(row, text="Open", width=96, command=lambda: open_tax_status(view.app)).grid(
+        row=0, column=1, sticky="e"
     )
 
-    tax = ctk.CTkFrame(view._money, corner_radius=12)
-    tax.grid(row=1, column=0, sticky="ew", pady=(0, 12))
-    tax.grid_columnconfigure(1, weight=1)
-    ctk.CTkLabel(tax, text="Tax overview", font=ctk.CTkFont(size=CARD_TITLE_SIZE, weight="bold"), anchor="w").grid(
-        row=0, column=0, sticky="w", padx=16, pady=14
+
+def _tax_overview_card(view) -> None:
+    card = ctk.CTkFrame(view._money, corner_radius=CARD_RADIUS, fg_color=CARD_BG)
+    card.grid(row=1, column=0, sticky="ew", pady=(0, SECTION_GAP))
+    card.grid_columnconfigure(0, weight=1)
+    ctk.CTkLabel(
+        card,
+        text="Tax overview",
+        font=ctk.CTkFont(size=CARD_TITLE_SIZE, weight="bold"),
+        anchor="w",
+    ).grid(row=0, column=0, sticky="w", padx=18, pady=(16, 4))
+    view.tax_count_label = ctk.CTkLabel(
+        card, text="—", text_color=TEXT_MUTED, font=ctk.CTkFont(size=FONT_SIZE_SM), anchor="w"
     )
-    view.tax_count_label = ctk.CTkLabel(tax, text="—", text_color=TEXT_MUTED, anchor="w")
-    view.tax_count_label.grid(row=0, column=1, sticky="w", padx=(8, 8), pady=14)
-    actions = ctk.CTkFrame(tax, fg_color="transparent")
-    actions.grid(row=0, column=2, sticky="e", padx=(0, 16), pady=10)
+    view.tax_count_label.grid(row=1, column=0, sticky="w", padx=18, pady=(0, 12))
+
+    primary = ctk.CTkFrame(card, fg_color="transparent")
+    primary.grid(row=2, column=0, sticky="ew", padx=18, pady=(0, 8))
     ctk.CTkButton(
-        actions, text="Run Monthly Cycle", width=150, fg_color=("#15803d", "#16a34a"), command=view._run_monthly_cycle
+        primary,
+        text="Run Monthly Cycle",
+        width=160,
+        fg_color=STAT_SUCCESS,
+        hover_color=("#166534", "#15803d"),
+        command=view._run_monthly_cycle,
     ).pack(side="left")
     ctk.CTkButton(
-        actions,
-        text="Accounting setup",
+        primary,
+        text="Filing Statuses",
         width=130,
-        fg_color="transparent",
-        border_width=1,
-        command=view._open_accounting_setup,
-    ).pack(side="left", padx=(8, 0))
-    ctk.CTkButton(
-        actions,
-        text="VO/CSH setup",
-        width=110,
-        fg_color="transparent",
-        border_width=1,
-        command=view._open_vo_csh_setup,
-    ).pack(side="left", padx=(8, 0))
-    ctk.CTkButton(actions, text="Open", width=80, command=view._open_accounting_setup).pack(side="left", padx=(8, 0))
+        fg_color=ACCENT,
+        command=lambda: open_filing_statuses(view.app),
+    ).pack(side="left", padx=(10, 0))
+
+    links = ctk.CTkFrame(card, fg_color="transparent")
+    links.grid(row=3, column=0, sticky="w", padx=18, pady=(0, 16))
+    for text, cmd in (
+        ("Accounting setup", view._open_accounting_setup),
+        ("VO/CSH setup", view._open_vo_csh_setup),
+        ("Monthly Service Close", lambda: open_tax_status(view.app)),
+    ):
+        ctk.CTkButton(
+            links,
+            text=text,
+            width=0,
+            height=28,
+            fg_color="transparent",
+            text_color=TEXT_MUTED,
+            hover_color=("gray85", "gray25"),
+            command=cmd,
+        ).pack(side="left", padx=(0, 12))

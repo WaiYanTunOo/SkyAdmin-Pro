@@ -22,6 +22,7 @@ from skyadmin_pro.db.migrations import (
     m017_documents_sync,
     m018_wave2b_sync,
     m019_sync_conflict_actors,
+    m020_appointments,
 )
 from skyadmin_pro.db.migrations.runner import register_migrations, run_pending_migrations
 
@@ -93,6 +94,11 @@ register_migrations(
             m019_sync_conflict_actors.VERSION,
             m019_sync_conflict_actors.NAME,
             m019_sync_conflict_actors.upgrade,
+        ),
+        (
+            m020_appointments.VERSION,
+            m020_appointments.NAME,
+            m020_appointments.upgrade,
         ),
     ]
 )

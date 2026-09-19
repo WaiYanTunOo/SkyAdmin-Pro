@@ -2,7 +2,9 @@
 
 from __future__ import annotations
 
-from skyadmin_pro.config import TAX_FILING_FIELDS
+from datetime import date
+
+from skyadmin_pro.config import MONTHLY_FILING_FIELDS, TAX_FILING_FIELDS
 from skyadmin_pro.db.sql_helpers import _in_clause
 
 
@@ -67,8 +69,29 @@ class FilingMixinB:
         )
 
     def count_pending_filings(self) -> int:
-        """Count of clients where any filing status = 'Pending'."""
-        where = " OR ".join(f"{f} = 'Pending'" for f in TAX_FILING_FIELDS)
+        """Tax filings pending card / snapshot ``pending_filings``.
+
+        Current calendar month ``client_months.status = 'closed'``, client
+        active, and any monthly field (pnd1/pnd3/pnd53/pp30) in
+        ``('Pending', 'On-Going')``. Complete / Not Applicable ignored.
+        """
+        today = date.today()
+        month_key = f"{today.year:04d}-{today.month:02d}"
+        unfinished = " OR ".join(f"COALESCE(c.{f}, '') IN ('Pending', 'On-Going')" for f in MONTHLY_FILING_FIELDS)
         with self.connection() as conn:
-            row = conn.execute(f"SELECT COUNT(*) AS n FROM clients WHERE {where}").fetchone()
+            row = conn.execute(
+                f"""
+                SELECT COUNT(DISTINCT c.id) AS n
+                FROM clients c
+                INNER JOIN client_months cm
+                  ON cm.client_id = c.id
+                 AND cm.month_key = ?
+                 AND cm.status = 'closed'
+                 AND cm.deleted_at IS NULL
+                WHERE c.deleted_at IS NULL
+                  AND COALESCE(c.status, 'active') != 'inactive'
+                  AND ({unfinished})
+                """,
+                (month_key,),
+            ).fetchone()
         return int(row["n"])
