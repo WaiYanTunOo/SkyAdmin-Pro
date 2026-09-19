@@ -1,11 +1,33 @@
 import { Context } from "hono";
-import { Env } from "../../db";
 import { checkRateLimit } from "../../rate_limit";
+import { SyncEnv } from "../../sync_auth";
 import { isMissingHlcColumn } from "../../sync_push";
+import { resolveOrgId, soloOrgId } from "../../sync_org";
 import { SYNC_TABLES, isSyncTable } from "../../sync_schema";
 
-/** GET /api/sync/pull?since=ISO&tables=a,b&limit=N */
-export async function syncPullHandler(c: Context<{ Bindings: Env }>) {
+type PullRow = {
+  table_name: string;
+  global_id: string;
+  row_json: string;
+  updated_at: string;
+  deleted_at: string | null;
+  hlc?: string | null;
+};
+
+function buildPullSql(columns: string, since: string, placeholders: string): string {
+  return since
+    ? `SELECT ${columns}
+        FROM sync_rows
+        WHERE org_id = ? AND table_name IN (${placeholders}) AND updated_at > ?
+        ORDER BY updated_at ASC LIMIT ?`
+    : `SELECT ${columns}
+        FROM sync_rows
+        WHERE org_id = ? AND table_name IN (${placeholders})
+        ORDER BY updated_at ASC LIMIT ?`;
+}
+
+/** GET /api/sync/pull?since=ISO&tables=a,b&limit=N — org-scoped rows. */
+export async function syncPullHandler(c: Context<SyncEnv>) {
   const machineId = (c.req.header("X-Machine-Id") || "").trim().toUpperCase();
   if (!machineId || !/^[A-Z0-9]{1,16}$/.test(machineId)) {
     return c.json({ ok: false, error: "Invalid machine ID format." }, 400);
@@ -13,6 +35,8 @@ export async function syncPullHandler(c: Context<{ Bindings: Env }>) {
   const limited = await checkRateLimit(c, "pull", { windowSeconds: 60, max: 30 });
   if (limited) return limited;
 
+  const orgId = resolveOrgId(c.get("syncOrgId"), machineId)
+    || soloOrgId(machineId);
   const since = (c.req.query("since") || "").trim();
   const tablesParam = (c.req.query("tables") || "").trim();
   const parsedLimit = parseInt(c.req.query("limit") || "500", 10);
@@ -20,42 +44,22 @@ export async function syncPullHandler(c: Context<{ Bindings: Env }>) {
   const tables = tablesParam
     ? tablesParam.split(",").map((t) => t.trim()).filter(isSyncTable)
     : [...SYNC_TABLES];
-
   if (!tables.length) {
     return c.json({ ok: false, error: "No valid tables requested." }, 400);
   }
 
   const placeholders = tables.map(() => "?").join(", ");
-  const buildPullSql = (columns: string) =>
-    since
-      ? `SELECT ${columns}
-        FROM sync_rows
-        WHERE machine_id = ? AND table_name IN (${placeholders}) AND updated_at > ?
-        ORDER BY updated_at ASC LIMIT ?`
-      : `SELECT ${columns}
-        FROM sync_rows
-        WHERE machine_id = ? AND table_name IN (${placeholders})
-        ORDER BY updated_at ASC LIMIT ?`;
-
-  const binds = since ? [machineId, ...tables, since, limit] : [machineId, ...tables, limit];
-  type PullRow = {
-    table_name: string;
-    global_id: string;
-    row_json: string;
-    updated_at: string;
-    deleted_at: string | null;
-    hlc?: string | null;
-  };
+  const binds = since ? [orgId, ...tables, since, limit] : [orgId, ...tables, limit];
   let results: PullRow[] | undefined;
   try {
-    ({ results } = await c.env.DB.prepare(buildPullSql(
-      "table_name, global_id, row_json, updated_at, deleted_at, hlc",
-    )).bind(...binds).all<PullRow>());
+    ({ results } = await c.env.DB.prepare(
+      buildPullSql("table_name, global_id, row_json, updated_at, deleted_at, hlc", since, placeholders),
+    ).bind(...binds).all<PullRow>());
   } catch (err) {
     if (!isMissingHlcColumn(err)) throw err;
-    ({ results } = await c.env.DB.prepare(buildPullSql(
-      "table_name, global_id, row_json, updated_at, deleted_at",
-    )).bind(...binds).all<PullRow>());
+    ({ results } = await c.env.DB.prepare(
+      buildPullSql("table_name, global_id, row_json, updated_at, deleted_at", since, placeholders),
+    ).bind(...binds).all<PullRow>());
   }
 
   const changes = (results || []).flatMap((row) => {
@@ -76,6 +80,7 @@ export async function syncPullHandler(c: Context<{ Bindings: Env }>) {
   return c.json({
     ok: true,
     since: since || null,
+    org_id: orgId,
     server_time: new Date().toISOString(),
     changes,
   });

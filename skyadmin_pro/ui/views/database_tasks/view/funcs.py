@@ -2,7 +2,6 @@ from __future__ import annotations
 
 from ._const_2 import TAB_CLIENTS
 from ._const_4 import TAB_COMPANY
-from ._const_6 import TAB_PIPELINE
 
 
 def open_menu_view(app, key: str, method: str, *args) -> None:
@@ -15,9 +14,8 @@ def open_menu_view(app, key: str, method: str, *args) -> None:
 
 
 def service_menu_panel_key(tab_name: str) -> str | None:
-    """Map Database & Tasks tab to the panel that owns a service-type combo, if any."""
+    """Map Companies tab to the panel that owns a service-type combo, if any."""
     return {
         TAB_CLIENTS: "clients",
         TAB_COMPANY: "company",
-        TAB_PIPELINE: "pipeline",
     }.get(tab_name)

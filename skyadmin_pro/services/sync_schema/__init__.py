@@ -12,10 +12,21 @@ from ._const_6 import FK_CLIENT_COLUMN
 from ._const_7 import FK_GROUP_COLUMN
 from ._const_8 import SYNC_EXCLUDED_COLUMNS
 from ._const_9._const_0._const_0 import SYNC_ALLOWED_COLUMNS
+from ._const_11 import (
+    CLIENT_FK_TABLES,
+    FK_SUPPLIER_COLUMN,
+    FK_TASK_COLUMN,
+    SUPPLIER_FK_TABLES,
+    TASK_FK_TABLES,
+)
 
 __all__ = [
+    "CLIENT_FK_TABLES",
     "FK_CLIENT_COLUMN",
     "FK_GROUP_COLUMN",
+    "FK_SUPPLIER_COLUMN",
+    "FK_TASK_COLUMN",
+    "SUPPLIER_FK_TABLES",
     "SYNC_ALLOWED_COLUMNS",
     "SYNC_EXCLUDED_COLUMNS",
     "SYNC_PULL_MAX_PAGES",
@@ -24,4 +35,5 @@ __all__ = [
     "SYNC_PUSH_PAGE_SIZE",
     "SYNC_SCHEMA_VERSION",
     "SYNC_TABLES",
+    "TASK_FK_TABLES",
 ]

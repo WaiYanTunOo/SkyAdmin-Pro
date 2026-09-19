@@ -7,18 +7,18 @@ class StatusMixinB:
     def month_close_summary(self, month_key: str, client_ids: list[int] | None = None) -> dict[str, int]:
         if client_ids is None:
             with self.connection() as conn:
-                total = conn.execute("SELECT COUNT(*) AS n FROM clients").fetchone()["n"]
+                total = conn.execute("SELECT COUNT(*) AS n FROM clients WHERE deleted_at IS NULL").fetchone()["n"]
                 closed = conn.execute(
                     """
                     SELECT COUNT(*) AS n FROM client_months
-                    WHERE month_key = ? AND status = 'closed'
+                    WHERE month_key = ? AND status = 'closed' AND deleted_at IS NULL
                     """,
                     (month_key,),
                 ).fetchone()["n"]
                 in_progress = conn.execute(
                     """
                     SELECT COUNT(*) AS n FROM client_months
-                    WHERE month_key = ? AND status = 'in_progress'
+                    WHERE month_key = ? AND status = 'in_progress' AND deleted_at IS NULL
                     """,
                     (month_key,),
                 ).fetchone()["n"]
@@ -33,6 +33,7 @@ class StatusMixinB:
                         f"""
                         SELECT status, COUNT(*) AS n FROM client_months
                         WHERE month_key = ? AND client_id IN ({placeholders})
+                          AND deleted_at IS NULL
                         GROUP BY status
                         """,
                         (month_key, *scope),

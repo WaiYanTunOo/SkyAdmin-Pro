@@ -1,5 +1,7 @@
 from __future__ import annotations
 
+from skyadmin_pro.db.soft_delete import soft_delete_by_id
+
 
 class FinancialMixinMixin0:
     def add_financial_document(
@@ -14,6 +16,7 @@ class FinancialMixinMixin0:
         amount: str = "",
         doc_date: str = "",
         description: str = "",
+        drive_file_id: str = "",
     ) -> int:
         """Insert a financial document record. Returns the new row id."""
         with self.connection() as conn:
@@ -21,8 +24,8 @@ class FinancialMixinMixin0:
                 """
                 INSERT INTO financial_documents
                     (client_id, category, subcategory, file_name, file_path,
-                     stored_path, amount, doc_date, description)
-                VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)
+                     stored_path, amount, doc_date, description, drive_file_id)
+                VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
                 """,
                 (
                     client_id,
@@ -34,6 +37,7 @@ class FinancialMixinMixin0:
                     amount,
                     doc_date,
                     description,
+                    drive_file_id,
                 ),
             )
             return int(cursor.lastrowid)
@@ -46,7 +50,7 @@ class FinancialMixinMixin0:
                 SELECT id, client_id, category, subcategory, file_name, file_path,
                        stored_path, amount, doc_date, description, created_at
                 FROM financial_documents
-                WHERE client_id = ? AND category = ?
+                WHERE client_id = ? AND category = ? AND deleted_at IS NULL
                 ORDER BY doc_date DESC, created_at DESC
                 """,
                 (client_id, category),
@@ -56,7 +60,7 @@ class FinancialMixinMixin0:
             SELECT id, client_id, category, subcategory, file_name, file_path,
                    stored_path, amount, doc_date, description, created_at
             FROM financial_documents
-            WHERE client_id = ?
+            WHERE client_id = ? AND deleted_at IS NULL
             ORDER BY doc_date DESC, created_at DESC
             """,
             (client_id,),
@@ -67,15 +71,15 @@ class FinancialMixinMixin0:
             """
             SELECT id, client_id, category, subcategory, file_name, file_path,
                    stored_path, amount, doc_date, description, created_at
-            FROM financial_documents WHERE id = ?
+            FROM financial_documents WHERE id = ? AND deleted_at IS NULL
             """,
             (doc_id,),
         )
 
     def delete_financial_document(self, doc_id: int) -> dict | None:
-        """Delete a financial document. Returns the deleted record (for file cleanup)."""
+        """Soft-delete a financial document. Returns the record (for file cleanup)."""
         doc = self.get_financial_document(doc_id)
         if doc:
             with self.connection() as conn:
-                conn.execute("DELETE FROM financial_documents WHERE id = ?", (doc_id,))
+                soft_delete_by_id(conn, "financial_documents", doc_id, self._now())
         return doc

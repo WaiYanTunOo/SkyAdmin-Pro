@@ -3,14 +3,20 @@ from __future__ import annotations
 import customtkinter as ctk
 
 from skyadmin_pro.services.translate import DEFAULT_DIRECTION, TRANSLATE_DIRECTIONS
-from skyadmin_pro.ui.theme import TEXT_MUTED
+from skyadmin_pro.ui.theme import TEXT_MUTED, form_sidebar_min_width
 from skyadmin_pro.ui.widgets import FeedbackLabel, themed_scrollable_frame
 
 
 class UtilitiesViewMixin10:
+    def _apply_responsive_layout(self, *, form_sidebar_min: int, metrics=None) -> None:
+        # Translator column: keep a readable width that grows on large screens.
+        width = max(360, min(form_sidebar_min + 40, 640))
+        self.body.grid_columnconfigure(1, weight=0, minsize=width)
+
     def _UtilitiesView_build_p1(self):
+        side = form_sidebar_min_width()
         self.body.grid_columnconfigure(0, weight=1)
-        self.body.grid_columnconfigure(1, weight=0, minsize=380)
+        self.body.grid_columnconfigure(1, weight=0, minsize=max(380, side))
         self.body.grid_rowconfigure(0, weight=1)
 
         self.hub = themed_scrollable_frame(self.body, corner_radius=12)

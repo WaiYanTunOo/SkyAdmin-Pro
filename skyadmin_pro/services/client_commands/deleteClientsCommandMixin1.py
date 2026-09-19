@@ -5,50 +5,57 @@ from skyadmin_pro.services.undo_manager import UndoConflictError
 
 
 class DeleteClientsCommandMixin1:
-    def undo(self, *, force: bool = False) -> None:
-        conflicts = self.check_conflicts()
-        if conflicts and not force:
-            raise UndoConflictError(conflicts)
+    def check_conflicts(self) -> list[str]:
+        """Live clients that reused a deleted name after the tombstone was freed."""
+
+        found: list[str] = []
+
         db = self._db
-        verb = "INSERT OR REPLACE" if force else "INSERT"
+
         with db.connection() as conn:
-            for row in self._client_rows:
-                cols = [c for c in row if c != "id"]
-                conn.execute(
-                    f"{verb} INTO clients (id, {', '.join(cols)}) VALUES (?, {', '.join('?' for _ in cols)})",
-                    (row["id"], *[row[c] for c in cols]),
-                )
-                # Restore ciphertext exactly — get_client() snapshots decrypt.
-                if row["id"] in self._raw_secrets:
-                    conn.execute(
-                        "UPDATE clients SET ird_password = ? WHERE id = ?",
-                        (self._raw_secrets[row["id"]], row["id"]),
-                    )
-            for table, rows in self._dependents.items():
-                for saved in rows:
-                    rowid = saved.pop("_rowid")
-                    exists = conn.execute(f'SELECT 1 FROM "{table}" WHERE rowid = ?', (rowid,)).fetchone()
-                    if exists is not None:
-                        # SET NULL case: row survived, just re-point the link.
-                        conn.execute(
-                            f'UPDATE "{table}" SET client_id = ? WHERE rowid = ?',
-                            (saved["client_id"], rowid),
-                        )
-                    else:
-                        cols = list(saved.keys())
-                        conn.execute(
-                            f'INSERT INTO "{table}" (rowid, {", ".join(cols)}) '
-                            f"VALUES (?, {', '.join('?' for _ in cols)})",
-                            (rowid, *[saved[c] for c in cols]),
-                        )
-            # Repair AUTOINCREMENT watermarks so future inserts never collide.
-            for table in ["clients", *self._dependents]:
+            for cid, name in self._names.items():
                 try:
-                    top = conn.execute(f'SELECT MAX(rowid) AS m FROM "{table}"').fetchone()["m"]
+                    hit = conn.execute(
+                        "SELECT id FROM clients WHERE name = ? COLLATE NOCASE AND deleted_at IS NULL AND id != ?",
+                        (name, cid),
+                    ).fetchone()
+
                 except DB_ERRORS:
                     continue
-                if top:
+
+                if hit is not None:
+                    found.append(f"Client name reused: {name}")
+
+        return found
+
+    def undo(self, *, force: bool = False) -> None:
+        conflicts = self.check_conflicts()
+
+        if conflicts and not force:
+            raise UndoConflictError(conflicts)
+
+        stamp = self._stamp
+
+        if not stamp:
+            return
+
+        db = self._db
+
+        with db.connection() as conn:
+            if force:
+                for cid, name in self._names.items():
                     conn.execute(
-                        "UPDATE sqlite_sequence SET seq = MAX(seq, ?) WHERE name = ?",
-                        (int(top), table),
+                        "UPDATE clients SET name = name || ' (replaced)',"
+                        " updated_at = ?"
+                        " WHERE name = ? COLLATE NOCASE"
+                        " AND deleted_at IS NULL AND id != ?",
+                        (db._now(), name, cid),
                     )
+
+            for cid, name in self._names.items():
+                conn.execute(
+                    "UPDATE clients SET name = ? WHERE id = ?",
+                    (name, cid),
+                )
+
+        db.batch_restore_deleted_clients(self._ids, stamp)

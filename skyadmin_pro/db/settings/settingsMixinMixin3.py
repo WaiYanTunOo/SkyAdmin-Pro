@@ -55,7 +55,8 @@ class SettingsMixinMixin3:
         for row in self._fetch_all(
             """
             SELECT DISTINCT organization FROM office_contacts
-            WHERE organization IS NOT NULL AND TRIM(organization) != ''
+            WHERE deleted_at IS NULL
+              AND organization IS NOT NULL AND TRIM(organization) != ''
             """
         ):
             name = str(row["organization"]).strip()
@@ -66,7 +67,8 @@ class SettingsMixinMixin3:
         for row in self._fetch_all(
             """
             SELECT DISTINCT department FROM office_contacts
-            WHERE department IS NOT NULL AND TRIM(department) != ''
+            WHERE deleted_at IS NULL
+              AND department IS NOT NULL AND TRIM(department) != ''
             """
         ):
             name = str(row["department"]).strip()
@@ -75,7 +77,7 @@ class SettingsMixinMixin3:
                 dept_fold.add(name.casefold())
                 new_depts += 1
 
-        for row in self._fetch_all("SELECT name, company_name FROM clients"):
+        for row in self._fetch_all("SELECT name, company_name FROM clients WHERE deleted_at IS NULL"):
             for field in (row.get("company_name"), row.get("name")):
                 name = str(field or "").strip()
                 if name and self.client_id_by_name(name) is None:

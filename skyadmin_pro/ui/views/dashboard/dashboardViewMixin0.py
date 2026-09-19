@@ -7,7 +7,7 @@ from .tabs import install_tabs
 
 class DashboardViewMixin0:
     title = "Dashboard"
-    subtitle = "Pending work and upcoming alerts. Not the full company list. Edit dates in Company Details."
+    subtitle = "Pending work and upcoming alerts. Jump cards open the single sidebar page for each tool."
 
     def build(self) -> None:
         self.body.grid_rowconfigure(0, weight=0)

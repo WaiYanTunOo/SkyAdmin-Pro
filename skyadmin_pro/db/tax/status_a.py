@@ -29,7 +29,7 @@ class StatusMixinA:
             """
             SELECT client_id, status, note, updated_at
             FROM client_months
-            WHERE month_key = ?
+            WHERE month_key = ? AND deleted_at IS NULL
             """,
             (month_key,),
         )
@@ -42,7 +42,8 @@ class StatusMixinA:
             SELECT DISTINCT c.id, c.name
             FROM clients c
             JOIN documents d ON d.client_id = c.id
-            WHERE d.document_type IN ({", ".join("?" for _ in MONTHLY_TAX_TYPES)})
+            WHERE c.deleted_at IS NULL AND d.deleted_at IS NULL
+              AND d.document_type IN ({", ".join("?" for _ in MONTHLY_TAX_TYPES)})
             ORDER BY c.name COLLATE NOCASE
             """,
             tuple(MONTHLY_TAX_TYPES),

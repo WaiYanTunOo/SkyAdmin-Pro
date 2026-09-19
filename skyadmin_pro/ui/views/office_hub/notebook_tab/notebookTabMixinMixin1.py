@@ -7,7 +7,7 @@ import customtkinter as ctk
 from skyadmin_pro.config import NOTEBOOK_ENTRY_TYPES
 from skyadmin_pro.ui.canvas_scroll import CanvasScrollFrame
 from skyadmin_pro.ui.debounce import debounced_after
-from skyadmin_pro.ui.theme import CARD_TITLE_SIZE, TEXT_MUTED
+from skyadmin_pro.ui.theme import CARD_TITLE_SIZE, TEXT_MUTED, card_style_kwargs
 from skyadmin_pro.ui.treeview import ThemedTreeview
 from skyadmin_pro.ui.widgets import themed_entry
 
@@ -73,12 +73,12 @@ class NotebookTabMixinMixin1:
         scroll.grid(row=3, column=0, sticky="ew")
         scroll.content.grid_columnconfigure(0, weight=1)
         self._notebook_scroll = scroll
-        form = ctk.CTkFrame(scroll.content, corner_radius=12)
-        form.grid(row=0, column=0, sticky="ew", pady=(10, 8))
-        form.grid_columnconfigure(1, weight=1, uniform="note_field")
-        form.grid_columnconfigure(3, weight=1, uniform="note_field")
+        form = ctk.CTkFrame(scroll.content, corner_radius=12, **card_style_kwargs())
+        form.grid(row=0, column=0, sticky="ew", pady=(10, 8), padx=4)
+        form.grid_columnconfigure(0, weight=1, uniform="note_col")
+        form.grid_columnconfigure(1, weight=1, uniform="note_col")
         ctk.CTkLabel(form, text="Notebook entry", font=ctk.CTkFont(size=CARD_TITLE_SIZE, weight="bold")).grid(
-            row=0, column=0, columnspan=4, sticky="w", padx=16, pady=(12, 8)
+            row=0, column=0, columnspan=2, sticky="w", padx=16, pady=(12, 8)
         )
 
         self.n_type = ctk.StringVar(value=NOTEBOOK_ENTRY_TYPES[-1][1])

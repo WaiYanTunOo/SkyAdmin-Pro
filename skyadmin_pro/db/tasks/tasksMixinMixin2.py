@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 from skyadmin_pro.config import service_task_category
+from skyadmin_pro.db.soft_delete import soft_delete_by_id
 
 
 class TasksMixinMixin2:
@@ -14,7 +15,7 @@ class TasksMixinMixin2:
                     """
                     SELECT p.status FROM tasks c
                     JOIN tasks p ON p.id = c.parent_task_id
-                    WHERE c.id = ?
+                    WHERE c.id = ? AND c.deleted_at IS NULL
                     """,
                     (task_id,),
                 ).fetchone()
@@ -27,21 +28,20 @@ class TasksMixinMixin2:
                 """
                 UPDATE tasks
                 SET status = ?, completed_at = ?, updated_at = ?
-                WHERE id = ?
+                WHERE id = ? AND deleted_at IS NULL
                 """,
                 (status, completed_at, now, task_id),
             )
 
     def delete_task(self, task_id: int) -> None:
         with self.connection() as conn:
-            # service_renewals.task_id CASCADEs on task delete — detach the
-            # history row first so deleting a routine todo never destroys
-            # the renewal audit trail.
+            # Soft-delete keeps a sync tombstone; detach renewals so the
+            # audit trail is not tied to a tombstoned task row.
             conn.execute(
                 "UPDATE service_renewals SET task_id = NULL WHERE task_id = ?",
                 (task_id,),
             )
-            conn.execute("DELETE FROM tasks WHERE id = ?", (task_id,))
+            soft_delete_by_id(conn, "tasks", task_id, self._now())
 
     def sync_service_progress_task(self, document_id: int) -> None:
         """Keep one "Continue: <service>" task in step with a service's progress.
@@ -51,14 +51,17 @@ class TasksMixinMixin2:
         work shows up in Tasks and on the Dashboard until it is finished.
         """
         doc = self._fetch_one(
-            "SELECT id, client_id, document_type, progress FROM documents WHERE id = ?",
+            "SELECT id, client_id, document_type, progress FROM documents" " WHERE id = ? AND deleted_at IS NULL",
             (document_id,),
         )
         if not doc:
             return
         progress = (doc.get("progress") or "").strip()
         if progress == "Ongoing":
-            linked = self._fetch_one("SELECT id FROM tasks WHERE source_document_id = ?", (document_id,))
+            linked = self._fetch_one(
+                "SELECT id FROM tasks WHERE source_document_id = ? AND deleted_at IS NULL",
+                (document_id,),
+            )
             if linked is None:
                 self.add_task(
                     title=f"Continue: {doc['document_type']}",
@@ -73,7 +76,7 @@ class TasksMixinMixin2:
                 )
         elif progress == "Completed":
             linked = self._fetch_one(
-                "SELECT id, status FROM tasks WHERE source_document_id = ?",
+                "SELECT id, status FROM tasks WHERE source_document_id = ?" " AND deleted_at IS NULL",
                 (document_id,),
             )
             if linked is not None and linked["status"] == "pending":
@@ -85,7 +88,7 @@ class TasksMixinMixin2:
             SELECT t.id, t.title, t.category, t.completed_at, c.name AS client_name
             FROM tasks t
             LEFT JOIN clients c ON c.id = t.client_id
-            WHERE t.status = 'completed'
+            WHERE t.status = 'completed' AND t.deleted_at IS NULL
               -- lexical compare on 'YYYY-MM-DD HH:MM:SS' keeps idx usable
               AND t.completed_at >= date('now', 'localtime')
               AND t.completed_at <  date('now', 'localtime', '+1 day')

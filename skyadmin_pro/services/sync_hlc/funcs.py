@@ -79,6 +79,12 @@ def hlc_now(db=None, *, node: str | None = None) -> str:
     return stamped
 
 
+def hlc_actor(value: object) -> str:
+    """Extract the HLC node (device/web actor); empty if unclocked/invalid."""
+    parsed = parse_hlc(value)
+    return parsed[2] if parsed else ""
+
+
 def note_remote_hlc(db, hlc_value: object) -> None:
     """Fast-forward the persisted clock past an incoming HLC (pull path)."""
     parsed = parse_hlc(hlc_value)

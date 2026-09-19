@@ -9,7 +9,7 @@ from ._const_8 import TAB_NAMES
 
 class DatabaseTasksViewMixin0:
     title = "Companies"
-    subtitle = "Company details and services. Not the daily work queue."
+    subtitle = "Company list, company file, and renewals. Daily work and finance are in the sidebar."
 
     def build(self) -> None:
         self.body.grid_columnconfigure(0, weight=1)
@@ -38,12 +38,6 @@ class DatabaseTasksViewMixin0:
             tab.grid_columnconfigure(0, weight=1)
             tab.grid_rowconfigure(0, weight=1)
 
-        self.tasks_panel = None
         self.clients_panel = None
-        self.courier_panel = None
-        self.month_panel = None
         self.renewals_panel = None
-        self.pipeline_panel = None
         self.company_panel = None
-        self.accounting_setup_panel = None
-        self.suppliers_panel = None

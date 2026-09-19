@@ -10,8 +10,9 @@ class SuppliersMixinMixin3:
             FROM supplier_payments sp
             LEFT JOIN suppliers s ON s.id = sp.supplier_id
             LEFT JOIN clients c ON c.id = sp.client_id
-            WHERE sp.paid = 0
-              AND (sp.client_id IS NULL OR (c.deleted_at IS NULL AND COALESCE(c.status, 'active') != 'inactive'))
+            WHERE sp.deleted_at IS NULL AND sp.paid = 0
+              AND (sp.client_id IS NULL OR (c.deleted_at IS NULL
+                   AND COALESCE(c.status, 'active') != 'inactive'))
               AND sp.due_date IS NOT NULL AND trim(sp.due_date) != ''
               AND sp.due_date < date('now', 'localtime')
             ORDER BY sp.due_date ASC

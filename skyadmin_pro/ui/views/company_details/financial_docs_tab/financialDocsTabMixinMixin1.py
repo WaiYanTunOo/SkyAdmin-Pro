@@ -42,31 +42,33 @@ class FinancialDocsTabMixinMixin1:
                 self.feedback.error(f"Cannot create document folder: {exc}")
                 return
             dest_path = dest_dir / file_name
-            # Prevent duplicate file copies — add numeric suffix if exists
             if dest_path.exists():
-                stem = dest_path.stem
-                suffix = dest_path.suffix
-                counter = 1
+                stem, suffix, counter = dest_path.stem, dest_path.suffix, 1
                 while dest_path.exists():
                     dest_path = dest_dir / f"{stem}_{counter}{suffix}"
                     counter += 1
+            rel = dest_path.relative_to(self.app.paths.root).as_posix()
             try:
-                import shutil
+                from skyadmin_pro.services.drive import upload_document_file
 
-                shutil.copy2(file_path, dest_path)
-                stored = str(dest_path)
+                result = upload_document_file(
+                    self.app.db, source=file_path, relpath=rel, local_root=self.app.paths.root
+                )
+                stored = result["local_path"]
+                drive_id = result.get("drive_file_id") or ""
             except Exception:
-                stored = ""
+                stored, drive_id = "", ""
             self.app.db.add_financial_document(
                 client_id=client_id,
                 category=category,
                 subcategory=subcategory,
-                file_name=dest_path.name,
+                file_name=Path(stored).name if stored else dest_path.name,
                 file_path=file_path,
                 stored_path=stored,
                 amount=amt_var.get().strip(),
                 doc_date=date_var.get().strip(),
                 description=desc_var.get().strip(),
+                drive_file_id=drive_id,
             )
             dialog.destroy()
             self.feedback.success(f"Document '{dest_path.name}' added.")

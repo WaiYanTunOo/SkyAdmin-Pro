@@ -3,6 +3,7 @@ from __future__ import annotations
 from ..importer.funcs import Database
 from ._common import *
 from ._common import live_api_base_url, logger, random
+from .device_limit import format_sync_http_error
 
 
 def _sync_request(
@@ -39,10 +40,10 @@ def _sync_request(
         try:
             parsed = json.loads(exc.read().decode("utf-8", errors="replace"))
             if isinstance(parsed, dict):
-                return (False, str(parsed.get("error") or f"HTTP {exc.code}"))
+                return (False, format_sync_http_error(exc.code, str(parsed.get("error") or "")))
         except (json.JSONDecodeError, ValueError, UnicodeDecodeError):
             pass
-        return (False, f"Sync HTTP {exc.code}")
+        return (False, format_sync_http_error(exc.code, ""))
     except (OSError, ValueError) as exc:
         return (False, str(exc))
 

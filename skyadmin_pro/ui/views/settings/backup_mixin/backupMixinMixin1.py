@@ -7,10 +7,18 @@ from tkinter import filedialog
 
 class BackupMixinMixin1:
     def _backup_encrypted(self) -> None:
+        from skyadmin_pro.services.auto_backup import auto_backups_dir
+
+        initial = auto_backups_dir(self.app.paths.root, self.app.db)
+        try:
+            initial.mkdir(parents=True, exist_ok=True)
+        except OSError:
+            initial = self.app.paths.root
         dest = filedialog.asksaveasfilename(
             parent=self.winfo_toplevel(),
             title="Save Encrypted Backup",
             defaultextension=".skybackup",
+            initialdir=str(initial) if Path(initial).is_dir() else str(self.app.paths.root),
             initialfile=f"SkyAdminPro_Backup_{date.today().isoformat()}.skybackup",
             filetypes=[("SkyAdmin Backup", "*.skybackup"), ("All files", "*.*")],
         )

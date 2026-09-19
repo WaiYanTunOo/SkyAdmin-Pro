@@ -178,7 +178,7 @@ describe("fetchExistingUpdatedAt", () => {
     const prepare = vi.fn(() => ({ bind }));
     const db = { prepare } as unknown as D1Database;
 
-    const existing = await fetchExistingUpdatedAt(db, "MID123", prepared);
+    const existing = await fetchExistingUpdatedAt(db, "m:MID123", prepared);
 
     expect(prepare).toHaveBeenCalledTimes(1);
     expect(prepare.mock.calls[0][0]).toMatch(/hlc/);
@@ -211,7 +211,7 @@ describe("fetchExistingUpdatedAt", () => {
     });
     const db = { prepare } as unknown as D1Database;
 
-    const existing = await fetchExistingUpdatedAt(db, "MID123", prepared);
+    const existing = await fetchExistingUpdatedAt(db, "m:MID123", prepared);
 
     expect(prepare).toHaveBeenCalledTimes(2);
     expect(existing.get(changeKey("clients", "gid-1"))).toEqual({
@@ -249,7 +249,7 @@ describe("writePushBatch", () => {
     const prepare = vi.fn((sql: string) => ({ bind: bind.bind({ sql }) }));
     const db = { prepare, batch } as unknown as D1Database;
 
-    await writePushBatch(db, "MID123", partition, existing);
+    await writePushBatch(db, "m:MID123", "MID123", partition, existing);
 
     expect(prepare).toHaveBeenCalled();
     expect(batch).toHaveBeenCalledTimes(1);
@@ -288,10 +288,12 @@ describe("writePushBatch", () => {
     }));
     const db = { prepare, batch } as unknown as D1Database;
 
-    await writePushBatch(db, "MID123", partition, existing);
+    await writePushBatch(db, "firm-acme", "MID123", partition, existing);
 
     const upserts = boundArgs.filter(([sql]) => String(sql).includes("sync_rows"));
     expect(upserts).toHaveLength(2);
+    expect(upserts[0][1]).toBe("firm-acme");
+    expect(upserts[0][2]).toBe("MID123");
     expect(upserts[0][upserts[0].length - 1]).toBe("0000000000200-0000-NODEA");
     expect(upserts[1][upserts[1].length - 1]).toBeNull();
   });

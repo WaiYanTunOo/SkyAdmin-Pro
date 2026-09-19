@@ -35,7 +35,8 @@ class OperationsMixinA:
                     """
                     SELECT id, document_type, expiry_date
                     FROM documents
-                    WHERE expiry_date IS NOT NULL AND trim(expiry_date) != ''
+                    WHERE deleted_at IS NULL
+                      AND expiry_date IS NOT NULL AND trim(expiry_date) != ''
                     ORDER BY id
                     LIMIT ? OFFSET ?
                     """,

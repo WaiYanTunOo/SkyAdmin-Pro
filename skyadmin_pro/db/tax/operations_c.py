@@ -30,14 +30,16 @@ class OperationsMixinC:
         # transaction so a crash can't leave an item without its task.
         task_title = f"Renew {label} for {client_name}"
         with self.connection() as conn:
+            now = self._now()
             existing = conn.execute(
-                "SELECT id FROM renewal_items WHERE client_id = ? AND template_name = ? LIMIT 1",
+                "SELECT id FROM renewal_items" " WHERE client_id = ? AND template_name = ? LIMIT 1",
                 (client_id, template),
             ).fetchone()
             if existing:
                 conn.execute(
-                    "UPDATE renewal_items SET due_days = 0, done = 0, done_at = NULL WHERE id = ?",
-                    (existing["id"],),
+                    "UPDATE renewal_items SET due_days = 0, done = 0, done_at = NULL,"
+                    " deleted_at = NULL, updated_at = ? WHERE id = ?",
+                    (now, existing["id"]),
                 )
                 renewal_item_id = existing["id"]
             else:
@@ -50,13 +52,14 @@ class OperationsMixinC:
                 )
                 renewal_item_id = cursor.lastrowid
             existing_task = conn.execute(
-                "SELECT id FROM tasks WHERE client_id = ? AND title = ? AND status = 'pending' LIMIT 1",
+                "SELECT id FROM tasks WHERE client_id = ? AND title = ?"
+                " AND status = 'pending' AND deleted_at IS NULL LIMIT 1",
                 (client_id, task_title),
             ).fetchone()
             if existing_task:
                 conn.execute(
                     "UPDATE tasks SET due_date = ?, updated_at = ? WHERE id = ?",
-                    (due, self._now(), existing_task["id"]),
+                    (due, now, existing_task["id"]),
                 )
             else:
                 conn.execute(
@@ -64,6 +67,6 @@ class OperationsMixinC:
                     INSERT INTO tasks (client_id, title, description, status, category, due_date, created_at, updated_at)
                     VALUES (?, ?, ?, 'pending', 'General', ?, ?, ?)
                     """,
-                    (client_id, task_title, f"Auto-created: {label} renewal due {due}", due, self._now(), self._now()),
+                    (client_id, task_title, f"Auto-created: {label} renewal due {due}", due, now, now),
                 )
         return renewal_item_id

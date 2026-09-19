@@ -31,24 +31,6 @@ class LicenseMixinMixin3:
         if upd_btn is not None:
             upd_btn.configure(state="normal", text="Check updates")
 
-    def _format_data_sync_status(self) -> str:
-        from skyadmin_pro.config import SETTING_SYNC_LAST_PULL
-        from skyadmin_pro.services.data_sync import is_data_sync_enabled
-
-        if not is_data_sync_enabled(self.app.db):
-            return "Cloud data sync: off (use encrypted backup for a second PC)"
-        last = (self.app.db.get_setting(SETTING_SYNC_LAST_PULL) or "").strip()
-        conflicts = self.app.db.count_sync_conflicts()
-        parts: list[str] = []
-        if last:
-            display = last.replace("T", " ")[:19]
-            parts.append(f"Last data sync: {display}")
-        else:
-            parts.append("Data sync: never")
-        if conflicts:
-            parts.append(f"{conflicts} sync conflict(s) logged")
-        return " · ".join(parts)
-
     def _run_integrity_check(self) -> None:
         ok = self.app.db.quick_check()
         self._refresh_integrity_banner()

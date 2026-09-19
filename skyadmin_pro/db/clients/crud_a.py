@@ -43,7 +43,7 @@ class CrudMixinA:
 
     def get_client(self, client_id: int) -> dict | None:
         row = self._fetch_one(
-            "SELECT * FROM clients WHERE id = ?",
+            "SELECT * FROM clients WHERE id = ? AND deleted_at IS NULL",
             (client_id,),
         )
         return self._prepare_client_record(row)

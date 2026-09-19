@@ -1,10 +1,11 @@
 from __future__ import annotations
 
 from skyadmin_pro.config import PIPELINE_MAX_STEP
+from skyadmin_pro.db.soft_delete import soft_delete_by_fk, soft_delete_by_id
 
 
 class PipelineMixinMixin0:
-    def add_pipeline_item(self: CoreMixin, *, client_id: int, service: str, step: int = 1) -> int:
+    def add_pipeline_item(self, *, client_id: int, service: str, step: int = 1) -> int:
         cleaned = service.strip()
         if not cleaned:
             raise ValueError("Enter a service name.")
@@ -13,7 +14,8 @@ class PipelineMixinMixin0:
         with self.connection() as conn:
             cursor = conn.execute(
                 """
-                INSERT INTO pipeline_items (client_id, service, step, step_date, created_at, updated_at)
+                INSERT INTO pipeline_items
+                    (client_id, service, step, step_date, created_at, updated_at)
                 VALUES (?, ?, ?, ?, ?, ?)
                 """,
                 (client_id, cleaned, step, now[:10] if step else None, now, now),
@@ -28,6 +30,7 @@ class PipelineMixinMixin0:
                    p.created_at, p.updated_at, c.name AS client_name
             FROM pipeline_items p
             LEFT JOIN clients c ON c.id = p.client_id
+            WHERE p.deleted_at IS NULL
             ORDER BY p.step ASC, p.updated_at DESC
             """
         if limit is not None and int(limit) > 0:
@@ -35,7 +38,10 @@ class PipelineMixinMixin0:
         return self._fetch_all(base)
 
     def get_pipeline_item(self, item_id: int) -> dict | None:
-        return self._fetch_one("SELECT * FROM pipeline_items WHERE id = ?", (item_id,))
+        return self._fetch_one(
+            "SELECT * FROM pipeline_items WHERE id = ? AND deleted_at IS NULL",
+            (item_id,),
+        )
 
     def set_pipeline_step(self, item_id: int, step: int) -> None:
         step = max(1, min(int(step), PIPELINE_MAX_STEP))
@@ -45,7 +51,7 @@ class PipelineMixinMixin0:
                 """
                 UPDATE pipeline_items
                 SET step = ?, step_date = ?, updated_at = ?
-                WHERE id = ?
+                WHERE id = ? AND deleted_at IS NULL
                 """,
                 (step, now[:10], now, item_id),
             )
@@ -69,12 +75,13 @@ class PipelineMixinMixin0:
             conn.execute(
                 """
                 UPDATE pipeline_items SET service = ?, notes = ?, updated_at = ?
-                WHERE id = ?
+                WHERE id = ? AND deleted_at IS NULL
                 """,
                 (service, notes, self._now(), item_id),
             )
 
     def delete_pipeline_item(self, item_id: int) -> None:
+        now = self._now()
         with self.connection() as conn:
-            conn.execute("DELETE FROM tasks WHERE pipeline_item_id = ?", (item_id,))
-            conn.execute("DELETE FROM pipeline_items WHERE id = ?", (item_id,))
+            soft_delete_by_fk(conn, "tasks", "pipeline_item_id", item_id, now)
+            soft_delete_by_id(conn, "pipeline_items", item_id, now)

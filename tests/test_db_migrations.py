@@ -15,9 +15,32 @@ def db_path(tmp_path):
 def test_fresh_database_records_all_migrations(db_path):
     db = Database(db_path)
     rows = db._fetch_all("SELECT version, name FROM schema_migrations ORDER BY version")
-    assert [int(row["version"]) for row in rows] == [1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15, 16]
+    assert [int(row["version"]) for row in rows] == [
+        1,
+        2,
+        3,
+        4,
+        5,
+        6,
+        7,
+        8,
+        9,
+        10,
+        11,
+        12,
+        13,
+        14,
+        15,
+        16,
+        17,
+        18,
+        19,
+    ]
     assert rows[0]["name"] == "legacy_schema"
     assert rows[11]["name"] == "sync_hlc"
+    assert rows[16]["name"] == "documents_sync"
+    assert rows[17]["name"] == "wave2b_sync"
+    assert rows[18]["name"] == "sync_conflict_actors"
     # m009 owns the group index (kept out of SCHEMA_SQL replay) — fresh DBs get it via migration.
     idx = db._fetch_all("SELECT name FROM sqlite_master WHERE type = 'index' AND name = 'idx_clients_group'")
     assert len(idx) == 1
@@ -25,14 +48,14 @@ def test_fresh_database_records_all_migrations(db_path):
     cols = {row["name"] for row in db._fetch_all("PRAGMA table_info(clients)")}
     assert "hlc" in cols
     log_cols = {row["name"] for row in db._fetch_all("PRAGMA table_info(sync_conflicts)")}
-    assert {"hlc_winner", "hlc_loser"} <= log_cols
+    assert {"hlc_winner", "hlc_loser", "actor_winner", "actor_loser", "org_id"} <= log_cols
 
 
 def test_migrations_are_idempotent_on_reopen(db_path):
     Database(db_path)
     db = Database(db_path)
     count = db._fetch_one("SELECT COUNT(*) AS n FROM schema_migrations")["n"]
-    assert count == 16
+    assert count == 19
 
 
 def test_new_migration_file_pattern(db_path):
@@ -157,6 +180,50 @@ def test_m016_adds_credential_sync_columns(db_path):
         assert {"global_id", "deleted_at", "hlc"} <= cols
     row = db._fetch_one("SELECT name FROM schema_migrations WHERE version = 16")
     assert row["name"] == "credentials_sync"
+
+
+def test_m017_adds_document_sync_columns(db_path):
+    """Wave 2a — documents / financial_documents sync + drive_file_id metadata."""
+    db = Database(db_path)
+    needed = {
+        "global_id",
+        "deleted_at",
+        "updated_at",
+        "hlc",
+        "drive_file_id",
+        "drive_parent_path",
+        "content_hash",
+        "byte_size",
+        "mime_type",
+        "original_filename",
+    }
+    for table in ("documents", "financial_documents"):
+        cols = {row["name"] for row in db._fetch_all(f"PRAGMA table_info({table})")}
+        assert needed <= cols
+    row = db._fetch_one("SELECT name FROM schema_migrations WHERE version = 17")
+    assert row["name"] == "documents_sync"
+
+
+def test_m018_adds_wave2b_sync_columns(db_path):
+    """Wave 2b — pipeline/suppliers/courier/tax calendar sync columns."""
+    db = Database(db_path)
+    needed = {"global_id", "deleted_at", "updated_at", "hlc"}
+    tables = (
+        "pipeline_items",
+        "suppliers",
+        "supplier_payments",
+        "supplier_services",
+        "courier_logs",
+        "client_months",
+        "renewal_items",
+        "tax_cycle_log",
+        "recurring_tasks",
+    )
+    for table in tables:
+        cols = {row["name"] for row in db._fetch_all(f"PRAGMA table_info({table})")}
+        assert needed <= cols, table
+    row = db._fetch_one("SELECT name FROM schema_migrations WHERE version = 18")
+    assert row["name"] == "wave2b_sync"
 
 
 def test_run_monthly_cycle_flips_only_monthly_fields(db_path):

@@ -113,9 +113,9 @@ class TestClientsMixin:
         assert "Archive Me 0" not in listed
         assert db.search_clients("Archive") == []
         assert db.count_clients() == 0
-        # Row still readable by id for undo/restore paths
-        assert db.get_client(ids[0]) is not None
-        assert db.get_client(ids[0])["deleted_at"]
+        assert db.get_client(ids[0]) is None
+        row = db._fetch_one("SELECT deleted_at FROM clients WHERE id = ?", (ids[0],))
+        assert row and row["deleted_at"]
         assert db.batch_restore_clients(ids) == 2
         assert {c["name"] for c in db.list_clients()} >= {"Archive Me 0", "Archive Me 1"}
 

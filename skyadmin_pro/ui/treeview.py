@@ -191,10 +191,9 @@ class ThemedTreeview(ctk.CTkFrame):
         self.hscrollbar = ttk.Scrollbar(
             self, orient="horizontal", command=self.tree.xview, style="Sky.Horizontal.TScrollbar"
         )
-        self.tree.configure(yscrollcommand=self._yscroll_command, xscrollcommand=self.hscrollbar.set)
+        self.tree.configure(yscrollcommand=self._yscroll_command, xscrollcommand=self._xscroll_command)
         self.tree.grid(row=0, column=0, sticky="nsew")
-        self._vscroll.grid(row=0, column=1, sticky="ns")
-        self.hscrollbar.grid(row=1, column=0, sticky="ew")
+        # Scrollbars start hidden; _x/_yscroll_command grids them when needed.
         # Excel-like: smooth wheel scrolling (Shift+wheel for horizontal)
         self.tree.bind("<MouseWheel>", self._on_mousewheel)
         self.tree.bind("<Shift-MouseWheel>", self._on_shift_mousewheel)
@@ -402,6 +401,11 @@ class ThemedTreeview(ctk.CTkFrame):
             scaled_head=scaled_head,
         )
         self.tree.configure(style="Sky.Treeview")
+        try:
+            self._vscroll.configure(style="Sky.Vertical.TScrollbar")
+            self.hscrollbar.configure(style="Sky.Horizontal.TScrollbar")
+        except tk.TclError:
+            pass
         self.tree.tag_configure("odd", background=odd)
         self.tree.tag_configure("even", background=even)
         self.tree.tag_configure("expired", background=expired, foreground=foreground)
@@ -419,7 +423,10 @@ class ThemedTreeview(ctk.CTkFrame):
         self._applied_tree_theme_key = current_key
 
     def clear(self) -> None:
+        from skyadmin_pro.ui.tree_empty import hide_empty_overlay
+
         self._deactivate_virtual()
+        hide_empty_overlay(self)
         for item in self.tree.get_children():
             self.tree.delete(item)
 
@@ -431,18 +438,20 @@ class ThemedTreeview(ctk.CTkFrame):
         tags: Sequence[Sequence[str]] | None = None,
         empty_message: str | None = None,
     ) -> None:
+        from skyadmin_pro.ui.tree_empty import hide_empty_overlay, show_empty_overlay
+        from skyadmin_pro.ui.tree_height import fills_vertically, rows_height
+
         row_list = list(rows)
         is_empty = not row_list
         if is_empty and empty_message:
-            width = max(1, len(self._column_ids))
-            row_list = [(empty_message,) + ("",) * (width - 1)]
-            iids = ["__empty__"]
-            tags = [("empty",)]
+            show_empty_overlay(self, empty_message)
+            iids = None
+            tags = None
+        else:
+            hide_empty_overlay(self)
 
-        # Dynamically manage grid weight so empty lists stay one line.
+        # Dynamically manage grid weight so empty embed lists stay compact.
         try:
-            from skyadmin_pro.ui.tree_height import rows_height
-
             self.tree.configure(
                 height=rows_height(
                     self,
@@ -455,15 +464,26 @@ class ThemedTreeview(ctk.CTkFrame):
             info = self.grid_info()
             if info and "row" in info:
                 row_idx = info["row"]
-                self.master.grid_rowconfigure(row_idx, weight=0 if is_empty else 1)
+                # Fill panels keep weight when empty so the viewport does not collapse.
+                keep_weight = is_empty and fills_vertically(self)
+                self.master.grid_rowconfigure(row_idx, weight=1 if (not is_empty or keep_weight) else 0)
 
-            # If our master is a card inside a page that has weight=1, try to toggle that too
             card_info = self.master.grid_info()
             if card_info and "row" in card_info:
                 card_row = card_info["row"]
-                self.master.master.grid_rowconfigure(card_row, weight=0 if is_empty else 1)
+                keep_weight = is_empty and fills_vertically(self)
+                self.master.master.grid_rowconfigure(card_row, weight=1 if (not is_empty or keep_weight) else 0)
         except (tk.TclError, AttributeError):
             pass
+
+        if is_empty:
+            self._deactivate_virtual()
+            children = self.tree.get_children()
+            if children:
+                self.tree.delete(*children)
+            if self._on_select:
+                self._on_select(None)
+            return
 
         if iids is not None and len(row_list) >= _VIRTUAL_THRESHOLD:
             self._set_rows_virtual(row_list, iids=iids, tags=tags)
@@ -548,14 +568,16 @@ class ThemedTreeview(ctk.CTkFrame):
         self._update_virtual_scrollbar()
 
     def _update_virtual_scrollbar(self) -> None:
+        from skyadmin_pro.ui.tree_scroll import apply_scrollbar_visibility
+
         total = len(self._virtual_rows)
         visible = self._visible_row_count()
         if total <= visible:
-            self._vscroll.set(0.0, 1.0)
+            apply_scrollbar_visibility(self._vscroll, 0.0, 1.0, row=0, column=1, sticky="ns")
             return
         first = self._virtual_offset / total
         last = (self._virtual_offset + visible) / total
-        self._vscroll.set(first, last)
+        apply_scrollbar_visibility(self._vscroll, first, last, row=0, column=1, sticky="ns")
 
     def _virtual_scroll_to_fraction(self, fraction: float) -> None:
         total = len(self._virtual_rows)
@@ -583,8 +605,16 @@ class ThemedTreeview(ctk.CTkFrame):
         self.tree.yview(*args)
 
     def _yscroll_command(self, first, last) -> None:
-        if not self._virtual_active:
-            self._vscroll.set(first, last)
+        if self._virtual_active:
+            return
+        from skyadmin_pro.ui.tree_scroll import apply_scrollbar_visibility
+
+        apply_scrollbar_visibility(self._vscroll, first, last, row=0, column=1, sticky="ns")
+
+    def _xscroll_command(self, first, last) -> None:
+        from skyadmin_pro.ui.tree_scroll import apply_scrollbar_visibility
+
+        apply_scrollbar_visibility(self.hscrollbar, first, last, row=1, column=0, sticky="ew")
 
     def _set_rows_incremental(
         self,

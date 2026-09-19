@@ -6,18 +6,33 @@ from pathlib import Path
 
 from ._const_0 import logger
 from ._const_4 import AUTO_BACKUP_KEEP
+from ._const_5 import SETTING_BACKUP_DESTINATION
 
 
 def retention_help_text(keep: int = AUTO_BACKUP_KEEP) -> str:
     """User-facing Settings copy for how many AutoBackups files are kept."""
     return (
-        f"Keeps the newest {keep} encrypted backups in the AutoBackups folder. "
-        "Older files are deleted automatically after each successful run."
+        f"Keeps the newest {keep} encrypted backups in the AutoBackups / backup folder. "
+        "Older files are deleted automatically after each successful run. "
+        "Each .skybackup is the entire database plus workspace files."
     )
 
 
-def auto_backups_dir(workspace_root: Path) -> Path:
-    """Path to the encrypted scheduled-backup folder under the workspace root."""
+def auto_backups_dir(workspace_root: Path, db=None) -> Path:
+    """Encrypted backup folder: setting override when valid, else ``{workspace}/AutoBackups``."""
+    override = ""
+    if db is not None:
+        try:
+            override = (db.get_setting(SETTING_BACKUP_DESTINATION) or "").strip()
+        except Exception:
+            override = ""
+    if override:
+        candidate = Path(override)
+        try:
+            if candidate.is_dir():
+                return candidate.resolve()
+        except OSError:
+            pass
     return Path(workspace_root) / "AutoBackups"
 
 

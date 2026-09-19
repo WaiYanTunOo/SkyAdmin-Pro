@@ -37,9 +37,13 @@ from .chunk_4_collect import collect_local_changes
 from .chunk_5 import _apply_remote_change
 from .chunk_6 import apply_remote_changes, ensure_sync_ids
 from .chunk_7 import sync_data
+from .dirty import clear_dirty, is_dirty, mark_dirty, suppress_dirty
+from .interval import normalize_sync_auto_interval, parse_sync_auto_interval_seconds
+from .scheduler import AutoSyncScheduler
 
 __all__ = [
     "API_BASE_URL",
+    "AutoSyncScheduler",
     "FK_CLIENT_COLUMN",
     "FK_GROUP_COLUMN",
     "SYNC_ALLOWED_COLUMNS",
@@ -51,17 +55,23 @@ __all__ = [
     "SYNC_SCHEMA_VERSION",
     "SYNC_TABLES",
     "apply_remote_changes",
+    "clear_dirty",
     "collect_local_changes",
     "ensure_sync_credentials",
     "ensure_sync_ids",
     "find_license_file",
     "get_machine_id",
     "is_data_sync_enabled",
+    "is_dirty",
     "live_api_base_url",
     "load_sync_credentials",
     "log_sync_conflict",
+    "mark_dirty",
+    "normalize_sync_auto_interval",
+    "parse_sync_auto_interval_seconds",
     "register_sync_device",
     "rotate_sync_credentials_after_license_change",
     "save_sync_credentials",
+    "suppress_dirty",
     "sync_data",
 ]

@@ -56,7 +56,7 @@ class AutoBackupSchedulerMixin0:
             interval = db.get_setting(SETTING_AUTO_BACKUP_INTERVAL) or "daily"
             last_run = db.get_setting(SETTING_AUTO_BACKUP_LAST_RUN)
             if should_run_backup(db, interval, last_run):
-                backup_dir = auto_backups_dir(self.app.paths.root)
+                backup_dir = auto_backups_dir(self.app.paths.root, db)
                 result = run_auto_backup(self.app.paths.root, db.db_file, backup_dir)
                 if result:
                     now = datetime.now()

@@ -74,7 +74,7 @@ class SettingsViewMixin1:
         ctk.CTkLabel(body, text="UI Zoom", anchor="w").grid(row=4, column=0, sticky="w", pady=4)
         self.zoom_menu = ctk.CTkOptionMenu(
             body,
-            values=["100%", "110%", "125%", "150%"],
+            values=["100%", "110%", "125%", "150%", "175%", "200%"],
             command=self._on_zoom_change,
             width=160,
         )

@@ -19,6 +19,9 @@ from skyadmin_pro.db.migrations import (
     m014_recurring_tasks,
     m015_pnd_monthly_annual,
     m016_credentials_sync,
+    m017_documents_sync,
+    m018_wave2b_sync,
+    m019_sync_conflict_actors,
 )
 from skyadmin_pro.db.migrations.runner import register_migrations, run_pending_migrations
 
@@ -75,6 +78,21 @@ register_migrations(
             m016_credentials_sync.VERSION,
             m016_credentials_sync.NAME,
             m016_credentials_sync.upgrade,
+        ),
+        (
+            m017_documents_sync.VERSION,
+            m017_documents_sync.NAME,
+            m017_documents_sync.upgrade,
+        ),
+        (
+            m018_wave2b_sync.VERSION,
+            m018_wave2b_sync.NAME,
+            m018_wave2b_sync.upgrade,
+        ),
+        (
+            m019_sync_conflict_actors.VERSION,
+            m019_sync_conflict_actors.NAME,
+            m019_sync_conflict_actors.upgrade,
         ),
     ]
 )

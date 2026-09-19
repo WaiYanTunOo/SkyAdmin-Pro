@@ -53,6 +53,7 @@ SIDEBAR_ICONS = {
     "database_tasks": "▦",
     "suppliers": "▤",
     "tax_status": "◷",
+    "accounting_setup": "⬡",
     "pipeline": "▷",
     "courier": "✈",
     "document_hub": "⧉",
@@ -158,6 +159,16 @@ FORM_SIDEBAR_MIN_WIDTH = 320
 SECTION_GAP = 20
 FORM_LABEL_COLOR = TEXT_INVERSE
 FORM_LABEL_FONT_SIZE = FONT_SIZE_SM
+
+
+def form_sidebar_min_width(content_width: int | None = None) -> int:
+    """Responsive form-sidebar width for the active display class / window."""
+    from skyadmin_pro.ui.display import form_sidebar_width, get_active_metrics
+
+    if content_width is None:
+        return get_active_metrics().form_sidebar_min
+    return form_sidebar_width(content_width)
+
 
 # Input contrast — readable in light and dark (entries, combos, textboxes)
 ENTRY_FG = ("#ffffff", "#1a1f2e")

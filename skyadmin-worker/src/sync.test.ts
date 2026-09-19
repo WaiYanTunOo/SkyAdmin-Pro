@@ -41,6 +41,16 @@ function mockEnv(overrides: Partial<Env> & { dbState?: Record<string, unknown> }
       const handlers = (...args: unknown[]) => ({
         first: async () => {
           const sqlLower = sql.toLowerCase();
+          if (sqlLower.includes("from issued_licenses")) {
+            const flags = (state as { license_flags?: Record<string, unknown> }).license_flags || {};
+            return {
+              org_id: `m:${String(args[0])}`,
+              sync_enabled: flags.sync_enabled ?? 1,
+              web_enabled: flags.web_enabled ?? 0,
+              drive_files_enabled: flags.drive_files_enabled ?? 0,
+              max_devices: flags.max_devices ?? 1,
+            };
+          }
           if (sqlLower.includes("from bans")) {
             return state.bans.has(String(args[0])) ? { x: 1 } : null;
           }
@@ -54,6 +64,18 @@ function mockEnv(overrides: Partial<Env> & { dbState?: Record<string, unknown> }
             const nonces = state.used_nonces as Set<string>;
             return nonces.has(String(args[0])) ? { nonce: String(args[0]) } : null;
           }
+              if (sqlLower.includes("from issued_licenses")) {
+                return {
+                  org_id: `m:${MID}`,
+                  sync_enabled: 1,
+                  web_enabled: 0,
+                  drive_files_enabled: 0,
+                  max_devices: 1,
+                };
+              }
+              if (sqlLower.includes("count(*)") && sqlLower.includes("sync_devices")) {
+            return { n: state.sync_devices.size };
+          }
           if (sqlLower.includes("from sync_devices")) {
             const tokenHash = state.sync_devices.get(String(args[0]));
             if (!tokenHash) return null;
@@ -62,6 +84,7 @@ function mockEnv(overrides: Partial<Env> & { dbState?: Record<string, unknown> }
               machine_id: String(args[0]),
               token_hash: tokenHash,
               expires_at: "2027-01-01T00:00:00",
+              org_id: `m:${String(args[0])}`,
             };
           }
           return null;
@@ -80,8 +103,9 @@ function mockEnv(overrides: Partial<Env> & { dbState?: Record<string, unknown> }
             state.sync_devices.set(String(args[0]), String(args[1]));
           }
           if (sqlLower.includes("update sync_devices set token_hash")) {
-            // UPDATE ... SET token_hash=?, ... expires_at=? WHERE machine_id=?
-            state.sync_devices.set(String(args[2]), String(args[0]));
+            // token_hash=?, expires_at=?, org_id=? WHERE machine_id=?
+            const mid = String(args[args.length - 1]);
+            state.sync_devices.set(mid, String(args[0]));
           }
           return { success: true };
         },
@@ -232,7 +256,10 @@ describe("POST /api/sync/register", () => {
             if (sqlLower.includes("from revocations")) return null;
             if (sqlLower.includes("from revoked_passcodes")) return null;
             if (sqlLower.includes("from used_nonces")) return null;
-            if (sqlLower.includes("from sync_devices")) {
+            if (sqlLower.includes("from issued_licenses")) {
+                return { org_id: `m:${MID}`, sync_enabled: 1, web_enabled: 0, drive_files_enabled: 0 };
+              }
+              if (sqlLower.includes("from sync_devices")) {
               const token = state.sync_devices.get(String(args[0]));
               return token ? { token } : null;
             }
@@ -304,6 +331,9 @@ describe("GET /api/sync/pull HLC", () => {
         return {
           bind: (..._args: unknown[]) => ({
             first: async () => {
+              if (sqlLower.includes("from issued_licenses")) {
+                return { org_id: `m:${MID}`, sync_enabled: 1, web_enabled: 0, drive_files_enabled: 0 };
+              }
               if (sqlLower.includes("from sync_devices")) {
                 return { machine_id: MID, token_hash: tokenHash, expires_at: future };
               }
@@ -387,7 +417,7 @@ describe("GET /api/sync/pull HLC", () => {
     expect(res.status).toBe(200);
     const body = await res.json();
     expect(body.ok).toBe(true);
-    expect(body.version).toBe(4);
+    expect(body.version).toBe(7);
     expect(body.proto).toBe(2);
     expect(body.hlc).toBe(true);
   });
@@ -407,6 +437,9 @@ describe("POST /api/sync/push LWW", () => {
         return {
           bind: (..._args: unknown[]) => ({
             first: async () => {
+              if (sqlLower.includes("from issued_licenses")) {
+                return { org_id: `m:${MID}`, sync_enabled: 1, web_enabled: 0, drive_files_enabled: 0 };
+              }
               if (sqlLower.includes("from sync_devices")) {
                 return { machine_id: MID, token_hash: tokenHash, expires_at: future };
               }
@@ -493,6 +526,9 @@ describe("POST /api/sync/push LWW", () => {
         return {
           bind: (..._args: unknown[]) => ({
             first: async () => {
+              if (sqlLower.includes("from issued_licenses")) {
+                return { org_id: `m:${MID}`, sync_enabled: 1, web_enabled: 0, drive_files_enabled: 0 };
+              }
               if (sqlLower.includes("from sync_devices")) {
                 return { machine_id: MID, token_hash: tokenHash, expires_at: future };
               }

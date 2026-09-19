@@ -15,7 +15,7 @@ class FinancialMixinMixin1:
                        fd.amount, fd.doc_date, fd.description
                 FROM financial_documents fd
                 LEFT JOIN clients c ON fd.client_id = c.id
-                WHERE fd.category = ?
+                WHERE fd.deleted_at IS NULL AND fd.category = ?
                   AND (fd.file_name LIKE ? ESCAPE '\\' OR fd.description LIKE ? ESCAPE '\\'
                        OR fd.amount LIKE ? ESCAPE '\\')
                 ORDER BY fd.doc_date DESC, fd.created_at DESC
@@ -29,8 +29,9 @@ class FinancialMixinMixin1:
                    fd.amount, fd.doc_date, fd.description
             FROM financial_documents fd
             LEFT JOIN clients c ON fd.client_id = c.id
-            WHERE fd.file_name LIKE ? ESCAPE '\\' OR fd.description LIKE ? ESCAPE '\\'
-               OR fd.amount LIKE ? ESCAPE '\\'
+            WHERE fd.deleted_at IS NULL
+              AND (fd.file_name LIKE ? ESCAPE '\\' OR fd.description LIKE ? ESCAPE '\\'
+               OR fd.amount LIKE ? ESCAPE '\\')
             ORDER BY fd.doc_date DESC, fd.created_at DESC
             """,
             (q, q, q),
@@ -42,7 +43,7 @@ class FinancialMixinMixin1:
             """
             SELECT category, COUNT(*) AS n
             FROM financial_documents
-            WHERE client_id = ?
+            WHERE client_id = ? AND deleted_at IS NULL
             GROUP BY category
             ORDER BY category
             """,
@@ -52,7 +53,7 @@ class FinancialMixinMixin1:
 
     def all_financial_documents(self, category: str | None = None, client_id: int | None = None) -> list[dict]:
         """List all financial documents across clients with optional filters."""
-        conditions = []
+        conditions = ["fd.deleted_at IS NULL"]
         params: list = []
         if category:
             conditions.append("fd.category = ?")
@@ -60,7 +61,7 @@ class FinancialMixinMixin1:
         if client_id:
             conditions.append("fd.client_id = ?")
             params.append(client_id)
-        where = " WHERE " + " AND ".join(conditions) if conditions else ""
+        where = " WHERE " + " AND ".join(conditions)
         return self._fetch_all(
             f"""
             SELECT fd.id, fd.client_id, c.name AS client_name,

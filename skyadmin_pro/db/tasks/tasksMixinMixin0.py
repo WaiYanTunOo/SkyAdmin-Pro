@@ -22,7 +22,7 @@ class TasksMixinMixin0:
             FROM tasks t
             LEFT JOIN clients c ON c.id = t.client_id
         """
-        where_clauses: list[str] = []
+        where_clauses: list[str] = ["t.deleted_at IS NULL"]
         params_list: list[object] = []
         if status:
             where_clauses.append("t.status = ?")
@@ -33,8 +33,7 @@ class TasksMixinMixin0:
                 "(t.title LIKE ? ESCAPE '\\' OR c.name LIKE ? ESCAPE '\\' OR t.category LIKE ? ESCAPE '\\')"
             )
             params_list.extend([escaped, escaped, escaped])
-        if where_clauses:
-            sql += " WHERE " + " AND ".join(where_clauses)
+        sql += " WHERE " + " AND ".join(where_clauses)
         sql += """
             ORDER BY CASE t.status WHEN 'pending' THEN 0 ELSE 1 END,
                      CASE WHEN t.due_date IS NULL OR t.due_date = '' THEN 1 ELSE 0 END,
@@ -52,7 +51,7 @@ class TasksMixinMixin0:
             FROM tasks t
             LEFT JOIN clients c ON c.id = t.client_id
         """
-        where_clauses: list[str] = []
+        where_clauses: list[str] = ["t.deleted_at IS NULL"]
         params_list: list[object] = []
         if status:
             where_clauses.append("t.status = ?")
@@ -63,8 +62,7 @@ class TasksMixinMixin0:
                 "(t.title LIKE ? ESCAPE '\\' OR c.name LIKE ? ESCAPE '\\' OR t.category LIKE ? ESCAPE '\\')"
             )
             params_list.extend([escaped, escaped, escaped])
-        if where_clauses:
-            sql += " WHERE " + " AND ".join(where_clauses)
+        sql += " WHERE " + " AND ".join(where_clauses)
         row = self._fetch_one(sql, tuple(params_list))
         return int(row["n"]) if row else 0
 
@@ -77,7 +75,7 @@ class TasksMixinMixin0:
                    c.name AS client_name
             FROM tasks t
             LEFT JOIN clients c ON c.id = t.client_id
-            WHERE t.id = ?
+            WHERE t.id = ? AND t.deleted_at IS NULL
             """,
             (task_id,),
         )

@@ -69,9 +69,7 @@ class FinancialDocsPanelMixin1:
             c = doc.get("category") or "Uncategorized"
             cats[c] = cats.get(c, 0) + 1
         parts = [f"{v} {k}" for k, v in sorted(cats.items())]
-        self.summary_label.configure(
-            text=f"{len(rows)} document(s) — {', '.join(parts)}" if parts else "No documents found"
-        )
+        self.summary_label.configure(text=f"{len(rows)} document(s) — {', '.join(parts)}" if parts else "")
 
     def _open_selected(self) -> None:
         selected = self.tree.tree.selection()

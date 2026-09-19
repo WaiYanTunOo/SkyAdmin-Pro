@@ -66,6 +66,7 @@ class CourierPanelMixin0:
                     for item in logs
                 ],
                 iids=[str(item["id"]) for item in logs],
+                empty_message="No courier deliveries yet.",
             )
             self._update_pager(len(logs))
             self.feedback.clear()

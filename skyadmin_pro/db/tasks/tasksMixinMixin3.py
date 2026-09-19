@@ -7,12 +7,15 @@ from skyadmin_pro.services.tracking import days_until, effective_expiry_date
 
 class TasksMixinMixin3:
     def list_documents(self, *, expiring_only: bool = False, limit: int | None = None, offset: int = 0) -> list[dict]:
-        where = ""
+        where = "WHERE d.deleted_at IS NULL"
         if expiring_only:
             # Lets idx_documents_expiry drive the filter instead of loading
             # the whole table and discarding rows in Python. Orphaned records
             # (client deleted) are excluded — they have nobody to alert.
-            where = "WHERE d.expiry_date IS NOT NULL AND trim(d.expiry_date) != '' AND d.client_id IS NOT NULL"
+            where = (
+                "WHERE d.deleted_at IS NULL AND d.expiry_date IS NOT NULL"
+                " AND trim(d.expiry_date) != '' AND d.client_id IS NOT NULL"
+            )
         base = f"""
             SELECT d.id, d.client_id, d.document_type, d.expiry_date, d.amount,
                    d.payment_date, d.start_date, d.file_name, d.file_path, d.created_at,
@@ -34,7 +37,7 @@ class TasksMixinMixin3:
                    d.created_at, c.name AS client_name
             FROM documents d
             LEFT JOIN clients c ON c.id = d.client_id
-            WHERE d.client_id IS NOT NULL
+            WHERE d.deleted_at IS NULL AND d.client_id IS NOT NULL
               AND d.expiry_date IS NOT NULL AND trim(d.expiry_date) != ''
               AND d.document_type IS NOT NULL AND trim(d.document_type) != ''
               AND {_expiry_type_condition("d.document_type", tuple(self.list_service_types()))}
@@ -65,7 +68,7 @@ class TasksMixinMixin3:
                    d.created_at, c.name AS client_name
             FROM documents d
             LEFT JOIN clients c ON c.id = d.client_id
-            WHERE d.client_id IS NOT NULL AND d.progress = 'Ongoing'
+            WHERE d.deleted_at IS NULL AND d.client_id IS NOT NULL AND d.progress = 'Ongoing'
               AND {clause}
             ORDER BY d.start_date IS NULL, d.start_date DESC, d.id DESC
             """,

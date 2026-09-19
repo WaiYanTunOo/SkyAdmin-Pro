@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 from skyadmin_pro.config import EXPIRY_ALERT_DAYS
+from skyadmin_pro.db.soft_delete import soft_delete_by_id
 from skyadmin_pro.services.tracking import days_until
 
 
@@ -13,6 +14,7 @@ class SuppliersMixinMixin1:
                    ss.service_type, ss.expiry_date, ss.notes, ss.created_at
             FROM supplier_services ss
             LEFT JOIN suppliers s ON s.id = ss.supplier_id
+            WHERE ss.deleted_at IS NULL AND s.deleted_at IS NULL
             ORDER BY s.name COLLATE NOCASE, ss.company_name COLLATE NOCASE
             """
         )
@@ -26,8 +28,10 @@ class SuppliersMixinMixin1:
             FROM supplier_services ss
             LEFT JOIN suppliers s ON s.id = ss.supplier_id
             LEFT JOIN clients c ON c.name = ss.company_name
-            WHERE ss.expiry_date IS NOT NULL AND trim(ss.expiry_date) != ''
-              AND c.id IS NOT NULL AND c.deleted_at IS NULL AND COALESCE(c.status, 'active') != 'inactive'
+            WHERE ss.deleted_at IS NULL AND s.deleted_at IS NULL
+              AND ss.expiry_date IS NOT NULL AND trim(ss.expiry_date) != ''
+              AND c.id IS NOT NULL AND c.deleted_at IS NULL
+              AND COALESCE(c.status, 'active') != 'inactive'
             ORDER BY ss.expiry_date ASC
             """
         )
@@ -89,4 +93,4 @@ class SuppliersMixinMixin1:
 
     def delete_supplier_service(self, service_id: int) -> None:
         with self.connection() as conn:
-            conn.execute("DELETE FROM supplier_services WHERE id = ?", (service_id,))
+            soft_delete_by_id(conn, "supplier_services", service_id, self._now())

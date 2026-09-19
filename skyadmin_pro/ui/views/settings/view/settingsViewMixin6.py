@@ -47,9 +47,8 @@ class SettingsViewMixin6:
 
         if "License" in self._lazy_tabs:
             self._refresh_license_label()
-            from skyadmin_pro.config import SETTING_DATA_SYNC_ENABLED
-
-            self.data_sync_var.set((self.app.db.get_setting(SETTING_DATA_SYNC_ENABLED) or "0").strip() == "1")
+            if hasattr(self, "_apply_data_sync_status_ui"):
+                self._apply_data_sync_status_ui()
             if hasattr(self, "_refresh_mobile_vault_status"):
                 self._refresh_mobile_vault_status()
 
@@ -64,6 +63,10 @@ class SettingsViewMixin6:
         if "Data & backup" in self._lazy_tabs:
             self._refresh_integrity_banner()
             self._refresh_backup_banner()
+            if getattr(self, "_backup_dest_var", None) is not None:
+                from skyadmin_pro.services.auto_backup import auto_backups_dir
+
+                self._backup_dest_var.set(str(auto_backups_dir(self.app.paths.root, self.app.db)))
 
     def _path_row(self, info, *, row: int, on_open) -> ctk.CTkLabel:
         frame = ctk.CTkFrame(info, fg_color="transparent")

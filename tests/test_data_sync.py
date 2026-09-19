@@ -394,7 +394,7 @@ def test_sync_pull_paginates_until_short_page(db, monkeypatch):
         return False, "unexpected"
 
     patch_sync(monkeypatch, "is_data_sync_enabled", lambda _db: True)
-    patch_sync(monkeypatch, "ensure_sync_credentials", lambda **_kw: ("MID", "tok"))
+    patch_sync(monkeypatch, "ensure_sync_credentials", lambda **_kw: (("MID", "tok"), ""))
     patch_sync(monkeypatch, "get_machine_id", lambda: "MID")
     patch_sync(monkeypatch, "_sync_request", fake_request)
     patch_sync(monkeypatch, "API_BASE_URL", "https://example.test")

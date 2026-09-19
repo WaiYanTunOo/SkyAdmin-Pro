@@ -29,5 +29,7 @@ class OfficeMixinMixin5:
             )
 
     def delete_notebook_entry(self, entry_id: int) -> None:
+        from skyadmin_pro.db.soft_delete import soft_delete_by_id
+
         with self.connection() as conn:
-            conn.execute("DELETE FROM notebook_entries WHERE id = ?", (entry_id,))
+            soft_delete_by_id(conn, "notebook_entries", entry_id, self._now())

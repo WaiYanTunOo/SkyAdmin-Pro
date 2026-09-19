@@ -1,9 +1,12 @@
 export const getJsPart5 = (csrfToken: string) => `
   var btn=document.getElementById('genBtn');btn.disabled=true;btn.textContent='Signing...';
-  api('POST','/api/generate',{mid:mid,days:days,price:priceForDays(days)}).then(function(d){
+  var payload=Object.assign({mid:mid,days:days,price:priceForDays(days)},readGenerateSku());
+  api('POST','/api/generate',payload).then(function(d){
     document.getElementById('license').textContent=d.license_key;
     document.getElementById('passcode').textContent=d.passcode;
     document.getElementById('result').style.display='block';
+    var so=document.getElementById('skuOut');
+    if(so)so.textContent='org='+(d.org_id||'')+' · sync='+d.sync_enabled+' · web='+d.web_enabled+' · drive='+d.drive_files_enabled+' · max_devices='+d.max_devices;
     btn.disabled=false;btn.textContent='Generate';
     showStatus('Generated!');
     return loadRecords();
@@ -53,7 +56,8 @@ function renderRecords(){
 function renew(mid,days){
   styledConfirm('Generate a new '+days+'-day license for '+mid+'?').then(function(ok){if(!ok)return;
   var price=priceForDays(days);
-  api('POST','/api/generate',{mid:mid,days:days,price:price}).then(function(d){
+  var payload=Object.assign({mid:mid,days:days,price:price},readGenerateSku());
+  api('POST','/api/generate',payload).then(function(d){
     navigator.clipboard.writeText(d.license_key);
     showStatus(days+'d generated & copied');
     return loadRecords();

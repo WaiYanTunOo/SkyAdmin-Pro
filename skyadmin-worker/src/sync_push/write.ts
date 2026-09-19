@@ -6,6 +6,7 @@ import { isMissingHlcColumn } from "./hlc";
 
 function buildPushStatements(
   db: D1Database,
+  orgId: string,
   machineId: string,
   partition: PushPartition,
   existing: Map<string, ExistingSyncRow | string>,
@@ -16,11 +17,9 @@ function buildPushStatements(
   for (const item of partition.conflicts) {
     const keptRaw = existing.get(changeKey(item.table, item.globalId));
     const kept = typeof keptRaw === "string" ? keptRaw : keptRaw?.updatedAt;
-    if (!kept) {
-      continue;
-    }
+    if (!kept) continue;
     statements.push(
-      db.prepare(CONFLICT_SQL).bind(machineId, item.table, item.globalId, kept, item.updatedAt)
+      db.prepare(CONFLICT_SQL).bind(machineId, item.table, item.globalId, kept, item.updatedAt),
     );
   }
 
@@ -29,8 +28,14 @@ function buildPushStatements(
     const upsert = db.prepare(upsertSql);
     statements.push(
       withHlc
-        ? upsert.bind(machineId, item.table, item.globalId, item.rowJson, item.updatedAt, item.deletedAt, item.hlc)
-        : upsert.bind(machineId, item.table, item.globalId, item.rowJson, item.updatedAt, item.deletedAt)
+        ? upsert.bind(
+          orgId, machineId, item.table, item.globalId,
+          item.rowJson, item.updatedAt, item.deletedAt, item.hlc,
+        )
+        : upsert.bind(
+          orgId, machineId, item.table, item.globalId,
+          item.rowJson, item.updatedAt, item.deletedAt,
+        ),
     );
   }
 
@@ -40,22 +45,27 @@ function buildPushStatements(
 async function runPushBatches(db: D1Database, statements: D1PreparedStatement[]): Promise<void> {
   for (let index = 0; index < statements.length; index += D1_BATCH_SIZE) {
     const chunk = statements.slice(index, index + D1_BATCH_SIZE);
-    if (chunk.length) {
-      await db.batch(chunk);
-    }
+    if (chunk.length) await db.batch(chunk);
   }
 }
 
 export async function writePushBatch(
   db: D1Database,
+  orgId: string,
   machineId: string,
   partition: PushPartition,
   existing: Map<string, ExistingSyncRow | string>,
 ): Promise<void> {
   try {
-    await runPushBatches(db, buildPushStatements(db, machineId, partition, existing, true));
+    await runPushBatches(
+      db,
+      buildPushStatements(db, orgId, machineId, partition, existing, true),
+    );
   } catch (err) {
     if (!isMissingHlcColumn(err)) throw err;
-    await runPushBatches(db, buildPushStatements(db, machineId, partition, existing, false));
+    await runPushBatches(
+      db,
+      buildPushStatements(db, orgId, machineId, partition, existing, false),
+    );
   }
 }

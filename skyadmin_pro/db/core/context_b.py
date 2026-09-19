@@ -46,6 +46,12 @@ class ContextMixinB:
         try:
             yield conn
             conn.commit()
+            try:
+                from skyadmin_pro.services.data_sync.dirty import notify_db_write
+
+                notify_db_write()
+            except Exception:
+                pass
         except Exception:  # defensive: caller body may raise anything — always roll back, then re-raise
             conn.rollback()
             raise

@@ -34,7 +34,7 @@ class LicenseMixinMixin4:
                         text="⚠ " + sync_msg,
                         text_color=("#b45309", "#fbbf24"),
                     )
-                self.data_sync_label.configure(text=self._format_data_sync_status())
+                self._apply_data_sync_status_ui()
                 count = self.app.db.count_sync_conflicts()
                 self.conflicts_btn.configure(
                     state="normal" if count else "disabled",

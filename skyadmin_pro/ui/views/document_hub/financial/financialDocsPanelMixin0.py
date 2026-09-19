@@ -2,7 +2,7 @@ from __future__ import annotations
 
 import customtkinter as ctk
 
-from skyadmin_pro.ui.theme import TEXT_MUTED
+from skyadmin_pro.ui.theme import FONT_SIZE_SM, TEXT_MUTED
 from skyadmin_pro.ui.widgets import themed_entry
 
 
@@ -25,7 +25,9 @@ class FinancialDocsPanelMixin0:
         bar.grid_columnconfigure(3, weight=1)
         bar.grid_columnconfigure(5, weight=1)
 
-        ctk.CTkLabel(bar, text="Search:", font=("Segoe UI", 12)).grid(row=0, column=0, padx=(0, 4))
+        ctk.CTkLabel(bar, text="Search", font=("Segoe UI", FONT_SIZE_SM), text_color=TEXT_MUTED).grid(
+            row=0, column=0, padx=(0, 4)
+        )
         self.search_var = ctk.StringVar()
         self._search_after: str | None = None
         self.search_entry = themed_entry(
@@ -35,7 +37,9 @@ class FinancialDocsPanelMixin0:
         self.search_entry.bind("<Return>", lambda _: self._do_search())
         self.search_var.trace_add("write", lambda *_: self._debounced_search())
 
-        ctk.CTkLabel(bar, text="Category:", font=("Segoe UI", 12)).grid(row=0, column=2, padx=(0, 4))
+        ctk.CTkLabel(bar, text="Category", font=("Segoe UI", FONT_SIZE_SM), text_color=TEXT_MUTED).grid(
+            row=0, column=2, padx=(0, 4)
+        )
         from skyadmin_pro.config import FINANCIAL_DOC_CATEGORIES
 
         self.cat_var = ctk.StringVar(value="All")
@@ -47,7 +51,9 @@ class FinancialDocsPanelMixin0:
         )
         self.cat_menu.grid(row=0, column=3, sticky="ew", padx=(0, 8))
 
-        ctk.CTkLabel(bar, text="Client:", font=("Segoe UI", 12)).grid(row=0, column=4, padx=(0, 4))
+        ctk.CTkLabel(bar, text="Client", font=("Segoe UI", FONT_SIZE_SM), text_color=TEXT_MUTED).grid(
+            row=0, column=4, padx=(0, 4)
+        )
         self.client_var = ctk.StringVar(value="All")
         self.client_menu = ctk.CTkOptionMenu(
             bar,
@@ -57,12 +63,14 @@ class FinancialDocsPanelMixin0:
         )
         self.client_menu.grid(row=0, column=5, sticky="ew", padx=(0, 8))
 
-        ctk.CTkButton(bar, text="Search", width=70, command=self._do_search).grid(row=0, column=6, padx=(0, 4))
+        ctk.CTkButton(bar, text="Search", width=70, command=self._do_search).grid(row=0, column=6, padx=(8, 4))
         ctk.CTkButton(
             bar, text="Clear", width=60, fg_color="transparent", border_width=1, command=self._clear_search
         ).grid(row=0, column=7, padx=(0, 4))
         ctk.CTkButton(bar, text="Open", width=60, command=self._open_selected).grid(row=0, column=8, padx=(0, 4))
-        ctk.CTkButton(bar, text="Refresh", width=70, command=self.refresh).grid(row=0, column=9)
+        ctk.CTkButton(bar, text="Refresh", width=70, fg_color="transparent", border_width=1, command=self.refresh).grid(
+            row=0, column=9
+        )
 
     def _build_treeview(self) -> None:
         from skyadmin_pro.ui.treeview import ThemedTreeview

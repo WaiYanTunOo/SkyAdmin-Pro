@@ -26,4 +26,16 @@ from ._const_0 import logger
 from ._const_1 import SETTING_SYNC_HLC_LAST
 from ._const_2 import _HLC_RE
 from ._const_3 import _node_cache
-from .funcs import format_hlc, hlc_now, legacy_hlc, node_id, note_remote_hlc, parse_hlc
+from .funcs import format_hlc, hlc_actor, hlc_now, legacy_hlc, node_id, note_remote_hlc, parse_hlc
+
+__all__ = [
+    "SETTING_SYNC_HLC_LAST",
+    "format_hlc",
+    "hlc_actor",
+    "hlc_now",
+    "legacy_hlc",
+    "logger",
+    "node_id",
+    "note_remote_hlc",
+    "parse_hlc",
+]

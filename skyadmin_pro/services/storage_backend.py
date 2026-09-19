@@ -1,22 +1,18 @@
-"""Attachment storage seam — local filesystem today, cloud later.
+"""Attachment storage seam — local filesystem today, Drive when configured.
 
-Owner-operator milestone stays offline-first: every call below hits the
-local workspace. When Google Drive (or another cloud store) is added, it
-slots in as a second ``StorageBackend`` implementation behind
-:func:`get_storage_backend` — views must keep talking to the interface,
-never to ``pathlib``/``shutil`` directly for *new* attachment code.
-
-Sync-metadata discipline for future cloud push (no migration of old rows):
-new/updated records already stamp ``updated_at`` via ``Database._now()``
-and carry a stable ``global_id`` (see ``CoreMixin._backfill_sync_global_ids``).
-A future push worker can order by ``(updated_at, id)`` and key by
-``global_id`` — nothing in this module changes write paths today.
+Owner-operator milestone stays offline-first. Google Drive slots in as a
+second ``StorageBackend`` behind :func:`get_storage_backend`. PDF bytes
+never go through the Worker (Plane B).
 """
 
 from __future__ import annotations
 
 from pathlib import Path
 from typing import Protocol
+
+
+class NotConfiguredError(RuntimeError):
+    """Raised when a cloud backend is selected but OAuth is missing."""
 
 
 class StorageBackend(Protocol):
@@ -69,22 +65,32 @@ class LocalStorageBackend:
         return sorted(p.relative_to(self._root).as_posix() for p in base.rglob("*") if p.is_file())
 
 
-def get_storage_backend(root: Path | str | None = None) -> LocalStorageBackend:
-    """Return the active backend. ``root=None`` uses the workspace root.
-
-    The ``backend=`` selection hook (env/config) for a Drive backend gets
-    added with the cloud milestone — the signature already returns the
-    ``StorageBackend`` interface so callers won't change.
-    """
+def get_storage_backend(root: Path | str | None = None, db=None):
+    """Return Drive when entitled+connected; otherwise local workspace."""
     if root is None:
         from skyadmin_pro.paths import default_workspace_root
 
         root = default_workspace_root()
+    if db is not None:
+        try:
+            from skyadmin_pro.services.drive.entitlement import (
+                drive_preference_on,
+                license_allows_drive,
+            )
+            from skyadmin_pro.services.drive.tokens import load_refresh_token
+
+            if license_allows_drive(db) and drive_preference_on(db) and load_refresh_token(db):
+                from skyadmin_pro.services.drive.backend import GoogleDriveStorageBackend
+
+                return GoogleDriveStorageBackend(db)
+        except Exception:
+            pass
     return LocalStorageBackend(root)
 
 
 __all__ = [
     "LocalStorageBackend",
+    "NotConfiguredError",
     "StorageBackend",
     "get_storage_backend",
 ]

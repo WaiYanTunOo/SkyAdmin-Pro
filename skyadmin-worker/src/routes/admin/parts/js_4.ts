@@ -71,6 +71,21 @@ function renderMachines(){
   if(!box.children.length)box.innerHTML='<div class="hint">No machines match this filter.</div>';
 }
 
+function readGenerateSku(){
+  var org=(document.getElementById('orgId').value||'').trim();
+  var maxRaw=document.getElementById('skuMaxDevices').value;
+  var maxDev=maxRaw===''?1:parseInt(maxRaw,10);
+  if(!Number.isFinite(maxDev)||maxDev<0)maxDev=1;
+  var body={
+    sync_enabled:document.getElementById('skuSync').checked?1:0,
+    web_enabled:document.getElementById('skuWeb').checked?1:0,
+    drive_files_enabled:document.getElementById('skuDrive').checked?1:0,
+    max_devices:maxDev
+  };
+  if(org)body.org_id=org;
+  return body;
+}
+
 function generate(){
   var mid=document.getElementById('mid').value.trim().toUpperCase();
   if(!mid||!/^[0-9A-F]{16}$/.test(mid)){showStatus('Enter 16-hex Machine ID');return;}

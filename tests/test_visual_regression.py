@@ -194,13 +194,23 @@ def test_shortcut_new_from_dashboard_navigates(app, monkeypatch):
 
 
 def test_audit_log_dialog_loads_without_crash(app):
-    """AuditLogDialog renders via set_rows (empty state or data rows)."""
+    """AuditLogDialog renders via set_rows (overlay empty state or data rows)."""
     from skyadmin_pro.ui.views.audit_log import AuditLogDialog
 
     dlg = AuditLogDialog(app)
     app.update()
     try:
-        assert dlg.tree.tree.get_children(), "expected empty-message row or data"
+        children = dlg.tree.tree.get_children()
+        overlay = getattr(dlg.tree, "_empty_overlay", None)
+        # Toplevel may not be mapped yet in headless tests; place+text is enough.
+        has_overlay = False
+        if overlay is not None:
+            try:
+                text = (overlay.cget("text") or "").strip()
+                has_overlay = bool(text) and overlay.winfo_manager() == "place"
+            except Exception:
+                has_overlay = False
+        assert children or has_overlay, "expected data rows or placed empty-state overlay"
     finally:
         try:
             dlg.destroy()

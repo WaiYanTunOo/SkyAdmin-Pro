@@ -2,7 +2,7 @@ from __future__ import annotations
 
 import customtkinter as ctk
 
-from skyadmin_pro.ui.theme import CARD_RADIUS, CARD_TITLE_SIZE, FORM_SIDEBAR_MIN_WIDTH
+from skyadmin_pro.ui.theme import CARD_RADIUS, CARD_TITLE_SIZE, form_sidebar_min_width
 from skyadmin_pro.ui.treeview import ThemedTreeview
 
 
@@ -14,8 +14,9 @@ class CourierPanelMixin2:
         self._page = 0
         self._page_size = 250
         self._has_more = False
+        self._form_sidebar_min = form_sidebar_min_width()
         self.grid_columnconfigure(0, weight=1)
-        self.grid_columnconfigure(1, weight=0, minsize=FORM_SIDEBAR_MIN_WIDTH)
+        self.grid_columnconfigure(1, weight=0, minsize=self._form_sidebar_min)
         self.grid_rowconfigure(0, weight=1)
 
         tree_card = ctk.CTkFrame(self, corner_radius=CARD_RADIUS)

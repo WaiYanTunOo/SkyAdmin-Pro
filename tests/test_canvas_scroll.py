@@ -99,15 +99,25 @@ def test_vo_csh_setup_tree_outside_canvas_scroll():
     assert "self._vo_csh_setup_frame = self._build_vo_csh_setup(tab)" in panel_src
 
 
-def test_accounting_setup_is_companies_main_tab():
-    expand_src = _pkg_text("skyadmin_pro", "ui", "views", "database_tasks", "view")
-    assert "TAB_ACCOUNTING" in expand_src
-    assert "AccountingSetupPanel" in expand_src
+def test_accounting_setup_is_finance_menu_page():
+    from skyadmin_pro.config import NAV_ACCOUNTING, NAV_GROUP_FINANCE, NAV_GROUPS
+
+    finance = next(g for g in NAV_GROUPS if g[0] == NAV_GROUP_FINANCE)
+    assert NAV_ACCOUNTING in finance[2]
+
+    menu_src = _pkg_text("skyadmin_pro", "ui", "views", "menu_panels")
+    assert "AccountingSetupMenuView" in menu_src
+    assert "AccountingSetupPanel" in menu_src
+
     from skyadmin_pro.ui.views.company_details.constants import SUBTAB_NAMES
 
     assert "Accounting Setup" not in SUBTAB_NAMES
     panel_src = _pkg_text("skyadmin_pro", "ui", "views", "company_details", "panel")
     assert "_build_accounting_setup" not in panel_src
+
+    from skyadmin_pro.ui.views.database_tasks.view import TAB_NAMES
+
+    assert "Accounting Setup" not in TAB_NAMES
 
 
 def test_tax_ids_and_vo_tabs_use_canvas_scroll():

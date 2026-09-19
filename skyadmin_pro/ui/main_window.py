@@ -20,11 +20,16 @@ from skyadmin_pro.config import (
     SETTING_SIDEBAR_COLLAPSED,
     SETTING_WINDOW_GEOMETRY,
 )
+from skyadmin_pro.ui.display import (
+    form_sidebar_width,
+    get_active_metrics,
+    metrics_for_screen,
+    preferred_geometry,
+    set_active_metrics,
+)
 from skyadmin_pro.ui.dnd import dnd_base_class, init_dnd
 from skyadmin_pro.ui.sidebar import SidebarWidget
 from skyadmin_pro.ui.theme import (
-    SIDEBAR_COLLAPSED_WIDTH,
-    SIDEBAR_WIDTH,
     STATUS_BAR_HEIGHT,
     TEXT_FAINT,
     TEXT_MUTED,
@@ -49,6 +54,7 @@ class MainWindow(dnd_base_class()):
         from skyadmin_pro.ui.views.database_tasks import DatabaseTasksView
         from skyadmin_pro.ui.views.document_hub import DocumentHubView
         from skyadmin_pro.ui.views.menu_panels import (
+            AccountingSetupMenuView,
             CourierMenuView,
             PipelineMenuView,
             SuppliersMenuView,
@@ -66,6 +72,7 @@ class MainWindow(dnd_base_class()):
             "tasks": lambda app: TasksMenuView(app.content, app=app),
             "courier": lambda app: CourierMenuView(app.content, app=app),
             "tax_status": lambda app: TaxStatusMenuView(app.content, app=app),
+            "accounting_setup": lambda app: AccountingSetupMenuView(app.content, app=app),
             "pipeline": lambda app: PipelineMenuView(app.content, app=app),
             "suppliers": lambda app: SuppliersMenuView(app.content, app=app),
             "office_hub": lambda app: OfficeHubView(app.content, app=app),
@@ -82,10 +89,14 @@ class MainWindow(dnd_base_class()):
 
         self.title(APP_NAME)
         self._set_window_icon()
+        self._layout_after: str | None = None
+        self._init_display_metrics()
         geometry = self.db.get_setting(SETTING_WINDOW_GEOMETRY, DEFAULT_WINDOW_GEOMETRY)
-        geometry = self._safe_geometry(geometry or DEFAULT_WINDOW_GEOMETRY)
+        geometry = self._pick_startup_geometry(geometry or DEFAULT_WINDOW_GEOMETRY)
+        geometry = self._safe_geometry(geometry)
         self.geometry(geometry)
-        self.minsize(*MIN_WINDOW_SIZE)
+        m = get_active_metrics()
+        self.minsize(m.min_width, m.min_height)
 
         self.grid_columnconfigure(1, weight=1)
         self.grid_rowconfigure(0, weight=1)
@@ -100,6 +111,10 @@ class MainWindow(dnd_base_class()):
         self.show_view(NAV_DASHBOARD)
         self._bind_keyboard_shortcuts()
         self._start_auto_backup()
+        self._start_auto_sync()
+        self.bind("<Configure>", self._on_window_configure, add="+")
+        self.bind("<FocusIn>", self._on_window_focus_in, add="+")
+        self.bind("<Map>", self._on_window_map, add="+")
 
         self.protocol("WM_DELETE_WINDOW", self._on_close)
 
@@ -219,10 +234,41 @@ class MainWindow(dnd_base_class()):
         except (OSError, RuntimeError) as exc:
             logger.warning("Auto-backup scheduler failed to start: %s", exc)
 
+    def _start_auto_sync(self) -> None:
+        try:
+            from skyadmin_pro.services.data_sync import AutoSyncScheduler
+
+            self._auto_sync = AutoSyncScheduler(self)
+            self._auto_sync.start()
+        except (OSError, RuntimeError) as exc:
+            logger.warning("Auto-sync scheduler failed to start: %s", exc)
+
+    def _on_window_focus_in(self, event) -> None:
+        if event.widget is not self:
+            return
+        scheduler = getattr(self, "_auto_sync", None)
+        on_focus = getattr(scheduler, "on_window_focus", None)
+        if callable(on_focus):
+            try:
+                on_focus()
+            except Exception:
+                logger.debug("Auto-sync focus pull failed", exc_info=True)
+
+    def _on_window_map(self, event) -> None:
+        if event.widget is not self:
+            return
+        scheduler = getattr(self, "_auto_sync", None)
+        on_focus = getattr(scheduler, "on_window_focus", None)
+        if callable(on_focus):
+            try:
+                on_focus()
+            except Exception:
+                logger.debug("Auto-sync map pull failed", exc_info=True)
+
     def _build_sidebar(self) -> None:
         """Build the outer sidebar frame and hand nav-button management to SidebarWidget."""
-        # Plain logical width — CustomTkinter scales it for Windows DPI itself.
-        width = SIDEBAR_COLLAPSED_WIDTH if self._sidebar_collapsed else SIDEBAR_WIDTH
+        m = get_active_metrics()
+        width = m.sidebar_collapsed if self._sidebar_collapsed else m.sidebar_width
         self.sidebar = ctk.CTkFrame(self, width=width, corner_radius=0)
         self.sidebar.grid(row=0, column=0, rowspan=2, sticky="nsw")
         self.sidebar.grid_propagate(False)
@@ -298,9 +344,74 @@ class MainWindow(dnd_base_class()):
         self.db.set_setting(SETTING_SIDEBAR_COLLAPSED, "1" if self._sidebar_collapsed else "0")
         self._apply_sidebar_layout()
 
+    def _init_display_metrics(self) -> None:
+        try:
+            sw = int(self.winfo_screenwidth())
+            sh = int(self.winfo_screenheight())
+        except (tk.TclError, ValueError):
+            sw, sh = 1920, 1080
+        set_active_metrics(metrics_for_screen(sw, sh))
+
+    def _pick_startup_geometry(self, geometry: str) -> str:
+        """On large screens, replace the stock 1280x800 default with a fitted size."""
+        try:
+            sw = int(self.winfo_screenwidth())
+            sh = int(self.winfo_screenheight())
+        except (tk.TclError, ValueError):
+            return geometry
+        raw = str(geometry or "").strip()
+        if raw == DEFAULT_WINDOW_GEOMETRY and max(sw, sh) >= 2560:
+            return preferred_geometry(sw, sh)
+        return geometry
+
+    def _on_window_configure(self, event=None) -> None:
+        if event is not None and event.widget is not self:
+            return
+        if self._layout_after is not None:
+            try:
+                self.after_cancel(self._layout_after)
+            except (tk.TclError, ValueError):
+                pass
+        self._layout_after = self.after(120, self._apply_responsive_layout)
+
+    def _apply_responsive_layout(self) -> None:
+        self._layout_after = None
+        try:
+            if not self.winfo_exists():
+                return
+            sw = int(self.winfo_screenwidth())
+            sh = int(self.winfo_screenheight())
+            ww = int(self.winfo_width())
+        except (tk.TclError, ValueError):
+            return
+        set_active_metrics(metrics_for_screen(sw, sh))
+        m = get_active_metrics()
+        try:
+            self.minsize(m.min_width, m.min_height)
+        except tk.TclError:
+            pass
+        self._apply_sidebar_layout()
+        content_w = max(0, ww - (m.sidebar_collapsed if self._sidebar_collapsed else m.sidebar_width))
+        form_w = form_sidebar_width(content_w, m)
+        for view in self._views.values():
+            apply = getattr(view, "_apply_responsive_layout", None)
+            if callable(apply):
+                try:
+                    apply(form_sidebar_min=form_w, metrics=m)
+                except Exception:
+                    pass
+            panel = getattr(view, "panel", None)
+            apply_p = getattr(panel, "_apply_responsive_layout", None) if panel is not None else None
+            if callable(apply_p):
+                try:
+                    apply_p(form_sidebar_min=form_w, metrics=m)
+                except Exception:
+                    pass
+
     def _apply_sidebar_layout(self) -> None:
         collapsed = self._sidebar_collapsed
-        width = SIDEBAR_COLLAPSED_WIDTH if collapsed else SIDEBAR_WIDTH
+        m = get_active_metrics()
+        width = m.sidebar_collapsed if collapsed else m.sidebar_width
         self.sidebar.configure(width=width)
         self.sidebar_toggle_btn.configure(text="»" if collapsed else "«")
         if collapsed:
@@ -342,8 +453,8 @@ class MainWindow(dnd_base_class()):
                 screen_h = int(self.winfo_screenheight())
             except (tk.TclError, ValueError):
                 return f"{width}x{height}"
-            width = max(800, min(width, screen_w))
-            height = max(600, min(height, screen_h))
+            width = max(MIN_WINDOW_SIZE[0], min(width, screen_w))
+            height = max(MIN_WINDOW_SIZE[1], min(height, screen_h))
             if match.group(3) is None or match.group(4) is None:
                 return f"{width}x{height}"
             x, y = int(match.group(3)), int(match.group(4))
@@ -473,13 +584,11 @@ class MainWindow(dnd_base_class()):
         self.open_office_hub_client_credentials(client_name, credential_type="RD")
 
     def open_accounting_setup(self) -> None:
-        """Navigate to Companies → Accounting Setup rollout queue."""
-        from skyadmin_pro.config import NAV_DATABASE_TASKS
+        """Navigate to Finance → Accounting Setup rollout queue."""
+        from skyadmin_pro.config import NAV_ACCOUNTING
 
-        view = self._ensure_view(NAV_DATABASE_TASKS)
-        if view is not None and hasattr(view, "open_accounting_setup"):
-            view.open_accounting_setup()
-        self.show_view(NAV_DATABASE_TASKS)
+        self._ensure_view(NAV_ACCOUNTING)
+        self.show_view(NAV_ACCOUNTING)
 
     def open_office_hub_setup(self) -> None:
         """Navigate to Office Hub → Setup migration queue."""
@@ -589,6 +698,13 @@ class MainWindow(dnd_base_class()):
                 stop()
             except Exception as exc:
                 logger.warning("Error stopping auto backup: %s", exc)
+        auto_sync = getattr(self, "_auto_sync", None)
+        stop_sync = getattr(auto_sync, "stop", None)
+        if callable(stop_sync):
+            try:
+                stop_sync()
+            except Exception as exc:
+                logger.warning("Error stopping auto sync: %s", exc)
         for view in self._views.values():
             teardown = getattr(view, "on_hide", None)
             if callable(teardown):

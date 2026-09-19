@@ -10,7 +10,7 @@ from skyadmin_pro.ui.views.database_tasks.view import DatabaseTasksView, service
 def test_service_menu_panel_key_maps_tabs_with_combos():
     assert service_menu_panel_key("Clients & Expiry") == "clients"
     assert service_menu_panel_key("Company Details") == "company"
-    assert service_menu_panel_key("Service Pipeline") == "pipeline"
+    assert service_menu_panel_key("Service Pipeline") is None
 
 
 def test_service_menu_panel_key_ignores_tabs_without_service_combo():
@@ -27,26 +27,21 @@ def test_service_menu_panel_key_ignores_tabs_without_service_combo():
 
 def test_refresh_active_tab_only_hits_selected_panel(monkeypatch):
     view = DatabaseTasksView.__new__(DatabaseTasksView)
-    view.tasks_panel = MagicMock()
-    view.courier_panel = MagicMock()
     view.clients_panel = MagicMock()
-    view.month_panel = MagicMock()
     view.company_panel = MagicMock()
     view.renewals_panel = MagicMock()
-    view.pipeline_panel = MagicMock()
-    view.suppliers_panel = MagicMock()
     monkeypatch.setattr(view, "_refresh_service_menus", lambda _tab: None)
 
-    view.refresh_active_tab("Courier Tracker")
-    view.courier_panel.refresh.assert_called_once()
-    view.tasks_panel.refresh.assert_not_called()
-    view.suppliers_panel.refresh.assert_not_called()
+    view.refresh_active_tab("Clients & Expiry")
+    view.clients_panel.refresh.assert_called_once()
+    view.company_panel.refresh.assert_not_called()
+    view.renewals_panel.refresh.assert_not_called()
 
-    view.courier_panel.reset_mock()
-    view.suppliers_panel.reset_mock()
-    view.refresh_active_tab("Suppliers & AP")
-    view.suppliers_panel.refresh.assert_called_once()
-    view.courier_panel.refresh.assert_not_called()
+    view.clients_panel.reset_mock()
+    view.renewals_panel.reset_mock()
+    view.refresh_active_tab("Renewals")
+    view.renewals_panel.refresh.assert_called_once()
+    view.clients_panel.refresh.assert_not_called()
 
 
 def test_suppliers_panel_refreshes_only_active_subtab():

@@ -43,7 +43,7 @@ class DashboardMixinB:
                    d.payment_date, d.progress, d.paid, c.name AS client_name
             FROM documents d
             LEFT JOIN clients c ON c.id = d.client_id
-            WHERE d.client_id IS NOT NULL
+            WHERE d.deleted_at IS NULL AND d.client_id IS NOT NULL
               AND c.deleted_at IS NULL AND COALESCE(c.status, 'active') != 'inactive'
               AND d.payment_date IS NOT NULL AND trim(d.payment_date) != ''
               AND date(d.payment_date) < date('now', 'localtime')
@@ -66,6 +66,7 @@ class DashboardMixinB:
             """
             SELECT file_name FROM documents
             WHERE client_id = ? AND document_type = 'Invoice' AND file_name LIKE ?
+              AND deleted_at IS NULL
             """,
             (client_id, f"{month_key}%"),
         )

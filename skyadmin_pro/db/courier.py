@@ -4,6 +4,8 @@ from __future__ import annotations
 
 from typing import TYPE_CHECKING
 
+from skyadmin_pro.db.soft_delete import soft_delete_by_id
+
 if TYPE_CHECKING:
     from skyadmin_pro.db.core import CoreMixin
 
@@ -51,6 +53,7 @@ class CourierMixin:
             FROM courier_logs cl
             LEFT JOIN clients c ON c.id = cl.client_id
             LEFT JOIN tasks t ON t.id = cl.task_id
+            WHERE cl.deleted_at IS NULL
             ORDER BY cl.date_sent DESC, cl.id DESC
             """
         if limit is not None and int(limit) > 0:
@@ -59,8 +62,4 @@ class CourierMixin:
 
     def delete_courier_log(self: CoreMixin, log_id: int) -> None:
         with self.connection() as conn:
-            conn.execute("DELETE FROM courier_logs WHERE id = ?", (log_id,))
-
-    # ------------------------------------------------------------------ #
-    # 9-step client-to-supplier pipeline
-    # ------------------------------------------------------------------ #
+            soft_delete_by_id(conn, "courier_logs", log_id, self._now())

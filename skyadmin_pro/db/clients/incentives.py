@@ -26,6 +26,7 @@ class IncentivesMixin:
             LEFT JOIN clients c ON c.id = d.client_id
             WHERE d.payment_date IS NOT NULL
               AND d.payment_date LIKE ?
+              AND d.deleted_at IS NULL
               AND {doc_clause}
             """
             doc_params = [prefix, *doc_params]
@@ -39,7 +40,7 @@ class IncentivesMixin:
                c.name AS client_name
         FROM pipeline_items p
         LEFT JOIN clients c ON c.id = p.client_id
-        WHERE p.created_at LIKE ?
+        WHERE p.created_at LIKE ? AND p.deleted_at IS NULL
         """
 
         sql = f"{doc_sql} UNION ALL {pipe_sql} ORDER BY service_date ASC"

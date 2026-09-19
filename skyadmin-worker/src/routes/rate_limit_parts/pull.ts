@@ -13,6 +13,9 @@ export function pullRateLimit(): void {
         bind: (..._args: unknown[]) => ({
           first: async () => {
             if (sql.includes("rate_limits")) return { count: 31 };
+            if (sql.toLowerCase().includes("from issued_licenses")) {
+              return { org_id: `m:${mid}`, sync_enabled: 1, web_enabled: 0, drive_files_enabled: 0 };
+            }
             if (sql.includes("SELECT machine_id, token_hash, expires_at")) {
               const future = new Date(Date.now() + 30 * 86400000).toISOString().slice(0, 19);
               return { machine_id: mid, token_hash: tokenHash, expires_at: future };

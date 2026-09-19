@@ -165,12 +165,16 @@ class TestDeleteClientsCommand:
         mgr.undo()
         assert db.get_client(cid)["name"] == "Doomed Co"
         with db.connection() as conn:
-            docs = conn.execute("SELECT client_id FROM documents WHERE client_id = ?", (cid,)).fetchall()
-            linked = conn.execute(
-                "SELECT client_id FROM tasks WHERE client_id = ? AND title = 'Linked task'", (cid,)
+            docs = conn.execute(
+                "SELECT client_id, deleted_at FROM documents WHERE client_id = ?",
+                (cid,),
             ).fetchall()
-        assert len(docs) == 1
-        assert len(linked) == 1
+            linked = conn.execute(
+                "SELECT client_id, deleted_at FROM tasks" " WHERE client_id = ? AND title = 'Linked task'",
+                (cid,),
+            ).fetchall()
+        assert len(docs) == 1 and docs[0]["deleted_at"] is None
+        assert len(linked) == 1 and linked[0]["deleted_at"] is None
 
     def test_ids_never_collide_after_undo(self, db):
         cid = db.get_or_create_client("Collision Co")
@@ -185,12 +189,17 @@ class TestDeleteClientsCommand:
         cid = db.get_or_create_client("Reused Co")
         mgr = UndoManager()
         mgr.execute(DeleteClientsCommand(db, [cid]))
-        # Name reused after delete → clean undo must refuse but stay armed.
+        # Free the tombstone name so a live squatter can take it.
+        with db.connection() as conn:
+            conn.execute(
+                "UPDATE clients SET name = ? WHERE id = ?",
+                ("Reused Co__tomb", cid),
+            )
         db.get_or_create_client("Reused Co")
         with pytest.raises(UndoConflictError):
             mgr.undo()
         assert mgr.can_undo()
-        # Forced undo overwrites the squatter.
+        # Forced undo renames the squatter and restores the original.
         mgr.undo(force=True)
         assert db.get_client(cid)["name"] == "Reused Co"
 

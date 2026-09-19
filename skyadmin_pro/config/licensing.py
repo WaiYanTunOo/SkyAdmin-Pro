@@ -181,11 +181,20 @@ MOBILE_VIEWER_URL = f"{API_BASE_URL.rstrip('/')}/viewer" if API_BASE_URL else ""
 SETTING_SYNC_LAST_PULL = "sync_last_pull_at"
 SETTING_SYNC_LAST_PUSH = "sync_last_push_at"
 SETTING_DATA_SYNC_ENABLED = "data_sync_enabled"
+# Auto sync: off | 15 | 30 | 60 (seconds). Default 30.
+SETTING_SYNC_AUTO_INTERVAL = "sync_auto_interval"
 
 # Wave E — Mobile Vault (salt/verifier/key local only; never sync passphrase)
 SETTING_MOBILE_VAULT_SALT = "mobile_vault_salt"
 SETTING_MOBILE_VAULT_VERIFIER = "mobile_vault_verifier"
 SETTING_MOBILE_VAULT_KEY = "mobile_vault_key_blob"
+
+# Plane B — customer Google Drive (see services/drive)
+SETTING_DRIVE_FILES_ENABLED = "drive_files_enabled"
+SETTING_LICENSE_DRIVE_FILES = "license_drive_files"
+SETTING_LICENSE_SYNC = "license_sync"
+SETTING_LICENSE_WEB = "license_web"
+SETTING_LICENSE_MAX_DEVICES = "license_max_devices"
 
 # ---------------------------------------------------------------------------
 # Pricing tiers (activation dialog)

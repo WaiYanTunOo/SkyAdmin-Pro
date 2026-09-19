@@ -85,8 +85,8 @@ export async function purgeStaleRateLimits(db: D1Database): Promise<void> {
  * Per-IP guard for mutating routes. Returns a 429 response when over limit,
  * or null when the request may proceed.
  */
-export async function checkRateLimit(
-  c: Context<{ Bindings: Env }>,
+export async function checkRateLimit<E extends { Bindings: Env }>(
+  c: Context<E>,
   name: string,
   opts: RateLimitOpts = {},
   message = "Too many requests — try again shortly.",

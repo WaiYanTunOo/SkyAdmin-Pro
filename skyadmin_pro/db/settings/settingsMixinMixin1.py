@@ -15,11 +15,21 @@ class SettingsMixinMixin1:
             return []
         lim = max(1, min(int(limit), 500))
         table = (table_name or "").strip()
+        select_cols = (
+            "id, table_name, global_id, direction, local_updated_at, remote_updated_at, "
+            "logged_at, hlc_winner, hlc_loser, actor_winner, actor_loser, org_id"
+        )
         with self.connection() as conn:
+            cols = {row[1] for row in conn.execute("PRAGMA table_info(sync_conflicts)").fetchall()}
+            if not {"actor_winner", "actor_loser", "org_id"} <= cols:
+                select_cols = (
+                    "id, table_name, global_id, direction, local_updated_at, "
+                    "remote_updated_at, logged_at, hlc_winner, hlc_loser"
+                )
             if table:
                 rows = conn.execute(
-                    """
-                    SELECT id, table_name, global_id, direction, local_updated_at, remote_updated_at, logged_at
+                    f"""
+                    SELECT {select_cols}
                     FROM sync_conflicts
                     WHERE table_name = ?
                     ORDER BY logged_at DESC, id DESC
@@ -29,8 +39,8 @@ class SettingsMixinMixin1:
                 ).fetchall()
             else:
                 rows = conn.execute(
-                    """
-                    SELECT id, table_name, global_id, direction, local_updated_at, remote_updated_at, logged_at
+                    f"""
+                    SELECT {select_cols}
                     FROM sync_conflicts
                     ORDER BY logged_at DESC, id DESC
                     LIMIT ?

@@ -15,10 +15,10 @@ def fills_vertically(widget) -> bool:
 
 
 def rows_height(widget, *, row_count: int, empty: bool, showheight: int, visible_rows: int) -> int:
-    """Empty stays 1; fill panels grow with viewport (or raised cap); embed keeps 20."""
-    if empty:
-        return 1
+    """Empty fill panels keep showheight; embed empty stays 1; fill grows with viewport."""
     floor = max(1, int(showheight))
+    if empty:
+        return floor if fills_vertically(widget) else 1
     n = max(1, int(row_count))
     if not fills_vertically(widget):
         return min(_EMBED_CAP, max(1, n))

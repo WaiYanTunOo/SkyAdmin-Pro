@@ -51,7 +51,30 @@ describe("D1 migrations", () => {
     expect(sql).not.toMatch(/DROP TABLE/);
   });
 
-  it("migration files form a contiguous 0001-0007 chain", () => {
+  it("0008 rebuilds sync_rows with org_id unique key", () => {
+    const sql = readFileSync(join(migrationsDir, "0008_org_scoped_sync.sql"), "utf8");
+    expect(sql).toMatch(/ALTER TABLE issued_licenses ADD COLUMN org_id/);
+    expect(sql).toMatch(/ALTER TABLE sync_devices ADD COLUMN org_id/);
+    expect(sql).toMatch(/UNIQUE\(org_id, table_name, global_id\)/);
+    expect(sql).toMatch(/DROP TABLE sync_rows/);
+    expect(sql).toMatch(/'m:' \|\| UPPER\(machine_id\)/);
+  });
+
+  it("0009 adds web_enabled and drive_files_enabled", () => {
+    const sql = readFileSync(join(migrationsDir, "0009_sku_entitlements.sql"), "utf8");
+    expect(sql).toMatch(/ADD COLUMN web_enabled/);
+    expect(sql).toMatch(/ADD COLUMN drive_files_enabled/);
+    expect(sql).not.toMatch(/DROP TABLE/);
+  });
+
+  it("0010 adds max_devices with fail-closed default 1", () => {
+    const sql = readFileSync(join(migrationsDir, "0010_max_devices.sql"), "utf8");
+    expect(sql).toMatch(/ADD COLUMN max_devices/);
+    expect(sql).toMatch(/DEFAULT 1/);
+    expect(sql).not.toMatch(/DROP TABLE/);
+  });
+
+  it("migration files form a contiguous 0001-0010 chain", () => {
     expect(migrationFiles()).toEqual([
       "0001_initial.sql",
       "0002_sync_devices_expires_at.sql",
@@ -60,10 +83,13 @@ describe("D1 migrations", () => {
       "0005_sync_devices_expires_backfill.sql",
       "0006_sync_rows_hlc.sql",
       "0007_drop_redundant_sync_devices_index.sql",
+      "0008_org_scoped_sync.sql",
+      "0009_sku_entitlements.sql",
+      "0010_max_devices.sql",
     ]);
   });
 
-  it("applies the full 0001-0006 chain on a real SQLite DB when sqlite3 is available", () => {
+  it("applies the full 0001-0010 chain on a real SQLite DB when sqlite3 is available", () => {
     let sqlite3 = "sqlite3";
     try {
       execFileSync(sqlite3, ["-version"], { stdio: "pipe" });
@@ -94,6 +120,17 @@ describe("D1 migrations", () => {
         { encoding: "utf8" },
       );
       expect(syncRows).toMatch(/hlc/);
+      expect(syncRows).toMatch(/org_id/);
+      const licenses = execFileSync(
+        sqlite3,
+        [dbPath, "PRAGMA table_info(issued_licenses);"],
+        { encoding: "utf8" },
+      );
+      expect(licenses).toMatch(/org_id/);
+      expect(licenses).toMatch(/sync_enabled/);
+      expect(licenses).toMatch(/web_enabled/);
+      expect(licenses).toMatch(/drive_files_enabled/);
+      expect(licenses).toMatch(/max_devices/);
     } finally {
       rmSync(dir, { recursive: true, force: true });
     }

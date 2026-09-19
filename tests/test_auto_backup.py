@@ -90,6 +90,18 @@ class TestRetentionMessaging:
     def test_auto_backups_dir(self, tmp_path):
         assert auto_backups_dir(tmp_path) == tmp_path / "AutoBackups"
 
+    def test_auto_backups_dir_override(self, tmp_path):
+        dest = tmp_path / "DriveBackups"
+        dest.mkdir()
+        db = _FakeDb()
+        db.set_setting("backup_destination", str(dest))
+        assert auto_backups_dir(tmp_path, db) == dest.resolve()
+
+    def test_auto_backups_dir_invalid_override_falls_back(self, tmp_path):
+        db = _FakeDb()
+        db.set_setting("backup_destination", str(tmp_path / "missing"))
+        assert auto_backups_dir(tmp_path, db) == tmp_path / "AutoBackups"
+
 
 class TestSchedulerNudge:
     def test_nudge_schedules_soon_check(self, tmp_path):

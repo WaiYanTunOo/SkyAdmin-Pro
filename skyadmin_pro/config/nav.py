@@ -10,6 +10,7 @@ NAV_COURIER = "courier"
 NAV_TAX_STATUS = "tax_status"
 NAV_PIPELINE = "pipeline"
 NAV_SUPPLIERS = "suppliers"
+NAV_ACCOUNTING = "accounting_setup"
 NAV_UTILITIES = "utilities"
 NAV_OFFICE_HUB = "office_hub"
 NAV_SETTINGS = "settings"
@@ -26,6 +27,7 @@ NAV_ITEMS: tuple[tuple[str, str], ...] = (
     (NAV_DATABASE_TASKS, "Companies"),
     (NAV_SUPPLIERS, "Suppliers & AP"),
     (NAV_TAX_STATUS, "Monthly Tax Status"),
+    (NAV_ACCOUNTING, "Accounting Setup"),
     (NAV_PIPELINE, "Service Pipeline"),
     (NAV_COURIER, "Courier Tracker"),
     (NAV_DOCUMENT_HUB, "Document Hub"),
@@ -42,7 +44,7 @@ NAV_GROUPS: tuple[tuple[str, str, tuple[str, ...]], ...] = (
     (NAV_DASHBOARD, "Dashboard", ()),
     (NAV_GROUP_DAILY, "Daily Work", (NAV_TASKS, NAV_PIPELINE, NAV_COURIER)),
     (NAV_DATABASE_TASKS, "Companies", ()),
-    (NAV_GROUP_FINANCE, "Finance", (NAV_SUPPLIERS, NAV_TAX_STATUS)),
+    (NAV_GROUP_FINANCE, "Finance", (NAV_SUPPLIERS, NAV_TAX_STATUS, NAV_ACCOUNTING)),
     (NAV_GROUP_OFFICE, "Office", (NAV_DOCUMENT_HUB, NAV_OFFICE_HUB, NAV_UTILITIES)),
     (NAV_SETTINGS, "Settings", ()),
 )

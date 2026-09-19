@@ -20,7 +20,7 @@ class OfficeMixinMixin4:
             FROM notebook_entries n
             LEFT JOIN clients c ON c.id = n.client_id
         """
-        conditions: list[str] = []
+        conditions: list[str] = ["n.deleted_at IS NULL"]
         params: list = []
         q = (query or "").strip()
         if q:
@@ -41,8 +41,7 @@ class OfficeMixinMixin4:
         if to_date:
             conditions.append("n.entry_date <= ?")
             params.append(to_date)
-        if conditions:
-            sql += " WHERE " + " AND ".join(conditions)
+        sql += " WHERE " + " AND ".join(conditions)
         sql += " ORDER BY n.is_pinned DESC, n.entry_date DESC, n.id DESC"
         return self._fetch_all(sql, tuple(params))
 
@@ -52,7 +51,7 @@ class OfficeMixinMixin4:
             SELECT n.*, c.name AS client_name
             FROM notebook_entries n
             LEFT JOIN clients c ON c.id = n.client_id
-            WHERE n.id = ?
+            WHERE n.id = ? AND n.deleted_at IS NULL
             """,
             (entry_id,),
         )

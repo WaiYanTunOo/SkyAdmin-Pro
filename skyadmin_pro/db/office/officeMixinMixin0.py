@@ -10,7 +10,7 @@ class OfficeMixinMixin0:
             FROM office_contacts oc
             LEFT JOIN clients c ON c.id = oc.client_id
         """
-        conditions: list[str] = []
+        conditions: list[str] = ["oc.deleted_at IS NULL"]
         params: list = []
         q = (query or "").strip()
         if q:
@@ -23,8 +23,7 @@ class OfficeMixinMixin0:
         if category:
             conditions.append("oc.category = ?")
             params.append(category)
-        if conditions:
-            sql += " WHERE " + " AND ".join(conditions)
+        sql += " WHERE " + " AND ".join(conditions)
         sql += " ORDER BY oc.is_favorite DESC, oc.name COLLATE NOCASE"
         return self._fetch_all(sql, tuple(params))
 
@@ -34,7 +33,7 @@ class OfficeMixinMixin0:
             SELECT oc.*, c.name AS client_name
             FROM office_contacts oc
             LEFT JOIN clients c ON c.id = oc.client_id
-            WHERE oc.id = ?
+            WHERE oc.id = ? AND oc.deleted_at IS NULL
             """,
             (contact_id,),
         )
@@ -98,5 +97,7 @@ class OfficeMixinMixin0:
             )
 
     def delete_office_contact(self, contact_id: int) -> None:
+        from skyadmin_pro.db.soft_delete import soft_delete_by_id
+
         with self.connection() as conn:
-            conn.execute("DELETE FROM office_contacts WHERE id = ?", (contact_id,))
+            soft_delete_by_id(conn, "office_contacts", contact_id, self._now())

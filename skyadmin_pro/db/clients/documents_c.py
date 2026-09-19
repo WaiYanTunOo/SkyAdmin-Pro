@@ -23,7 +23,7 @@ class DocumentsMixinC:
                    d.completed_at, d.created_at, c.name AS client_name
             FROM documents d
             LEFT JOIN clients c ON c.id = d.client_id
-            WHERE d.id = ?
+            WHERE d.id = ? AND d.deleted_at IS NULL
             """,
             (document_id,),
         )
@@ -37,7 +37,7 @@ class DocumentsMixinC:
                    d.completed_at, d.created_at, c.name AS client_name
             FROM documents d
             LEFT JOIN clients c ON c.id = d.client_id
-            WHERE d.client_id = ? AND {clause}
+            WHERE d.client_id = ? AND d.deleted_at IS NULL AND {clause}
             ORDER BY d.expiry_date IS NULL, d.expiry_date, d.id DESC
             """,
             (client_id, *params),

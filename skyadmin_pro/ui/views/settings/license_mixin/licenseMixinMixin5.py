@@ -6,16 +6,24 @@ from skyadmin_pro.ui.theme import TEXT_MUTED
 
 
 class LicenseMixinMixin5:
-    def _on_data_sync_toggle(self) -> None:
-        from skyadmin_pro.config import SETTING_DATA_SYNC_ENABLED
+    def _on_sync_auto_interval(self) -> None:
+        from skyadmin_pro.config import SETTING_SYNC_AUTO_INTERVAL
+        from skyadmin_pro.services.data_sync import normalize_sync_auto_interval
 
-        enabled = bool(self.data_sync_var.get())
-        self.app.db.set_setting(SETTING_DATA_SYNC_ENABLED, "1" if enabled else "0")
-        self._refresh_license_label()
-        if enabled:
-            self.feedback.info("Cloud data sync enabled for this licensed PC only.")
-        else:
-            self.feedback.info("Cloud data sync disabled — use encrypted backup for a second PC.")
+        value = normalize_sync_auto_interval(self._sync_auto_interval_var.get())
+        self._sync_auto_interval_var.set(value)
+        self.app.db.set_setting(SETTING_SYNC_AUTO_INTERVAL, value)
+        self._nudge_auto_sync()
+        self.app.set_status(f"Auto sync interval: {value}")
+
+    def _nudge_auto_sync(self) -> None:
+        scheduler = getattr(self.app, "_auto_sync", None)
+        nudge = getattr(scheduler, "nudge", None)
+        if callable(nudge):
+            try:
+                nudge()
+            except Exception:
+                pass
 
     def _sync_now(self) -> None:
         from skyadmin_pro.services.data_sync import sync_data
@@ -62,8 +70,6 @@ class LicenseMixinMixin5:
         )
 
     def _show_license(self) -> None:
-        # Read from the app itself (embedded) so it always works in the
-        # packaged exe; fall back to the shipped LICENSE file if present.
         from skyadmin_pro.config import LEGAL_LICENSE_TEXT
 
         self._show_legal("License Agreement", LEGAL_LICENSE_TEXT)

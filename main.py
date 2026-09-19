@@ -297,10 +297,23 @@ def bootstrap() -> MainWindow:
     apply_high_dpi_scaling()
 
     saved_zoom = db.get_setting("ui_zoom")
+    if not saved_zoom:
+        try:
+            from skyadmin_pro.ui.display import suggested_zoom_for_screen
+
+            sw = sh = 1920
+            if sys.platform == "win32":
+                import ctypes
+
+                sw = int(ctypes.windll.user32.GetSystemMetrics(0))
+                sh = int(ctypes.windll.user32.GetSystemMetrics(1))
+            saved_zoom = suggested_zoom_for_screen(sw, sh)
+        except Exception:
+            saved_zoom = "100%"
     if saved_zoom:
         try:
-            scale = int(saved_zoom.replace("%", "")) / 100.0
-            ctk.set_widget_scaling(scale)
+            scale = int(str(saved_zoom).replace("%", "")) / 100.0
+            ctk.set_widget_scaling(max(0.5, min(2.0, scale)))
         except Exception:
             pass
 

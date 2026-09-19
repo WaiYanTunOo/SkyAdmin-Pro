@@ -72,7 +72,7 @@ class BackupMixinMixin2:
     def _BackupMixin_restore_encrypted_p1(self):
         from skyadmin_pro.services.auto_backup import auto_backups_dir
 
-        auto_dir = auto_backups_dir(self.app.paths.root)
+        auto_dir = auto_backups_dir(self.app.paths.root, self.app.db)
         initial = str(auto_dir) if auto_dir.is_dir() else None
         src = filedialog.askopenfilename(
             parent=self.winfo_toplevel(),

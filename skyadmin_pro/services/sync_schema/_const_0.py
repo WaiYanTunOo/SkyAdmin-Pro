@@ -1,3 +1,3 @@
 from __future__ import annotations
 
-SYNC_SCHEMA_VERSION = 4
+SYNC_SCHEMA_VERSION = 7

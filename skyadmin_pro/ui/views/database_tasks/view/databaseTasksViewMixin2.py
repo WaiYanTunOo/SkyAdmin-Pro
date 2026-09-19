@@ -10,7 +10,6 @@ from skyadmin_pro.ui.views.company_details.panel import (
 from ._const_2 import TAB_CLIENTS
 from ._const_4 import TAB_COMPANY
 from ._const_5 import TAB_RENEWALS
-from ._const_9 import TAB_ACCOUNTING
 from .funcs import service_menu_panel_key
 
 
@@ -42,9 +41,11 @@ class DatabaseTasksViewMixin2:
         self.refresh_active_tab(TAB_COMPANY)
 
     def open_accounting_setup(self) -> None:
-        self._ensure_panel(TAB_ACCOUNTING)
-        self.tabs.set(TAB_ACCOUNTING)
-        self.refresh_active_tab(TAB_ACCOUNTING)
+        from skyadmin_pro.config import NAV_ACCOUNTING
+
+        from .funcs import open_menu_view
+
+        open_menu_view(self.app, NAV_ACCOUNTING, "on_show")
 
     def open_vo_csh_setup(self) -> None:
         self.tabs.set(TAB_COMPANY)
@@ -89,7 +90,7 @@ class DatabaseTasksViewMixin2:
         """Update service-type combobox values on constructed panels.
 
         When *tab_name* is given only the panel owning that tab's combo is
-        refreshed.  When ``None`` all three known panels are refreshed.
+        refreshed.  When ``None`` both known Companies panels are refreshed.
         """
         types = self.app.db.list_service_types()
         if tab_name is not None:
@@ -98,7 +99,7 @@ class DatabaseTasksViewMixin2:
                 return
             panels = [panel_key]
         else:
-            panels = ["clients", "company", "pipeline"]
+            panels = ["clients", "company"]
         for key in panels:
             if key == "clients" and self.clients_panel is not None:
                 combo = self.clients_panel.expiry_type
@@ -111,8 +112,3 @@ class DatabaseTasksViewMixin2:
                     combo.configure(values=types)
                     if combo.get() not in types:
                         combo.set(types[0] if types else "")
-            elif key == "pipeline" and self.pipeline_panel is not None:
-                combo = self.pipeline_panel.pipe_service
-                combo.configure(values=types)
-                if combo.get() not in types:
-                    combo.set(types[0] if types else "")

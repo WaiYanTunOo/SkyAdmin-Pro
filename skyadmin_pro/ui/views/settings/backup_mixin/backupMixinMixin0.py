@@ -56,14 +56,16 @@ class BackupMixinMixin0:
             self.app.set_status("Auto-backup disabled")
 
     def _open_auto_backups_folder(self) -> None:
-        """Create AutoBackups/ if missing and open it for restore/browse."""
+        """Create backup folder if missing and open it for restore/browse."""
         from skyadmin_pro.services.auto_backup import auto_backups_dir
 
-        folder = auto_backups_dir(self.app.paths.root)
+        folder = auto_backups_dir(self.app.paths.root, self.app.db)
         try:
             folder.mkdir(parents=True, exist_ok=True)
         except OSError as exc:
-            self.feedback.error(f"Could not create AutoBackups folder: {exc}")
+            self.feedback.error(f"Could not create backup folder: {exc}")
             return
         self._open_path(folder)
-        self.app.set_status(f"Opened AutoBackups: {folder}")
+        self.app.set_status(f"Opened backup folder: {folder}")
+        if getattr(self, "_backup_dest_var", None) is not None:
+            self._backup_dest_var.set(str(folder))

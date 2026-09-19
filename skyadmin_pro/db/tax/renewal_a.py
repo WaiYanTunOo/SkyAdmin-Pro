@@ -41,7 +41,7 @@ class RenewalMixinA:
             """
             SELECT id, client_id, template_name, item, due_days, done, done_at
             FROM renewal_items
-            WHERE client_id = ? AND template_name = ?
+            WHERE client_id = ? AND template_name = ? AND deleted_at IS NULL
             ORDER BY due_days DESC, id ASC
             """,
             (client_id, template_name),
@@ -51,8 +51,8 @@ class RenewalMixinA:
         done_at = self._now() if done else None
         with self.connection() as conn:
             conn.execute(
-                "UPDATE renewal_items SET done = ?, done_at = ? WHERE id = ?",
-                (1 if done else 0, done_at, item_id),
+                "UPDATE renewal_items SET done = ?, done_at = ?, updated_at = ?" " WHERE id = ? AND deleted_at IS NULL",
+                (1 if done else 0, done_at, self._now(), item_id),
             )
 
     def renewal_checklist_progress(self, client_id: int, template_name: str = "Visa Renewal") -> tuple[int, int]:
@@ -61,7 +61,8 @@ class RenewalMixinA:
                 """
                 SELECT COUNT(*) AS total,
                        COALESCE(SUM(CASE WHEN done = 1 THEN 1 ELSE 0 END), 0) AS done
-                FROM renewal_items WHERE client_id = ? AND template_name = ?
+                FROM renewal_items
+                WHERE client_id = ? AND template_name = ? AND deleted_at IS NULL
                 """,
                 (client_id, template_name),
             ).fetchone()

@@ -25,16 +25,17 @@ def open_sync_conflicts_dialog(
         messagebox.showinfo(
             "Sync conflicts",
             "No sync conflicts logged.\n\n"
-            "Conflicts are recorded when the server has older data than your PC "
-            "(last-write-wins keeps your local copy).",
+            "Cross-device merges are recorded when two devices edit the same row "
+            "and last-write-wins (higher HLC) keeps one copy. "
+            "Open this dialog after sync to see winner/loser device nodes.",
             parent=parent.winfo_toplevel(),
         )
         return
 
     top = ctk.CTkToplevel(parent)
     top.title("SkyAdmin Pro — Sync conflicts")
-    top.geometry("920x560")
-    top.minsize(720, 420)
+    top.geometry("1100x560")
+    top.minsize(840, 420)
     make_modal(top)
     top.grid_columnconfigure(0, weight=1)
     top.grid_rowconfigure(2, weight=1)
@@ -52,7 +53,7 @@ def open_sync_conflicts_dialog(
         anchor="w",
         justify="left",
         text_color=TEXT_MUTED,
-        wraplength=700,
+        wraplength=900,
     )
     summary_lbl.grid(row=0, column=0, sticky="ew")
 

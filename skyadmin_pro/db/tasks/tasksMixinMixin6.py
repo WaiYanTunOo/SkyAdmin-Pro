@@ -65,7 +65,8 @@ class TasksMixinMixin6:
                 """
                 SELECT id, client_id, title_template, category
                 FROM recurring_tasks
-                WHERE last_generated IS NULL OR last_generated < date('now', 'start of month')
+                WHERE deleted_at IS NULL
+                  AND (last_generated IS NULL OR last_generated < date('now', 'start of month'))
                 """
             ).fetchall()
             created = 0

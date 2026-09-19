@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 from skyadmin_pro.config import GENERAL_RENEWAL_TEMPLATE_NAME, renewal_template_for
+from skyadmin_pro.db.soft_delete import soft_delete_by_fk, soft_delete_by_id, soft_delete_ids
 from skyadmin_pro.db.sql_helpers import _in_clause
 from skyadmin_pro.services.tracking import days_until, effective_expiry_date
 
@@ -14,7 +15,9 @@ class TasksMixinMixin4:
         Uses three bulk queries (items, services, clients) and groups in
         Python instead of querying per client.
         """
-        all_items = self._fetch_all("SELECT client_id, template_name, item, due_days, done FROM renewal_items")
+        all_items = self._fetch_all(
+            "SELECT client_id, template_name, item, due_days, done FROM renewal_items" " WHERE deleted_at IS NULL"
+        )
         if not all_items:
             return []
         service_types = tuple(self.list_service_types())
@@ -24,7 +27,8 @@ class TasksMixinMixin4:
             SELECT d.client_id, d.document_type, d.expiry_date, c.name AS client_name
             FROM documents d
             LEFT JOIN clients c ON c.id = d.client_id
-            WHERE d.client_id IS NOT NULL AND trim(d.expiry_date) != '' AND {clause}
+            WHERE d.deleted_at IS NULL AND d.client_id IS NOT NULL
+              AND trim(d.expiry_date) != '' AND {clause}
             """,
             tuple(params),
         )
@@ -73,16 +77,16 @@ class TasksMixinMixin4:
         return results
 
     def delete_document(self, document_id: int) -> None:
+        now = self._now()
         with self.connection() as conn:
             task_ids = [
-                row["task_id"]
+                int(row["task_id"])
                 for row in conn.execute(
-                    "SELECT task_id FROM service_renewals WHERE service_id = ? AND task_id IS NOT NULL",
+                    "SELECT task_id FROM service_renewals" " WHERE service_id = ? AND task_id IS NOT NULL",
                     (document_id,),
                 ).fetchall()
             ]
             if task_ids:
-                placeholders = ", ".join("?" for _ in task_ids)
-                conn.execute(f"DELETE FROM tasks WHERE id IN ({placeholders})", task_ids)
-            conn.execute("DELETE FROM tasks WHERE source_document_id = ?", (document_id,))
-            conn.execute("DELETE FROM documents WHERE id = ?", (document_id,))
+                soft_delete_ids(conn, "tasks", task_ids, now)
+            soft_delete_by_fk(conn, "tasks", "source_document_id", document_id, now)
+            soft_delete_by_id(conn, "documents", document_id, now)

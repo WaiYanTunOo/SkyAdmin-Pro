@@ -4,7 +4,7 @@ from tkinter import messagebox
 
 import customtkinter as ctk
 
-from skyadmin_pro.ui.theme import FORM_SIDEBAR_MIN_WIDTH, TEXT_MUTED
+from skyadmin_pro.ui.theme import TEXT_MUTED, form_sidebar_min_width
 from skyadmin_pro.ui.widgets import themed_entry
 
 
@@ -29,6 +29,16 @@ class TaskPanelMixin3:
         self.refresh()
         self.app.invalidate_dashboard()
 
+    def _apply_responsive_layout(self, *, form_sidebar_min: int, metrics=None) -> None:
+        self._form_sidebar_min = form_sidebar_min
+        self.grid_columnconfigure(1, weight=0, minsize=form_sidebar_min)
+        form = getattr(self, "_task_form", None)
+        if form is not None:
+            try:
+                form.configure(width=form_sidebar_min)
+            except Exception:
+                pass
+
     def _TaskPanel__init__p1(self, app, feedback):
         self.app = app
         self.feedback = feedback
@@ -37,8 +47,9 @@ class TaskPanelMixin3:
         self._page = 0
         self._page_size = 250
         self._has_more = False
+        self._form_sidebar_min = form_sidebar_min_width()
         self.grid_columnconfigure(0, weight=1)
-        self.grid_columnconfigure(1, weight=0, minsize=FORM_SIDEBAR_MIN_WIDTH)
+        self.grid_columnconfigure(1, weight=0, minsize=self._form_sidebar_min)
         self.grid_rowconfigure(1, weight=1)
 
         top = ctk.CTkFrame(self, fg_color="transparent")

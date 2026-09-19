@@ -1,6 +1,6 @@
 import { Context } from "hono";
-import { Env } from "../../db";
 import { checkRateLimit } from "../../rate_limit";
+import { SyncEnv } from "../../sync_auth";
 import {
   MAX_PUSH_CHANGES,
   fetchExistingUpdatedAt,
@@ -9,9 +9,10 @@ import {
   writePushBatch,
   type PushChange,
 } from "../../sync_push";
+import { resolveOrgId, soloOrgId } from "../../sync_org";
 
-/** POST /api/sync/push */
-export async function syncPushHandler(c: Context<{ Bindings: Env }>) {
+/** POST /api/sync/push — org-scoped HLC LWW merge. */
+export async function syncPushHandler(c: Context<SyncEnv>) {
   const machineId = (c.req.header("X-Machine-Id") || "").trim().toUpperCase();
   if (!machineId || !/^[A-Z0-9]{1,16}$/.test(machineId)) {
     return c.json({ ok: false, error: "Invalid machine ID format." }, 400);
@@ -35,19 +36,28 @@ export async function syncPushHandler(c: Context<{ Bindings: Env }>) {
   const { prepared, skipped: invalidSkipped, legacy } = preparePushChanges(changes);
   if (legacy > 0) {
     return c.json(
-      { ok: false, error: "upgrade-required", legacy, detail: "Sync protocol v1 is retired — update the desktop app." },
+      {
+        ok: false,
+        error: "upgrade-required",
+        legacy,
+        detail: "Sync protocol v1 is retired — update the desktop app.",
+      },
       400,
     );
   }
-  const existing = await fetchExistingUpdatedAt(c.env.DB, machineId, prepared);
+
+  const orgId = resolveOrgId(c.get("syncOrgId"), machineId)
+    || soloOrgId(machineId);
+  const existing = await fetchExistingUpdatedAt(c.env.DB, orgId, prepared);
   const partition = partitionPushChanges(prepared, existing);
-  await writePushBatch(c.env.DB, machineId, partition, existing);
+  await writePushBatch(c.env.DB, orgId, machineId, partition, existing);
 
   return c.json({
     ok: true,
     applied: partition.apply.length,
     skipped: invalidSkipped + partition.skipped,
     conflicts: partition.conflicts.length,
+    org_id: orgId,
     server_time: new Date().toISOString(),
   });
 }

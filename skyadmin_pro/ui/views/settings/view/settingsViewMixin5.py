@@ -52,6 +52,7 @@ class SettingsViewMixin5:
         scroll = self._scroll_tab(tab)
         row = 0
         row = self._build_data_tab_backup(scroll, row)
+        row = self._SettingsView_build_drive_card(scroll, row)
         row = self._build_data_tab_advanced(scroll, row)
 
     def _build_data_tab_backup(self, scroll, row: int) -> int:

@@ -29,6 +29,7 @@ import {
   viewerManifestHandler,
   viewerServiceWorkerHandler,
 } from "./routes/viewer";
+import { webSessionHandler } from "./routes/web";
 
 const app = new Hono<{ Bindings: Env }>();
 
@@ -66,6 +67,8 @@ app.use("/api/sync/register", async (c, next) => {
   await next();
 });
 app.post("/api/sync/register", syncRegisterHandler);
+
+app.post("/api/web/session", webSessionHandler);
 
 app.use("/api/sync/schema", syncAuthMiddleware);
 app.use("/api/sync/pull", syncAuthMiddleware);

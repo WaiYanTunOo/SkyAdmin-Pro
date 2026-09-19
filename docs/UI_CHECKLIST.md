@@ -1,18 +1,22 @@
 # SkyAdmin Pro — Windows UI checklist
 
-Manual QA after UI/theme changes. Test at **1100×700** (minimum) and **1920×1080**.
+Manual QA after UI/theme changes. Test at **1100×700** (minimum), **1920×1080**, **3840×2160 (4K)**, and **7680×4320 (8K)** when available.
 
 ## Appearance
 
 - [ ] **Dark** mode — all entries readable while typing
 - [ ] **Light** mode — same
 - [ ] Toggle theme in Settings — inputs and tables refresh without restart
+- [ ] Resize / maximize on **1080p**, **4K**, and **8K** — sidebar and form sidebars grow with the window; no off-screen geometry
+- [ ] Settings → UI Zoom includes **175%** / **200%** for large displays
 
 ## Navigation (each sidebar view)
 
 - [ ] Dashboard — stat cards wrap; onboard client field expands
+- [ ] Companies — Clients & Expiry, Company Details, Renewals (each tab fills the page; not a half-height scroll)
+- [ ] Daily Work — Tasks, Service Pipeline, Courier Tracker (sidebar pages, not Companies tabs)
+- [ ] Finance — Suppliers & AP, Monthly Tax Status, Accounting Setup
 - [ ] Document Hub — all tabs open
-- [ ] Database & Tasks — Tasks, Courier Tracker, Clients & Expiry, Monthly Tax Status, Company Details, Renewals, Service Pipeline, Suppliers & AP (each tab fills the page; Clients and Renewals are not a half-height scroll)
 - [ ] Office Hub — Contacts, Vault, Notebook search/fields
 - [ ] Utilities — translator subtitle wraps
 - [ ] Settings — license/sync row; activation fields

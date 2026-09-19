@@ -81,5 +81,7 @@ class OfficeMixinMixin3:
             )
 
     def delete_office_credential(self, entry_id: int) -> None:
+        from skyadmin_pro.db.soft_delete import soft_delete_by_id
+
         with self.connection() as conn:
-            conn.execute("DELETE FROM office_credentials WHERE id = ?", (entry_id,))
+            soft_delete_by_id(conn, "office_credentials", entry_id, self._now())

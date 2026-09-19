@@ -75,11 +75,13 @@ class DashboardViewMixin6:
         run_background(self, work=work, on_success=on_success, on_error=on_error)
 
     def _open_accounting_setup(self) -> None:
+        from skyadmin_pro.config import NAV_ACCOUNTING
+
         open_setup = getattr(self.app, "open_accounting_setup", None)
         if callable(open_setup):
             open_setup()
         else:
-            self.app.show_view(NAV_DATABASE_TASKS)
+            self.app.show_view(NAV_ACCOUNTING)
 
     def _open_vo_csh_setup(self) -> None:
         open_setup = getattr(self.app, "open_vo_csh_setup", None)

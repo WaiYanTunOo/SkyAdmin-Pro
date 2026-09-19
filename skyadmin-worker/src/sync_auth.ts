@@ -13,10 +13,19 @@
 import { Context, Next } from "hono";
 import { Env } from "./db";
 import { withSyncDevicesExpiresAt } from "./sync_devices_schema";
+import { resolveOrgId } from "./sync_org";
+import { requireSyncEnabled } from "./sku_entitlements";
 import { timingSafeEqual } from "./timing_safe";
 
 export type SyncContext = {
   syncMachineId: string;
+  syncOrgId: string;
+};
+
+/** Hono env for sync-auth middleware + pull/push handlers. */
+export type SyncEnv = {
+  Bindings: Env;
+  Variables: SyncContext;
 };
 
 /** Sync tokens expire after 30 days of inactivity. */
@@ -31,7 +40,37 @@ export async function hashSyncToken(token: string): Promise<string> {
     .join("");
 }
 
-export async function syncAuthMiddleware(c: Context<{ Bindings: Env }>, next: Next) {
+type DeviceRow = {
+  machine_id: string;
+  token_hash: string;
+  expires_at: string | null;
+  org_id?: string | null;
+};
+
+async function lookupSyncDevice(
+  db: D1Database,
+  machineId: string,
+): Promise<DeviceRow | null> {
+  try {
+    return await db
+      .prepare(
+        "SELECT machine_id, token_hash, expires_at, org_id FROM sync_devices WHERE machine_id = ?",
+      )
+      .bind(machineId)
+      .first<DeviceRow>();
+  } catch (err) {
+    const msg = String(err instanceof Error ? err.message : err).toLowerCase();
+    if (!(msg.includes("no such column") && msg.includes("org_id"))) throw err;
+    return await db
+      .prepare(
+        "SELECT machine_id, token_hash, expires_at FROM sync_devices WHERE machine_id = ?",
+      )
+      .bind(machineId)
+      .first<DeviceRow>();
+  }
+}
+
+export async function syncAuthMiddleware(c: Context<SyncEnv>, next: Next) {
   const machineId = (c.req.header("X-Machine-Id") || "").trim().toUpperCase();
   const auth = c.req.header("Authorization") || "";
   const match = auth.match(/^Bearer\s+(.+)$/i);
@@ -44,18 +83,11 @@ export async function syncAuthMiddleware(c: Context<{ Bindings: Env }>, next: Ne
   }
 
   const result = await withSyncDevicesExpiresAt(c.env.DB, async () => {
-    // Look up by machine_id only — token is never stored in plaintext.
-    const row = await c.env.DB.prepare(
-      "SELECT machine_id, token_hash, expires_at FROM sync_devices WHERE machine_id = ?",
-    )
-      .bind(machineId)
-      .first<{ machine_id: string; token_hash: string; expires_at: string | null }>();
-
+    const row = await lookupSyncDevice(c.env.DB, machineId);
     if (!row || !row.token_hash) {
       return { ok: false as const, error: "Invalid sync credentials." };
     }
 
-    // Verify the provided token against the stored hash.
     let tokenHash: string;
     try {
       tokenHash = await hashSyncToken(token);
@@ -66,7 +98,6 @@ export async function syncAuthMiddleware(c: Context<{ Bindings: Env }>, next: Ne
       return { ok: false as const, error: "Invalid sync credentials." };
     }
 
-    // Fail closed: missing TTL is treated as expired (legacy null rows).
     if (!row.expires_at) {
       return { ok: false as const, error: "Sync token expired. Please re-register." };
     }
@@ -84,13 +115,23 @@ export async function syncAuthMiddleware(c: Context<{ Bindings: Env }>, next: Ne
       .bind(newExpiry, machineId)
       .run();
 
-    return { ok: true as const };
+    return {
+      ok: true as const,
+      orgId: resolveOrgId(row.org_id, machineId),
+    };
   });
 
   if (!result.ok) {
     return c.json({ ok: false, error: result.error }, 401);
   }
 
+  const syncOk = await requireSyncEnabled(c.env.DB, machineId);
+  if (!syncOk.ok) {
+    return c.json({ ok: false, error: syncOk.error }, 403);
+  }
+
+  c.set("syncMachineId", machineId);
+  c.set("syncOrgId", result.orgId);
   await next();
 }
 

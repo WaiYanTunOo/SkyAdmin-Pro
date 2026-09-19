@@ -46,8 +46,10 @@ class OfficeMixinMixin2:
             )
 
     def delete_client_credential(self, entry_id: int) -> None:
+        from skyadmin_pro.db.soft_delete import soft_delete_by_id
+
         with self.connection() as conn:
-            conn.execute("DELETE FROM client_credentials WHERE id = ?", (entry_id,))
+            soft_delete_by_id(conn, "client_credentials", entry_id, self._now())
 
     def list_office_credentials(self, *, query: str = "", system_type: str | None = None) -> list[dict]:
         from skyadmin_pro.services.vault import prepare_office_credential_row
@@ -57,7 +59,7 @@ class OfficeMixinMixin2:
             FROM office_credentials oc
             LEFT JOIN office_contacts c ON c.id = oc.contact_id
         """
-        conditions: list[str] = []
+        conditions: list[str] = ["oc.deleted_at IS NULL"]
         params: list = []
         q = (query or "").strip()
         if q:
@@ -70,8 +72,7 @@ class OfficeMixinMixin2:
         if system_type:
             conditions.append("oc.system_type = ?")
             params.append(system_type)
-        if conditions:
-            sql += " WHERE " + " AND ".join(conditions)
+        sql += " WHERE " + " AND ".join(conditions)
         sql += " ORDER BY oc.is_favorite DESC, oc.account_label COLLATE NOCASE"
         return [prepare_office_credential_row(row) for row in self._fetch_all(sql, tuple(params))]
 
@@ -83,7 +84,7 @@ class OfficeMixinMixin2:
             SELECT oc.*, c.name AS contact_name
             FROM office_credentials oc
             LEFT JOIN office_contacts c ON c.id = oc.contact_id
-            WHERE oc.id = ?
+            WHERE oc.id = ? AND oc.deleted_at IS NULL
             """,
             (entry_id,),
         )

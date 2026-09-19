@@ -4,7 +4,6 @@ from tkinter import filedialog, messagebox
 
 from skyadmin_pro.services.export import default_export_name, export_to_excel
 
-from ._const_0 import TAB_TASKS
 from ._const_2 import TAB_CLIENTS
 from ._const_4 import TAB_COMPANY
 
@@ -92,9 +91,6 @@ class DatabaseTasksViewMixin3:
         except Exception:
             return False
         self._ensure_panel(tab)
-        if tab == TAB_TASKS and self.tasks_panel is not None:
-            self.tasks_panel._save()
-            return True
         if tab == TAB_COMPANY and self.company_panel is not None:
             return bool(self.company_panel._on_shortcut_save())
         return False

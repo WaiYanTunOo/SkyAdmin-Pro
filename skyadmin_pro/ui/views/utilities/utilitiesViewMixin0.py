@@ -14,7 +14,7 @@ from ._const_0 import _SECTION_TITLES
 
 class UtilitiesViewMixin0:
     title = "Utilities"
-    subtitle = "Copy a message, then translate if needed. Not for editing UI language (see Settings)."
+    subtitle = "Copy a ready message, then translate if needed. Suppliers & AP is under Finance — not here."
 
     def build(self) -> None:
         actions, translator = self._UtilitiesView_build_p1()

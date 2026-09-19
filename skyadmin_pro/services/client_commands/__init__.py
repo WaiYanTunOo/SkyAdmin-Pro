@@ -1,10 +1,15 @@
 """Client undo commands — exact single-level revert for add/edit/status/delete.
 
+
+
 Snapshots are taken in do() before mutating, so undo() restores the exact
-prior state. Delete uses a generic dependent-row snapshot (every table with
-a client_id column): SET NULL links are re-pointed, CASCADE-deleted rows are
-re-inserted with their original ids, and sqlite_sequence watermarks are
-repaired so future inserts never collide.
+
+prior state. Delete soft-tombstones the client and synced children under one
+
+``deleted_at`` stamp; undo clears matching tombstones (force renames any live
+
+name squatter first).
+
 """
 
 from __future__ import annotations

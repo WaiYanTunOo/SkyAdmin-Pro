@@ -22,6 +22,8 @@ from .settingsViewMixin9 import SettingsViewMixin9
 from .settingsViewMixin10 import SettingsViewMixin10
 from .settingsViewMixin11 import SettingsViewMixin11
 from .settingsViewMixin12 import SettingsViewMixin12
+from .settingsViewMixin13 import SettingsViewMixin13
+from .settingsViewMixin14 import SettingsViewMixin14
 
 
 class SettingsView(
@@ -38,6 +40,8 @@ class SettingsView(
     SettingsViewMixin10,
     SettingsViewMixin11,
     SettingsViewMixin12,
+    SettingsViewMixin13,
+    SettingsViewMixin14,
     BackupMixin,
     ChecklistMixin,
     LicenseMixin,

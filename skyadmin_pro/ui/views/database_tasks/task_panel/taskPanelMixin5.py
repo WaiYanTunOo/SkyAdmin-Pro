@@ -3,7 +3,7 @@ from __future__ import annotations
 import customtkinter as ctk
 
 from skyadmin_pro.config import TASK_CATEGORIES
-from skyadmin_pro.ui.theme import CARD_TITLE_SIZE, FORM_ROW_GAP, FORM_SIDEBAR_MIN_WIDTH, TEXT_MUTED
+from skyadmin_pro.ui.theme import CARD_TITLE_SIZE, FORM_ROW_GAP, TEXT_MUTED, form_sidebar_min_width
 from skyadmin_pro.ui.widgets import FormField, themed_scrollable_frame
 
 from ._const_0 import FORM_PADX
@@ -29,7 +29,9 @@ class TaskPanelMixin5:
         self.page_size_menu.set("250")
         self.page_size_menu.pack(side="right")
 
-        form = themed_scrollable_frame(self, corner_radius=12, width=FORM_SIDEBAR_MIN_WIDTH)
+        form_w = getattr(self, "_form_sidebar_min", form_sidebar_min_width())
+        form = themed_scrollable_frame(self, corner_radius=12, width=form_w)
+        self._task_form = form
         form.grid(row=1, column=1, sticky="nsew")
         form.grid_columnconfigure(0, weight=1)
 

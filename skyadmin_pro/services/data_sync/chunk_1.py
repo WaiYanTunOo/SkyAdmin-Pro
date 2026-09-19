@@ -3,9 +3,10 @@ from __future__ import annotations
 from ._common import *
 from ._common import get_machine_id, live_api_base_url
 from .chunk_0 import _license_code, load_sync_credentials, save_sync_credentials
+from .device_limit import format_register_http_error
 
 
-def register_sync_device(timeout: float = 10.0) -> tuple[bool, str]:
+def register_sync_device(timeout: float = 10.0, db=None) -> tuple[bool, str]:
     """Exchange the active license for a device-scoped sync token.
 
     Re-registering always rotates the token on the Worker (license renewal hygiene).
@@ -32,9 +33,10 @@ def register_sync_device(timeout: float = 10.0) -> tuple[bool, str]:
         try:
             body = exc.read().decode("utf-8", errors="replace")
             data = json.loads(body)
-            return (False, str(data.get("error") or f"HTTP {exc.code}"))
+            err = str(data.get("error") or "")
+            return (False, format_register_http_error(exc.code, err))
         except (json.JSONDecodeError, ValueError, UnicodeDecodeError):
-            return (False, f"Sync registration failed (HTTP {exc.code}).")
+            return (False, format_register_http_error(exc.code, ""))
     except (OSError, ValueError) as exc:
         return (False, f"Sync registration failed: {exc}")
     if not isinstance(data, dict) or not data.get("ok"):
@@ -44,21 +46,29 @@ def register_sync_device(timeout: float = 10.0) -> tuple[bool, str]:
     if not token:
         return (False, "Server did not return a sync token.")
     save_sync_credentials(mid, token)
+    if db is not None:
+        from .entitlements import apply_sku_flags_from_response
+
+        apply_sku_flags_from_response(db, data)
     return (True, "Sync credentials registered.")
 
 
-def rotate_sync_credentials_after_license_change(timeout: float = 10.0) -> tuple[bool, str]:
+def rotate_sync_credentials_after_license_change(timeout: float = 10.0, db=None) -> tuple[bool, str]:
     """Rotate the device sync token after license renewal or replacement."""
     if load_sync_credentials() is None:
         return (True, "No sync credentials to rotate.")
-    return register_sync_device(timeout=timeout)
+    return register_sync_device(timeout=timeout, db=db)
 
 
-def ensure_sync_credentials(timeout: float = 10.0) -> tuple[str, str] | None:
+def ensure_sync_credentials(timeout: float = 10.0, db=None) -> tuple[tuple[str, str] | None, str]:
+    """Return ((machine_id, token), "") or (None, error_message)."""
     creds = load_sync_credentials()
     if creds:
-        return creds
-    ok, _msg = register_sync_device(timeout=timeout)
+        return creds, ""
+    ok, msg = register_sync_device(timeout=timeout, db=db)
     if not ok:
-        return None
-    return load_sync_credentials()
+        return None, msg
+    creds = load_sync_credentials()
+    if not creds:
+        return None, "Could not register sync credentials — activate online first."
+    return creds, ""

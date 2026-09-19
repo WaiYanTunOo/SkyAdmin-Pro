@@ -11,7 +11,12 @@ CREATE TABLE IF NOT EXISTS issued_licenses (
     expires_at TEXT,
     nonce TEXT UNIQUE NOT NULL,
     issued_at TEXT NOT NULL DEFAULT (datetime('now')),
-    price_thb INTEGER DEFAULT 0
+    price_thb INTEGER DEFAULT 0,
+    org_id TEXT, -- Wave 1 firm namespace; solo default m:MACHINE (0008)
+    sync_enabled INTEGER NOT NULL DEFAULT 1,
+    web_enabled INTEGER NOT NULL DEFAULT 0, -- Wave 4 SKU (0009)
+    drive_files_enabled INTEGER NOT NULL DEFAULT 0, -- Wave 4 SKU (0009)
+    max_devices INTEGER NOT NULL DEFAULT 1 -- Wave 4 SKU (0010); 0 = unlimited
 );
 
 CREATE TABLE IF NOT EXISTS revocations (
@@ -93,28 +98,32 @@ CREATE INDEX IF NOT EXISTS idx_used_nonces_nonce ON used_nonces(nonce);
 CREATE INDEX IF NOT EXISTS idx_revocations_target ON revocations(target);
 CREATE INDEX IF NOT EXISTS idx_revoked_passcodes_passcode ON revoked_passcodes(passcode);
 
--- P4: cross-device data sync (per licensed machine_id namespace)
+-- P4 / Wave 1: org-scoped sync (solo = org_id m:MACHINE)
 CREATE TABLE IF NOT EXISTS sync_devices (
     machine_id TEXT NOT NULL PRIMARY KEY,
     token_hash TEXT NOT NULL,
     created_at TEXT NOT NULL DEFAULT (datetime('now')),
     last_seen_at TEXT,
-    expires_at TEXT NOT NULL DEFAULT (datetime('now', '+30 days'))
+    expires_at TEXT NOT NULL DEFAULT (datetime('now', '+30 days')),
+    org_id TEXT
 );
 
 CREATE TABLE IF NOT EXISTS sync_rows (
     id INTEGER PRIMARY KEY AUTOINCREMENT,
-    machine_id TEXT NOT NULL,
+    org_id TEXT NOT NULL,
+    machine_id TEXT NOT NULL, -- last-writer audit
     table_name TEXT NOT NULL,
     global_id TEXT NOT NULL,
     row_json TEXT NOT NULL,
     updated_at TEXT NOT NULL,
     deleted_at TEXT,
     hlc TEXT, -- Phase 2 merge clock (0006 on migrated DBs; nullable for legacy rows)
-    UNIQUE(machine_id, table_name, global_id)
+    UNIQUE(org_id, table_name, global_id)
 );
-CREATE INDEX IF NOT EXISTS idx_sync_rows_pull ON sync_rows(machine_id, updated_at);
-CREATE INDEX IF NOT EXISTS idx_sync_rows_table ON sync_rows(machine_id, table_name, updated_at);
+CREATE INDEX IF NOT EXISTS idx_sync_rows_pull ON sync_rows(org_id, updated_at);
+CREATE INDEX IF NOT EXISTS idx_sync_rows_table ON sync_rows(org_id, table_name, updated_at);
+CREATE INDEX IF NOT EXISTS idx_licenses_org_id ON issued_licenses(org_id);
+CREATE INDEX IF NOT EXISTS idx_sync_devices_org_id ON sync_devices(org_id);
 
 -- P4.1: sync conflict audit log (last-write-wins skips on push)
 CREATE TABLE IF NOT EXISTS sync_conflicts (

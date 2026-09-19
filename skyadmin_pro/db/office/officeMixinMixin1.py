@@ -18,7 +18,7 @@ class OfficeMixinMixin1:
             FROM client_credentials cc
             JOIN clients c ON c.id = cc.client_id
         """
-        conditions: list[str] = []
+        conditions: list[str] = ["cc.deleted_at IS NULL"]
         params: list = []
         q = (query or "").strip()
         if q:
@@ -34,8 +34,7 @@ class OfficeMixinMixin1:
         if client_id:
             conditions.append("cc.client_id = ?")
             params.append(client_id)
-        if conditions:
-            sql += " WHERE " + " AND ".join(conditions)
+        sql += " WHERE " + " AND ".join(conditions)
         sql += " ORDER BY cc.is_favorite DESC, c.name COLLATE NOCASE, cc.credential_type"
         return [prepare_client_credential_row(row) for row in self._fetch_all(sql, tuple(params))]
 
@@ -47,7 +46,7 @@ class OfficeMixinMixin1:
             SELECT cc.*, c.name AS client_name
             FROM client_credentials cc
             JOIN clients c ON c.id = cc.client_id
-            WHERE cc.id = ?
+            WHERE cc.id = ? AND cc.deleted_at IS NULL
             """,
             (entry_id,),
         )

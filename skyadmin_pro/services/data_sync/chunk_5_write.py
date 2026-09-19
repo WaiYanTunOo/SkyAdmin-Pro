@@ -2,10 +2,11 @@ from __future__ import annotations
 
 from skyadmin_pro.services.mobile_vault import VAULT_SYNC_TABLES
 
-from ._common import FK_CLIENT_COLUMN, FK_GROUP_COLUMN, INTEGRITY_ERRORS
-from .chunk_2 import _client_id_for_global, _group_id_for_global
+from ._common import FK_GROUP_COLUMN, INTEGRITY_ERRORS
+from .chunk_2 import _group_id_for_global
 from .chunk_3 import _filter_sync_row, _sync_ident, _unique_group_name
 from .cred_payload import strip_mobile_secret_on_pull
+from .fk_pull import remap_pull_fks
 
 
 def _apply_remote_delete(db, table, local, change, updated_at, global_id, remote_hlc) -> str:
@@ -36,9 +37,7 @@ def _apply_remote_upsert(db, table, local, change, updated_at, global_id, remote
     row.pop("deleted_at", None)
     if remote_hlc is not None:
         row["hlc"] = str(change.get("hlc"))
-    if table in ("tasks", "office_contacts", "notebook_entries", "client_credentials"):
-        client_gid = row.pop(FK_CLIENT_COLUMN, None) or row.pop("client_global_id", None)
-        row["client_id"] = _client_id_for_global(db, str(client_gid) if client_gid else None)
+    remap_pull_fks(db, table, row)
     if table == "clients":
         group_gid = row.pop(FK_GROUP_COLUMN, None) or row.pop("group_global_id", None)
         row.pop("group_id", None)

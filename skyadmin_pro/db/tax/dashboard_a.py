@@ -26,7 +26,7 @@ class DashboardMixinA:
             pending_sql = """
                 SELECT COUNT(*) AS n FROM tasks t
                 LEFT JOIN clients c ON c.id = t.client_id
-                WHERE t.status = 'pending'
+                WHERE t.status = 'pending' AND t.deleted_at IS NULL
                   AND (t.client_id IS NULL OR (c.deleted_at IS NULL AND COALESCE(c.status, 'active') != 'inactive'))
             """
             if exclude_expired_tasks:
@@ -36,15 +36,15 @@ class DashboardMixinA:
             done_today = conn.execute(
                 """
                 SELECT COUNT(*) AS n FROM tasks
-                WHERE status = 'completed'
+                WHERE status = 'completed' AND deleted_at IS NULL
                   AND date(completed_at) = date('now', 'localtime')
                 """
             ).fetchone()["n"]
-            clients = conn.execute("SELECT COUNT(*) AS n FROM clients").fetchone()["n"]
+            clients = conn.execute("SELECT COUNT(*) AS n FROM clients WHERE deleted_at IS NULL").fetchone()["n"]
             overdue = conn.execute(
                 f"""
                 SELECT COUNT(*) AS n FROM documents
-                WHERE client_id IS NOT NULL
+                WHERE deleted_at IS NULL AND client_id IS NOT NULL
                   AND payment_date IS NOT NULL AND trim(payment_date) != ''
                   AND payment_date < date('now', 'localtime')
                   AND COALESCE(paid, 0) = 0
@@ -55,7 +55,7 @@ class DashboardMixinA:
             supplier_due = conn.execute(
                 """
                 SELECT COUNT(*) AS n FROM supplier_payments
-                WHERE paid = 0
+                WHERE deleted_at IS NULL AND paid = 0
                   AND due_date IS NOT NULL AND trim(due_date) != ''
                   AND date(due_date) < date('now', 'localtime')
                 """
@@ -64,7 +64,7 @@ class DashboardMixinA:
             ongoing = conn.execute(
                 f"""
                 SELECT COUNT(*) AS n FROM documents
-                WHERE client_id IS NOT NULL AND progress = 'Ongoing'
+                WHERE deleted_at IS NULL AND client_id IS NOT NULL AND progress = 'Ongoing'
                   AND {ongoing_clause}
                 """,
                 tuple(ongoing_params),

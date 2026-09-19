@@ -571,7 +571,7 @@ class MonthStatusPanel(ctk.CTkFrame):
                 iids.append(str(client_id))
                 tag = _STATUS_TAG[status]
                 tags.append((tag,) if tag else ())
-            self.tree.set_rows(rows, iids=iids, tags=tags)
+            self.tree.set_rows(rows, iids=iids, tags=tags, empty_message="No accounting clients for this month.")
 
         run_background(self, work=work, on_success=on_success)
 
