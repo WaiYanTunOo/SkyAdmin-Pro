@@ -520,6 +520,9 @@ def main() -> None:
             logging.getLogger(__name__).info("License OK: %s", msg)
     except SystemExit:
         raise
+    except KeyboardInterrupt:
+        print("\n[SkyAdmin] App terminated by user (Ctrl+C). Exiting cleanly.")
+        raise SystemExit(0) from None
     except Exception as exc:
         logging.getLogger(__name__).exception("License check failed")
         _fatal_error("SkyAdmin Pro — License error", f"License verification failed:\n{exc}")
@@ -579,7 +582,7 @@ def main() -> None:
                 try:
                     app.db.shutdown()
                 except Exception:
-                    pass
+                    pass  # Shutdown errors are non-fatal during forced exit
                 app.destroy()
 
         import threading
@@ -592,8 +595,8 @@ def main() -> None:
             while True:
                 try:
                     app.db.generate_recurring_tasks()
-                except Exception:
-                    pass
+                except Exception as e:
+                    logging.getLogger(__name__).debug("Recurring task generation failed: %s", e)
                 _time.sleep(3600)  # Check every hour
 
         threading.Thread(target=_run_cron, daemon=True).start()
@@ -608,6 +611,9 @@ def main() -> None:
                 pass
     except SystemExit:
         raise
+    except KeyboardInterrupt:
+        print("\n[SkyAdmin] App terminated by user (Ctrl+C). Exiting cleanly.")
+        raise SystemExit(0) from None
     except Exception as exc:
         logging.getLogger(__name__).exception("Startup failed")
         _fatal_error(

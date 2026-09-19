@@ -86,7 +86,7 @@ def get_storage_backend(root: Path | str | None = None, db=None):
         except Exception as e:
             import logging
 
-            logging.error(f"UI Error: {e}")
+            logging.getLogger(__name__).error("Drive backend unavailable, falling back to local: %s", e)
     return LocalStorageBackend(root)
 
 
