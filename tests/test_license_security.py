@@ -374,7 +374,7 @@ def test_report_activation_claim_skips_without_api(monkeypatch):
     import skyadmin_pro.config as config
 
     monkeypatch.setattr(config, "API_BASE_URL", "")
-    ok, msg, _key = lic.report_activation_claim("dummy")
+    ok, msg, _key, _data = lic.report_activation_claim("dummy")
     assert ok
     assert "no api" in msg.lower()
 
@@ -406,7 +406,7 @@ def test_report_activation_claim_posts_code(mid, monkeypatch):
         return FakeResp()
 
     monkeypatch.setattr(urllib.request, "urlopen", fake_urlopen)
-    ok, msg, license_key = lic.report_activation_claim(key)
+    ok, msg, license_key, _data = lic.report_activation_claim(key)
     assert ok, msg
     assert license_key is None
     assert captured["url"] == "https://worker.test/api/claim"
