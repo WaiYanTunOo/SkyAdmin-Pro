@@ -101,5 +101,7 @@ class AutoSyncScheduler:
             return
         try:
             self.app.after_cancel(timer_id)
-        except Exception:
-            pass
+        except Exception as e:
+            import logging
+
+            logging.error(f"UI Error: {e}")

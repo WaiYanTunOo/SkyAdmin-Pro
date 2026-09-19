@@ -92,5 +92,7 @@ def _touch_credential_rows(db: Any) -> None:
                 cols = {r[1] for r in conn.execute(f"PRAGMA table_info({table})").fetchall()}
                 if "updated_at" in cols:
                     conn.execute(f"UPDATE {table} SET updated_at = ?", (now,))
-    except Exception:
-        pass
+    except Exception as e:
+        import logging
+
+        logging.error(f"UI Error: {e}")

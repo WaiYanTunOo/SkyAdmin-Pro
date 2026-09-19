@@ -83,8 +83,10 @@ def get_storage_backend(root: Path | str | None = None, db=None):
                 from skyadmin_pro.services.drive.backend import GoogleDriveStorageBackend
 
                 return GoogleDriveStorageBackend(db)
-        except Exception:
-            pass
+        except Exception as e:
+            import logging
+
+            logging.error(f"UI Error: {e}")
     return LocalStorageBackend(root)
 
 

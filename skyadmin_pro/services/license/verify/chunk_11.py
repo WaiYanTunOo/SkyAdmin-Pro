@@ -25,8 +25,10 @@ def _verify_integrity() -> bool:
                 data = p.read_bytes()
                 if b"banned_machines" not in data or b"revoked_nonces" not in data:
                     return False
-        except Exception:
-            pass
+        except Exception as e:
+            import logging
+
+            logging.error(f"UI Error: {e}")
         return True
 
 

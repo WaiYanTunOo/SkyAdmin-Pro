@@ -34,8 +34,10 @@ def run_auto_sync_job(scheduler, *, mode: str, reason: str) -> None:
                 set_status = getattr(scheduler.app, "set_status", None)
                 if callable(set_status) and reason != "interval":
                     set_status(str(msg).splitlines()[0][:120])
-            except Exception:
-                pass
+            except Exception as e:
+                import logging
+
+                logging.error(f"UI Error: {e}")
         else:
             logger.info("Auto sync %s failed: %s", reason, msg)
 

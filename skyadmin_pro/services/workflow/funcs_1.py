@@ -70,8 +70,10 @@ def copy_to_clipboard(text: str, tk_window=None) -> None:
 
         pyperclip.copy(text)
         return
-    except Exception:
-        pass
+    except Exception as e:
+        import logging
+
+        logging.error(f"UI Error: {e}")
     if tk_window is not None:
         try:
             tk_window.clipboard_clear()

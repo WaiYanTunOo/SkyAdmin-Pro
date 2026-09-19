@@ -39,16 +39,22 @@ def _record_online_sync() -> None:
 
                 seal_p = p.parent / ".last_sync.seal"
                 seal_p.write_text(seal_value(seal_data), encoding="utf-8")
-            except Exception:
-                pass
+            except Exception as e:
+                import logging
+
+                logging.error(f"UI Error: {e}")
             # Also record monotonic last_seen for clock-tamper detection
             try:
                 seen_p = p.parent / ".last_seen.txt"
                 seen_p.write_text(now_iso, encoding="utf-8")
-            except Exception:
-                pass
-    except Exception:
-        pass
+            except Exception as e:
+                import logging
+
+                logging.error(f"UI Error: {e}")
+    except Exception as e:
+        import logging
+
+        logging.error(f"UI Error: {e}")
 
 
 def _get_last_sync_time() -> datetime | None:
@@ -67,8 +73,10 @@ def _get_last_sync_time() -> datetime | None:
                 expected = f"{txt}|{get_machine_id()}"
                 if verify_seal(sealed) != expected:
                     return None  # tampered or copied from another machine
-        except Exception:
-            pass
+        except Exception as e:
+            import logging
+
+            logging.error(f"UI Error: {e}")
         return datetime.fromisoformat(txt)
     except Exception:
         return None
@@ -88,8 +96,10 @@ def _is_clock_tampered() -> bool:
         # If now is >5 min before last_seen, clock went backwards
         if (datetime.now() - last_seen).total_seconds() < -300:
             return True
-    except Exception:
-        pass
+    except Exception as e:
+        import logging
+
+        logging.error(f"UI Error: {e}")
     return False
 
 

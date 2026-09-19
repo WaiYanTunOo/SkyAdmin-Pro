@@ -35,8 +35,10 @@ def _check_debugger() -> None:
             if _ct.windll.kernel32.IsDebuggerPresent():
                 _log.warning("Debugger is attached — license activation may be blocked.")
                 return
-        except Exception:
-            pass
+        except Exception as e:
+            import logging
+
+            logging.error(f"UI Error: {e}")
 
 
 def _legacy_machine_id() -> str:

@@ -54,8 +54,10 @@ def _record_attempt(success: bool) -> None:
         recent.append(now)
         p.parent.mkdir(parents=True, exist_ok=True)
         p.write_text("\n".join(str(t) for t in recent) + "\n", encoding="utf-8")
-    except Exception:
-        pass
+    except Exception as e:
+        import logging
+
+        logging.error(f"UI Error: {e}")
 
 
 def is_daily_sync_stale() -> bool:

@@ -47,8 +47,10 @@ def mark_dirty() -> None:
         return
     try:
         handler()
-    except Exception:
-        pass
+    except Exception as e:
+        import logging
+
+        logging.error(f"UI Error: {e}")
 
 
 def notify_db_write() -> None:
