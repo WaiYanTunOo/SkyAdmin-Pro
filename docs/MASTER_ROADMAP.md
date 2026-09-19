@@ -417,9 +417,9 @@ Tag v* → Release (build + sign + installer + release_check + GitHub Release + 
 | P1.2 | Dashboard snapshot single connection | `db/tax.py` | `desktop-core` | ⚠️ Partial — budget relaxed (≤40 statements / 1 connection); full ≤3 rewrite out of sprint |
 | P1.3 | Remove monolithic `_migrate()` / extract remaining `_migrate_*` | `db/core.py`, `db/migrations/` | `desktop-core` | ✅ Done (wrappers removed; versioned migrations) |
 | P1.4 | Dashboard first-paint deferral | `ui/views/dashboard.py` | `ui-performance` | ✅ Progressive trees on `on_show` |
-| P1.5 | Worker `recordsHandler` optimization | `routes/records.ts` | `worker-api` | Later |
+| P1.5 | Worker `recordsHandler` optimization | `routes/records.ts` | `worker-api` | [x] |
 | P1.6 | Worker static imports | `routes/generate.ts` | `worker-api` | Later |
-| P1.7 | D1 error handling in routes | `routes/generate.ts` | `worker-api` | Later |
+| P1.7 | D1 error handling in routes | `routes/generate.ts` | `worker-api` | [x] |
 
 ### Phase U1 — UI/UX Polish (residual sprint focus)
 
@@ -428,10 +428,10 @@ Tag v* → Release (build + sign + installer + release_check + GitHub Release + 
 | U1.0a | Company Details: trees outside `CanvasScrollFrame` | `company_details/` | `company-details` + `ui-performance` | ✅ Done |
 | U1.0b | Settings: remove nested checklist scroll | `settings/view.py` | `ui-performance` | ✅ Done |
 | U1.1 | DatePickerField polish (root binds, grab, drop `-topmost`) | `widgets.py` | `ui-widgets` | ✅ Done |
-| U1.2 | Consolidate Company Details refresh | `company_details/panel.py` | `company-details` | Later |
+| U1.2 | Consolidate Company Details refresh | `company_details/panel.py` | `company-details` | ✅ Done |
 | U1.3 | Add public `get_view()` method | `main_window.py` | `ui-performance` | Later |
-| U1.4 | Constants for tab names | `database_tasks/view.py`, `company_details/panel.py` | `ui-performance` | Later |
-| U1.5 | Narrow exception handlers in services | `services/*.py` | `desktop-core` | Later |
+| U1.4 | Constants for tab names | `database_tasks/view.py`, `company_details/panel.py` | `ui-performance` | ✅ Done |
+| U1.5 | Narrow exception handlers in services | `services/*.py` | `desktop-core` | ✅ Done |
 | U1.6 | Split `config.py` | `config.py` | `desktop-core` | Later |
 | U1.7 | Replace `__import__()` calls | 9+ files | `desktop-core` | Later |
 
