@@ -80,6 +80,8 @@ class UtilitiesViewMixin8:
             final = final.replace(token, entries[token].get().strip())
         try:
             top.destroy()
-        except Exception:
-            pass
+        except Exception as e:
+            import logging
+
+            logging.error(f"UI Error: {e}")
         self._finish_copy(snippet.label, final)

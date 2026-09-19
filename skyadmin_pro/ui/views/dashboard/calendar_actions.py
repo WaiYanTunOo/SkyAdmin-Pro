@@ -87,5 +87,7 @@ def update_calendar_count(view, snap: dict | None = None) -> None:
         n = view.app.db.count_upcoming_appointments(30)
     try:
         label.configure(text=f"{n} upcoming (30 days)")
-    except Exception:
-        pass
+    except Exception as e:
+        import logging
+
+        logging.error(f"UI Error: {e}")

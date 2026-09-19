@@ -24,19 +24,25 @@ class SettingsViewMixin6:
             theme = self.app.db.get_setting(SETTING_COLOR_THEME, DEFAULT_COLOR_THEME) or DEFAULT_COLOR_THEME
             try:
                 self.color_theme_menu.set(theme)
-            except Exception:
-                pass
+            except Exception as e:
+                import logging
+
+                logging.error(f"UI Error: {e}")
             self.tagline_var.set(self.app.db.get_setting("app_tagline") or APP_TAGLINE)
             saved_lang = (self.app.db.get_setting("ui_language") or "en").upper()
             try:
                 self.lang_menu.set(saved_lang)
-            except Exception:
-                pass
+            except Exception as e:
+                import logging
+
+                logging.error(f"UI Error: {e}")
             saved_zoom = self.app.db.get_setting("ui_zoom") or "100%"
             try:
                 self.zoom_menu.set(saved_zoom)
-            except Exception:
-                pass
+            except Exception as e:
+                import logging
+
+                logging.error(f"UI Error: {e}")
             self.portal_var.set(self.app.db.get_setting(SETTING_PORTAL_URL, DEFAULT_PORTAL_URL) or DEFAULT_PORTAL_URL)
             self._refresh_update_banner()
 

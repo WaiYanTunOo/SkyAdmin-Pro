@@ -17,8 +17,10 @@ def collect_supplier_visible(result: dict, ensure) -> None:
         for name in ("Suppliers", "Supplier Services", "Payments (AP)"):
             try:
                 ensure_tab(name)
-            except Exception:
-                pass
+            except Exception as e:
+                import logging
+
+                logging.error(f"UI Error: {e}")
     directory = getattr(panel, "directory", None)
     add_visible_sheet_fields(
         result,

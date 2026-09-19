@@ -9,8 +9,10 @@ class DatabaseTasksViewMixin4:
 
             self._ensure_panel(TAB_CLIENTS)
             self._ensure_panel(TAB_EXPIRY)
-        except Exception:
-            pass
+        except Exception as e:
+            import logging
+
+            logging.error(f"UI Error: {e}")
         # (panel attr, tree attr, sheet name, {ui col id: db field})
         # Derived UI cols (status/days) are omitted — Excel has no matching field.
         specs = (

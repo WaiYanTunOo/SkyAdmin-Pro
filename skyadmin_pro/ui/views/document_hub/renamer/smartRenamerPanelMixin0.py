@@ -76,8 +76,10 @@ class SmartRenamerPanelMixin0:
         if self._preview_after is not None:
             try:
                 self.after_cancel(self._preview_after)
-            except Exception:
-                pass
+            except Exception as e:
+                import logging
+
+                logging.error(f"UI Error: {e}")
         self._preview_after = self.after(150, self._update_preview)
 
     def _update_preview(self) -> None:

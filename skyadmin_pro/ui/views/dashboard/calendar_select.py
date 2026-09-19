@@ -56,5 +56,7 @@ def style_cell(cell, *, is_selected: bool) -> None:
     weight = "bold" if (is_today or is_selected or in_month) else "normal"
     try:
         lbl.configure(text_color=color, font=ctk.CTkFont(size=FONT_SIZE_SM, weight=weight))
-    except Exception:
-        pass
+    except Exception as e:
+        import logging
+
+        logging.error(f"UI Error: {e}")

@@ -25,8 +25,10 @@ class UtilitiesViewMixin3:
                     try:
                         item["label"] = item["label_entry"].get().strip()
                         item["text"] = item["text_box"].get("1.0", "end").strip()
-                    except Exception:
-                        pass
+                    except Exception as e:
+                        import logging
+
+                        logging.error(f"UI Error: {e}")
         new_overrides: dict[str, dict[str, dict[str, str]]] = dict(self._overrides)
         for section, items in self._editor_draft.items():
             defaults = SNIPPET_SECTIONS.get(section, ())

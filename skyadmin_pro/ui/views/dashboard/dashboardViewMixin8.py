@@ -34,8 +34,10 @@ class DashboardViewMixin8:
             if self._timeline_resize_after:
                 try:
                     self.after_cancel(self._timeline_resize_after)
-                except Exception:
-                    pass
+                except Exception as e:
+                    import logging
+
+                    logging.error(f"UI Error: {e}")
                 self._timeline_resize_after = None
 
             def _redraw() -> None:

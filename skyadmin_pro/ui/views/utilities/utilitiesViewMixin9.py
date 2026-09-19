@@ -13,14 +13,18 @@ class UtilitiesViewMixin9:
             if close is not None:
                 try:
                     close.destroy()
-                except Exception:
-                    pass
+                except Exception as e:
+                    import logging
+
+                    logging.error(f"UI Error: {e}")
             return
         if close is not None:
             try:
                 close.destroy()
-            except Exception:
-                pass
+            except Exception as e:
+                import logging
+
+                logging.error(f"UI Error: {e}")
         self.hub_feedback.success(f"Copied: {label}")
         self.app.set_status(f"Copied “{label}” to the clipboard.")
 

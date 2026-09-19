@@ -45,15 +45,19 @@ class TaskPanelMixin2:
                 task = self.app.db.get_task(self._editing_id)
                 if task:
                     saved_status = task.get("status") or "pending"
-            except Exception:
-                pass
+            except Exception as e:
+                import logging
+
+                logging.error(f"UI Error: {e}")
         self.status_label.configure(text=f"Status: {saved_status}")
         self.refresh()
         if self._editing_id is not None:
             try:
                 self.tree.tree.selection_set(str(self._editing_id))
-            except Exception:
-                pass
+            except Exception as e:
+                import logging
+
+                logging.error(f"UI Error: {e}")
         self.app.set_status("Tasks saved.")
         self.app.invalidate_dashboard()
 

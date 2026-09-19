@@ -398,15 +398,19 @@ class MainWindow(dnd_base_class()):
             if callable(apply):
                 try:
                     apply(form_sidebar_min=form_w, metrics=m)
-                except Exception:
-                    pass
+                except Exception as e:
+                    import logging
+
+                    logging.error(f"UI Error: {e}")
             panel = getattr(view, "panel", None)
             apply_p = getattr(panel, "_apply_responsive_layout", None) if panel is not None else None
             if callable(apply_p):
                 try:
                     apply_p(form_sidebar_min=form_w, metrics=m)
-                except Exception:
-                    pass
+                except Exception as e:
+                    import logging
+
+                    logging.error(f"UI Error: {e}")
 
     def _apply_sidebar_layout(self) -> None:
         collapsed = self._sidebar_collapsed

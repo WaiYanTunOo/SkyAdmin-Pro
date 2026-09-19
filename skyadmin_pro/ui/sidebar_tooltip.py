@@ -45,6 +45,8 @@ class SidebarTooltip:
         if self._top is not None:
             try:
                 self._top.destroy()
-            except Exception:
-                pass
+            except Exception as e:
+                import logging
+
+                logging.error(f"UI Error: {e}")
             self._top = None

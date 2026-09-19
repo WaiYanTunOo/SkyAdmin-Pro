@@ -14,8 +14,10 @@ def collect_financial_visible(result: dict, ensure) -> None:
     if callable(ensure_hub):
         try:
             ensure_hub("Financial Docs")
-        except Exception:
-            pass
+        except Exception as e:
+            import logging
+
+            logging.error(f"UI Error: {e}")
     fin = getattr(hub, "financial", None)
     add_visible_sheet_fields(
         result,
@@ -40,8 +42,10 @@ def collect_financial_visible(result: dict, ensure) -> None:
             from ._const_4 import TAB_COMPANY
 
             ensure_panel(TAB_COMPANY)
-        except Exception:
-            pass
+        except Exception as e:
+            import logging
+
+            logging.error(f"UI Error: {e}")
     company = getattr(companies, "company_panel", None)
     add_visible_sheet_fields(
         result,

@@ -69,8 +69,10 @@ class BackupMixinMixin2:
                 except Exception:
                     try:
                         db.shutdown()
-                    except Exception:
-                        pass
+                    except Exception as e:
+                        import logging
+
+                        logging.error(f"UI Error: {e}")
                     db._restore_lockout = True
                     db._close_pooled_conn()
                 summary = restore_encrypted_backup(src_path, self.app.paths.root, db.db_file)

@@ -44,15 +44,19 @@ class LicenseMixinMixin4:
                 self.daily_sync_label.configure(text="")
                 try:
                     self.data_sync_label.configure(text="")
-                except Exception:
-                    pass
+                except Exception as e:
+                    import logging
+
+                    logging.error(f"UI Error: {e}")
         except Exception:
             self.license_label.configure(text="License: unavailable")
             try:
                 self.daily_sync_label.configure(text="")
                 self.data_sync_label.configure(text="")
-            except Exception:
-                pass
+            except Exception as e:
+                import logging
+
+                logging.error(f"UI Error: {e}")
 
     def _check_for_updates(self) -> None:
         from skyadmin_pro.services.license import check_for_updates

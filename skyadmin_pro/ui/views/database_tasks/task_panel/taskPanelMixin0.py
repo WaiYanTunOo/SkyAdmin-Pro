@@ -85,8 +85,10 @@ class TaskPanelMixin0:
         if self._search_after is not None:
             try:
                 self.after_cancel(self._search_after)
-            except Exception:
-                pass
+            except Exception as e:
+                import logging
+
+                logging.error(f"UI Error: {e}")
         self._search_after = self.after(300, self._run_search)
 
     def _run_search(self) -> None:

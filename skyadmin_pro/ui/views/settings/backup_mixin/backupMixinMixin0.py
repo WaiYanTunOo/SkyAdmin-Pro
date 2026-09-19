@@ -46,8 +46,10 @@ class BackupMixinMixin0:
         if callable(nudge):
             try:
                 nudge()
-            except Exception:
-                pass
+            except Exception as e:
+                import logging
+
+                logging.error(f"UI Error: {e}")
         if enabled == "1":
             self.feedback.info(f"Auto-backup enabled ({interval}).")
             self.app.set_status(f"Auto-backup on ({interval}) — schedule updated")

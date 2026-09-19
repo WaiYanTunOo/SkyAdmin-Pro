@@ -10,8 +10,10 @@ class TaskPanelMixin1:
         self._run_search()
         try:
             self.search_entry.focus_set()
-        except Exception:
-            pass
+        except Exception as e:
+            import logging
+
+            logging.error(f"UI Error: {e}")
 
     def _update_pager(self, shown: int) -> None:
         label = f"Page {self._page + 1} · {shown} shown"
@@ -21,8 +23,10 @@ class TaskPanelMixin1:
             self.page_label.configure(text=label)
             self.prev_btn.configure(state="normal" if self._page > 0 else "disabled")
             self.next_btn.configure(state="normal" if self._has_more else "disabled")
-        except Exception:
-            pass
+        except Exception as e:
+            import logging
+
+            logging.error(f"UI Error: {e}")
 
     def _prev_page(self) -> None:
         if self._page > 0:

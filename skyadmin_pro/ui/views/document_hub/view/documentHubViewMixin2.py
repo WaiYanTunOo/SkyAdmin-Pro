@@ -31,8 +31,10 @@ class DocumentHubViewMixin2:
                 return
             try:
                 panel.render_counts(ready, ready_sig, staging, staging_sig)
-            except Exception:
-                pass
+            except Exception as e:
+                import logging
+
+                logging.error(f"UI Error: {e}")
 
         run_background(self, work=work, on_success=on_success)
 
@@ -55,5 +57,7 @@ class DocumentHubViewMixin2:
             if hasattr(panel, "_signature"):
                 try:
                     panel._signature = None  # type: ignore[attr-defined]
-                except Exception:
-                    pass
+                except Exception as e:
+                    import logging
+
+                    logging.error(f"UI Error: {e}")

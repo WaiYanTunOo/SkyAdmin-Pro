@@ -18,8 +18,10 @@ class UtilitiesViewMixin2:
                         item["label"] = item["label_entry"].get()
                         # strip the trailing newline Text.get always appends
                         item["text"] = item["text_box"].get("1.0", "end").rstrip("\n")
-                    except Exception:
-                        pass
+                    except Exception as e:
+                        import logging
+
+                        logging.error(f"UI Error: {e}")
         for child in top.winfo_children():
             child.destroy()
 

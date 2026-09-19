@@ -75,8 +75,10 @@ class DatabaseTasksViewMixin3:
     def _on_shortcut_new(self) -> None:
         try:
             self.tabs.set(TAB_CLIENTS)
-        except Exception:
-            pass
+        except Exception as e:
+            import logging
+
+            logging.error(f"UI Error: {e}")
         self._ensure_panel(TAB_CLIENTS)
         if self.clients_panel is not None:
             self.clients_panel._open_client_dialog()

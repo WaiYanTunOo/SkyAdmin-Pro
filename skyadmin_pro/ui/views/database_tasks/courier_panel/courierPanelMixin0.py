@@ -86,8 +86,10 @@ class CourierPanelMixin0:
             self.page_label.configure(text=label)
             self.prev_btn.configure(state="normal" if self._page > 0 else "disabled")
             self.next_btn.configure(state="normal" if self._has_more else "disabled")
-        except Exception:
-            pass
+        except Exception as e:
+            import logging
+
+            logging.error(f"UI Error: {e}")
 
     def _prev_page(self) -> None:
         if self._page > 0:

@@ -79,8 +79,10 @@ class GlobalSearchDialogMixin0:
         try:
             if self._search_after is not None:
                 self.after_cancel(self._search_after)
-        except Exception:
-            pass
+        except Exception as e:
+            import logging
+
+            logging.error(f"UI Error: {e}")
         self._search_after = None
         super().destroy()
 
@@ -88,8 +90,10 @@ class GlobalSearchDialogMixin0:
         if self._search_after is not None:
             try:
                 self.after_cancel(self._search_after)
-            except Exception:
-                pass
+            except Exception as e:
+                import logging
+
+                logging.error(f"UI Error: {e}")
             self._search_after = None
         try:
             self._search_after = self.after(250, self._run_search)

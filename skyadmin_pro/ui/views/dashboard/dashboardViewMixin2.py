@@ -10,8 +10,10 @@ class DashboardViewMixin2:
             from skyadmin_pro.ui.async_ui import cancel_pump
 
             cancel_pump(self)
-        except Exception:
-            pass
+        except Exception as e:
+            import logging
+
+            logging.error(f"UI Error: {e}")
         self._snap_seq = int(getattr(self, "_snap_seq", 0)) + 1
         had_pending = bool(self._tree_refresh_after or self._detail_trees_after or self._timeline_after)
         self._cancel_deferred_refresh()
@@ -30,8 +32,10 @@ class DashboardViewMixin2:
             if after_id is not None:
                 try:
                     self.after_cancel(after_id)
-                except Exception:
-                    pass
+                except Exception as e:
+                    import logging
+
+                    logging.error(f"UI Error: {e}")
                 setattr(self, attr, None)
 
     def refresh(self, *, force: bool = False) -> None:
@@ -54,8 +58,10 @@ class DashboardViewMixin2:
         db = self.app.db
         try:
             self.app.set_status("Loading dashboard…")
-        except Exception:
-            pass
+        except Exception as e:
+            import logging
+
+            logging.error(f"UI Error: {e}")
 
         def work():
             return db.dashboard_snapshot()
@@ -67,22 +73,28 @@ class DashboardViewMixin2:
                 # Hidden while loading: still cache cards, skip tree storms.
                 try:
                     self._apply_stat_cards(snap)
-                except Exception:
-                    pass
+                except Exception as e:
+                    import logging
+
+                    logging.error(f"UI Error: {e}")
                 self._snap_fingerprint = snap_fingerprint(snap)
                 return
             self._apply_snapshot(snap, force=force)
             try:
                 self.app.set_status("Ready")
-            except Exception:
-                pass
+            except Exception as e:
+                import logging
+
+                logging.error(f"UI Error: {e}")
 
         def on_error(msg: str) -> None:
             if seq != getattr(self, "_snap_seq", 0) or not self.winfo_exists():
                 return
             try:
                 self.app.set_status(f"Dashboard failed to load: {msg}")
-            except Exception:
-                pass
+            except Exception as e:
+                import logging
+
+                logging.error(f"UI Error: {e}")
 
         run_background(self, work=work, on_success=on_success, on_error=on_error)

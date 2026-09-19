@@ -63,8 +63,10 @@ def _clear_day_cells(view, grid) -> None:
         for cell in cells.values():
             try:
                 cell.destroy()
-            except Exception:
-                pass
+            except Exception as e:
+                import logging
+
+                logging.error(f"UI Error: {e}")
         view._calendar_cells = {}
         return
     for child in grid.winfo_children():

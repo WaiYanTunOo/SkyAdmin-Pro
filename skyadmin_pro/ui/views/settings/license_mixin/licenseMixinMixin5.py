@@ -22,8 +22,10 @@ class LicenseMixinMixin5:
         if callable(nudge):
             try:
                 nudge()
-            except Exception:
-                pass
+            except Exception as e:
+                import logging
+
+                logging.error(f"UI Error: {e}")
 
     def _sync_now(self) -> None:
         from skyadmin_pro.services.data_sync import sync_data
@@ -57,8 +59,10 @@ class LicenseMixinMixin5:
             try:
                 self.app.refresh_sidebar_status()
                 self.app.set_status(msg.splitlines()[0])
-            except Exception:
-                pass
+            except Exception as e:
+                import logging
+
+                logging.error(f"UI Error: {e}")
 
         run_background(
             self,

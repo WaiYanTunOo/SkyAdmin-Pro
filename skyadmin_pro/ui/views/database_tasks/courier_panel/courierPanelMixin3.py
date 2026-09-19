@@ -19,8 +19,10 @@ class CourierPanelMixin3:
         if form is not None:
             try:
                 form.configure(width=form_sidebar_min)
-            except Exception:
-                pass
+            except Exception as e:
+                import logging
+
+                logging.error(f"UI Error: {e}")
 
     def _CourierPanel__init__p2(self, pager):
         self.next_btn = ctk.CTkButton(

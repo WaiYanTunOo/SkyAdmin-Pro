@@ -24,5 +24,7 @@ class MonthCloseHost:
         text = f"{not_closed} not closed ({summary['open']} open · {summary['in_progress']} in progress)"
         try:
             self.summary.configure(text=text)
-        except Exception:
-            pass
+        except Exception as e:
+            import logging
+
+            logging.error(f"UI Error: {e}")

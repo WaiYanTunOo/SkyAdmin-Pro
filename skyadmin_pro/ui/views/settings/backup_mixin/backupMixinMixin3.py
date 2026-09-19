@@ -25,13 +25,17 @@ class BackupMixinMixin3:
             )
             try:
                 self.app.db.shutdown()
-            except Exception:
-                pass
+            except Exception as e:
+                import logging
+
+                logging.error(f"UI Error: {e}")
             root = self.winfo_toplevel()
             try:
                 root.destroy()
-            except Exception:
-                pass
+            except Exception as e:
+                import logging
+
+                logging.error(f"UI Error: {e}")
 
         def _on_error(err) -> None:
             try:

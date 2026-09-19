@@ -36,8 +36,10 @@ class TaskPanelMixin3:
         if form is not None:
             try:
                 form.configure(width=form_sidebar_min)
-            except Exception:
-                pass
+            except Exception as e:
+                import logging
+
+                logging.error(f"UI Error: {e}")
 
     def _TaskPanel__init__p1(self, app, feedback):
         self.app = app

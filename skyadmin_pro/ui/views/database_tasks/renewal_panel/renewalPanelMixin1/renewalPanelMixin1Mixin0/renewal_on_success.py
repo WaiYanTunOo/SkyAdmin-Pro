@@ -19,8 +19,10 @@ def renewal_on_success(self, seq, payload) -> None:
     else:
         try:
             self.service_box.set("")
-        except Exception:
-            pass
+        except Exception as e:
+            import logging
+
+            logging.error(f"UI Error: {e}")
     if payload["client_id"] is None:
         self.countdown.configure(
             text="Select a company and a service to plan the renewal.",
@@ -66,7 +68,9 @@ def renewal_on_success(self, seq, payload) -> None:
     self.countdown.configure(text=f"{document_type} — {detail}", text_color=tag_color)
     try:
         self.app.set_status(f"Renewal for {payload.get('client')}: {document_type} — {detail} ({template}).")
-    except Exception:
-        pass
+    except Exception as e:
+        import logging
+
+        logging.error(f"UI Error: {e}")
     self.checklist_title.configure(text=f"{template} checklist — {payload.get('client')}")
     self._rebuild_checklist(payload.get("items", []))

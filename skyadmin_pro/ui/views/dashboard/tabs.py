@@ -49,8 +49,10 @@ def install_tabs(view) -> None:
 def _on_tab_change(view) -> None:
     try:
         view._detail_scroll._on_content_configure()
-    except Exception:
-        pass
+    except Exception as e:
+        import logging
+
+        logging.error(f"UI Error: {e}")
     tabs = getattr(view, "_dash_tabs", None)
     if tabs is not None and tabs.get() == "Calendar":
         from .calendar_tab import ensure_calendar

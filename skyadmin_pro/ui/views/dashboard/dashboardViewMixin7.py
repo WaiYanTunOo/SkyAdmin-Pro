@@ -46,5 +46,7 @@ class DashboardViewMixin7:
             text += f" · {pending} need filing (closed month)"
         try:
             label.configure(text=text)
-        except Exception:
-            pass
+        except Exception as e:
+            import logging
+
+            logging.error(f"UI Error: {e}")

@@ -20,15 +20,19 @@ class DocumentHubViewMixin1:
             from skyadmin_pro.ui.async_ui import cancel_pump
 
             cancel_pump(self)
-        except Exception:
-            pass
+        except Exception as e:
+            import logging
+
+            logging.error(f"UI Error: {e}")
 
     def _cancel_poll(self) -> None:
         if self._poll_after is not None:
             try:
                 self.after_cancel(self._poll_after)
-            except Exception:
-                pass
+            except Exception as e:
+                import logging
+
+                logging.error(f"UI Error: {e}")
             self._poll_after = None
 
     def _active_feedback(self) -> FeedbackLabel | None:
@@ -88,7 +92,9 @@ class DocumentHubViewMixin1:
                 return
             try:
                 apply(files, signature)
-            except Exception:
-                pass
+            except Exception as e:
+                import logging
+
+                logging.error(f"UI Error: {e}")
 
         run_background(self, work=work, on_success=on_success)

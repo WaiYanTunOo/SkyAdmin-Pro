@@ -66,8 +66,10 @@ class SettingsViewMixin0:
             # Re-apply theme bounds safely if possible
             self.app.apply_app_theme()
             self.app.set_status(f"UI Zoom set to {value}")
-        except Exception:
-            pass
+        except Exception as e:
+            import logging
+
+            logging.error(f"UI Error: {e}")
 
     def _ensure_panel(self, name: str) -> None:
         if name in self._lazy_tabs:

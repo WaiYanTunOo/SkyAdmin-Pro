@@ -25,8 +25,10 @@ class TaxIdsTabMixinMixin5:
             return
         try:
             self.client_cred_tree.tree.selection_remove(self.client_cred_tree.tree.selection())
-        except Exception:
-            pass
+        except Exception as e:
+            import logging
+
+            logging.error(f"UI Error: {e}")
         self._clear_client_cred_form()
 
     def _save_client_cred(self) -> None:

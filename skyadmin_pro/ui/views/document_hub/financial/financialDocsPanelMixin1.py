@@ -12,8 +12,10 @@ class FinancialDocsPanelMixin1:
         if self._search_after is not None:
             try:
                 self.after_cancel(self._search_after)
-            except Exception:
-                pass
+            except Exception as e:
+                import logging
+
+                logging.error(f"UI Error: {e}")
             self._search_after = None
         self.search_var.set("")
         self.cat_var.set("All")
@@ -24,8 +26,10 @@ class FinancialDocsPanelMixin1:
         if iid is not None:
             try:
                 self.tree.tree.selection_set(iid)
-            except Exception:
-                pass
+            except Exception as e:
+                import logging
+
+                logging.error(f"UI Error: {e}")
         self._open_selected()
 
     def refresh(self) -> None:

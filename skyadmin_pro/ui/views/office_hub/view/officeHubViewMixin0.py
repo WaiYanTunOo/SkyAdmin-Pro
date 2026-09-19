@@ -89,5 +89,7 @@ class OfficeHubViewMixin0:
             if callable(cancel):
                 try:
                     cancel()
-                except Exception:
-                    pass
+                except Exception as e:
+                    import logging
+
+                    logging.error(f"UI Error: {e}")

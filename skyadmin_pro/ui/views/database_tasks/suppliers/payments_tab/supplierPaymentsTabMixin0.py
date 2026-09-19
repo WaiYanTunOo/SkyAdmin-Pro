@@ -78,8 +78,10 @@ class SupplierPaymentsTabMixin0:
                 return
             try:
                 self.feedback.error(f"Payments failed to load: {msg}")
-            except Exception:
-                pass
+            except Exception as e:
+                import logging
+
+                logging.error(f"UI Error: {e}")
 
         run_background(host, work=work, on_success=on_success, on_error=on_error)
 

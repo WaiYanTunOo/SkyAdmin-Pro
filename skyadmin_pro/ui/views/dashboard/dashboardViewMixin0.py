@@ -58,8 +58,10 @@ class DashboardViewMixin0:
         if after_id is not None:
             try:
                 self.after_cancel(after_id)
-            except Exception:
-                pass
+            except Exception as e:
+                import logging
+
+                logging.error(f"UI Error: {e}")
             self._detail_build_after = None
 
     def _schedule_detail_trees_progressive(self) -> None:

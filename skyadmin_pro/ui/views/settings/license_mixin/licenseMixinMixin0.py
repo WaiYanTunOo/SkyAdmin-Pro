@@ -68,8 +68,10 @@ class LicenseMixinMixin0:
             if log_path.exists():
                 lines = log_path.read_text(encoding="utf-8", errors="replace").splitlines()
                 log_tail = "\n".join(lines[-40:])
-        except Exception:
-            pass
+        except Exception as e:
+            import logging
+
+            logging.error(f"UI Error: {e}")
         body = (
             f"Machine ID: {get_machine_id()}\n"
             f"Workspace: {self.app.paths.root}\n\n"

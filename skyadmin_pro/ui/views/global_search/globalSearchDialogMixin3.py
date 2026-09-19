@@ -67,8 +67,10 @@ class GlobalSearchDialogMixin3:
             for child in row.winfo_children():
                 try:
                     child.bind("<Button-1>", _navigate)
-                except Exception:
-                    pass
+                except Exception as e:
+                    import logging
+
+                    logging.error(f"UI Error: {e}")
 
     def _navigate_and_close(self, nav_key: str) -> None:
         self.app.show_view(nav_key)

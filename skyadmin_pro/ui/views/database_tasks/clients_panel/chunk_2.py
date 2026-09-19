@@ -9,8 +9,10 @@ class ClientsExpiryPanelMixin2:
         if self._search_after is not None:
             try:
                 self.after_cancel(self._search_after)
-            except Exception:
-                pass
+            except Exception as e:
+                import logging
+
+                logging.error(f"UI Error: {e}")
         self._search_after = self.after(300, self._run_search)
 
     def _run_search(self) -> None:
@@ -23,8 +25,10 @@ class ClientsExpiryPanelMixin2:
         self._run_search()
         try:
             self.search_entry.focus_set()
-        except Exception:
-            pass
+        except Exception as e:
+            import logging
+
+            logging.error(f"UI Error: {e}")
 
     def _refresh_clients(self) -> None:
         """Group-filter menu legacy entry point (was missing → AttributeError)."""
@@ -57,5 +61,7 @@ class ClientsExpiryPanelMixin2:
             self.client_page_label.configure(text=label)
             self.client_prev.configure(state="normal" if self._page > 0 else "disabled")
             self.client_next.configure(state="normal" if self._has_more else "disabled")
-        except Exception:
-            pass
+        except Exception as e:
+            import logging
+
+            logging.error(f"UI Error: {e}")
