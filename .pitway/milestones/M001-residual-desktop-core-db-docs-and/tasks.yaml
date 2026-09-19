@@ -1,0 +1,298 @@
+schema_version: 1
+tasks:
+  - id: T001
+    name: DB pool connection audit + single-connection dashboard_snapshot
+    objective: Audit remaining raw _connect() call sites so every data path uses the
+      pool; collapse dashboard_snapshot to a single pooled connection; ensure
+      background-thread connections are closed deterministically.
+    status: ready
+    depends_on: []
+    acceptance_criteria:
+      - No stray raw _connect() call sites remain outside the pool's own opener;
+        every consumer path uses _get_pooled_conn().
+      - dashboard_snapshot performs its reads over one pooled connection.
+      - Background-thread connection scopes close deterministically and the pool
+        regression tests still pass.
+    context_files:
+      - skyadmin_pro/db/core/pool.py
+      - skyadmin_pro/db/core/connect_a.py
+      - skyadmin_pro/db/core/connect_b.py
+      - skyadmin_pro/db/core/bg_conn_a.py
+      - skyadmin_pro/db/core/bg_conn_b.py
+      - skyadmin_pro/db/core/context_a.py
+      - skyadmin_pro/db/core/context_b.py
+      - skyadmin_pro/db/tax/dashboard_b.py
+      - tests/test_db_pool.py
+    write_scope:
+      - skyadmin_pro/db/core/bg_conn_b.py
+      - skyadmin_pro/db/core/context_a.py
+      - skyadmin_pro/db/core/context_b.py
+      - skyadmin_pro/db/tax/dashboard_b.py
+      - tests/test_db_pool.py
+    verification:
+      strategy: command
+      detail: python -m pytest tests/test_db_pool.py tests/test_db_mixins.py -q
+      timeout_ms: 600000
+    result: null
+    usage: null
+  - id: T002
+    name: Narrow non-defensive bare excepts in db/services/config
+    objective: Replace remaining bare `except Exception` handlers in db/, services/
+      (non-UI), and config/ with specific exception types or an explicit
+      re-raise justification, leaving Tk-teardown defensive handlers untouched.
+    status: waiting
+    depends_on:
+      - T001
+    acceptance_criteria:
+      - Ruff lint passes with zero errors; no new bare excepts introduced.
+      - The desktop pytest suite still passes.
+      - Handlers previously swallowing genuine errors now surface or log them.
+    context_files:
+      - skyadmin_pro/db/core/init.py
+      - skyadmin_pro/db/core/queries.py
+      - skyadmin_pro/services/crypto/funcs_1.py
+      - skyadmin_pro/services/crypto/funcs_6.py
+      - skyadmin_pro/services/undo_manager.py
+      - skyadmin_pro/config/__init__.py
+      - skyadmin_pro/paths.py
+    write_scope:
+      - skyadmin_pro/db/core/init.py
+      - skyadmin_pro/db/core/queries.py
+      - skyadmin_pro/services/crypto/funcs_1.py
+      - skyadmin_pro/services/crypto/funcs_6.py
+      - skyadmin_pro/services/undo_manager.py
+      - skyadmin_pro/config/__init__.py
+      - skyadmin_pro/paths.py
+    verification:
+      strategy: command
+      detail: python -m ruff check skyadmin_pro services scripts && python -m pytest
+        tests/ -q --tb=short -x
+      timeout_ms: 1200000
+    result: null
+    usage: null
+  - id: T003
+    name: Single-source license constants
+    objective: Eliminate duplicated license/URL/legal constants so licensing.py
+      (config) is the single source and consumers import from it instead of
+      redefining.
+    status: waiting
+    depends_on:
+      - T002
+    acceptance_criteria:
+      - No duplicate license/URL constant definitions remain across services/
+        and config/.
+      - Activation and licensing tests still pass.
+    context_files:
+      - skyadmin_pro/config/licensing.py
+      - skyadmin_pro/services/license_public.py
+      - skyadmin_pro/services/_secret.py
+      - tests/test_license_security.py
+    write_scope:
+      - skyadmin_pro/config/licensing.py
+      - skyadmin_pro/services/license_public.py
+      - skyadmin_pro/services/_secret.py
+    verification:
+      strategy: command
+      detail: python -m pytest tests/test_license_security.py
+        tests/test_license_ed25519.py tests/test_activation_dialog.py -q
+      timeout_ms: 600000
+    result: null
+    usage: null
+  - id: T004
+    name: Split config/__init__.py below 100 lines
+    objective: Move remaining logic out of config/__init__.py into named
+      sub-modules, keeping the re-export surface identical, and keep each file
+      under the 100-line limit.
+    status: waiting
+    depends_on:
+      - T003
+    acceptance_criteria:
+      - config/__init__.py is under 100 lines and still re-exports every public
+        name.
+      - Import compatibility tests and the full suite pass.
+    context_files:
+      - skyadmin_pro/config/__init__.py
+      - tests/conftest.py
+    write_scope:
+      - skyadmin_pro/config/__init__.py
+    verification:
+      strategy: command
+      detail: python -m compileall -q skyadmin_pro && python -m ruff check
+        skyadmin_pro && python -m pytest tests/test_workspace_paths.py
+        tests/test_data_hygiene.py -q
+      timeout_ms: 600000
+    result: null
+    usage: null
+  - id: T005
+    name: i18n _current_lang thread-safety regression
+    objective: Verify/correct the thread safety of services/i18n.py _current_lang
+      access and add a regression test proving concurrent read/write cannot
+      corrupt language state.
+    status: waiting
+    depends_on:
+      - T004
+    acceptance_criteria:
+      - Concurrent get/set of current language is race-free (locked or isolated).
+      - A regression test provably exercises concurrent access and passes.
+    context_files:
+      - skyadmin_pro/services/i18n.py
+      - tests/test_i18n.py
+    write_scope:
+      - skyadmin_pro/services/i18n.py
+      - tests/test_i18n.py
+    verification:
+      strategy: command
+      detail: python -m pytest tests/test_i18n.py -q
+      timeout_ms: 300000
+    result: null
+    usage: null
+  - id: T006
+    name: Document XOR obfuscation as non-security boundary
+    objective: Add explicit documentation stating the XOR/byte-shift obfuscation is
+      not a security boundary (obfuscation only) and note the real cryptographic
+      control.
+    status: waiting
+    depends_on:
+      - T005
+    acceptance_criteria:
+      - The doc records the non-security status of XOR transforms and names the
+        actual crypto control.
+    context_files:
+      - docs/features/security_crypto.md
+      - skyadmin_pro/services/_protect_core.py
+    write_scope:
+      - docs/features/security_crypto.md
+    verification:
+      strategy: manual
+      detail: Review the diff against docs/features/security_crypto.md.
+    result: null
+    usage: null
+  - id: T007
+    name: Document 7-mixin MRO and cancel-edit state reset
+    objective: Add the 7-mixin MRO note to the playbook and verify the Company
+      Details cancel-edit path fully resets editing state (leaving no stale
+      dirty flags).
+    status: waiting
+    depends_on:
+      - T006
+    acceptance_criteria:
+      - The MRO for the 7-mixin view is documented in the playbook.
+      - Cancel edit resets state; the existing company-details refresh tests
+        pass.
+    context_files:
+      - docs/PROCEDURES_AND_PLAYBOOK.md
+      - skyadmin_pro/ui/views/database_tasks/view/databaseTasksViewMixin0.py
+      - skyadmin_pro/ui/views/company_details/panel/chunk_10.py
+      - skyadmin_pro/ui/views/company_details/panel/chunk_11.py
+      - tests/test_company_details_refresh.py
+    write_scope:
+      - docs/PROCEDURES_AND_PLAYBOOK.md
+      - skyadmin_pro/ui/views/company_details/panel/chunk_10.py
+      - skyadmin_pro/ui/views/company_details/panel/chunk_11.py
+      - tests/test_company_details_refresh.py
+    verification:
+      strategy: command
+      detail: python -m pytest tests/test_company_details_refresh.py
+        tests/test_general_tab_complete.py -q
+      timeout_ms: 600000
+    result: null
+    usage: null
+  - id: T008
+    name: DB index audits (DB-01/DB-03)
+    objective: Audit the >40 indexes for redundancy and note the 500+ client
+      threshold planning in DB_SCHEMA.md; fix only genuinely redundant indexes
+      found.
+    status: waiting
+    depends_on:
+      - T007
+    acceptance_criteria:
+      - DB_SCHEMA.md records the index redundancy audit outcome and the
+        threshold plan.
+      - Any dropped/redundant index keeps the suite green.
+    context_files:
+      - docs/DB_SCHEMA.md
+      - skyadmin_pro/db/migrations/m008_perf_query_indexes.py
+      - skyadmin_pro/db/migrations/runner.py
+    write_scope:
+      - docs/DB_SCHEMA.md
+    verification:
+      strategy: manual
+      detail: Review the audit record in docs/DB_SCHEMA.md.
+    result: null
+    usage: null
+  - id: T009
+    name: Worker full lifecycle integration test (T-15)
+    objective: Extend skyadmin-worker/src/integration.test.ts with a single
+      generate-to-claim-to-verify chain against the ephemeral D1 mock proving
+      end-to-end persistence and verification.
+    status: waiting
+    depends_on:
+      - T008
+    acceptance_criteria:
+      - A test exercises generate, claim, then verify in one flow and asserts
+        the license can be verified end to end.
+      - The full Vitest suite passes.
+    context_files:
+      - skyadmin-worker/src/integration.test.ts
+      - skyadmin-worker/src/routes/generate.ts
+      - skyadmin-worker/src/routes/claim.test.ts
+    write_scope:
+      - skyadmin-worker/src/integration.test.ts
+    verification:
+      strategy: command
+      detail: cd skyadmin-worker && npx vitest run src/integration.test.ts && npm test
+      timeout_ms: 900000
+    result: null
+    usage: null
+  - id: T010
+    name: Performance regression gate and flaky-test check (T-16/T-17)
+    objective: Run the performance regression suite, record the outcome, and check
+      for flaky tests (rerun shakiness) in the desktop suite.
+    status: waiting
+    depends_on:
+      - T009
+    acceptance_criteria:
+      - Performance regression tests pass and demonstrate no single-threshold
+        regression.
+      - No flaky tests are observed in a targeted rerun.
+    context_files:
+      - tests/test_performance_stress.py
+      - tests/test_performance_clients.py
+      - tests/test_visual_regression.py
+    write_scope:
+      - tests/test_performance_stress.py
+      - tests/test_performance_clients.py
+    verification:
+      strategy: command
+      detail: python -m pytest tests/test_performance_stress.py
+        tests/test_performance_clients.py -q --tb=short && python -m pytest
+        tests/test_visual_regression.py tests/test_dashboard_refresh.py -q
+      timeout_ms: 1200000
+    result: null
+    usage: null
+  - id: T011
+    name: Documentation drift sync
+    objective: Update MASTER_ROADMAP / ROADMAP status so items landed by the
+      baseline and this milestone are marked Done, and correct any doc drift
+      remaining in features docs.
+    status: waiting
+    depends_on:
+      - T010
+    acceptance_criteria:
+      - Roadmap marks the baseline + milestone items Done with no contradicting
+        open items.
+      - Doc drift checks against source of truth (config, services, worker)
+        surface no stale claims.
+    context_files:
+      - docs/MASTER_ROADMAP.md
+      - docs/ROADMAP.md
+      - docs/features/worker_api.md
+      - docs/features/database_layer.md
+    write_scope:
+      - docs/MASTER_ROADMAP.md
+      - docs/ROADMAP.md
+    verification:
+      strategy: manual
+      detail: Review roadmap diffs against the landed commit list.
+    result: null
+    usage: null
