@@ -540,7 +540,9 @@ def run_activation_standalone() -> bool:
         return True
 
     app = ctk.CTk()
-    app.withdraw()
+    app.geometry("0x0+10000+10000")
+    app.attributes("-alpha", 0.0)
+    # app.withdraw() # Caused Toplevel to be hidden by Windows WM
 
     def _finish() -> None:
         try:
