@@ -44,6 +44,8 @@ Set these on the Worker (production uses `wrangler secret put`):
 
 Generate an Ed25519 keypair (must match `skyadmin_pro/services/license_public.py`):
 
+> **Tip:** You can also generate a keypair directly in the Admin Panel → System Setup section (no local Python needed).
+
 ```bash
 python -c "
 from cryptography.hazmat.primitives.asymmetric.ed25519 import Ed25519PrivateKey

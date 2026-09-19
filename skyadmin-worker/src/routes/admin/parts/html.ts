@@ -21,7 +21,7 @@ export const getAdminHtml = (adminPath: string, csrfToken: string) => `
 <div class="pkg-head pkg-row"><span>Label</span><span>Days</span><span>Baht</span><span></span></div>
 <div id="pkgEditor"></div>
 <label>Over 1-year message</label>
-<input id="overYear" placeholder="Over 1 Year — discuss on WhatsApp">
+<input id="overYear" placeholder="Over 1 Year &#x2014; discuss on WhatsApp">
 <div class="btns" style="margin-top:8px">
 <button type="button" id="addPkgBtn" class="sm green">Add package</button>
 <button type="button" id="savePkgBtn" class="sm gray">Save packages</button>

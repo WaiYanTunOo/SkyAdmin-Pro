@@ -6,7 +6,7 @@ export const getGenerateHtml = () => `
 <input id="mid" placeholder="72FA00DC6B64525F" autocomplete="off" autocapitalize="characters" spellcheck="false">
 <label>Package</label>
 <select id="days">
-<option value="7" selected>Loading packages…</option>
+<option value="7" selected>Loading packages...</option>
 </select>
 <div id="cWrap" style="display:none"><label>Custom days</label><input id="cDays" type="number" min="1" max="36500"></div>
 <label>Org ID (optional)</label>
