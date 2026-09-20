@@ -2,10 +2,10 @@
 schema_version: 1
 id: M001
 title: Residual desktop-core, DB, docs and Worker lifecycle hardening
-status: in_progress
+status: completed
 requirement: null
 confirmed_at: 2026-09-19T18:42:37Z
-verification_approved_hash: sha256:b693694509540aec598648a850410a187a184cf4edef5e039351dacff55c185f
+verification_approved_hash: sha256:5d65ec88803945150fa710f02f1396b81d631cb0fd8c465240908c3fffeab56e
 base_branch: main
 base_revision: 1fbc0a7fb5684392e59785d3b8a61d2a6dbba96d
 acceptance_criteria:
@@ -37,6 +37,7 @@ verification:
     criterion: AC003
     type: command
     command: python -m pytest tests/ -q --tb=short
+    timeout_ms: 1200000
   - id: CT004
     criterion: AC004
     type: command
@@ -49,6 +50,7 @@ verification:
     criterion: AC006
     type: command
     command: python scripts/release_check.py
+    timeout_ms: 1800000
   - id: CT007
     criterion: AC007
     type: manual
@@ -90,3 +92,8 @@ lifecycle integration test (T-15); and the performance/flaky release gates
 ## Change Log
 
 - 2026-09-20: Draft created for residual hardening milestone (M001).
+- 2026-09-20: Amend verification plan to add `timeout_ms` to CT003 (pytest,
+  ~13 min full suite) and CT006 (release_check, ~5+ min) so the command
+  checks run to completion instead of timing out at the 120s default. CT002
+  cleared via verification-repair VR001 (ruff format 13 files; HLC ordering
+  fix in collect_local_changes for the intermittent release-check flake).
