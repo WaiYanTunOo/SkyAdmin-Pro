@@ -121,36 +121,58 @@ tasks:
     name: Single-source license constants
     objective: Eliminate duplicated license/URL/legal constants so licensing.py
       (config) is the single source and consumers import from it instead of
-      redefining.
-    status: ready
+      redefining. The five shared license setting keys
+      (SETTING_DRIVE_FILES_ENABLED, SETTING_LICENSE_DRIVE_FILES,
+      SETTING_LICENSE_SYNC, SETTING_LICENSE_WEB, SETTING_LICENSE_MAX_DEVICES)
+      are currently redefined in services/drive/keys.py; drive/keys.py must
+      import them from config instead while keeping only its Drive-OAuth/org-id
+      unique keys.
+    status: completed
     depends_on:
       - T002
     acceptance_criteria:
-      - No duplicate license/URL constant definitions remain across services/
-        and config/.
-      - Activation and licensing tests still pass.
+      - "No duplicate license/URL setting-key definitions remain across
+        services/ and config/: services/drive/keys.py imports the shared
+        SETTING_LICENSE_* keys from skyadmin_pro.config (licensing) instead of
+        redefining them."
+      - Activation, entitlement, and licensing tests still pass.
     context_files:
       - skyadmin_pro/config/licensing.py
       - skyadmin_pro/services/license_public.py
       - skyadmin_pro/services/_secret.py
-      - tests/test_license_security.py
+      - skyadmin_pro/services/drive/keys.py
+      - skyadmin_pro/config/__init__.py
     write_scope:
       - skyadmin_pro/config/licensing.py
       - skyadmin_pro/services/license_public.py
       - skyadmin_pro/services/_secret.py
+      - skyadmin_pro/services/drive/keys.py
+      - skyadmin_pro/config/__init__.py
     verification:
       strategy: command
       detail: python -m pytest tests/test_license_security.py
-        tests/test_license_ed25519.py tests/test_activation_dialog.py -q
+        tests/test_license_ed25519.py tests/test_activation_dialog.py
+        tests/test_drive_backend.py tests/test_device_limit_sync.py -q
+        --tb=short
       timeout_ms: 600000
-    result: null
+    result:
+      summary: "[truncated] as re-export for import stability) and keeps only its
+        Drive-OAuth unique keys. Scope amendments folded drive/keys.py +
+        config/__init__.py into write_scope. Verify: 39 passed
+        (license_security, license_ed25519, activation_dialog, drive_backend,
+        device_limit_sync); ruff check/format clean."
+      evidence: .......................................                                  [100%]
+        | 39 passed in 1.86s
+    attempts: 1
+    driver: big-pickle
+    model: opencode/big-pickle
     usage: null
   - id: T004
     name: Split config/__init__.py below 100 lines
     objective: Move remaining logic out of config/__init__.py into named
       sub-modules, keeping the re-export surface identical, and keep each file
       under the 100-line limit.
-    status: waiting
+    status: ready
     depends_on:
       - T003
     acceptance_criteria:
