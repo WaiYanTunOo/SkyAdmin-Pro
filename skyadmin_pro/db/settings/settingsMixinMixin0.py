@@ -79,7 +79,7 @@ class SettingsMixinMixin0:
         self._seed_checklist_templates()
 
     def get_setting(self, key: str, default: str | None = None) -> str | None:
-        with self.connection() as conn:
+        with self.read_connection() as conn:
             row = conn.execute("SELECT value FROM settings WHERE key = ?", (key,)).fetchone()
         if row is None:
             return default
@@ -96,7 +96,7 @@ class SettingsMixinMixin0:
             )
 
     def _has_table(self, name: str) -> bool:
-        with self.connection() as conn:
+        with self.read_connection() as conn:
             row = conn.execute(
                 "SELECT 1 FROM sqlite_master WHERE type='table' AND name=? LIMIT 1",
                 (name,),

@@ -8,6 +8,7 @@ from contextlib import contextmanager
 _suppress_depth = 0
 _dirty = False
 _handler: Callable[[], None] | None = None
+_in_handler = False
 
 
 def set_dirty_handler(handler: Callable[[], None] | None) -> None:
@@ -38,19 +39,22 @@ def suppress_dirty() -> Iterator[None]:
 
 def mark_dirty() -> None:
     """Flag local changes and notify the scheduler (no-op while suppressed)."""
-    global _dirty
+    global _dirty, _in_handler
     if _suppress_depth > 0:
         return
     _dirty = True
     handler = _handler
-    if handler is None:
+    if handler is None or _in_handler:
         return
+    _in_handler = True
     try:
         handler()
     except Exception as e:
         import logging
 
         logging.error(f"UI Error: {e}")
+    finally:
+        _in_handler = False
 
 
 def notify_db_write() -> None:

@@ -6,6 +6,7 @@ from skyadmin_pro.services.data_sync.dirty import (
     clear_dirty,
     is_dirty,
     mark_dirty,
+    notify_db_write,
     set_dirty_handler,
     suppress_dirty,
 )
@@ -64,3 +65,25 @@ class TestDirtyFlag:
         mark_dirty()
         clear_dirty()
         assert is_dirty() is False
+
+    def test_handler_is_called_once_when_reentrant(self):
+        calls: list[int] = []
+
+        def nested():
+            calls.append(1)
+            mark_dirty()
+
+        set_dirty_handler(nested)
+        mark_dirty()
+        assert calls == [1]
+
+    def test_notify_from_handler_read_does_not_recurse(self):
+        calls: list[int] = []
+
+        def nested():
+            calls.append(1)
+            notify_db_write()
+
+        set_dirty_handler(nested)
+        mark_dirty()
+        assert calls == [1]

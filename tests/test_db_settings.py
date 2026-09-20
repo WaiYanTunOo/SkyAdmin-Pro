@@ -27,6 +27,32 @@ class TestSettings:
         assert db.get_setting("k") == "b"
 
 
+class TestSettingReadsDoNotMarkDirty:
+    def test_get_setting_uses_read_connection(self, db):
+        from skyadmin_pro.services.data_sync.dirty import clear_dirty, is_dirty
+
+        db.set_setting("probe", "x")
+        clear_dirty()
+        assert is_dirty() is False
+        assert db.get_setting("probe") == "x"
+        assert is_dirty() is False
+
+    def test_get_setting_inside_handler_does_not_loop(self, db):
+        from skyadmin_pro.services.data_sync.dirty import clear_dirty, mark_dirty, set_dirty_handler
+
+        calls: list[int] = []
+
+        def nested():
+            calls.append(1)
+            db.get_setting("probe")
+
+        set_dirty_handler(nested)
+        mark_dirty()
+        set_dirty_handler(None)
+        clear_dirty()
+        assert calls == [1]
+
+
 class TestChecklists:
     def test_template_names_include_builtins(self, db):
         names = db.list_checklist_template_names()
