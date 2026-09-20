@@ -70,8 +70,8 @@ def decrypt_secret(
                 logger.warning("Encrypted secret could not be decrypted (wrong machine or tampered data)")
                 return ""
             continue
-        except (ValueError, OSError) as exc:
-            logger.warning("Encrypted secret decode failed: %s", exc)
+        except (ValueError, OSError):
+            logger.warning("Encrypted secret decode failed (corrupt payload)")
             return ""
     return ""
 
