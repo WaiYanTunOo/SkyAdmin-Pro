@@ -228,7 +228,7 @@ tasks:
     objective: Verify/correct the thread safety of services/i18n.py _current_lang
       access and add a regression test proving concurrent read/write cannot
       corrupt language state.
-    status: ready
+    status: completed
     depends_on:
       - T004
     acceptance_criteria:
@@ -244,14 +244,24 @@ tasks:
       strategy: command
       detail: python -m pytest tests/test_i18n.py -q
       timeout_ms: 300000
-    result: null
+    result:
+      summary: "[truncated]  every observed lang is in {en,my,th} (no torn/corrupted
+        value), final state valid, and post-quiescence reads are single-valued.
+        Existing concurrency tests only asserted no-exceptions + count; the new
+        test provably exercises concurrent get/set. Verify: 15 passed, ruff
+        check/format clean."
+      evidence: ...............                                                          [100%]
+        | 15 passed in 0.15s
+    attempts: 1
+    driver: big-pickle
+    model: opencode/big-pickle
     usage: null
   - id: T006
     name: Document XOR obfuscation as non-security boundary
     objective: Add explicit documentation stating the XOR/byte-shift obfuscation is
       not a security boundary (obfuscation only) and note the real cryptographic
       control.
-    status: waiting
+    status: ready
     depends_on:
       - T005
     acceptance_criteria:
