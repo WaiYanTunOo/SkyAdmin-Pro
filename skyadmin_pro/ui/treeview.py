@@ -409,7 +409,7 @@ class ThemedTreeview(ctk.CTkFrame):
         # If theme already applied this cycle and shared styles match,
         # skip expensive per-widget tag configuration
         if self._theme_applied_this_cycle and _SHARED_STYLE_KEY is not None:
-            self.configure(fg_color=None)  # minimal widget-level update only
+            self.configure(fg_color=table_palette(mode)["background"])
             self.tree.configure(style="Sky.Treeview")
             try:
                 self._vscroll.configure(style="Sky.Vertical.TScrollbar")

@@ -396,7 +396,7 @@ tasks:
       visual_regression/treeview_* test clusters. Real app bug introduced by the
       same baseline commit that emptied view/_const_*.py, surfaced by the T002
       rehydration.
-    status: ready
+    status: completed
     depends_on: []
     acceptance_criteria:
       - The apply_theme() fast path no longer passes None to configure(); the
@@ -422,7 +422,18 @@ tasks:
         tests/test_phase4_walkthrough.py tests/test_ui_smoke.py
         tests/test_visual_regression.py -q --tb=short
       timeout_ms: 1200000
-    result: null
+    result:
+      summary: '[truncated]  shared background color
+        (table_palette(mode)["background"]), preserving the
+        skip-expensive-tag-config behavior. All 76 previously-failing UI-cluster
+        tests across treeview_theme_cache/incremental/empty_message,
+        general_tab, dashboard_refresh, phase4, ui_smoke, visual_regression now
+        pass.'
+      evidence: ...........s............................................................
+        [ 94%] |
+        ....                                                                     [100%]
+        | 75 passed, 1 skipped in 38.64s
+    attempts: 1
     usage: null
   - id: T014
     name: Fix test_theme_cache order dependence
@@ -432,7 +443,7 @@ tasks:
       assertions fail. Make the file order-independent: each test pins the
       appearance mode it expects before applying the theme instead of relying on
       module set-up state."
-    status: ready
+    status: in_progress
     depends_on: []
     acceptance_criteria:
       - Every test in test_theme_cache.py pins the appearance mode it asserts
@@ -449,4 +460,5 @@ tasks:
       detail: python -m pytest tests/test_theme_cache.py -q --tb=short
       timeout_ms: 300000
     result: null
+    attempts: 1
     usage: null
