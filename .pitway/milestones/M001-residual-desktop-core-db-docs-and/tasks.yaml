@@ -443,7 +443,7 @@ tasks:
       assertions fail. Make the file order-independent: each test pins the
       appearance mode it expects before applying the theme instead of relying on
       module set-up state."
-    status: in_progress
+    status: completed
     depends_on: []
     acceptance_criteria:
       - Every test in test_theme_cache.py pins the appearance mode it asserts
@@ -459,6 +459,13 @@ tasks:
       strategy: command
       detail: python -m pytest tests/test_theme_cache.py -q --tb=short
       timeout_ms: 300000
-    result: null
+    result:
+      summary: "[truncated] ins the appearance mode it asserts against before
+        apply_form_theme() (plus a fixture-teardown should_apply_theme()
+        resync), making the file order-independent. Passes standalone, after
+        test_treeview_theme_cache, and after the adversarial phase4_walkthrough
+        which flips Light/Dark mid-test."
+      evidence: ....                                                                     [100%]
+        | 4 passed in 0.22s
     attempts: 1
     usage: null

@@ -19,11 +19,16 @@ def app_root():
     except Exception:
         pass
     ctk.set_appearance_mode("dark")
+    should_apply_theme()
 
 
 def test_apply_form_theme_skips_already_themed_on_second_call(app_root, monkeypatch):
     """Second call with unchanged mode should skip redundant walks."""
     root = app_root
+
+    ctk.set_appearance_mode("dark")
+    _THEMED_WIDGET_CACHE.clear()
+    should_apply_theme()
 
     # First call: widgets get themed and cached
     apply_form_theme(root)
@@ -48,6 +53,10 @@ def test_apply_form_theme_re_themes_when_mode_changes(app_root, monkeypatch):
     """Changing mode should re-theme and walk the tree again."""
     root = app_root
 
+    ctk.set_appearance_mode("dark")
+    _THEMED_WIDGET_CACHE.clear()
+    should_apply_theme()
+
     apply_form_theme(root)
     assert getattr(root, "_subtree_themed_mode", None) == "Dark"
 
@@ -71,6 +80,10 @@ def test_apply_form_theme_re_themes_when_mode_changes(app_root, monkeypatch):
 
 def test_apply_form_theme_caches_by_theme_name(app_root):
     """Cache is keyed by theme name, so different modes don't collide."""
+    ctk.set_appearance_mode("dark")
+    _THEMED_WIDGET_CACHE.clear()
+    should_apply_theme()
+
     widget = ctk.CTkEntry(app_root)
     apply_form_theme(widget)
 
@@ -87,6 +100,10 @@ def test_apply_form_theme_caches_by_theme_name(app_root):
 
 def test_should_apply_theme_clears_cache_on_mode_change(app_root):
     """should_apply_theme() should clear the cache when mode changes."""
+    ctk.set_appearance_mode("dark")
+    _THEMED_WIDGET_CACHE.clear()
+    should_apply_theme()
+
     widget = ctk.CTkFrame(app_root)
     apply_form_theme(widget)
     assert id(widget) in _THEMED_WIDGET_CACHE.get("Dark", set())
