@@ -443,7 +443,7 @@ tasks:
     objective: Update MASTER_ROADMAP / ROADMAP status so items landed by the
       baseline and this milestone are marked Done, and correct any doc drift
       remaining in features docs.
-    status: ready
+    status: completed
     depends_on:
       - T010
     acceptance_criteria:
@@ -456,13 +456,38 @@ tasks:
       - docs/ROADMAP.md
       - docs/features/worker_api.md
       - docs/features/database_layer.md
+      - skyadmin_pro/config/__init__.py
+      - skyadmin_pro/db/migrations/__init__.py
     write_scope:
       - docs/MASTER_ROADMAP.md
       - docs/ROADMAP.md
+      - docs/features/worker_api.md
+      - docs/features/database_layer.md
     verification:
       strategy: manual
       detail: Review roadmap diffs against the landed commit list.
-    result: null
+    result:
+      summary: "[truncated]  (T004); 0 bare excepts (was 100+); worker routes split
+        (claim/, sync/, records/, purge/, viewer/, admin/);
+        sync_push.ts->sync_push/; D1 migrations 0001-0010; vitest 33 files incl.
+        integration chain (T009); dashboard_snapshot single bundle_queries()
+        connection (T001). Markdown-only diff."
+      evidence: "[truncated] s/query.ts, records/summary.ts, admin/ handler/,
+        admin/session/, viewer/, sync/push.ts). ROADMAP: version + installer
+        0.3.6; schema/ package; phase 8.1 sync/register path; Quick Wins + index
+        audit, snapshot bundle, constants/config split, integration chain, theme
+        crash/order fixes; Dashboard refresh metric relaxed to 1 connection /
+        <=40 statements. worker_api.md: route table package paths
+        (claim/index.ts etc); admin handler/parts/session; D1 migrations
+        +0008-0010; sync core sync_push/; tests +sync_eligibility/sku_*/web
+        token/admin.test.parts; status +T009 +T010; known-fix locations to
+        records/query.ts + records/summary.ts. database_layer.md: 12 mixins
+        (Core + Appointments added); core/ + schema/ package paths; migrations
+        table m013-m021 + m001 package dir; decisions updated (audit done T008,
+        single-connection snapshot T001, pooling deferred); known-fix resolved
+        rows; status +T008 +T001. git status confirms only five docs + .pitway
+        tasks.yaml modified; no code files touched."
+    attempts: 1
     usage: null
   - id: T012
     name: Fix bg-thread connection close (D-03)

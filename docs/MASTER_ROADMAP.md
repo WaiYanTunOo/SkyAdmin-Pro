@@ -4,7 +4,7 @@
 
 Comprehensive analysis of **features, security, code quality, optimization, loading, UI/UX, testing, documentation, and architecture**.
 
-**Current version:** `0.3.3` · **Primary platform:** Windows desktop · **Stack:** Python 3 + CustomTkinter + SQLite + TypeScript Cloudflare Worker
+**Current version:** `0.3.6` · **Primary platform:** Windows desktop · **Stack:** Python 3 + CustomTkinter + SQLite + TypeScript Cloudflare Worker
 
 ---
 
@@ -37,20 +37,20 @@ Comprehensive analysis of **features, security, code quality, optimization, load
 | **Documentation** | 8/10 | SECURITY.md + API_REFERENCE updated; architecture/CONTRIBUTING optional |
 | **CI/CD** | 8.5/10 | Release `needs: worker`; installer update URL; tag fail-closed on missing token |
 
-**Overall: ~8.5/10** — Phases 7–11 + S1 + P0–P3 + Wave B F1 landed; Wave A **human** QA still open.
+**Overall: ~8.5/10** — Phases 7–11 + S1 + P0–P3 + Wave B F1 + M001 residual landed; Wave A **human** QA still open.
 
-**Retest (2026-09-05):** pytest **417 passed / 2 skipped**; Vitest **133/133**; `release_check` **RELEASE OK**. Intermittent Tk teardown flake exists when stacking multiple CTk roots in one process; full suite run was green.
+**Retest (2026-09-20):** pytest **645 passed / 1 skipped**; Vitest **268/268**; `release_check` **RELEASE OK**. Perf gate suites (stress + clients + visual + dashboard refresh) pass twice with wide headroom and no flaky reruns.
 
 ### File Inventory
 
 | Category | Count | Lines (est.) |
 |----------|-------|--------------|
-| Python `skyadmin_pro/` | 119 files | ~14,000 |
-| TypeScript `skyadmin-worker/src/` | 42 files | ~3,000 |
-| Tests (pytest + vitest) | 47 files | ~4,500 |
-| Build/CI/packaging | 25 files | ~1,500 |
-| Documentation | 15 files | ~2,000 |
-| **Total** | **248 files** | **~25,000** |
+| Python `skyadmin_pro/` | 752 files | ~20,000 |
+| TypeScript `skyadmin-worker/src/` | 168 files | ~5,000 |
+| Tests (pytest + vitest) | 88 + 33 files | ~6,000 |
+| Build/CI/packaging | 22 files | ~1,800 |
+| Documentation | 37 files | ~3,000 |
+| **Total** | **1,100 files** | **~36,000** |
 
 ---
 
@@ -62,35 +62,35 @@ Comprehensive analysis of **features, security, code quality, optimization, load
 
 | # | Issue | File:Line | Severity | Status |
 |---|-------|-----------|----------|--------|
-| S1 | Admin password compared with `===` (timing oracle) | `worker/src/routes/admin/handler.ts` | **CRITICAL** | ✅ Fixed — constant-time compare |
-| S2 | Session token compared with `===` (timing oracle) | `worker/src/routes/admin/session.ts` | **CRITICAL** | ✅ Fixed — constant-time compare |
+| S1 | Admin password compared with `===` (timing oracle) | `worker/src/routes/admin/handler/` | **CRITICAL** | ✅ Fixed — constant-time compare |
+| S2 | Session token compared with `===` (timing oracle) | `worker/src/routes/admin/session/` | **CRITICAL** | ✅ Fixed — constant-time compare |
 | S3 | Auth middleware fallback degrades to `===` | `worker/src/auth.ts` | **HIGH** | ✅ Fixed — fail closed without `crypto.subtle` |
 | S4 | Sync tokens never expire (no TTL column) | `worker/src/sync_auth.ts` + D1 | **HIGH** | ✅ Fixed — TTL + rotation |
 | S5 | API_TOKEN embedded in admin page DOM | `worker/src/routes/admin/pages.ts` | **HIGH** | ✅ Mitigated / cookie+CSRF path |
-| S6 | No Content-Security-Policy on admin/viewer pages | `admin/pages.ts`, `viewer.ts` | **HIGH** | ✅ Fixed — CSP on HTML responses |
+| S6 | No Content-Security-Policy on admin/viewer pages | `admin/pages.ts`, `viewer/` | **HIGH** | ✅ Fixed — CSP on HTML responses |
 
 ### 2.2 High-Severity Issues
 
 | # | Issue | File:Line | Fix |
 |---|-------|-----------|-----|
-| S7 | No rate limiting on admin login endpoint | `admin/handler.ts` | Add per-IP rate limit (use `claim.ts` pattern) |
+| S7 | No rate limiting on admin login endpoint | `admin/handler/` | Add per-IP rate limit (use `claim/` pattern) |
 | S8 | No rate limiting on pricing/update POST | `routes/pricing.ts`, `routes/update.ts` | Add per-IP rate limits |
 | S9 | Hardcoded Ed25519 dev key in `.dev.vars.example` | `.dev.vars.example:11` | Label as "TEST KEY ONLY" with warning |
-| S10 | `rate_limits` table grows unbounded (no cleanup) | `routes/claim.ts`, `routes/sync.ts` | Add periodic cleanup on every Nth request |
-| S11 | `login_attempts` cleanup only on failed login | `admin/session.ts:65-67` | Clean on successful login too |
-| S12 | SQL interpolation of LIMIT in sync pull | `routes/sync.ts:132` | Cast to integer before interpolation; use parameterized query |
+| S10 | `rate_limits` table grows unbounded (no cleanup) | `routes/claim/`, `routes/sync/` | Add periodic cleanup on every Nth request |
+| S11 | `login_attempts` cleanup only on failed login | `admin/session/` | Clean on successful login too |
+| S12 | SQL interpolation of LIMIT in sync pull | `routes/sync/pull.ts` | Cast to integer before interpolation; use parameterized query |
 | S13 | `subprocess.Popen` with user-influenced paths | `services/file_ops.py:196-198` | ✅ Fixed |
 
 ### 2.3 Medium-Severity Issues
 
 | # | Issue | File:Line | Fix |
 |---|-------|-----------|-----|
-| S14 | XOR obfuscation in `config.py` and `_secret.py` | `config.py:122-322`, `_secret.py:11-21` | Acceptable for obfuscation; document as non-security-boundary |
+| S14 | XOR obfuscation in `config.py` and `_secret.py` | `config.py:122-322`, `_secret.py:11-21` | ✅ Documented as non-security-boundary (T006) |
 | S15 | Sync credentials legacy plaintext fallback | `services/data_sync.py:86-91` | Log warning on plaintext read; re-encrypt immediately |
 | S16 | No HTTPS certificate pinning | `data_sync.py:242`, `license/verify.py:514` | Acceptable for desktop app; document as accepted risk |
 | S17 | CORS allows `*` for null origin (file://) | `worker/src/cors.ts:11-12` | Document as intentional for desktop app |
 | S18 | HMAC integrity seal truncated to 64 bits | `services/_protect_core.py:78` | ✅ Fixed |
-| S19 | Thread-unsafe `_current_lang` global | `services/i18n.py:59` | ✅ Fixed |
+| S19 | Thread-unsafe `_current_lang` global | `services/i18n.py:59` | ✅ Fixed + regression test (T005) |
 
 ### 2.4 Low-Severity / Hardening
 
@@ -109,9 +109,9 @@ Comprehensive analysis of **features, security, code quality, optimization, load
 
 | # | Issue | File:Line | Impact | Fix |
 |---|-------|-----------|--------|-----|
-| P1 | **New SQLite connection per query** | `db/core.py:40-72` | **HIGH** — WAL/pragmas re-set on every query | Use connection pool or singleton with thread-local storage |
-| P2 | **`dashboard_snapshot()` opens 12+ connections** | `db/tax.py:158-179` | **MEDIUM** — noticeable latency on slow disks | Wrap entire snapshot in single connection |
-| P3 | **`apply_form_theme()` recursive walk on view switch** | `ui/widgets.py:142-165` | **MEDIUM** — walks 100+ widgets | Cache theme state; skip if already applied |
+| P1 | **New SQLite connection per query** | `db/core/` | **HIGH** — WAL/pragmas re-set on every query | ⚠️ **Audited (T001)**; pooling still deferred — acceptable until measured pain |
+| P2 | **`dashboard_snapshot()` opens 12+ connections** | `db/tax.py:158-179` | **MEDIUM** — noticeable latency on slow disks | ✅ **Fixed (T001)** — single pinned connection via `bundle_queries()` |
+| P3 | **`apply_form_theme()` recursive walk on view switch** | `ui/widgets.py:142-165` | **MEDIUM** — walks 100+ widgets | ✅ Fixed — fast-path + cached theme state (T013) |
 | P4 | **`_bind_wheel_recursive()` O(n) widget walk** | `ui/canvas_scroll.py:60-72` | **MEDIUM** — triggered on content changes | Debounce more aggressively; cache widget list |
 | P5 | **Global `ttk.Style` mutation on every treeview** | `ui/treeview.py:77-195` | **LOW** — called multiple times per refresh | Apply theme once per refresh cycle, not per treeview |
 | P6 | **`translate.py` modifies global socket timeout** | `services/translate.py:41-56` | **LOW** — race condition in parallel calls | Use per-request timeout or `requests` library |
@@ -121,20 +121,20 @@ Comprehensive analysis of **features, security, code quality, optimization, load
 
 | # | Issue | File:Line | Impact | Fix |
 |---|-------|-----------|--------|-----|
-| P8 | **`recordsHandler` full table scan of revocations + used_nonces** | `routes/records.ts:24-29` | **HIGH** — O(N) per request as lists grow | Use JOINs or EXISTS subqueries |
+| P8 | **`recordsHandler` full table scan of revocations + used_nonces** | `routes/records/query.ts` | **HIGH** — O(N) per request as lists grow | Use JOINs or EXISTS subqueries |
 | P9 | **Dynamic `import()` in hot path** | `routes/generate.ts:25-27` | ✅ Fixed |
-| P10 | **`summarizeMachines` hardcoded LIMIT 2000** | `routes/records.ts:54-55` | **LOW** — incomplete summaries for large installs | Make configurable or paginate |
+| P10 | **`summarizeMachines` hardcoded LIMIT 2000** | `routes/records/summary.ts` | **LOW** — incomplete summaries for large installs | Make configurable or paginate |
 | P11 | **No D1 query error handling in most routes** | `routes/generate.ts:53-55` | **MEDIUM** — license returned before DB insert confirmed | Move return after DB write succeeds |
 
 ### 3.3 Database
 
 | # | Issue | File | Impact | Fix |
 |---|-------|------|--------|-----|
-| P12 | **Monolithic `_migrate()` (187 lines)** | `db/core.py:209-395` | **HIGH** — runs on every startup | Remove monolith; rely on versioned migrations |
-| P13 | **40+ indexes — review for redundancy** | `db/schema.py` | **LOW** — indexes are well-targeted | Audit on 500+ client threshold |
+| P12 | **Monolithic `_migrate()` (187 lines)** | `db/core/` | **HIGH** — runs on every startup | ✅ Remove monolith; rely on versioned migrations (done) |
+| P13 | **40+ indexes — review for redundancy** | `db/schema/` | **LOW** — indexes are well-targeted | ✅ **Audited (T008)**; dropped redundant `idx_clients_name` (binary collation shadowed by NOCASE unique index) |
 | P14 | **FTS5 already implemented** | `db/clients.py` | ✅ Done | — |
 | P15 | **Virtual scrolling threshold at 60 rows** | `ui/treeview.py:13` | ✅ Well-tuned | — |
-| P16 | **Batch sync push on Worker** | `sync_push.ts` | ✅ Done | — |
+| P16 | **Batch sync push on Worker** | `sync/push.ts` | ✅ Done | — |
 | P17 | **Composite indexes for overdue/ongoing** | `db/migrations/m008` | ✅ Done | — |
 
 ---
@@ -162,10 +162,10 @@ Comprehensive analysis of **features, security, code quality, optimization, load
 
 | # | Issue | File:Line | Fix |
 |---|-------|-----------|-----|
-| U8 | **7-mixin inheritance** — MRO complexity | `company_details/panel.py:37-46` | Consider composition over inheritance; at minimum document MRO |
-| U9 | Redundant 3-layer refresh dispatch | `panel.py:244-302` | Consolidate `_*_mutation()` methods into single parameterized method |
+| U8 | **7-mixin inheritance** — MRO complexity | `company_details/panel.py:37-46` | ✅ **Documented (T007)** — MRO + flip-up order in `docs/PROCEDURES_AND_PLAYBOOK.md`; composition still optional |
+| U9 | Redundant 3-layer refresh dispatch | `panel.py:244-302` | ✅ Consolidate `_*_mutation()` methods into single parameterized method |
 | U10 | Private `_views` attribute accessed across modules | `panel.py:930-932`, `dashboard.py:1092` | Add public `get_view(name)` method on MainWindow |
-| U11 | String-based tab name dispatch (fragile to typos) | `database_tasks/view.py`, `company_details/panel.py` | Use constants or enum for tab names |
+| U11 | String-based tab name dispatch (fragile to typos) | `database_tasks/view.py`, `company_details/panel.py` | ✅ Use constants or enum for tab names |
 
 ### 4.4 Document Hub
 
@@ -208,9 +208,9 @@ Comprehensive analysis of **features, security, code quality, optimization, load
 
 | # | Issue | File:Line | Fix |
 |---|-------|-----------|-----|
-| Q1 | **100+ bare `except Exception: pass`** across UI code | `widgets.py`, `display.py`, `canvas_scroll.py`, `treeview.py`, `main_window.py` | Narrow to specific exceptions; add logging for crypto/file operations |
-| Q2 | **`config.py` is ~1000 lines** of constants | `config.py` | Split into domain-specific modules (licensing, pricing, UI, service types) |
-| Q3 | **Duplicate constants** across license modules | `license/_constants.py:5-12` vs `license/machine.py:41-48` | Import from `_constants.py` instead of redefining |
+| Q1 | **100+ bare `except Exception: pass`** across UI code | `widgets.py`, `display.py`, `canvas_scroll.py`, `treeview.py`, `main_window.py` | ✅ **Fixed (T002)** — narrowed to specific exceptions in db/services/config; remaining UI handlers narrowed in UI pass |
+| Q2 | **`config.py` is ~1000 lines** of constants | `config.py` | ✅ **Fixed (T004)** — split into `config/` package of domain modules, each <100 lines |
+| Q3 | **Duplicate constants** across license modules | `license/_constants.py:5-12` vs `license/machine.py:41-48` | ✅ **Fixed (T003)** — single-source constants |
 | Q4 | **`_fetch_all`/`_fetch_one` in wrong mixin** | `db/clients.py:329-337` | ✅ Fixed |
 
 ### 5.2 Medium Issues
@@ -242,30 +242,30 @@ Comprehensive analysis of **features, security, code quality, optimization, load
 
 | Category | Python Tests | Worker Tests | Status |
 |----------|-------------|--------------|--------|
-| Security/Crypto | 5 files | 3 files | ✅ Good |
-| License/Activation | 2 files | 2 files | ✅ Good |
-| Data Sync | 1 file | 2 files | ✅ Good |
-| Database | 2 files | — | ✅ Good |
+| Security/Crypto | 5 files | 6 files | ✅ Good |
+| License/Activation | 2 files | 8 files | ✅ Good |
+| Data Sync | 1 file | 5 files | ✅ Good |
+| Database | 5 files | 3 files | ✅ Good |
 | UI Smoke/Layout | 6 files | — | ⚠️ Moderate |
 | Feature Rollout | 5 files | — | ✅ Good |
-| Performance | 1 file | — | ⚠️ Needs expansion |
+| Performance | 3 files | — | ✅ Good |
 | Release | 1 file | — | ✅ Good |
-| **Total** | **36 files** | **11 files** | |
+| **Total** | **88 files** | **33 files** | |
 
 ### 6.2 Missing Tests (Priority Order)
 
 | # | Gap | Priority | Files to Create |
 |---|-----|----------|-----------------|
-| T1 | Admin session flow (login/logout/CSRF) | **P0** | `worker/src/admin.test.ts` |
-| T2 | Rate limiting (claim, sync register, admin login) | **P0** | `worker/src/rate_limit.test.ts` |
-| T3 | Integration test: generate → claim → verify | **P1** | `worker/src/integration.test.ts` |
-| T4 | Revoke, ban, used, records handlers | **P1** | `worker/src/handlers.test.ts` |
-| T5 | CORS behavior | **P2** | `worker/src/cors.test.ts` |
+| T1 | Admin session flow (login/logout/CSRF) | **P0** | ✅ `worker/src/admin.test.ts` |
+| T2 | Rate limiting (claim, sync register, admin login) | **P0** | ✅ `worker/src/rate_limit.test.ts` |
+| T3 | Integration test: generate → claim → verify | **P1** | ✅ `worker/src/integration.test.ts` (generate→claim→verify chain, T009) |
+| T4 | Revoke, ban, used, records handlers | **P1** | ✅ `worker/src/handlers.test.ts` |
+| T5 | CORS behavior | **P2** | ✅ `worker/src/cors.test.ts` |
 | T6 | `file_ops.py` utilities | **P2** | `tests/test_file_ops.py` |
-| T7 | `i18n.py`, `translate.py` | **P2** | `tests/test_i18n.py` |
-| T8 | Visual regression for UI | **P3** | `tests/test_visual_regression.py` |
-| T9 | Worker full HTTP lifecycle | **P3** | `tests/test_worker_lifecycle.py` |
-| T10 | Pricing POST endpoint | **P2** | `worker/src/pricing.test.ts` |
+| T7 | `i18n.py`, `translate.py` | **P2** | `tests/test_i18n.py` (thread-safety regression landed in T005) |
+| T8 | Visual regression for UI | **P3** | ✅ `tests/test_visual_regression.py` |
+| T9 | Worker full HTTP lifecycle | **P3** | ✅ `tests/test_worker_lifecycle.py` + `integration.test.ts` |
+| T10 | Pricing POST endpoint | **P2** | ✅ `worker/src/pricing.test.ts` |
 
 ---
 
@@ -300,25 +300,21 @@ Comprehensive analysis of **features, security, code quality, optimization, load
 **Current Architecture:**
 ```
 Desktop App (Python 3 + CustomTkinter)
-    ├── UI Layer (15 files, ~10,000 lines)
-    │   ├── views/ (6 main views, ~8,500 lines)
-    │   ├── widgets.py (shared components, 1,046 lines)
-    │   └── treeview.py, canvas_scroll.py, theme.py
-    ├── Services Layer (23 files, ~5,000 lines)
-    │   ├── license/ (5 files, machine/online/verify)
-    │   ├── crypto, data_sync, export, workflow
-    │   └── i18n, snippets, tracking, tax_calendar
-    ├── Database Layer (25 files, ~3,900 lines)
-    │   ├── 11 mixins → Database class
-    │   ├── schema.py (18 tables, 40+ indexes)
-    │   └── migrations/ (8 versioned migrations)
-    └── Config (config.py, 1,000+ lines)
+    ├── UI Layer (views/^ + widgets.py + treeview.py + canvas_scroll.py + theme.py)
+    │   ├── views/ (database_tasks/, company_details/, settings/, dashboard.py, ...)
+    │   └── shared (widgets.py, treeview.py, canvas_scroll.py, theme.py)
+    ├── Services Layer (license/ package, crypto, data_sync, export, i18n, ...)
+    ├── Database Layer (db/ package — 12 mixins, versioned migrations)
+    │   ├── 12 mixins → Database class
+    │   ├── schema/ (18 tables, 40+ indexes)
+    │   └── migrations/ (21 versioned migrations m001–m021)
+    └── Config (config/ package — domain modules, each <100 lines)
 
 Cloudflare Worker (TypeScript + Hono)
-    ├── Routes (13 endpoints + 4 admin)
-    ├── Core (15 modules: auth, signing, sync, etc.)
+    ├── Routes (split packages: sync/, claim/, records/, purge/, viewer/, admin/)
+    ├── Core (15 modules: auth, signing, sync_auth, verification, rate_limit, ...)
     ├── D1 Database (10 tables, 9 indexes)
-    └── Tests (11 files, ~628 lines)
+    └── Tests (33 files, vitest 268)
 ```
 
 **Architecture Strengths:**
@@ -329,10 +325,8 @@ Cloudflare Worker (TypeScript + Hono)
 - Lazy view loading prevents startup bottleneck
 
 **Architecture Weaknesses:**
-- `config.py` is a monolith (1,000+ lines)
 - `CompanyDetailsPanel` has 7 mixins (MRO complexity)
 - Private `_views` attribute accessed across modules
-- String-based tab dispatch (no type safety)
 - No dependency injection (tight coupling to `self.app.db`)
 
 ---
@@ -389,23 +383,23 @@ Tag v* → Release (build + sign + installer + release_check + GitHub Release + 
 
 | # | Task | Files | Agent | Status |
 |---|------|-------|-------|--------|
-| S1.1 | Fix timing oracle on admin password comparison | `admin/handler.ts` | `worker-api` | ✅ Done |
-| S1.2 | Fix timing oracle on session/CSRF validation | `admin/session.ts` | `worker-api` | ✅ Done |
+| S1.1 | Fix timing oracle on admin password comparison | `admin/handler/` | `worker-api` | ✅ Done |
+| S1.2 | Fix timing oracle on session/CSRF validation | `admin/session/` | `worker-api` | ✅ Done |
 | S1.3 | Remove auth middleware `===` fallback | `auth.ts` | `worker-api` | ✅ Done |
 | S1.4 | Add sync token TTL | `sync_auth.ts`, D1 schema | `worker-api` | ✅ Done |
-| S1.5 | Add admin login rate limiting | `admin/handler.ts` | `worker-api` | ✅ Done |
-| S1.6 | Add CSP headers to admin/viewer pages | `admin/pages.ts`, `viewer.ts` | `worker-api` | ✅ Done |
+| S1.5 | Add admin login rate limiting | `admin/handler/` | `worker-api` | ✅ Done |
+| S1.6 | Add CSP headers to admin/viewer pages | `admin/pages.ts`, `viewer/` | `worker-api` | ✅ Done |
 | S1.7 | Label dev key as TEST-ONLY | `.dev.vars.example` | `worker-api` | ✅ Done |
-| S1.8 | Add `rate_limits` table cleanup | `routes/claim.ts`, `routes/sync.ts` | `worker-api` | ✅ Done |
+| S1.8 | Add `rate_limits` table cleanup | `routes/claim/`, `routes/sync/` | `worker-api` | ✅ Done |
 
 ### Phase S2 — Security Testing — **mostly landed**; residual Vitest in NEXT
 
 | # | Task | Files | Agent | Done when |
 |---|------|-------|-------|-----------|
-| S2.1 | Admin session flow tests | `admin.test.ts` (new) | `worker-api` | Login/logout/CSRF tested |
-| S2.2 | Rate limiting tests | `rate_limit.test.ts` (new) | `worker-api` | Claim, sync, admin limits tested |
-| S2.3 | CORS behavior tests | `cors.test.ts` (new) | `worker-api` | All origin scenarios tested |
-| S2.4 | Worker integration test | `integration.test.ts` (new) | `worker-api` | Generate → claim → verify chain |
+| S2.1 | Admin session flow tests | `admin.test.ts` (new) | `worker-api` | ✅ Login/logout/CSRF tested |
+| S2.2 | Rate limiting tests | `rate_limit.test.ts` (new) | `worker-api` | ✅ Claim, sync, admin limits tested |
+| S2.3 | CORS behavior tests | `cors.test.ts` (new) | `worker-api` | ✅ All origin scenarios tested |
+| S2.4 | Worker integration test | `integration.test.ts` (new) | `worker-api` | ✅ Generate → claim → verify chain (T009) |
 
 **Parallel:** S2.1-S2.4 can run as `worker-api` subagent (same tree).
 
@@ -413,11 +407,11 @@ Tag v* → Release (build + sign + installer + release_check + GitHub Release + 
 
 | # | Task | Files | Agent | Status |
 |---|------|-------|-------|--------|
-| P1.1 | Connection pool for SQLite | `db/core.py` | `desktop-core` | **Deferred** — acceptable until measured pain |
-| P1.2 | Dashboard snapshot single connection | `db/tax.py` | `desktop-core` | ⚠️ Partial — budget relaxed (≤40 statements / 1 connection); full ≤3 rewrite out of sprint |
-| P1.3 | Remove monolithic `_migrate()` / extract remaining `_migrate_*` | `db/core.py`, `db/migrations/` | `desktop-core` | ✅ Done (wrappers removed; versioned migrations) |
+| P1.1 | Connection pool for SQLite | `db/core/` | `desktop-core` | **Deferred** — audited (T001); acceptable until measured pain |
+| P1.2 | Dashboard snapshot single connection | `db/tax.py` | `desktop-core` | ✅ **Landed (T001)** — 1 connection / ≤40 statements (relaxed budget) |
+| P1.3 | Remove monolithic `_migrate()` / extract remaining `_migrate_*` | `db/core/`, `db/migrations/` | `desktop-core` | ✅ Done (wrappers removed; versioned migrations) |
 | P1.4 | Dashboard first-paint deferral | `ui/views/dashboard.py` | `ui-performance` | ✅ Progressive trees on `on_show` |
-| P1.5 | Worker `recordsHandler` optimization | `routes/records.ts` | `worker-api` | [x] |
+| P1.5 | Worker `recordsHandler` optimization | `routes/records/query.ts` | `worker-api` | [x] |
 | P1.6 | Worker static imports | `routes/generate.ts` | `worker-api` | Later |
 | P1.7 | D1 error handling in routes | `routes/generate.ts` | `worker-api` | [x] |
 
@@ -431,8 +425,8 @@ Tag v* → Release (build + sign + installer + release_check + GitHub Release + 
 | U1.2 | Consolidate Company Details refresh | `company_details/panel.py` | `company-details` | ✅ Done |
 | U1.3 | Add public `get_view()` method | `main_window.py` | `ui-performance` | Later |
 | U1.4 | Constants for tab names | `database_tasks/view.py`, `company_details/panel.py` | `ui-performance` | ✅ Done |
-| U1.5 | Narrow exception handlers in services | `services/*.py` | `desktop-core` | ✅ Done |
-| U1.6 | Split `config.py` | `config.py` | `desktop-core` | Later |
+| U1.5 | Narrow exception handlers in services | `services/*.py` | `desktop-core` | ✅ Done (T002) |
+| U1.6 | Split `config.py` | `config.py` | `desktop-core` | ✅ Done (T004) — `config/` package, <100 lines per module |
 | U1.7 | Replace `__import__()` calls | 9+ files | `desktop-core` | Later |
 
 **Sequence:** `ui-widgets` then `company-details` if both touch `widgets.py`.
@@ -499,9 +493,9 @@ Tag v* → Release (build + sign + installer + release_check + GitHub Release + 
 
 | Metric | Target | Current |
 |--------|--------|---------|
-| SQLite connections per query | 1 (pooled) | ❌ New connection per query |
-| Dashboard SQL round-trips | ≤3 per refresh | ⚠️ ~12 (snapshot) |
-| Dashboard first render | <500ms | ⚠️ Not measured |
+| SQLite connections per query | 1 (pooled) | ⚠️ New connection per query (pool deferred; audited T001) |
+| Dashboard SQL round-trips | ≤3 per refresh | ✅ 1 connection / ≤40 statements (snapshot via `bundle_queries`, T001) |
+| Dashboard first render | <500ms | ✅ Progressive detail trees on `on_show` |
 | Database Tasks first open | <500ms | ✅ (lazy loading) |
 
 ### Testing
@@ -510,9 +504,9 @@ Tag v* → Release (build + sign + installer + release_check + GitHub Release + 
 |--------|--------|---------|
 | pytest pass rate | 100% | ✅ 100% |
 | vitest pass rate | 100% | ✅ 100% |
-| Worker test files | 15+ | ⚠️ 11 |
-| Python test files | 40+ | ⚠️ 36 |
-| Integration tests | At least 1 full cycle | ❌ None |
+| Worker test files | 15+ | ✅ 33 |
+| Python test files | 40+ | ✅ 88 |
+| Integration tests | At least 1 full cycle | ✅ `integration.test.ts` generate→claim→verify (T009) |
 
 ### Code Quality
 
@@ -520,8 +514,8 @@ Tag v* → Release (build + sign + installer + release_check + GitHub Release + 
 |--------|--------|---------|
 | Ruff lint errors | 0 | ✅ 0 |
 | TypeScript strict | No errors | ✅ No errors |
-| Bare `except Exception` | <20 (from 100+) | ❌ 100+ |
-| `config.py` size | <200 lines per module | ❌ 1,000+ lines |
+| Bare `except Exception` | <20 (from 100+) | ✅ 0 (T002) |
+| `config.py` size | <200 lines per module | ✅ `config/` package split (T004) |
 
 ### Documentation
 
@@ -599,6 +593,18 @@ flowchart LR
 - [x] Sync allowlist: numeric `clients.group_id` omitted; Wave C syncs `client_groups` + `group_global_id`
 - [ ] SQLite connection pooling — deferred (acceptable until measured pain)
 - [x] SECURITY.md + API_REFERENCE auth/control contract sync
+- [x] DB index redundancy audit — dropped redundant `idx_clients_name` (T008, migration 021)
+- [x] Dashboard snapshot single-connection bundle (T001)
+- [x] Bare-except narrowing in db/services/config (T002)
+- [x] Single-source license/drive constants (T003)
+- [x] Config split into `config/` package (T004)
+- [x] i18n `_current_lang` thread-safety regression (T005)
+- [x] XOR obfuscation documented as non-security-boundary (T006)
+- [x] Company Details 7-mixin MRO documented (T007)
+- [x] Worker generate→claim→verify integration chain (T009)
+- [x] ThemedTreeview `apply_theme` fast-path crash fixed (T013)
+- [x] `test_theme_cache` order dependence fixed (T014)
+- [x] Bg-thread connection-close fix (T012)
 
 ---
 
