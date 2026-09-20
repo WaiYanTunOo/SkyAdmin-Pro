@@ -71,6 +71,14 @@
    - **Exception**: Supplier services (e.g. Attori) are **excluded** from this rule. Expired supplier obligations must continue to display on the dashboard until they are explicitly marked as paid or renewed.
    - **Implementation**: Handled natively in Python inside `dashboard_snapshot` via `exclude_expired=True` on `list_expiring_documents()` and `list_tasks()`, combined with an explicit connection-pinned SQL query in `dashboard_counts()` to ensure counts accurately reflect the filtered state without breaking connection tracking.
 
+### 2.5 CompanyDetailsPanel Mixin MRO
+- **Definition**: `CompanyDetailsPanel` (in `skyadmin_pro/ui/views/company_details/panel/__init__.py`) composes 19 panel chunk mixins (`CompanyDetailsPanelMixin0`…`Mixin18`, each under 100 lines in `panel/chunk_*.py`) followed by the 5 sub-tab mixins (`GeneralTabMixin`, `TaxIdsTabMixin`, `FilingTabMixin`, `VoCshTabMixin`, `FinancialDocsTabMixin`) and then `ctk.CTkFrame`.
+- **Resolution rule**: Python C3 MRO searches bases left→right. Base order in the class statement sets priority: **panel chunk mixins first (highest), then sub-tab mixins, then `CTkFrame`**. A method defined by an earlier base shadows the same method in later bases.
+- **Panel-level vs sub-tab dispatch**:
+  - Refresh dispatch (`refresh`, `refresh_active_subtab`, `_refresh_after_mutation`) lives on the **panel** chunk mixins (`panel/chunk_5.py`), NOT on sub-tab mixins — sub-tab mixins only implement their own `_refresh_<tab>_subtab` on panel mixins. Never move refresh dispatch into a sub-tab mixin.
+  - Editing state (`_editing_service_id`, `_editing_doc_id`), Ctrl+S routing (`_on_shortcut_save` in `chunk_2.py`), sub-tab/company change resets, and cancel-edit live on panel chunk mixins so they always win over sub-tab scope.
+- **Cancel-edit completeness**: `_cancel_service_edit()` (`chunk_10.py`) and `_cancel_document_edit()` (`chunk_11.py`) must clear the editing ID **and** reset every form widget to its "New record" default, including the type dropdowns (`service_type` → first service type; `doc_type` → `IMPORTANT_DOC_TYPES[0]`). A stale type dropdown is a stale dirty flag.
+
 ---
 
 ## 3. Fast Verification & Testing Playbook

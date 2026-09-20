@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 from skyadmin_pro.config import (
+    IMPORTANT_DOC_TYPES,
     SERVICE_PROGRESS,
 )
 
@@ -15,6 +16,8 @@ class CompanyDetailsPanelMixin11:
         self._editing_doc_id = None
         if hasattr(self, "document_status_label"):
             self.document_status_label.configure(text="New document record")
+        if hasattr(self, "doc_type"):
+            self.doc_type.set(IMPORTANT_DOC_TYPES[0])
         if hasattr(self, "doc_expiry"):
             self.doc_expiry.set("")
             self.doc_file.set("")

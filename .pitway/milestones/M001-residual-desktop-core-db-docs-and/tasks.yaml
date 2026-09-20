@@ -292,7 +292,7 @@ tasks:
     objective: Add the 7-mixin MRO note to the playbook and verify the Company
       Details cancel-edit path fully resets editing state (leaving no stale
       dirty flags).
-    status: ready
+    status: completed
     depends_on:
       - T006
     acceptance_criteria:
@@ -315,14 +315,22 @@ tasks:
       detail: python -m pytest tests/test_company_details_refresh.py
         tests/test_general_tab_complete.py -q
       timeout_ms: 600000
-    result: null
+    result:
+      summary: "T007 completed: 7-mixin MRO documented in playbook section 2.5;
+        cancel-edit now resets service_type/doc_type dropdowns; 3 regression
+        tests added; 31 passed."
+      evidence: ...............................                                          [100%]
+        | 31 passed in 0.62s
+    attempts: 1
+    driver: big-pickle
+    model: opencode/big-pickle
     usage: null
   - id: T008
     name: DB index audits (DB-01/DB-03)
     objective: Audit the >40 indexes for redundancy and note the 500+ client
       threshold planning in DB_SCHEMA.md; fix only genuinely redundant indexes
       found.
-    status: waiting
+    status: ready
     depends_on:
       - T007
     acceptance_criteria:
