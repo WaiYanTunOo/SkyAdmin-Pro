@@ -9,3 +9,4 @@ cryptography>=46.0.6,<51
 fpdf2>=2.8.0
 sqlcipher3>=0.6.2
 uharfbuzz>=0.40.0
+tomli>=2.0.0; python_version < "3.11"

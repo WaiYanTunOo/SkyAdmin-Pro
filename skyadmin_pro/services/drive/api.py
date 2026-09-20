@@ -46,7 +46,7 @@ def refresh_access_token(db) -> str:
     ).encode()
     req = urllib.request.Request(TOKEN_URI, data=data, method="POST")
     try:
-        with urllib.request.urlopen(req, timeout=30) as resp:
+        with urllib.request.urlopen(req, timeout=30) as resp:  # nosec B310 - fixed https TOKEN_URI
             payload = json.loads(resp.read().decode())
     except urllib.error.HTTPError as exc:
         raise DriveApiError(f"Token refresh failed: {exc.code}") from exc

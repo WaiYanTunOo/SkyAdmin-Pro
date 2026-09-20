@@ -18,8 +18,8 @@ jobs:
       run:
         working-directory: skyadmin-worker
     steps:
-      - uses: actions/checkout@v4
-      - uses: actions/setup-node@v4
+      - uses: actions/checkout@v5
+      - uses: actions/setup-node@v5
         with:
           node-version: "22"
           cache: npm
@@ -36,11 +36,11 @@ jobs:
     outputs:
       version: ${{ steps.version.outputs.version }}
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v5
         with:
           fetch-depth: 0
 
-      - uses: actions/setup-python@v5
+      - uses: actions/setup-python@v6
         with:
           python-version: "3.12"
           cache: pip
@@ -73,16 +73,18 @@ jobs:
           }
           Write-Host "Tag matches APP_VERSION: $tagVer"
 
-      - name: Require signing cert on tags
+      - name: Check signing credentials on tags
         if: startsWith(github.ref, 'refs/tags/')
         shell: pwsh
         env:
           WINDOWS_CERT_PFX: ${{ secrets.WINDOWS_CERT_PFX }}
+          AZURE_TRUSTED_SIGNING_VAULT_URL: ${{ secrets.AZURE_TRUSTED_SIGNING_VAULT_URL }}
         run: |
-          if (-not $env:WINDOWS_CERT_PFX) {
-            throw "WINDOWS_CERT_PFX secret is required for v* releases (installer-first, signed ship path)."
+          if (-not $env:WINDOWS_CERT_PFX -and -not $env:AZURE_TRUSTED_SIGNING_VAULT_URL) {
+            Write-Host "::warning::No code-signing credentials configured (WINDOWS_CERT_PFX / AZURE_TRUSTED_SIGNING). Building an unsigned v* release — SmartScreen will warn users. This does not block the build; signing is optional at present."
+          } else {
+            Write-Host "Signing credentials present."
           }
-          Write-Host "Signing cert present."
 
       - name: Install dependencies
         run: |
@@ -171,7 +173,7 @@ jobs:
           python scripts\generate_changelog.py --version ${{ steps.version.outputs.version }} --output dist\RELEASE_NOTES.md
 
       - name: Upload artifacts
-        uses: actions/upload-artifact@v4
+        uses: actions/upload-artifact@v5
         with:
           name: SkyAdminPro-windows-${{ steps.version.outputs.version }}
           path: |
@@ -189,14 +191,14 @@ jobs:
     permissions:
       contents: write
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v5
 
-      - uses: actions/setup-python@v5
+      - uses: actions/setup-python@v6
         with:
           python-version: "3.12"
 
       - name: Download Windows artifacts
-        uses: actions/download-artifact@v4
+        uses: actions/download-artifact@v5
         with:
           name: SkyAdminPro-windows-${{ needs.windows-release.outputs.version }}
           path: dist

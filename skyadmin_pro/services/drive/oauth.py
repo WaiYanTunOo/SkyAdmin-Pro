@@ -33,7 +33,7 @@ def _exchange_code(client_id: str, client_secret: str, code: str, redirect_uri: 
         }
     ).encode()
     req = urllib.request.Request(TOKEN_URI, data=data, method="POST")
-    with urllib.request.urlopen(req, timeout=30) as resp:
+    with urllib.request.urlopen(req, timeout=30) as resp:  # nosec B310 - fixed https TOKEN_URI
         return json.loads(resp.read().decode())
 
 

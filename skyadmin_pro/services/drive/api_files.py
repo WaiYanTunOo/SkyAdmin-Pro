@@ -41,7 +41,7 @@ def download_bytes(access: str, file_id: str) -> bytes:
     url = f"{DRIVE_API}/files/{urllib.parse.quote(file_id)}?alt=media"
     req = urllib.request.Request(url, headers={"Authorization": f"Bearer {access}"})
     try:
-        with urllib.request.urlopen(req, timeout=60) as resp:
+        with urllib.request.urlopen(req, timeout=60) as resp:  # nosec B310 - fixed https DRIVE_API url
             return resp.read()
     except urllib.error.HTTPError as exc:
         raise DriveApiError(f"Drive download failed: {exc.code}") from exc

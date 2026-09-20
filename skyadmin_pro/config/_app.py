@@ -9,7 +9,10 @@ from pathlib import Path
 def _resolve_app_version() -> str:
     """Read version from pyproject.toml (dev + frozen bundle) with safe fallback."""
     try:
-        import tomllib
+        try:
+            import tomllib
+        except ImportError:  # Python < 3.11
+            import tomli as tomllib  # type: ignore[no-redef]
 
         candidates: list[Path] = []
         if getattr(sys, "frozen", False) and hasattr(sys, "_MEIPASS"):

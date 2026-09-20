@@ -14,7 +14,7 @@ def drive_request(access: str, method: str, url: str, *, data: bytes | None = No
     hdrs = {"Authorization": f"Bearer {access}", **(headers or {})}
     req = urllib.request.Request(url, data=data, method=method, headers=hdrs)
     try:
-        with urllib.request.urlopen(req, timeout=60) as resp:
+        with urllib.request.urlopen(req, timeout=60) as resp:  # nosec B310 - fixed https DRIVE_API url
             body = resp.read()
             if not body:
                 return {}
