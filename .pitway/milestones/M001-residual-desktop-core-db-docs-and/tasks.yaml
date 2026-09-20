@@ -370,7 +370,7 @@ tasks:
     objective: Extend skyadmin-worker/src/integration.test.ts with a single
       generate-to-claim-to-verify chain against the ephemeral D1 mock proving
       end-to-end persistence and verification.
-    status: ready
+    status: completed
     depends_on:
       - T008
     acceptance_criteria:
@@ -387,13 +387,25 @@ tasks:
       strategy: command
       detail: cd skyadmin-worker && npx vitest run src/integration.test.ts && npm test
       timeout_ms: 900000
-    result: null
+    result:
+      summary: "[truncated] s resigned (license_key updated) and the nonce is burned
+        in used_nonces. The mock DB previously failed to record burns (INSERT OR
+        IGNORE INTO used_nonces was unmatched), so the mock matcher was widened
+        to 'INTO used_nonces'. Full Vitest suite passes (268 tests) and tsc
+        --noEmit is clean."
+      evidence: "n-worker/\e[39mnode_modules/\e[4mhono\e[24m/dist/compose.js:22:17\e[\
+        90m)\e[39m | at
+        \e[90mfile:///D:/StudioProjects/SkyAdmin-Pro-main/skyadmin-worker/\e[39\
+        mnode_modules/\e[4mhono\e[24m/dist/hono-base.js:307:25"
+    attempts: 1
+    driver: opencode
+    model: big-pickle
     usage: null
   - id: T010
     name: Performance regression gate and flaky-test check (T-16/T-17)
     objective: Run the performance regression suite, record the outcome, and check
       for flaky tests (rerun shakiness) in the desktop suite.
-    status: waiting
+    status: ready
     depends_on:
       - T009
     acceptance_criteria:

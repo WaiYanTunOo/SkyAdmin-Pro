@@ -2,6 +2,7 @@
 
 import { describe, expect, it } from "vitest";
 import app from "./index";
+import { parseActivationClaim } from "./verification";
 import type { Env } from "./db";
 
 const TEST_MID = "AABBCCDD11223344";
@@ -59,7 +60,7 @@ function createMockDb() {
             });
             lastInsertedNonce = nonce as string;
           }
-          if (sql.includes("INSERT INTO used_nonces")) {
+          if (sql.includes("INTO used_nonces")) {
             const nonce = params[0] as string;
             store.used_nonces.push({ nonce });
           }
@@ -281,5 +282,71 @@ describe("full license lifecycle", () => {
     );
     // Cleanup runs regardless of claim success
     expect(res.status).toBeGreaterThanOrEqual(200);
+  });
+
+  it("generate → claim → verify chain persists and verifies end to end", async () => {
+    const { db, store } = createMockDb();
+    const env = mockEnv(db);
+
+    // 1) Generate
+    const genRes = await app.request(
+      "http://localhost/api/generate",
+      {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+          Authorization: "Bearer test-api-token",
+        },
+        body: JSON.stringify({ mid: TEST_MID, days: TEST_DAYS }),
+      },
+      env,
+    );
+    expect(genRes.status).toBe(200);
+    const genBody = await genRes.json() as {
+      ok: boolean;
+      license_key: string;
+      nonce: string;
+    };
+    expect(genBody.ok).toBe(true);
+    expect(genBody.license_key).toBeTruthy();
+    expect(genBody.nonce).toBeTruthy();
+    expect(store.issued_licenses).toHaveLength(1);
+
+    // 2) Claim with the generated license key as the activation code
+    const claimRes = await app.request(
+      "http://localhost/api/claim",
+      {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ code: genBody.license_key }),
+      },
+      env,
+    );
+    expect(claimRes.status).toBe(200);
+    const claimBody = await claimRes.json() as {
+      ok: boolean;
+      already_used: boolean;
+      nonce: string;
+      license_key: string;
+      expires_at: string | null;
+    };
+    expect(claimBody.ok).toBe(true);
+    expect(claimBody.already_used).toBe(false);
+    expect(claimBody.nonce).toBe(genBody.nonce);
+    expect(claimBody.license_key).toBeTruthy();
+
+    // Persistence: nonce burned, stored license resigned (package period)
+    const burned = store.used_nonces.some((r: any) => r.nonce === genBody.nonce);
+    expect(burned).toBe(true);
+    const storedLic = store.issued_licenses[0] as any;
+    expect(storedLic.license_key).toBe(claimBody.license_key);
+
+    // 3) Verify: the claimed license key resists tampering and parses back
+    // to the same nonce/machine (Ed25519 signature checked inside).
+    const verified = await parseActivationClaim(claimBody.license_key);
+    expect(verified).not.toBeNull();
+    expect(verified!.nonce).toBe(genBody.nonce);
+    expect(verified!.mid).toBe(TEST_MID);
+    expect(verified!.kind).toBe("license");
   });
 });
