@@ -34,23 +34,23 @@ def refresh_access_token(db) -> str:
     refresh = load_refresh_token(db)
     client_id = resolve_client_id(db)
     client_secret = resolve_client_secret(db)
-    if not refresh or not client_id or not client_secret:
+    if not refresh or not client_id:
         raise NotConfiguredError("Google Drive is not connected.")
-    data = urllib.parse.urlencode(
-        {
-            "client_id": client_id,
-            "client_secret": client_secret,
-            "refresh_token": refresh,
-            "grant_type": "refresh_token",
-        }
-    ).encode()
+    payload = {
+        "client_id": client_id,
+        "refresh_token": refresh,
+        "grant_type": "refresh_token",
+    }
+    if client_secret:
+        payload["client_secret"] = client_secret
+    data = urllib.parse.urlencode(payload).encode()
     req = urllib.request.Request(TOKEN_URI, data=data, method="POST")
     try:
         with urllib.request.urlopen(req, timeout=30) as resp:  # nosec B310 - fixed https TOKEN_URI
-            payload = json.loads(resp.read().decode())
+            body = json.loads(resp.read().decode())
     except urllib.error.HTTPError as exc:
         raise DriveApiError(f"Token refresh failed: {exc.code}") from exc
-    token = (payload.get("access_token") or "").strip()
+    token = (body.get("access_token") or "").strip()
     if not token:
         raise DriveApiError("Token refresh returned no access_token.")
     return token

@@ -10,6 +10,7 @@ from skyadmin_pro.services.drive.keys import (
     SETTING_DRIVE_ID_MAP,
     SETTING_DRIVE_REFRESH_TOKEN,
 )
+from skyadmin_pro.services.drive.oauth_defaults import BUNDLED_GOOGLE_OAUTH_CLIENT_ID
 from skyadmin_pro.services.secret_fields import decrypt_secret, encrypt_secret
 
 
@@ -18,11 +19,17 @@ def resolve_client_id(db=None) -> str:
     if env:
         return env
     if db is not None:
-        return (db.get_setting(SETTING_DRIVE_CLIENT_ID) or "").strip()
-    return ""
+        stored = (db.get_setting(SETTING_DRIVE_CLIENT_ID) or "").strip()
+        if stored:
+            return stored
+    return (BUNDLED_GOOGLE_OAUTH_CLIENT_ID or "").strip()
 
 
 def resolve_client_secret(db=None) -> str:
+    """Resolve OAuth client secret from env or encrypted Settings only.
+
+    Never log the return value — callers must not print/log this string.
+    """
     env = (os.environ.get("GOOGLE_OAUTH_CLIENT_SECRET") or "").strip()
     if env:
         return env

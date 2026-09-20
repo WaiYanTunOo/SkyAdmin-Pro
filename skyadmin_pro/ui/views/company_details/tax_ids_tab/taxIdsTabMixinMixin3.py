@@ -8,7 +8,7 @@ from skyadmin_pro.ui.treeview import ThemedTreeview
 
 class TaxIdsTabMixinMixin3:
     def _TaxIdsTabMixin_build_tax_ids_p2(self, tree_card, frame):
-        # Rows: 0 title, 1 form, 2 save, 3 tree, 4–5 labels, 6–7 cred form.
+        # Rows: 0 title, 1 form, 2 save, 3 tree, 4–5 labels, 6 cred FormField form.
         tree_card.grid(row=3, column=0, sticky="ew", pady=(4, 0))
         tree_card.grid_columnconfigure(0, weight=1)
         self._client_cred_rows: dict[str, dict] = {}

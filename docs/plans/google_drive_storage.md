@@ -15,7 +15,8 @@ Canonical doc: [`docs/MULTI_PLATFORM.md`](../MULTI_PLATFORM.md) (includes web se
 - Admin UI + `POST /api/generate` set `org_id` / `sync_enabled` / `web_enabled` / `drive_files_enabled`
 
 ## Configure
-- `GOOGLE_OAUTH_CLIENT_ID` / `GOOGLE_OAUTH_CLIENT_SECRET`
+- Vendor: set `BUNDLED_GOOGLE_OAUTH_CLIENT_ID` (or `GOOGLE_OAUTH_CLIENT_ID`) — PKCE, no secret required
+- Optional override: Settings Advanced custom OAuth / `GOOGLE_OAUTH_CLIENT_SECRET`
 - Generate licenses with `org_id`, `web_enabled`, `drive_files_enabled` as needed (Admin form or API)
 
 ## Deferred

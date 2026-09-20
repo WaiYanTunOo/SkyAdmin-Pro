@@ -28,6 +28,145 @@ class _MemDb:
         self._s[key] = str(value)
 
 
+def test_drive_oauth_client_config_roundtrip():
+    from skyadmin_pro.services.drive import tokens
+    from skyadmin_pro.services.drive.tokens import (
+        resolve_client_id,
+        resolve_client_secret,
+        save_client_config,
+    )
+
+    db = _MemDb()
+    with patch.object(tokens, "BUNDLED_GOOGLE_OAUTH_CLIENT_ID", ""):
+        assert resolve_client_id(db) == ""
+        assert resolve_client_secret(db) == ""
+        save_client_config(db, "cid-1", "csecret-1")
+        assert resolve_client_id(db) == "cid-1"
+        assert resolve_client_secret(db) == "csecret-1"
+
+
+def test_resolve_client_id_falls_back_to_bundled():
+    from skyadmin_pro.services.drive import tokens
+
+    db = _MemDb()
+    with patch.object(tokens, "BUNDLED_GOOGLE_OAUTH_CLIENT_ID", "bundled-cid"):
+        assert tokens.resolve_client_id(db) == "bundled-cid"
+
+
+def test_connect_google_drive_requires_oauth_client():
+    from skyadmin_pro.services.drive import tokens
+    from skyadmin_pro.services.drive.oauth import connect_google_drive
+
+    db = _MemDb()
+    with (
+        patch.object(tokens, "BUNDLED_GOOGLE_OAUTH_CLIENT_ID", ""),
+        pytest.raises(NotConfiguredError, match="Google OAuth is not configured"),
+    ):
+        connect_google_drive(db, timeout_sec=0.1)
+
+
+def test_pkce_exchange_omits_secret_when_empty():
+    from skyadmin_pro.services.drive import oauth_pkce
+
+    captured: dict = {}
+
+    class _Resp:
+        def __enter__(self):
+            return self
+
+        def __exit__(self, *a):
+            return False
+
+        def read(self):
+            return b'{"refresh_token":"rt","access_token":"at"}'
+
+    def fake_urlopen(req, timeout=30):
+        captured["body"] = req.data.decode()
+        return _Resp()
+
+    with patch("skyadmin_pro.services.drive.oauth_pkce.urllib.request.urlopen", side_effect=fake_urlopen):
+        out = oauth_pkce.exchange_code("cid", "", "code", "http://127.0.0.1:9/", "verifier")
+    assert out["refresh_token"] == "rt"
+    assert "code_verifier=verifier" in captured["body"]
+    assert "client_secret" not in captured["body"]
+
+
+def test_pkce_exchange_surfaces_google_error():
+    import io
+    import urllib.error as ue
+
+    from skyadmin_pro.services.drive import oauth_pkce
+
+    err = ue.HTTPError(
+        "https://oauth2.googleapis.com/token",
+        401,
+        "Unauthorized",
+        hdrs=None,
+        fp=io.BytesIO(b'{"error":"invalid_client","error_description":"Unauthorized"}'),
+    )
+    with (
+        patch("skyadmin_pro.services.drive.oauth_pkce.urllib.request.urlopen", side_effect=err),
+        pytest.raises(NotConfiguredError, match="Client secret"),
+    ):
+        oauth_pkce.exchange_code("cid", "", "code", "http://127.0.0.1:9/", "verifier")
+
+
+def test_pkce_exchange_redacts_client_secret_in_errors():
+    import io
+    import urllib.error as ue
+
+    from skyadmin_pro.services.drive import oauth_pkce
+
+    secret = "super-secret-value-xyz"
+    err = ue.HTTPError(
+        "https://oauth2.googleapis.com/token",
+        400,
+        "Bad Request",
+        hdrs=None,
+        fp=io.BytesIO(f'{{"error":"invalid_client","error_description":"bad {secret}"}}'.encode()),
+    )
+    with (
+        patch("skyadmin_pro.services.drive.oauth_pkce.urllib.request.urlopen", side_effect=err),
+        pytest.raises(NotConfiguredError) as raised,
+    ):
+        oauth_pkce.exchange_code("cid", secret, "code", "http://127.0.0.1:9/", "verifier")
+    assert secret not in str(raised.value)
+    assert "[redacted]" in str(raised.value)
+
+
+def test_refresh_access_token_without_secret():
+    from skyadmin_pro.services.drive import api
+    from skyadmin_pro.services.drive.keys import SETTING_DRIVE_REFRESH_TOKEN
+    from skyadmin_pro.services.secret_fields import encrypt_secret
+
+    db = _MemDb()
+    db.set_setting(SETTING_DRIVE_REFRESH_TOKEN, encrypt_secret("refresh-tok"))
+    captured: dict = {}
+
+    class _Resp:
+        def __enter__(self):
+            return self
+
+        def __exit__(self, *a):
+            return False
+
+        def read(self):
+            return b'{"access_token":"access-1"}'
+
+    def fake_urlopen(req, timeout=30):
+        captured["body"] = req.data.decode()
+        return _Resp()
+
+    with (
+        patch.object(api, "resolve_client_id", return_value="cid"),
+        patch.object(api, "resolve_client_secret", return_value=""),
+        patch("skyadmin_pro.services.drive.api.urllib.request.urlopen", side_effect=fake_urlopen),
+    ):
+        assert api.refresh_access_token(db) == "access-1"
+    assert "client_secret" not in captured["body"]
+    assert "refresh_token=refresh-tok" in captured["body"]
+
+
 def test_drive_connect_locked_without_license():
     db = _MemDb()
     assert license_allows_drive(db) is False

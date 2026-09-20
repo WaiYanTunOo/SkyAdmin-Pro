@@ -5,7 +5,7 @@ import customtkinter as ctk
 from skyadmin_pro.config import CLIENT_CREDENTIAL_TYPES
 from skyadmin_pro.ui.canvas_scroll import CanvasScrollFrame
 from skyadmin_pro.ui.debounce import debounced_after
-from skyadmin_pro.ui.theme import CARD_TITLE_SIZE, TEXT_MUTED
+from skyadmin_pro.ui.theme import CARD_TITLE_SIZE, TEXT_MUTED, card_style_kwargs
 from skyadmin_pro.ui.treeview import ThemedTreeview
 from skyadmin_pro.ui.widgets import themed_entry
 
@@ -13,7 +13,7 @@ from skyadmin_pro.ui.widgets import themed_entry
 class VaultTabMixinMixin3:
     def _VaultTabMixin_build_client_credentials__p1(self, parent):
         parent.grid_columnconfigure(0, weight=1)
-        parent.grid_columnconfigure(1, weight=0, minsize=400)
+        parent.grid_columnconfigure(1, weight=1, minsize=420)
         parent.grid_rowconfigure(0, weight=1)
 
         left = ctk.CTkFrame(parent, fg_color="transparent")
@@ -67,15 +67,15 @@ class VaultTabMixinMixin3:
         scroll.grid(row=0, column=1, sticky="nsew", padx=(10, 0))
         scroll.content.grid_columnconfigure(0, weight=1)
         self._client_cred_scroll = scroll
-        form = ctk.CTkFrame(scroll.content, corner_radius=12)
+        form = ctk.CTkFrame(scroll.content, corner_radius=12, **card_style_kwargs())
         form.grid(row=0, column=0, sticky="nsew", padx=4, pady=(8, 4))
-        form.grid_columnconfigure(1, weight=1, uniform="vault_field")
-        form.grid_columnconfigure(3, weight=1, uniform="vault_field")
+        form.grid_columnconfigure(0, weight=1, uniform="client_cred_col")
+        form.grid_columnconfigure(1, weight=1, uniform="client_cred_col")
         ctk.CTkLabel(
             form,
             text="Client portal login (read-only)",
             font=ctk.CTkFont(size=CARD_TITLE_SIZE, weight="bold"),
-        ).grid(row=0, column=0, columnspan=4, sticky="w", padx=16, pady=(10, 6))
+        ).grid(row=0, column=0, columnspan=2, sticky="w", padx=16, pady=(12, 8))
 
         self.cc_client = ctk.StringVar()
         self.cc_type = ctk.StringVar(value=CLIENT_CREDENTIAL_TYPES[0])

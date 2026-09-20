@@ -56,6 +56,21 @@ class VaultTabMixinMixin1:
         )
         if hasattr(self, "_office_cred_scroll"):
             self._office_cred_scroll._on_content_configure()
+        self._refresh_office_cred_contact_choices()
+
+    def _refresh_office_cred_contact_choices(self) -> None:
+        menu = getattr(self, "oc_contact_menu", None)
+        if menu is None:
+            return
+        names = [""] + [
+            (row.get("name") or "").strip()
+            for row in self.app.db.list_office_contacts()
+            if (row.get("name") or "").strip()
+        ]
+        current = self.oc_contact.get()
+        menu.configure(values=names or [""])
+        if current in names:
+            self.oc_contact.set(current)
 
     def _on_office_cred_select(self, iid: str | None) -> None:
         if not iid:

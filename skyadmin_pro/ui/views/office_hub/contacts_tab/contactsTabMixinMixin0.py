@@ -11,6 +11,8 @@ class ContactsTabMixinMixin0:
         self._ContactsTabMixin_build_contacts_tab_p2(form)
 
     def _refresh_contact_pickers(self) -> None:
+        if not hasattr(self, "c_org_menu"):
+            return
         companies = [""] + self.app.db.list_organizations()
         depts = [""] + self.app.db.list_departments()
         clients = [""] + self.app.db.list_client_names()

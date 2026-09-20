@@ -89,6 +89,13 @@ Format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 - Fix startup syntax error and harden CI, worker, and dependencies.
 - Fix CI/CD: run wrangler directly with env token instead of action input.
 
+## [0.3.10] - 2026-09-20
+
+### Fixed
+
+- Include SKU flags in already_used claim response for desktop re-claim.
+- Widen countdown test margin to survive CI clock jitter.
+
 ## [Unreleased]
 
 ### Removed

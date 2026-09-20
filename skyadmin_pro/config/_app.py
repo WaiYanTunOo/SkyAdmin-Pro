@@ -34,7 +34,7 @@ def _resolve_app_version() -> str:
         return _pkg_version("skyadmin-pro")
     except ImportError:
         pass
-    return "0.3.9"
+    return "0.3.10"
 
 
 APP_NAME = "SkyAdmin Pro"

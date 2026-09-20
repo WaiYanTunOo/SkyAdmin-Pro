@@ -59,11 +59,9 @@ class OfficeHubViewMixin0:
             self._refresh_contacts()
         elif tab_name == "Passwords":
             self._refresh_contact_pickers()
-            clients = [""] + self.app.db.list_client_names()
-            if hasattr(self, "cc_client_menu"):
-                self.cc_client_menu.configure(values=clients)
             self._refresh_client_credentials()
             self._refresh_office_credentials()
+            self._refresh_office_cred_contact_choices()
         elif tab_name == "Notebook":
             self._refresh_notes()
 

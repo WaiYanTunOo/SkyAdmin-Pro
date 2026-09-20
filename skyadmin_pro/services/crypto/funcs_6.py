@@ -81,15 +81,24 @@ def restore_encrypted_backup(archive: Path, workspace_root: Path, db_file: Path)
 
         # Rewrite is best-effort: never abort an otherwise-successful restore.
         try:
-            from skyadmin_pro.db.cipher import DB_ERRORS, migrate_plaintext_to_cipher
+            from skyadmin_pro.database import Database
+            from skyadmin_pro.db.cipher import DB_ERRORS
+            from skyadmin_pro.services.portable_paths import normalize_portable_paths
 
             paths_rewritten = _rewrite_db_paths(db_file, ws)
-        except (*DB_ERRORS, OSError, RuntimeError, ValueError):
+            try:
+                db = Database(db_file)
+                norm = normalize_portable_paths(db, local_root=ws)
+                paths_rewritten += int(norm.get("linked", 0))
+            except (*DB_ERRORS, OSError, RuntimeError, ValueError):
+                logger.warning("Portable path normalize failed", exc_info=True)
+        except Exception:
             logger.warning("Path rewriting failed", exc_info=True)
 
         # Backups ship plaintext — encrypt after rewrite so next app open is cipher.
-        # Migration too is best-effort; restore remains usable either way.
         try:
+            from skyadmin_pro.db.cipher import DB_ERRORS, migrate_plaintext_to_cipher
+
             migrate_plaintext_to_cipher(db_file)
         except (*DB_ERRORS, OSError, RuntimeError, ValueError):
             logger.warning("Post-restore cipher migration failed", exc_info=True)

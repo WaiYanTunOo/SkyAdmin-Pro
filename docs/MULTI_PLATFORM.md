@@ -146,17 +146,30 @@ SkyAdmin/Backups/*.skybackup
 
 See also: `docs/CRDT_DESIGN.md`, `docs/plans/google_drive_storage.md`.
 
-## Google Drive OAuth setup (customer account)
+## Google Drive OAuth (customer files)
 
 PDFs stay in the **customer’s** Drive. The Worker never receives file bytes.
 
-1. In Google Cloud Console create an OAuth **Desktop** client.
-2. Set env vars (or Settings → store client id; secret is encrypted in SQLite):
-   - `GOOGLE_OAUTH_CLIENT_ID`
-   - `GOOGLE_OAUTH_CLIENT_SECRET`
-3. Redirect URI used by the app: `http://127.0.0.1:<ephemeral-port>/` (loopback).
-4. License SKU must have `drive_files_enabled=1` (Worker generate / migration **0009**).
-5. Settings → Data & backup → **Connect Google Drive**.
-6. Optional: **Upload existing files to Drive** — backfills rows with empty `drive_file_id` (skips already linked).
+### End users (one-click)
+
+1. License SKU must have `drive_files_enabled=1` (Worker generate / migration **0009**).
+2. Settings → Data & backup → **Sign in with Google** → grant Drive access in the browser.
+3. Optional: **Upload existing files to Drive** — backfills rows with empty `drive_file_id`.
+
+### Vendor ops (required once)
+
+1. Google Cloud Console → OAuth consent screen (External) → scope `https://www.googleapis.com/auth/drive.file`.
+2. Credentials → create **Desktop** OAuth client → copy **Client ID** only.
+3. Paste into `skyadmin_pro/services/drive/oauth_defaults.py` → `BUNDLED_GOOGLE_OAUTH_CLIENT_ID`, or set env `GOOGLE_OAUTH_CLIENT_ID` for builds. **Do not commit a client secret** (desktop uses PKCE).
+4. Consent **Testing**: add each client Gmail as a test user until Google verifies the app for Production.
+
+Redirect URI used by the app: `http://127.0.0.1:<ephemeral-port>/` (loopback).
+
+### Advanced / self-host
+
+Settings → **Advanced — custom OAuth app**, or env:
+
+- `GOOGLE_OAUTH_CLIENT_ID` (required)
+- `GOOGLE_OAUTH_CLIENT_SECRET` (optional; omit when using PKCE public client)
 
 Deploy note: D1 migrations **0008** then **0009** must be applied (`npm run db:migrate` in `skyadmin-worker`) before relying on SKU gates / web session.

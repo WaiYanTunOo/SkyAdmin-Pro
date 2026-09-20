@@ -5,7 +5,7 @@ import customtkinter as ctk
 from skyadmin_pro.config import OFFICE_SYSTEM_TYPES
 from skyadmin_pro.ui.canvas_scroll import CanvasScrollFrame
 from skyadmin_pro.ui.debounce import debounced_after
-from skyadmin_pro.ui.theme import CARD_TITLE_SIZE, TEXT_MUTED
+from skyadmin_pro.ui.theme import CARD_TITLE_SIZE, TEXT_MUTED, card_style_kwargs
 from skyadmin_pro.ui.treeview import ThemedTreeview
 from skyadmin_pro.ui.widgets import themed_entry
 
@@ -13,7 +13,7 @@ from skyadmin_pro.ui.widgets import themed_entry
 class VaultTabMixinMixin5:
     def _VaultTabMixin_build_office_credentials__p1(self, parent):
         parent.grid_columnconfigure(0, weight=1)
-        parent.grid_columnconfigure(1, weight=0, minsize=400)
+        parent.grid_columnconfigure(1, weight=1, minsize=420)
         parent.grid_rowconfigure(0, weight=1)
 
         left = ctk.CTkFrame(parent, fg_color="transparent")
@@ -65,15 +65,15 @@ class VaultTabMixinMixin5:
         scroll.grid(row=0, column=1, sticky="nsew", padx=(10, 0))
         scroll.content.grid_columnconfigure(0, weight=1)
         self._office_cred_scroll = scroll
-        form = ctk.CTkFrame(scroll.content, corner_radius=12)
+        form = ctk.CTkFrame(scroll.content, corner_radius=12, **card_style_kwargs())
         form.grid(row=0, column=0, sticky="nsew", padx=4, pady=(8, 4))
-        form.grid_columnconfigure(1, weight=1, uniform="vault_field")
-        form.grid_columnconfigure(3, weight=1, uniform="vault_field")
+        form.grid_columnconfigure(0, weight=1, uniform="office_cred_col")
+        form.grid_columnconfigure(1, weight=1, uniform="office_cred_col")
         ctk.CTkLabel(
             form,
-            text="Office username / email (encrypted)",
+            text="Office account (encrypted)",
             font=ctk.CTkFont(size=CARD_TITLE_SIZE, weight="bold"),
-        ).grid(row=0, column=0, columnspan=4, sticky="w", padx=16, pady=(10, 6))
+        ).grid(row=0, column=0, columnspan=2, sticky="w", padx=16, pady=(12, 8))
 
         self.oc_label = ctk.StringVar()
         self.oc_login = ctk.StringVar()

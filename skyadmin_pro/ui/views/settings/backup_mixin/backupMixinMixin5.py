@@ -8,6 +8,7 @@ class BackupMixinMixin5:
         if not drive_connect_unlocked(self.app.db):
             self.feedback.error("Drive files are not enabled on this license.")
             return
+        self._persist_drive_oauth_from_entries()
         try:
             msg = connect_google_drive(self.app.db)
             self.feedback.success(msg)

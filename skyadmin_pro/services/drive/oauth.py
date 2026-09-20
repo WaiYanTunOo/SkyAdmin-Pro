@@ -1,16 +1,15 @@
-"""Desktop Google OAuth (stdlib urllib + local redirect)."""
+"""Desktop Google OAuth (stdlib urllib + local redirect + PKCE)."""
 
 from __future__ import annotations
 
-import json
 import secrets
 import threading
 import urllib.parse
-import urllib.request
 import webbrowser
 from http.server import BaseHTTPRequestHandler, HTTPServer
 
 from skyadmin_pro.services.drive.errors import NotConfiguredError
+from skyadmin_pro.services.drive.oauth_pkce import exchange_code, pkce_pair
 from skyadmin_pro.services.drive.tokens import (
     resolve_client_id,
     resolve_client_secret,
@@ -18,35 +17,21 @@ from skyadmin_pro.services.drive.tokens import (
 )
 
 AUTH_URI = "https://accounts.google.com/o/oauth2/v2/auth"
-TOKEN_URI = "https://oauth2.googleapis.com/token"
 SCOPES = "https://www.googleapis.com/auth/drive.file"
-
-
-def _exchange_code(client_id: str, client_secret: str, code: str, redirect_uri: str) -> dict:
-    data = urllib.parse.urlencode(
-        {
-            "code": code,
-            "client_id": client_id,
-            "client_secret": client_secret,
-            "redirect_uri": redirect_uri,
-            "grant_type": "authorization_code",
-        }
-    ).encode()
-    req = urllib.request.Request(TOKEN_URI, data=data, method="POST")
-    with urllib.request.urlopen(req, timeout=30) as resp:  # nosec B310 - fixed https TOKEN_URI
-        return json.loads(resp.read().decode())
 
 
 def connect_google_drive(db, *, timeout_sec: float = 180.0) -> str:
     """Open browser OAuth; store refresh token. Returns success message."""
     client_id = resolve_client_id(db)
     client_secret = resolve_client_secret(db)
-    if not client_id or not client_secret:
+    if not client_id:
         raise NotConfiguredError(
-            "Set GOOGLE_OAUTH_CLIENT_ID and GOOGLE_OAUTH_CLIENT_SECRET (or Settings client id/secret) first."
+            "Google OAuth is not configured. Set GOOGLE_OAUTH_CLIENT_ID "
+            "or paste the vendor Client ID into oauth_defaults."
         )
 
     state = secrets.token_urlsafe(16)
+    code_verifier, code_challenge = pkce_pair()
     result: dict = {}
 
     class Handler(BaseHTTPRequestHandler):
@@ -60,7 +45,7 @@ def connect_google_drive(db, *, timeout_sec: float = 180.0) -> str:
             result["code"] = qs.get("code", [""])[0]
             self.send_response(200)
             self.end_headers()
-            self.wfile.write(b"SkyAdmin: Google Drive connected. You can close this tab.")
+            self.wfile.write(b"SkyAdmin: Authorization received. Return to the app to finish connecting.")
 
         def log_message(self, *_args):
             return
@@ -77,6 +62,8 @@ def connect_google_drive(db, *, timeout_sec: float = 180.0) -> str:
             "access_type": "offline",
             "prompt": "consent",
             "state": state,
+            "code_challenge": code_challenge,
+            "code_challenge_method": "S256",
         }
     )
     thread = threading.Thread(target=server.handle_request, daemon=True)
@@ -87,7 +74,7 @@ def connect_google_drive(db, *, timeout_sec: float = 180.0) -> str:
     code = result.get("code") or ""
     if not code:
         raise NotConfiguredError("OAuth timed out or was cancelled.")
-    tokens = _exchange_code(client_id, client_secret, code, redirect_uri)
+    tokens = exchange_code(client_id, client_secret, code, redirect_uri, code_verifier)
     refresh = (tokens.get("refresh_token") or "").strip()
     if not refresh:
         raise NotConfiguredError("No refresh_token returned — revoke app access and retry.")

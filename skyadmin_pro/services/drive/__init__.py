@@ -15,6 +15,7 @@ from skyadmin_pro.services.drive.entitlement import (
 from skyadmin_pro.services.drive.errors import NotConfiguredError
 from skyadmin_pro.services.drive.keys import SETTING_DRIVE_FILES_ENABLED
 from skyadmin_pro.services.drive.oauth import connect_google_drive
+from skyadmin_pro.services.drive.relink_backfill import relink_and_backfill_to_drive
 from skyadmin_pro.services.drive.tokens import clear_drive_tokens, load_refresh_token
 from skyadmin_pro.services.drive.upload import upload_document_file
 
@@ -33,6 +34,7 @@ __all__ = [
     "license_max_devices",
     "license_org_id",
     "load_refresh_token",
+    "relink_and_backfill_to_drive",
     "set_license_entitlements",
     "upload_document_file",
 ]
