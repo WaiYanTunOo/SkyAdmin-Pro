@@ -78,17 +78,19 @@ def test_apply_form_theme_cache_drops_dead_widgets():
             return list(self._children)
 
     current_mode = ctk.get_appearance_mode()
-    cache = w._THEMED_WIDGET_CACHE.setdefault(current_mode, w.WeakSet())
+    w._THEMED_WIDGET_CACHE.clear()
+    cache = w._THEMED_WIDGET_CACHE
 
     widget = MockWidget()
     w.apply_form_theme(widget)
-    assert widget in cache
+    assert widget in cache[current_mode]
     assert getattr(widget, "_applied_form_theme_mode", None) == current_mode
 
     del widget
     gc.collect()
 
-    assert len(cache) == 0
+    assert cache.get(current_mode) is not None
+    assert len(cache[current_mode]) == 0
 
     fresh = MockWidget()
     w.apply_form_theme(fresh)
