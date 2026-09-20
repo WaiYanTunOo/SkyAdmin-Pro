@@ -88,8 +88,8 @@ def test_apply_form_theme_caches_by_theme_name(app_root):
     apply_form_theme(widget)
 
     # Widget should be cached under "Dark"
-    assert id(widget) in _THEMED_WIDGET_CACHE.get("Dark", set())
-    assert id(widget) not in _THEMED_WIDGET_CACHE.get("Light", set())
+    assert widget in _THEMED_WIDGET_CACHE.get("Dark", set())
+    assert widget not in _THEMED_WIDGET_CACHE.get("Light", set())
 
     widget.destroy()
     ctk.set_appearance_mode("light")
@@ -106,7 +106,7 @@ def test_should_apply_theme_clears_cache_on_mode_change(app_root):
 
     widget = ctk.CTkFrame(app_root)
     apply_form_theme(widget)
-    assert id(widget) in _THEMED_WIDGET_CACHE.get("Dark", set())
+    assert widget in _THEMED_WIDGET_CACHE.get("Dark", set())
 
     ctk.set_appearance_mode("light")
     should_apply_theme()

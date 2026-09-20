@@ -56,6 +56,45 @@ def test_apply_form_theme_gc_safe_caching():
     assert call_count == 0  # skipped walk completely!
 
 
+def test_apply_form_theme_cache_drops_dead_widgets():
+    """Dead widgets must not linger in the theme cache.
+
+    Regression: the cache previously stored raw id() values; when a widget was
+    garbage-collected and its memory address was reused by a later widget, the
+    stale id() caused a false cache hit so the new widget never got themed
+    (_applied_form_theme_mode stayed None).
+    """
+    import gc
+
+    import customtkinter as ctk
+
+    import skyadmin_pro.ui.widgets as w
+
+    class MockWidget:
+        def __init__(self, children=None):
+            self._children = children or []
+
+        def winfo_children(self):
+            return list(self._children)
+
+    current_mode = ctk.get_appearance_mode()
+    cache = w._THEMED_WIDGET_CACHE.setdefault(current_mode, w.WeakSet())
+
+    widget = MockWidget()
+    w.apply_form_theme(widget)
+    assert widget in cache
+    assert getattr(widget, "_applied_form_theme_mode", None) == current_mode
+
+    del widget
+    gc.collect()
+
+    assert len(cache) == 0
+
+    fresh = MockWidget()
+    w.apply_form_theme(fresh)
+    assert getattr(fresh, "_applied_form_theme_mode", None) == current_mode
+
+
 def test_should_apply_theme_transitions():
     import skyadmin_pro.ui.widgets as w
 

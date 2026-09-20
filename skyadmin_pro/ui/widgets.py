@@ -8,6 +8,7 @@ from collections.abc import Callable
 from datetime import date, datetime
 from pathlib import Path
 from typing import Any, ClassVar
+from weakref import WeakSet
 
 import customtkinter as ctk
 
@@ -176,7 +177,7 @@ _LAST_THEME_MODE: str | None = None
 # Theme name -> set of widget id() values that have already been themed.
 # When apply_form_theme() is called and the current mode matches a cached
 # mode, widgets already in the set are skipped, avoiding redundant walks.
-_THEMED_WIDGET_CACHE: dict[str, set[int]] = {}
+_THEMED_WIDGET_CACHE: dict[str, WeakSet] = {}
 _THEMED_WIDGET_CACHE_SIZE_LIMIT = 5000
 
 
@@ -194,7 +195,7 @@ def apply_form_theme(root: ctk.Misc) -> None:
         return
 
     # Check theme-level cache: if mode unchanged and this widget is cached, skip
-    if current_mode in _THEMED_WIDGET_CACHE and id(root) in _THEMED_WIDGET_CACHE[current_mode]:
+    if current_mode in _THEMED_WIDGET_CACHE and root in _THEMED_WIDGET_CACHE[current_mode]:
         # Still need to recurse into children in case they aren't cached
         pass
     else:
@@ -216,11 +217,11 @@ def apply_form_theme(root: ctk.Misc) -> None:
 
         # Add to cache
         if current_mode not in _THEMED_WIDGET_CACHE:
-            _THEMED_WIDGET_CACHE[current_mode] = set()
-        _THEMED_WIDGET_CACHE[current_mode].add(id(root))
+            _THEMED_WIDGET_CACHE[current_mode] = WeakSet()
+        _THEMED_WIDGET_CACHE[current_mode].add(root)
         # Prune cache if it grows too large
         if len(_THEMED_WIDGET_CACHE[current_mode]) > _THEMED_WIDGET_CACHE_SIZE_LIMIT:
-            _THEMED_WIDGET_CACHE[current_mode] = set()
+            _THEMED_WIDGET_CACHE[current_mode] = WeakSet()
 
     try:
         children = root.winfo_children()
