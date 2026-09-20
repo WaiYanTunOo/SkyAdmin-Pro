@@ -78,7 +78,7 @@ class AppointmentsMutateMixin:
         sets = ", ".join(f"{k} = ?" for k in updates)
         with self.connection() as conn:
             conn.execute(
-                f"UPDATE appointments SET {sets}" " WHERE id = ? AND deleted_at IS NULL",
+                f"UPDATE appointments SET {sets} WHERE id = ? AND deleted_at IS NULL",
                 (*updates.values(), appointment_id),
             )
 

@@ -82,10 +82,13 @@ def collect_local_changes(db: Database, *, since: str = "", limit: int | None = 
                     "row": row_payload,
                     "updated_at": str(row.get("updated_at") or row.get("created_at") or ""),
                     "deleted_at": deleted_at,
-                    "hlc": hlc_now(db),
                     "proto": 2,
                 }
             )
-    changes.sort(key=lambda c: (c["updated_at"], c.get("hlc") or ""))
+    # Keep updated_at as the primary ordering (push cursor semantics), then stamp
+    # HLCs in that final order so collect order always matches HLC order.
+    changes.sort(key=lambda c: c["updated_at"])
+    for change in changes:
+        change["hlc"] = hlc_now(db)
     collect_local_changes.last_vault_passwords = vault_passwords  # type: ignore[attr-defined]
     return changes[:limit]

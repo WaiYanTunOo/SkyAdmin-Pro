@@ -32,5 +32,5 @@ def upgrade(db: CoreMixin) -> None:
             )
             """
         )
-        conn.execute("CREATE INDEX IF NOT EXISTS idx_appointments_date" " ON appointments(appointment_date)")
-        conn.execute("CREATE INDEX IF NOT EXISTS idx_appointments_client" " ON appointments(client_id)")
+        conn.execute("CREATE INDEX IF NOT EXISTS idx_appointments_date ON appointments(appointment_date)")
+        conn.execute("CREATE INDEX IF NOT EXISTS idx_appointments_client ON appointments(client_id)")

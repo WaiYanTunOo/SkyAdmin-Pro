@@ -1,2 +1,56 @@
 schema_version: 1
-results: []
+results:
+  - check: CT001
+    status: pass
+    at: 2026-09-20T04:09:32Z
+    evidence: All checks passed!
+    recorded_by: command
+    duration_ms: 540
+    termination_reason: exited
+  - check: CT002
+    status: fail
+    at: 2026-09-20T04:09:32Z
+    evidence: 174 |                 (cid,), | | | 13 files would be reformatted, 997
+      files already formatted
+    recorded_by: command
+    duration_ms: 550
+    termination_reason: exited
+  - check: CT003
+    status: fail
+    at: 2026-09-20T04:11:32Z
+    evidence: ............................................s...........................
+      [ 11%] | ...........................................................
+    recorded_by: command
+    duration_ms: 120295
+    termination_reason: timeout
+  - check: CT004
+    status: pass
+    at: 2026-09-20T04:11:39Z
+    evidence: (no output; exit 0)
+    recorded_by: command
+    duration_ms: 6464
+    termination_reason: exited
+  - check: CT005
+    status: pass
+    at: 2026-09-20T04:11:50Z
+    evidence: "n-worker/\e[39mnode_modules/\e[4mhono\e[24m/dist/compose.js:22:17\e[\
+      90m)\e[39m | at
+      \e[90mfile:///D:/StudioProjects/SkyAdmin-Pro-main/skyadmin-worker/\e[39mn\
+      ode_modules/\e[4mhono\e[24m/dist/hono-base.js:307:25"
+    recorded_by: command
+    duration_ms: 10707
+    termination_reason: exited
+  - check: CT006
+    status: fail
+    at: 2026-09-20T04:13:50Z
+    evidence: (no output; timed out)
+    recorded_by: command
+    duration_ms: 120271
+    termination_reason: timeout
+  - check: CT002
+    status: pass
+    at: 2026-09-20T04:58:57Z
+    evidence: 1010 files already formatted
+    recorded_by: command
+    duration_ms: 283
+    termination_reason: exited

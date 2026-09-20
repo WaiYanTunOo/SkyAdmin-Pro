@@ -51,7 +51,7 @@ class RenewalMixinA:
         done_at = self._now() if done else None
         with self.connection() as conn:
             conn.execute(
-                "UPDATE renewal_items SET done = ?, done_at = ?, updated_at = ?" " WHERE id = ? AND deleted_at IS NULL",
+                "UPDATE renewal_items SET done = ?, done_at = ?, updated_at = ? WHERE id = ? AND deleted_at IS NULL",
                 (1 if done else 0, done_at, self._now(), item_id),
             )
 

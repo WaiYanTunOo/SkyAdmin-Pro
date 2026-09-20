@@ -16,7 +16,7 @@ class TasksMixinMixin4:
         Python instead of querying per client.
         """
         all_items = self._fetch_all(
-            "SELECT client_id, template_name, item, due_days, done FROM renewal_items" " WHERE deleted_at IS NULL"
+            "SELECT client_id, template_name, item, due_days, done FROM renewal_items WHERE deleted_at IS NULL"
         )
         if not all_items:
             return []
@@ -82,7 +82,7 @@ class TasksMixinMixin4:
             task_ids = [
                 int(row["task_id"])
                 for row in conn.execute(
-                    "SELECT task_id FROM service_renewals" " WHERE service_id = ? AND task_id IS NOT NULL",
+                    "SELECT task_id FROM service_renewals WHERE service_id = ? AND task_id IS NOT NULL",
                     (document_id,),
                 ).fetchall()
             ]
