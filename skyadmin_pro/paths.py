@@ -44,8 +44,8 @@ def user_documents_dir() -> Path:
                 ctypes.windll.ole32.CoTaskMemFree(out)
             if value:
                 return Path(value)
-        except Exception:
-            pass  # fall back below
+        except (OSError, AttributeError, ValueError):
+            pass  # SHGetKnownFolderPath unavailable/unexpected args — fall back below
     home = Path.home()
     documents = home / "Documents"
     return documents if documents.exists() else home

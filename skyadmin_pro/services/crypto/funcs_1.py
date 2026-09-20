@@ -2,7 +2,12 @@ from __future__ import annotations
 
 from pathlib import Path
 
+from skyadmin_pro.db.cipher import DB_ERRORS
+
 from ._const_0 import logger
+
+_REWRITE_OPEN_ERRORS = (*DB_ERRORS, OSError, RuntimeError)
+_REWRITE_FALLBACK_ERRORS = (*DB_ERRORS, OSError)
 
 
 def _rewrite_db_paths(db_file: Path, new_workspace: Path) -> int:
@@ -31,18 +36,20 @@ def _rewrite_db_paths(db_file: Path, new_workspace: Path) -> int:
 
             conn = cipher_connect(str(db_file))
             conn.execute("SELECT 1 FROM sqlite_master LIMIT 1")
-    except Exception:
+    except _REWRITE_OPEN_ERRORS:
+        # Strategy fallback: if the header probe/open fails for any DB/OS/driver
+        # reason, retry with plaintext sqlite3 before giving up.
         if conn is not None:
             try:
                 conn.close()
-            except Exception:
+            except DB_ERRORS:
                 logger.debug("Failed to close DB connection", exc_info=True)
             conn = None
         try:
             import sqlite3 as _sqlite3
 
             conn = _sqlite3.connect(str(db_file))
-        except Exception:
+        except _REWRITE_FALLBACK_ERRORS:
             logger.warning("Cannot open restored DB for path rewriting", exc_info=True)
             return 0
 
@@ -54,7 +61,7 @@ def _rewrite_db_paths(db_file: Path, new_workspace: Path) -> int:
                 "SELECT value FROM settings WHERE key = ?",
                 (SETTING_WORKSPACE_ROOT,),
             ).fetchone()
-        except Exception:
+        except DB_ERRORS:
             row = None
 
         old_root = row[0] if row and row[0] else None
@@ -80,7 +87,7 @@ def _rewrite_db_paths(db_file: Path, new_workspace: Path) -> int:
                         (new_root, len(old_root) + 1),
                     )
                     updated += cnt
-            except Exception:
+            except DB_ERRORS:
                 logger.debug("Table %s not found during path rewrite", table)
 
         # Update the workspace_root setting.
@@ -89,7 +96,7 @@ def _rewrite_db_paths(db_file: Path, new_workspace: Path) -> int:
                 "UPDATE settings SET value = ? WHERE key = ?",
                 (new_root, SETTING_WORKSPACE_ROOT),
             )
-        except Exception:
+        except DB_ERRORS:
             logger.debug("Settings table not found during path rewrite")
 
         conn.commit()
@@ -103,6 +110,6 @@ def _rewrite_db_paths(db_file: Path, new_workspace: Path) -> int:
     finally:
         try:
             conn.close()
-        except Exception:
+        except DB_ERRORS:
             logger.debug("Failed to close connection after path rewrite", exc_info=True)
     return updated

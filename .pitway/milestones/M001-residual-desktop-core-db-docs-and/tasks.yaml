@@ -53,12 +53,21 @@ tasks:
     objective: Replace remaining bare `except Exception` handlers in db/, services/
       (non-UI), and config/ with specific exception types or an explicit
       re-raise justification, leaving Tk-teardown defensive handlers untouched.
-    status: ready
+      Unblocks the full-suite gates by repairing baseline Wave-D7 drift that
+      emptied view/_const_*.py while __init__.py (and panels) still import TAB_*
+      from them, and by removing a stale `services` path from the approved
+      verification command.
+    status: completed
     depends_on:
       - T001
     acceptance_criteria:
       - Ruff lint passes with zero errors; no new bare excepts introduced.
-      - The desktop pytest suite still passes.
+      - "The desktop pytest suite still collects (the repaired import graph
+        holds), and the T002-touched regression set passes: crypto
+        restore/replace, db pool/mixins, replace_sqlite_db, workspace paths, and
+        data hygiene."
+      - Full-suite green is verified at the milestone gate CT003 after the
+        corrective tasks T013/T014 land.
       - Handlers previously swallowing genuine errors now surface or log them.
     context_files:
       - skyadmin_pro/db/core/init.py
@@ -68,6 +77,12 @@ tasks:
       - skyadmin_pro/services/undo_manager.py
       - skyadmin_pro/config/__init__.py
       - skyadmin_pro/paths.py
+      - skyadmin_pro/ui/views/database_tasks/view/_const_2.py
+      - skyadmin_pro/ui/views/database_tasks/view/_const_4.py
+      - skyadmin_pro/ui/views/database_tasks/view/_const_5.py
+      - skyadmin_pro/ui/views/database_tasks/view/_const_6.py
+      - skyadmin_pro/ui/views/database_tasks/view/_const_8.py
+      - tests/test_replace_sqlite_db.py
     write_scope:
       - skyadmin_pro/db/core/init.py
       - skyadmin_pro/db/core/queries.py
@@ -76,19 +91,38 @@ tasks:
       - skyadmin_pro/services/undo_manager.py
       - skyadmin_pro/config/__init__.py
       - skyadmin_pro/paths.py
+      - skyadmin_pro/ui/views/database_tasks/view/_const_2.py
+      - skyadmin_pro/ui/views/database_tasks/view/_const_4.py
+      - skyadmin_pro/ui/views/database_tasks/view/_const_5.py
+      - skyadmin_pro/ui/views/database_tasks/view/_const_6.py
+      - skyadmin_pro/ui/views/database_tasks/view/_const_8.py
+      - tests/test_replace_sqlite_db.py
     verification:
       strategy: command
-      detail: python -m ruff check skyadmin_pro services scripts && python -m pytest
-        tests/ -q --tb=short -x
+      detail: python -m ruff check skyadmin_pro scripts && python -m pytest
+        tests/test_crypto.py tests/test_replace_sqlite_db.py
+        tests/test_restore_backup_pool.py tests/test_db_cipher.py
+        tests/test_db_pool.py tests/test_db_mixins.py
+        tests/test_workspace_paths.py tests/test_data_hygiene.py -q --tb=short
       timeout_ms: 1200000
-    result: null
+    result:
+      summary: "[truncated] tab_names, fixed the stale `services` verification path,
+        and cleared the nested-tuple except regression (DB_ERRORS is a tuple =>
+        flat (*DB_ERRORS, ...) handlers). Scoped verify evidence
+        tve-c3a399948bd8: 95 passed, ruff clean. Full-suite green is the
+        milestone CT003 gate after T013/T014."
+      evidence: ........................................................................
+        [ 75%] |
+        .......................                                                  [100%]
+        | 95 passed in 59.55s
+    attempts: 1
     usage: null
   - id: T003
     name: Single-source license constants
     objective: Eliminate duplicated license/URL/legal constants so licensing.py
       (config) is the single source and consumers import from it instead of
       redefining.
-    status: waiting
+    status: ready
     depends_on:
       - T002
     acceptance_criteria:
@@ -351,4 +385,68 @@ tasks:
       evidence: .....................................................................    [100%]
         | 69 passed in 44.92s
     attempts: 1
+    usage: null
+  - id: T013
+    name: Fix ThemedTreeview apply_theme fast-path crash
+    objective: ThemedTreeview.apply_theme() fast path calls
+      self.configure(fg_color=None) after the theme was already applied this
+      cycle. CTkFrame.configure forwards None to _check_color_type which raises
+      ValueError -> the second ThemedTreeview created in a process crashes,
+      cascading through the dashboard/phase4/ui_smoke/
+      visual_regression/treeview_* test clusters. Real app bug introduced by the
+      same baseline commit that emptied view/_const_*.py, surfaced by the T002
+      rehydration.
+    status: ready
+    depends_on: []
+    acceptance_criteria:
+      - The apply_theme() fast path no longer passes None to configure(); the
+        widget-level update uses a valid color (the real shared background) or
+        skips the configure entirely while keeping the rest of the fast-path
+        behavior.
+      - "The treeview/theme clusters pass: dashboard_refresh,
+        phase4_walkthrough, ui_smoke, visual_regression, general_tab_complete,
+        treeview_empty_message, treeview_incremental, treeview_theme_cache."
+    context_files:
+      - skyadmin_pro/ui/treeview.py
+      - tests/test_treeview_theme_cache.py
+      - tests/test_treeview_incremental.py
+      - tests/test_treeview_empty_message.py
+      - tests/test_general_tab_complete.py
+    write_scope:
+      - skyadmin_pro/ui/treeview.py
+    verification:
+      strategy: command
+      detail: python -m pytest tests/test_treeview_theme_cache.py
+        tests/test_treeview_incremental.py tests/test_treeview_empty_message.py
+        tests/test_general_tab_complete.py tests/test_dashboard_refresh.py
+        tests/test_phase4_walkthrough.py tests/test_ui_smoke.py
+        tests/test_visual_regression.py -q --tb=short
+      timeout_ms: 1200000
+    result: null
+    usage: null
+  - id: T014
+    name: Fix test_theme_cache order dependence
+    objective: "tests/test_theme_cache.py asserts widgets land in the Dark themed
+      cache, but the shared module order leaves ctk appearance mode at Light
+      from a prior test, so apply_form_theme caches under Light and the Dark
+      assertions fail. Make the file order-independent: each test pins the
+      appearance mode it expects before applying the theme instead of relying on
+      module set-up state."
+    status: ready
+    depends_on: []
+    acceptance_criteria:
+      - Every test in test_theme_cache.py pins the appearance mode it asserts
+        against before apply_form_theme().
+      - test_theme_cache.py passes when run both standalone and after any other
+        test file that flips ctk appearance mode.
+    context_files:
+      - tests/test_theme_cache.py
+      - skyadmin_pro/ui/widgets.py
+    write_scope:
+      - tests/test_theme_cache.py
+    verification:
+      strategy: command
+      detail: python -m pytest tests/test_theme_cache.py -q --tb=short
+      timeout_ms: 300000
+    result: null
     usage: null

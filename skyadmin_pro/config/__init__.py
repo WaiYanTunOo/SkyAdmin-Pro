@@ -28,13 +28,13 @@ def _resolve_app_version() -> str:
             version = data.get("project", {}).get("version")
             if version:
                 return str(version)
-    except Exception:
+    except (OSError, ValueError):
         pass
     try:
         from importlib.metadata import version as _pkg_version
 
         return _pkg_version("skyadmin-pro")
-    except Exception:
+    except ImportError:
         pass
     return "0.3.6"
 

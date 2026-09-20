@@ -75,6 +75,8 @@ class UndoManager:
         try:
             return list(check())
         except Exception:
+            # Duck-typed command preview must never raise into the UI; a broken
+            # check_conflicts() treats the undo as clean and logs the cause.
             logger.warning("preview_conflicts() failed; treating as clean", exc_info=True)
             return []
 
