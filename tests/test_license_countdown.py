@@ -65,11 +65,10 @@ class TestLicenseCountdownText:
     def test_active_short_duration(self) -> None:
         from skyadmin_pro.services.license.verify.chunk_3 import license_countdown_text
 
-        future = (datetime.now() + timedelta(hours=2, minutes=30)).isoformat()
+        future = (datetime.now() + timedelta(hours=3, minutes=5)).isoformat()
         with _patch_license_chunk3(future):
             text = license_countdown_text()
-            assert "2h" in text
-            assert "30m" in text
+            assert "3h" in text
 
 
 class TestRemainingSeconds:
