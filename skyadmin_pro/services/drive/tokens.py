@@ -7,6 +7,7 @@ import os
 from skyadmin_pro.services.drive.keys import (
     SETTING_DRIVE_CLIENT_ID,
     SETTING_DRIVE_CLIENT_SECRET,
+    SETTING_DRIVE_ID_MAP,
     SETTING_DRIVE_REFRESH_TOKEN,
 )
 from skyadmin_pro.services.secret_fields import decrypt_secret, encrypt_secret
@@ -48,3 +49,21 @@ def save_client_config(db, client_id: str, client_secret: str = "") -> None:
     db.set_setting(SETTING_DRIVE_CLIENT_ID, (client_id or "").strip())
     if client_secret:
         db.set_setting(SETTING_DRIVE_CLIENT_SECRET, encrypt_secret(client_secret))
+
+
+def save_id_map(db, id_map: dict[str, str]) -> None:
+    import json
+
+    db.set_setting(SETTING_DRIVE_ID_MAP, encrypt_secret(json.dumps(id_map or {})))
+
+
+def load_id_map(db) -> dict[str, str]:
+    import json
+
+    raw = (db.get_setting(SETTING_DRIVE_ID_MAP) or "").strip()
+    if not raw:
+        return {}
+    try:
+        return json.loads(decrypt_secret(raw))
+    except (json.JSONDecodeError, ValueError, TypeError):
+        return {}

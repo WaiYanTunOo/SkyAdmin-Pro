@@ -104,6 +104,10 @@ function freshClaimEnv(): Env {
           issued_at: "2026-01-01T00:00:00",
           license_key: "SUPER-SECRET-KEY",
           expires_at: "2099-01-01T00:00:00",
+          sync_enabled: 1,
+          web_enabled: 0,
+          drive_files_enabled: 1,
+          max_devices: 3,
         };
       }
       return null;
@@ -179,5 +183,78 @@ describe("claim stacking", () => {
     expect(res.status).toBe(200);
     const body = (await res.json()) as Record<string, unknown>;
     expect(body.ok).toBe(true);
+  });
+});
+
+describe("claim SKU flags", () => {
+  it("returns drive_files_enabled and sync_enabled from issued_licenses", async () => {
+    const env = freshClaimEnv();
+    const code = await generatePasscode(MID, 30, DEV_ED25519_KEY_B64);
+    const res = await app.request(
+      "http://localhost/api/claim",
+      {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ code }),
+      },
+      env,
+    );
+    expect(res.status).toBe(200);
+    const body = (await res.json()) as Record<string, unknown>;
+    expect(body.ok).toBe(true);
+    expect(body.drive_files_enabled).toBe(1);
+    expect(body.sync_enabled).toBe(1);
+    expect(body.web_enabled).toBe(0);
+    expect(body.max_devices).toBe(3);
+  });
+
+  it("returns 0 for all SKU flags when row has nulls", async () => {
+    const env = freshClaimEnv();
+    const bound = (sql: string) => ({
+      first: async () => {
+        if (sql.includes("rate_limits")) return { count: 1 };
+        if (sql.includes("SELECT nonce FROM used_nonces")) return null;
+        if (sql.includes("SELECT machine_id, package_days")) {
+          return {
+            machine_id: MID,
+            package_days: 30,
+            issued_at: "2026-01-01T00:00:00",
+            license_key: "SUPER-SECRET-KEY",
+            expires_at: "2099-01-01T00:00:00",
+            sync_enabled: null,
+            web_enabled: null,
+            drive_files_enabled: null,
+            max_devices: null,
+          };
+        }
+        return null;
+      },
+      run: async () => ({ success: true }),
+      all: async () => ({ results: [] }),
+    });
+    const overrideEnv = {
+      ...env,
+      DB: {
+        prepare: (sql: string) => ({ bind: (..._a: unknown[]) => bound(sql), run: async () => ({ success: true }) }),
+        batch: async () => [{ success: true }],
+      } as unknown as D1Database,
+    } as Env;
+    const code = await generatePasscode(MID, 30, DEV_ED25519_KEY_B64);
+    const res = await app.request(
+      "http://localhost/api/claim",
+      {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ code }),
+      },
+      overrideEnv,
+    );
+    expect(res.status).toBe(200);
+    const body = (await res.json()) as Record<string, unknown>;
+    expect(body.ok).toBe(true);
+    expect(body.drive_files_enabled).toBe(0);
+    expect(body.sync_enabled).toBe(0);
+    expect(body.web_enabled).toBe(0);
+    expect(body.max_devices).toBe(0);
   });
 });

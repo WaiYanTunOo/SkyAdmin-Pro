@@ -5,8 +5,8 @@ from __future__ import annotations
 from pathlib import Path
 
 from skyadmin_pro.services.drive import api as drive_api
-from skyadmin_pro.services.drive.errors import NotConfiguredError
-from skyadmin_pro.services.drive.tokens import load_refresh_token
+from skyadmin_pro.services.drive.errors import DriveApiError, NotConfiguredError
+from skyadmin_pro.services.drive.tokens import load_id_map, load_refresh_token, save_id_map
 
 
 class GoogleDriveStorageBackend:
@@ -14,12 +14,15 @@ class GoogleDriveStorageBackend:
 
     def __init__(self, db) -> None:
         self._db = db
-        self._id_map: dict[str, str] = {}
+        self._id_map: dict[str, str] = load_id_map(db)
 
     def _access(self) -> str:
         if not load_refresh_token(self._db):
             raise NotConfiguredError("Google Drive is not connected.")
-        return drive_api.refresh_access_token(self._db)
+        try:
+            return drive_api.refresh_access_token(self._db)
+        except DriveApiError:
+            raise NotConfiguredError("Drive session expired — reconnect.") from None
 
     def _ensure_path_folder(self, access: str, relpath: str) -> tuple[str, str]:
         parts = Path(relpath).as_posix().strip("/").split("/")
@@ -37,6 +40,7 @@ class GoogleDriveStorageBackend:
         parent_id, name = self._ensure_path_folder(access, relpath)
         file_id = drive_api.upload_bytes(access, name, data, parent_id)
         self._id_map[Path(relpath).as_posix()] = file_id
+        save_id_map(self._db, self._id_map)
         # Path-like sentinel so Protocol callers keep working; id is queryable.
         return Path(f"drive://{file_id}")
 
@@ -57,6 +61,7 @@ class GoogleDriveStorageBackend:
         if not file_id:
             return False
         drive_api.delete_file(access, file_id)
+        save_id_map(self._db, self._id_map)
         return True
 
     def exists(self, relpath: str) -> bool:

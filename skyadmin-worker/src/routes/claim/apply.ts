@@ -71,5 +71,9 @@ export async function finishClaim(
     already_used: false,
     license_key: licenseKey,
     expires_at: expiresAt,
+    sync_enabled: row?.sync_enabled ?? 0,
+    web_enabled: row?.web_enabled ?? 0,
+    drive_files_enabled: row?.drive_files_enabled ?? 0,
+    max_devices: row?.max_devices ?? 0,
   });
 }

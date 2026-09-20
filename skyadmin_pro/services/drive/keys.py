@@ -27,3 +27,4 @@ from skyadmin_pro.config import (
 SETTING_DRIVE_REFRESH_TOKEN = "drive_refresh_token_enc"
 SETTING_DRIVE_CLIENT_ID = "drive_oauth_client_id"
 SETTING_DRIVE_CLIENT_SECRET = "drive_oauth_client_secret_enc"
+SETTING_DRIVE_ID_MAP = "drive_id_map_enc"
