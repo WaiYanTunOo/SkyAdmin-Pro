@@ -51,13 +51,19 @@ def derive_db_key_hex() -> str:
     return raw.hex()
 
 
-def connect(db_file: str | Path, *, timeout: int = 10, key_hex: str | None = None) -> Any:
-    """Open a keyed SQLCipher connection (fails closed without the driver)."""
+def connect(
+    db_file: str | Path, *, timeout: int = 10, key_hex: str | None = None, check_same_thread: bool = True
+) -> Any:
+    """Open a keyed SQLCipher connection (fails closed without the driver).
+
+    ``check_same_thread`` forwards to the driver so the pool owner (main
+    thread) can close background handles deterministically in shutdown().
+    """
     drv = driver()
     key = key_hex or derive_db_key_hex()
     if not all(c in "0123456789abcdef" for c in key):
         raise ValueError("Invalid database key format — expected hex string")
-    conn = drv.connect(str(db_file), timeout=timeout)
+    conn = drv.connect(str(db_file), timeout=timeout, check_same_thread=check_same_thread)
     try:
         conn.execute(f"PRAGMA kdf_iter = {int(CIPHER_KDF_ITERATIONS)}")
         conn.execute(f"PRAGMA key = \"x'{key}'\"")
@@ -68,11 +74,7 @@ def connect(db_file: str | Path, *, timeout: int = 10, key_hex: str | None = Non
 
 
 def db_state(path: str | Path) -> str:
-    """Classify a database file: 'new', 'plaintext', or 'cipher'.
-
-    'cipher' means non-magic header (encrypted) — or any file we cannot
-    read; callers needing certainty should attempt a keyed open.
-    """
+    """Classify 'new', 'plaintext', or 'cipher'; when unsure, callers should keyed-open."""
     p = Path(path)
     if not p.exists() or p.stat().st_size == 0:
         return "new"

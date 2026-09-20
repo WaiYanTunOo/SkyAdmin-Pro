@@ -40,7 +40,7 @@ class AppointmentsListMixin:
             conditions.append("a.appointment_date <= ?")
             params.append(str(to_date)[:10])
         sql += " WHERE " + " AND ".join(conditions)
-        sql += " ORDER BY a.appointment_date ASC," " COALESCE(a.appointment_time, '99:99') ASC, a.id ASC"
+        sql += " ORDER BY a.appointment_date ASC, COALESCE(a.appointment_time, '99:99') ASC, a.id ASC"
         if limit is not None and int(limit) > 0:
             sql += " LIMIT ?"
             params.append(int(limit))

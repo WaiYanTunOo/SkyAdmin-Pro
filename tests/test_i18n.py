@@ -141,3 +141,40 @@ class TestI18n:
         assert not errors
         assert len(results) == 200
         set_language("en")
+
+    def test_concurrent_state_never_corrupted(self):
+        observed = []
+        errors = []
+        valid = {"en", "my", "th"}
+
+        def reader():
+            try:
+                for _ in range(300):
+                    observed.append(get_language())
+                    _ = tr("Dashboard")
+            except Exception as e:
+                errors.append(e)
+
+        def writer(lang):
+            try:
+                for _ in range(300):
+                    set_language(lang)
+            except Exception as e:
+                errors.append(e)
+
+        threads = [
+            threading.Thread(target=reader),
+            threading.Thread(target=writer, args=("my",)),
+            threading.Thread(target=writer, args=("th",)),
+        ]
+        for t in threads:
+            t.start()
+        for t in threads:
+            t.join()
+
+        assert not errors
+        assert observed
+        assert set(observed) <= valid
+        assert get_language() in valid
+        assert len({get_language() for _ in range(50)}) == 1
+        set_language("en")

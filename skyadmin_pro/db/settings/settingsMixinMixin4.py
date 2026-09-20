@@ -39,7 +39,7 @@ class SettingsMixinMixin4:
                 continue
             if only_missing:
                 existing = self._fetch_one(
-                    "SELECT COUNT(*) AS n FROM office_contacts" " WHERE client_id = ? AND deleted_at IS NULL",
+                    "SELECT COUNT(*) AS n FROM office_contacts WHERE client_id = ? AND deleted_at IS NULL",
                     (cid,),
                 )
                 if existing and int(existing["n"]) > 0:

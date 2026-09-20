@@ -40,5 +40,5 @@ class SuppliersDeleteMixin:
 
     def list_supplier_payments(self) -> list[dict]:
         return self._fetch_all(
-            _PAY_COLS + " WHERE sp.deleted_at IS NULL" " ORDER BY sp.paid ASC, sp.due_date IS NULL, sp.due_date ASC"
+            _PAY_COLS + " WHERE sp.deleted_at IS NULL ORDER BY sp.paid ASC, sp.due_date IS NULL, sp.due_date ASC"
         )

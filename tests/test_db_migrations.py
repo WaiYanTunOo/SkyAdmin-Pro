@@ -36,6 +36,7 @@ def test_fresh_database_records_all_migrations(db_path):
         18,
         19,
         20,
+        21,
     ]
     assert rows[0]["name"] == "legacy_schema"
     assert rows[11]["name"] == "sync_hlc"
@@ -43,6 +44,7 @@ def test_fresh_database_records_all_migrations(db_path):
     assert rows[17]["name"] == "wave2b_sync"
     assert rows[18]["name"] == "sync_conflict_actors"
     assert rows[19]["name"] == "appointments"
+    assert rows[20]["name"] == "drop_redundant_idx_clients_name"
     # m009 owns the group index (kept out of SCHEMA_SQL replay) — fresh DBs get it via migration.
     idx = db._fetch_all("SELECT name FROM sqlite_master WHERE type = 'index' AND name = 'idx_clients_group'")
     assert len(idx) == 1
@@ -57,7 +59,7 @@ def test_migrations_are_idempotent_on_reopen(db_path):
     Database(db_path)
     db = Database(db_path)
     count = db._fetch_one("SELECT COUNT(*) AS n FROM schema_migrations")["n"]
-    assert count == 20
+    assert count == 21
 
 
 def test_new_migration_file_pattern(db_path):
@@ -83,6 +85,32 @@ def test_new_migration_file_pattern(db_path):
         register_migrations(original)
         if marker.exists():
             marker.unlink()
+
+
+def test_m021_drops_redundant_idx_clients_name(db_path):
+    """Fresh DBs never carry the redundant binary idx_clients_name; legacy DBs drop it via m021."""
+    db = Database(db_path)
+    names = {
+        row["name"]
+        for row in db._fetch_all("SELECT name FROM sqlite_master WHERE type = 'index' AND name = 'idx_clients_name'")
+    }
+    assert "idx_clients_name" not in names
+
+    # Simulate a legacy DB that still has the redundant index; clear the m021 marker.
+    with db.connection() as conn:
+        conn.execute("CREATE INDEX IF NOT EXISTS idx_clients_name ON clients(name)")
+        conn.execute("DELETE FROM schema_migrations WHERE version = 21")
+    reopen = Database(db_path)
+    names = {
+        row["name"]
+        for row in reopen._fetch_all(
+            "SELECT name FROM sqlite_master WHERE type = 'index' AND name = 'idx_clients_name'"
+        )
+    }
+    assert "idx_clients_name" not in names
+    # NOCASE UNIQUE auto-index still serves name lookups.
+    cid = reopen.get_or_create_client("Drop Probe Co")
+    assert reopen.client_id_by_name("drop probe co") == cid
 
 
 def test_m009_upgrades_legacy_db_missing_group_id(db_path):

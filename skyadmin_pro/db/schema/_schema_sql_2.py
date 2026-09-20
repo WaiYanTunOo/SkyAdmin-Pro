@@ -66,7 +66,6 @@ SCHEMA_SQL_PART_2 = (
     "CREATE INDEX IF NOT EXISTS idx_documents_client ON documents(client_id);\n"
     "CREATE INDEX IF NOT EXISTS idx_documents_payment_date ON documents(payment_date);\n"
     "CREATE INDEX IF NOT EXISTS idx_documents_start_date ON documents(start_date);\n"
-    "CREATE INDEX IF NOT EXISTS idx_clients_name ON clients(name);\n"
     "CREATE INDEX IF NOT EXISTS idx_pipeline_client ON pipeline_items(client_id);\n"
     "CREATE INDEX IF NOT EXISTS idx_courier_logs_client ON courier_logs(client_id);\n"
 )

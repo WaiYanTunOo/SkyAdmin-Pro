@@ -170,7 +170,7 @@ class TestDeleteClientsCommand:
                 (cid,),
             ).fetchall()
             linked = conn.execute(
-                "SELECT client_id, deleted_at FROM tasks" " WHERE client_id = ? AND title = 'Linked task'",
+                "SELECT client_id, deleted_at FROM tasks WHERE client_id = ? AND title = 'Linked task'",
                 (cid,),
             ).fetchall()
         assert len(docs) == 1 and docs[0]["deleted_at"] is None

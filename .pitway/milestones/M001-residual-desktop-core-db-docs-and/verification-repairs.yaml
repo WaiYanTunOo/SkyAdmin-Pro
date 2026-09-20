@@ -1,0 +1,26 @@
+schema_version: 1
+records:
+  - id: VR001
+    files:
+      - skyadmin_pro/db/appointments/list_a.py
+      - skyadmin_pro/db/appointments/mutate_a.py
+      - skyadmin_pro/db/migrations/m020_appointments.py
+      - skyadmin_pro/db/settings/settingsMixinMixin4.py
+      - skyadmin_pro/db/suppliers/suppliersMixinMixin0.py
+      - skyadmin_pro/db/suppliers/suppliers_delete.py
+      - skyadmin_pro/db/tasks/tasksMixinMixin2.py
+      - skyadmin_pro/db/tasks/tasksMixinMixin4.py
+      - skyadmin_pro/db/tax/operations_c.py
+      - skyadmin_pro/db/tax/renewal_a.py
+      - skyadmin_pro/services/drive/oauth.py
+      - skyadmin_pro/ui/views/settings/view/settingsViewMixin14.py
+      - tests/test_undo.py
+      - skyadmin_pro/services/data_sync/chunk_4_collect.py
+    checks:
+      - CT002
+    change_log: Ruff format the 13 pre-existing unformatted files (AC002 gate); fix
+      collect_local_changes HLC ordering so the final sort no longer inverts the
+      monotonic HLC stamp order (fixes intermittent
+      test_collect_stamps_proto2_monotonic, caught by CT006 release_check).
+    approved_at: 2026-09-20T04:58:41Z
+    status: committed

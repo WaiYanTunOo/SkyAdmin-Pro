@@ -99,3 +99,83 @@ def test_persist_filing_field_routes_history_through_mutation(monkeypatch):
     panel.app.db.log_tax_change.assert_called_once()
     panel.app.db.update_client_fields.assert_called_once()
     panel._refresh_after_mutation.assert_called_once_with(SUBTAB_FILING)
+
+
+def test_cancel_service_edit_resets_editing_state_fully():
+    panel = CompanyDetailsPanel.__new__(CompanyDetailsPanel)
+    panel.app = MagicMock()
+    panel.app.db.list_service_types.return_value = ["Accounting", "Auditing"]
+    panel.service_type = MagicMock()
+    panel.service_type.get.return_value = "Accounting"
+    panel.service_start = MagicMock()
+    panel.service_expiry = MagicMock()
+    panel.service_payment = MagicMock()
+    panel.service_amount = MagicMock()
+    panel.service_progress = MagicMock()
+    panel.service_paid = MagicMock()
+    panel.service_status_label = MagicMock()
+    panel._editing_service_id = 7
+    panel._editing_doc_id = None
+
+    panel._cancel_service_edit()
+
+    assert panel._editing_service_id is None
+    panel.service_status_label.configure.assert_called_once_with(text="New service record")
+    panel.service_type.set.assert_called_once_with("Accounting")
+    panel.service_start.set.assert_called_once_with("")
+    panel.service_expiry.set.assert_called_once_with("")
+    panel.service_payment.set.assert_called_once_with("")
+    panel.service_amount.set.assert_called_once_with("")
+    panel.service_progress.set.assert_called_once_with("Not started")
+    panel.service_paid.deselect.assert_called_once()
+
+
+def test_cancel_document_edit_resets_editing_state_fully():
+    panel = CompanyDetailsPanel.__new__(CompanyDetailsPanel)
+    panel.app = MagicMock()
+    panel.doc_type = MagicMock()
+    panel.doc_type.get.return_value = "Tax Returns"
+    panel.doc_expiry = MagicMock()
+    panel.doc_file = MagicMock()
+    panel.doc_path = MagicMock()
+    panel.document_status_label = MagicMock()
+    panel._editing_doc_id = 9
+    panel._editing_service_id = None
+
+    panel._cancel_document_edit()
+
+    assert panel._editing_doc_id is None
+    panel.document_status_label.configure.assert_called_once_with(text="New document record")
+    panel.doc_type.set.assert_called_once_with("Company Certificate")
+    panel.doc_expiry.set.assert_called_once_with("")
+    panel.doc_file.set.assert_called_once_with("")
+    panel.doc_path.set.assert_called_once_with("")
+
+
+def test_cancel_edit_idempotent_when_no_edit_in_progress():
+    panel = CompanyDetailsPanel.__new__(CompanyDetailsPanel)
+    panel.app = MagicMock()
+    panel.app.db.list_service_types.return_value = ["Accounting"]
+    panel._editing_service_id = None
+    panel._editing_doc_id = None
+    panel.service_type = MagicMock()
+    panel.service_status_label = MagicMock()
+    panel.doc_type = MagicMock()
+    panel.document_status_label = MagicMock()
+    panel.service_start = MagicMock()
+    panel.service_expiry = MagicMock()
+    panel.service_payment = MagicMock()
+    panel.service_amount = MagicMock()
+    panel.service_progress = MagicMock()
+    panel.service_paid = MagicMock()
+    panel.doc_expiry = MagicMock()
+    panel.doc_file = MagicMock()
+    panel.doc_path = MagicMock()
+
+    panel._cancel_service_edit()
+    panel._cancel_document_edit()
+
+    assert panel._editing_service_id is None
+    assert panel._editing_doc_id is None
+    panel.service_type.set.assert_called_once_with("Accounting")
+    panel.doc_type.set.assert_called_once_with("Company Certificate")

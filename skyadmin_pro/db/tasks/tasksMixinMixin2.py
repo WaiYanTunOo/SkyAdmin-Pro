@@ -51,7 +51,7 @@ class TasksMixinMixin2:
         work shows up in Tasks and on the Dashboard until it is finished.
         """
         doc = self._fetch_one(
-            "SELECT id, client_id, document_type, progress FROM documents" " WHERE id = ? AND deleted_at IS NULL",
+            "SELECT id, client_id, document_type, progress FROM documents WHERE id = ? AND deleted_at IS NULL",
             (document_id,),
         )
         if not doc:
@@ -76,7 +76,7 @@ class TasksMixinMixin2:
                 )
         elif progress == "Completed":
             linked = self._fetch_one(
-                "SELECT id, status FROM tasks WHERE source_document_id = ?" " AND deleted_at IS NULL",
+                "SELECT id, status FROM tasks WHERE source_document_id = ? AND deleted_at IS NULL",
                 (document_id,),
             )
             if linked is not None and linked["status"] == "pending":

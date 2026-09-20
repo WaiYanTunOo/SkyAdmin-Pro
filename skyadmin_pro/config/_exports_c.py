@@ -1,0 +1,71 @@
+"""Re-export surface for config: nav, pricing (group C).
+
+Imported by ``config/__init__.py`` via `from ._exports_c import *`;
+``__all__`` pins the exact public names so the surface is unchanged.
+"""
+
+from skyadmin_pro.config.nav import (
+    NAV_ACCOUNTING,
+    NAV_CHILD_TO_GROUP,
+    NAV_COURIER,
+    NAV_DASHBOARD,
+    NAV_DATABASE_TASKS,
+    NAV_DOCUMENT_HUB,
+    NAV_GROUP_DAILY,
+    NAV_GROUP_FINANCE,
+    NAV_GROUP_OFFICE,
+    NAV_GROUPS,
+    NAV_ITEMS,
+    NAV_OFFICE_HUB,
+    NAV_PIPELINE,
+    NAV_SETTINGS,
+    NAV_SUPPLIERS,
+    NAV_TASKS,
+    NAV_TAX_STATUS,
+    NAV_UTILITIES,
+)
+from skyadmin_pro.config.pricing import (
+    ACCOUNTING_PRICING_SERVICES,
+    DEFAULT_FLAT_FEE_PRICING,
+    DEFAULT_PRICING_MATRIX,
+    DEFAULT_SERVICE_CHARGE_LINES,
+    FLAT_FEE_TRANSACTION_RANGE,
+    PAYMENT_STATUSES,
+    PRICING_DEFAULT_SERVICE,
+    TRANSACTION_RANGE_PRICING_SERVICES,
+    default_charge_lines_for,
+    is_transaction_volume_tier,
+    pricing_uses_transaction_ranges,
+)
+
+__all__ = [
+    "ACCOUNTING_PRICING_SERVICES",
+    "DEFAULT_FLAT_FEE_PRICING",
+    "DEFAULT_PRICING_MATRIX",
+    "DEFAULT_SERVICE_CHARGE_LINES",
+    "FLAT_FEE_TRANSACTION_RANGE",
+    "NAV_ACCOUNTING",
+    "NAV_CHILD_TO_GROUP",
+    "NAV_COURIER",
+    "NAV_DASHBOARD",
+    "NAV_DATABASE_TASKS",
+    "NAV_DOCUMENT_HUB",
+    "NAV_GROUP_DAILY",
+    "NAV_GROUP_FINANCE",
+    "NAV_GROUP_OFFICE",
+    "NAV_GROUPS",
+    "NAV_ITEMS",
+    "NAV_OFFICE_HUB",
+    "NAV_PIPELINE",
+    "NAV_SETTINGS",
+    "NAV_SUPPLIERS",
+    "NAV_TASKS",
+    "NAV_TAX_STATUS",
+    "NAV_UTILITIES",
+    "PAYMENT_STATUSES",
+    "PRICING_DEFAULT_SERVICE",
+    "TRANSACTION_RANGE_PRICING_SERVICES",
+    "default_charge_lines_for",
+    "is_transaction_volume_tier",
+    "pricing_uses_transaction_ranges",
+]

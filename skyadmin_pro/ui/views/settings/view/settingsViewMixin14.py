@@ -17,9 +17,7 @@ class SettingsViewMixin14:
         card = SectionCard(
             scroll,
             title="Google Drive files",
-            subtitle=(
-                "Store PDFs in YOUR Google Drive (not vendor storage). " "Requires the Files-on-Drive license SKU."
-            ),
+            subtitle=("Store PDFs in YOUR Google Drive (not vendor storage). Requires the Files-on-Drive license SKU."),
         )
         card.grid(row=row, column=0, sticky="ew", pady=(12, 0))
         body = card.body

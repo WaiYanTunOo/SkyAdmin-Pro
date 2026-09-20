@@ -70,6 +70,6 @@ def test_replace_sqlite_db_gives_up(tmp_path: Path) -> None:
     with (
         patch("os.replace", side_effect=always_denied),
         patch("skyadmin_pro.db.replace_db._try_overwrite_bytes", return_value=False),
+        pytest.raises(PermissionError),
     ):
-        with pytest.raises(PermissionError):
-            replace_sqlite_db(staged, dest, attempts=3)
+        replace_sqlite_db(staged, dest, attempts=3)

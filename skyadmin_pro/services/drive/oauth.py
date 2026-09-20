@@ -43,7 +43,7 @@ def connect_google_drive(db, *, timeout_sec: float = 180.0) -> str:
     client_secret = resolve_client_secret(db)
     if not client_id or not client_secret:
         raise NotConfiguredError(
-            "Set GOOGLE_OAUTH_CLIENT_ID and GOOGLE_OAUTH_CLIENT_SECRET " "(or Settings client id/secret) first."
+            "Set GOOGLE_OAUTH_CLIENT_ID and GOOGLE_OAUTH_CLIENT_SECRET (or Settings client id/secret) first."
         )
 
     state = secrets.token_urlsafe(16)

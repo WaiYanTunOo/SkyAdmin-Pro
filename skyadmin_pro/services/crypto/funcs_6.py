@@ -54,7 +54,7 @@ def restore_encrypted_backup(archive: Path, workspace_root: Path, db_file: Path)
             staged_db.write_bytes(db_payload)
             try:
                 replace_sqlite_db(staged_db, db_file)
-            except Exception:
+            except OSError:
                 try:
                     staged_db.unlink(missing_ok=True)
                 except OSError:
@@ -79,17 +79,19 @@ def restore_encrypted_backup(archive: Path, workspace_root: Path, db_file: Path)
                     staged.unlink(missing_ok=True)
                 restored_files += 1
 
+        # Rewrite is best-effort: never abort an otherwise-successful restore.
         try:
+            from skyadmin_pro.db.cipher import DB_ERRORS, migrate_plaintext_to_cipher
+
             paths_rewritten = _rewrite_db_paths(db_file, ws)
-        except Exception:
+        except (*DB_ERRORS, OSError, RuntimeError, ValueError):
             logger.warning("Path rewriting failed", exc_info=True)
 
         # Backups ship plaintext — encrypt after rewrite so next app open is cipher.
+        # Migration too is best-effort; restore remains usable either way.
         try:
-            from skyadmin_pro.db.cipher import migrate_plaintext_to_cipher
-
             migrate_plaintext_to_cipher(db_file)
-        except Exception:
+        except (*DB_ERRORS, OSError, RuntimeError, ValueError):
             logger.warning("Post-restore cipher migration failed", exc_info=True)
 
         return RestoreSummary(

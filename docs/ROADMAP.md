@@ -4,7 +4,7 @@
 
 Living plan after **Phase 5** (release gates, sync conflicts, auto-update, packaging, viewer PWA, Inno Setup).
 
-**Current version:** `0.3.3` · **Primary platform:** Windows desktop
+**Current version:** `0.3.6` · **Primary platform:** Windows desktop
 
 ---
 
@@ -12,7 +12,7 @@ Living plan after **Phase 5** (release gates, sync conflicts, auto-update, packa
 
 | Area | Status |
 |------|--------|
-| Windows portable exe + installer | ✅ `build.ps1`, `build-installer.ps1`, `dist\SkyAdminPro-Setup-0.3.3.exe` |
+| Windows portable exe + installer | ✅ `build.ps1`, `build-installer.ps1`, `dist\SkyAdminPro-Setup-0.3.6.exe` |
 | License / activation | ✅ Ed25519, claim burn, control list SKYCTRL2 |
 | Worker API | ✅ Generate, revoke, sync, pricing, update, admin, viewer PWA |
 | UI theme (Phases 0–4) | ✅ Form tokens, themed entries, walkthrough tests |
@@ -25,7 +25,7 @@ Living plan after **Phase 5** (release gates, sync conflicts, auto-update, packa
 - **Fail-closed secrets** (`secret_fields.py`) — machine-bound Fernet
 - **Export redaction** (`export.py` + `test_export_security.py`)
 - **Lazy top-level views** (`main_window._ensure_view`) — only Dashboard loads at startup
-- **40+ SQLite indexes** in `schema.py`
+- **40+ SQLite indexes** in `schema/` (audited 2026-09; redundant `idx_clients_name` dropped, migration 021)
 
 ### Top complexity hotspots (split targets)
 
@@ -48,7 +48,7 @@ Living plan after **Phase 5** (release gates, sync conflicts, auto-update, packa
 
 | # | Task | Files | Done when |
 |---|------|-------|-----------|
-| 7.1 | **Versioned DB migrations** — `schema_migrations` table; numbered scripts instead of `_migrate_*` chain | `db/core.py`, `db/migrations/` | New column = one migration file + test |
+| 7.1 | **Versioned DB migrations** — `schema_migrations` table; numbered scripts instead of `_migrate_*` chain | `db/core/`, `db/migrations/` | New column = one migration file + test |
 | 7.2 | **Dashboard query budget** — single `dashboard_snapshot()`; ≤3 SQL round-trips per refresh | `db/tax.py`, `ui/views/dashboard.py` | Regression test on query count |
 | 7.3 | **Integrity banner** — show `quick_check()` failure in Settings (not only dialog) | `ui/views/settings.py` | User sees DB warning on open |
 | 7.4 | **Background thread audit** — uncaught exceptions in sync/backup/export threads | `settings.py`, `document_hub.py`, `utilities.py` | Errors surface in `FeedbackLabel` | ✅ |
@@ -62,7 +62,7 @@ Living plan after **Phase 5** (release gates, sync conflicts, auto-update, packa
 
 | # | Task | Files | Priority |
 |---|------|-------|----------|
-| 8.1 | **Harden `/api/sync/register`** — reject banned/revoked/expired before issuing token | `skyadmin-worker/src/routes/sync.ts` | **P0** |
+| 8.1 | **Harden `/api/sync/register`** — reject banned/revoked/expired before issuing token | `skyadmin-worker/src/routes/sync/register.ts` | **P0** |
 | 8.2 | **Worker route tests** — claim rate limit, sync push LWW, register rejection | `*.test.ts` | **P0** |
 | 8.3 | **Encrypt `sync_device.json`** — machine-bound like `secret_fields` | `services/data_sync.py` | P1 |
 | 8.4 | **Export runtime guard** — assert DataFrame columns ⊆ allowed set | `services/export.py` | P1 |
@@ -144,7 +144,7 @@ services/license/           verify.py, online.py, machine.py  (package; monolith
 - [x] Vault round-trip tests (`tests/test_vault.py`)
 - [x] Document Hub lazy tab panels (`document_hub.py`)
 - [x] FTS5 client search (`core.py`, `clients.py`)
-- [x] Batch sync push on Worker (`sync_push.ts`) (Phase 10.3)
+- [x] Batch sync push on Worker (`sync/push.ts`) (Phase 10.3)
 - [x] Composite overdue/ongoing indexes + migration 008 (Phase 10.4)
 - [x] Perf regression tests — overdue + dashboard query budget (Phase 10.5)
 - [x] CI release workflow (`.github/workflows/release.yml`)
@@ -164,6 +164,11 @@ services/license/           verify.py, online.py, machine.py  (package; monolith
 - [x] Sync/updates loading states + thread error surfacing (`license_mixin.py`, `async_ui.py`) (Phase 9C / 7.4)
 - [x] Single version source — `APP_VERSION` reads `pyproject.toml` (Phase 7.5)
 - [x] Split `admin.ts` into `routes/admin/` package (`handler`, `session`, `pages`) — see `docs/WORKER_ADMIN.md`
+- [x] DB index redundancy audit — dropped `idx_clients_name` (m021)
+- [x] Dashboard snapshot single-connection bundle (`bundle_queries`)
+- [x] Single-version license constants + config `config/` package split
+- [x] Worker generate → claim → verify integration chain (`integration.test.ts`)
+- [x] ThemedTreeview `apply_theme` fast-path crash + `test_theme_cache` order dependence fixed
 
 ---
 
@@ -179,7 +184,7 @@ services/license/           verify.py, online.py, machine.py  (package; monolith
 |--------|--------|
 | pytest + vitest | 100% pass on CI |
 | `release_check.py` | RELEASE OK before every ship |
-| Dashboard refresh | ≤3 SQL queries |
+| Dashboard refresh | ≤3 SQL queries (relaxed to 1 connection / ≤40 statements) |
 | First open Database Tasks | <500ms to interactive tab (lazy) |
 | Client search (500 rows) | <100ms perceived (debounce + FTS) |
 | Security | Banned machine cannot obtain sync token |

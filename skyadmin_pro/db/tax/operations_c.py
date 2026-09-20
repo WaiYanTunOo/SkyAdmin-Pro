@@ -32,7 +32,7 @@ class OperationsMixinC:
         with self.connection() as conn:
             now = self._now()
             existing = conn.execute(
-                "SELECT id FROM renewal_items" " WHERE client_id = ? AND template_name = ? LIMIT 1",
+                "SELECT id FROM renewal_items WHERE client_id = ? AND template_name = ? LIMIT 1",
                 (client_id, template),
             ).fetchone()
             if existing:

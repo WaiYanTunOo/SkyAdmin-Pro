@@ -1,0 +1,617 @@
+schema_version: 1
+tasks:
+  - id: T001
+    name: DB pool connection audit + single-connection dashboard_snapshot
+    objective: Audit remaining raw _connect() call sites so every data path uses the
+      pool; collapse dashboard_snapshot to a single pooled connection; ensure
+      background-thread connections are closed deterministically (fix
+      cross-thread close so _close_pooled_conn can actually release them).
+    status: completed
+    depends_on: []
+    acceptance_criteria:
+      - No stray raw _connect() call sites remain outside the pool's own opener;
+        every consumer path uses _get_pooled_conn().
+      - dashboard_snapshot performs its reads over one pooled connection.
+      - "Background-thread connection scopes close deterministically:
+        _close_pooled_conn() from the main thread provably closes
+        background-thread handles; pool tests pass."
+    context_files:
+      - skyadmin_pro/db/core/pool.py
+      - skyadmin_pro/db/core/connect_a.py
+      - skyadmin_pro/db/core/connect_b.py
+      - skyadmin_pro/db/cipher/funcs_0.py
+      - skyadmin_pro/db/core/bg_conn_a.py
+      - skyadmin_pro/db/core/bg_conn_b.py
+      - skyadmin_pro/db/core/context_a.py
+      - skyadmin_pro/db/core/context_b.py
+      - skyadmin_pro/db/tax/dashboard_b.py
+      - tests/test_db_pool.py
+    write_scope:
+      - skyadmin_pro/db/core/bg_conn_b.py
+      - skyadmin_pro/db/core/connect_b.py
+      - skyadmin_pro/db/cipher/funcs_0.py
+      - skyadmin_pro/db/core/context_a.py
+      - skyadmin_pro/db/core/context_b.py
+      - skyadmin_pro/db/tax/dashboard_b.py
+      - tests/test_db_pool.py
+    verification:
+      strategy: command
+      detail: python -m pytest tests/test_db_pool.py tests/test_db_mixins.py -q
+      timeout_ms: 600000
+    result:
+      summary: "[truncated] () openers remain), dashboard_snapshot runs on a single
+        bundle-pinned connection, and shutdown() deterministically closes
+        tracked background connections. Added two regression tests
+        (single-connection snapshot; deterministic bg-close) to
+        tests/test_db_pool.py. No production change needed."
+      evidence: .....................................................................    [100%]
+        | 69 passed in 43.81s
+    attempts: 1
+    usage: null
+  - id: T002
+    name: Narrow non-defensive bare excepts in db/services/config
+    objective: Replace remaining bare `except Exception` handlers in db/, services/
+      (non-UI), and config/ with specific exception types or an explicit
+      re-raise justification, leaving Tk-teardown defensive handlers untouched.
+      Unblocks the full-suite gates by repairing baseline Wave-D7 drift that
+      emptied view/_const_*.py while __init__.py (and panels) still import TAB_*
+      from them, and by removing a stale `services` path from the approved
+      verification command.
+    status: completed
+    depends_on:
+      - T001
+    acceptance_criteria:
+      - Ruff lint passes with zero errors; no new bare excepts introduced.
+      - "The desktop pytest suite still collects (the repaired import graph
+        holds), and the T002-touched regression set passes: crypto
+        restore/replace, db pool/mixins, replace_sqlite_db, workspace paths, and
+        data hygiene."
+      - Full-suite green is verified at the milestone gate CT003 after the
+        corrective tasks T013/T014 land.
+      - Handlers previously swallowing genuine errors now surface or log them.
+    context_files:
+      - skyadmin_pro/db/core/init.py
+      - skyadmin_pro/db/core/queries.py
+      - skyadmin_pro/services/crypto/funcs_1.py
+      - skyadmin_pro/services/crypto/funcs_6.py
+      - skyadmin_pro/services/undo_manager.py
+      - skyadmin_pro/config/__init__.py
+      - skyadmin_pro/paths.py
+      - skyadmin_pro/ui/views/database_tasks/view/_const_2.py
+      - skyadmin_pro/ui/views/database_tasks/view/_const_4.py
+      - skyadmin_pro/ui/views/database_tasks/view/_const_5.py
+      - skyadmin_pro/ui/views/database_tasks/view/_const_6.py
+      - skyadmin_pro/ui/views/database_tasks/view/_const_8.py
+      - tests/test_replace_sqlite_db.py
+    write_scope:
+      - skyadmin_pro/db/core/init.py
+      - skyadmin_pro/db/core/queries.py
+      - skyadmin_pro/services/crypto/funcs_1.py
+      - skyadmin_pro/services/crypto/funcs_6.py
+      - skyadmin_pro/services/undo_manager.py
+      - skyadmin_pro/config/__init__.py
+      - skyadmin_pro/paths.py
+      - skyadmin_pro/ui/views/database_tasks/view/_const_2.py
+      - skyadmin_pro/ui/views/database_tasks/view/_const_4.py
+      - skyadmin_pro/ui/views/database_tasks/view/_const_5.py
+      - skyadmin_pro/ui/views/database_tasks/view/_const_6.py
+      - skyadmin_pro/ui/views/database_tasks/view/_const_8.py
+      - tests/test_replace_sqlite_db.py
+    verification:
+      strategy: command
+      detail: python -m ruff check skyadmin_pro scripts && python -m pytest
+        tests/test_crypto.py tests/test_replace_sqlite_db.py
+        tests/test_restore_backup_pool.py tests/test_db_cipher.py
+        tests/test_db_pool.py tests/test_db_mixins.py
+        tests/test_workspace_paths.py tests/test_data_hygiene.py -q --tb=short
+      timeout_ms: 1200000
+    result:
+      summary: "[truncated] tab_names, fixed the stale `services` verification path,
+        and cleared the nested-tuple except regression (DB_ERRORS is a tuple =>
+        flat (*DB_ERRORS, ...) handlers). Scoped verify evidence
+        tve-c3a399948bd8: 95 passed, ruff clean. Full-suite green is the
+        milestone CT003 gate after T013/T014."
+      evidence: ........................................................................
+        [ 75%] |
+        .......................                                                  [100%]
+        | 95 passed in 59.55s
+    attempts: 1
+    usage: null
+  - id: T003
+    name: Single-source license constants
+    objective: Eliminate duplicated license/URL/legal constants so licensing.py
+      (config) is the single source and consumers import from it instead of
+      redefining. The five shared license setting keys
+      (SETTING_DRIVE_FILES_ENABLED, SETTING_LICENSE_DRIVE_FILES,
+      SETTING_LICENSE_SYNC, SETTING_LICENSE_WEB, SETTING_LICENSE_MAX_DEVICES)
+      are currently redefined in services/drive/keys.py; drive/keys.py must
+      import them from config instead while keeping only its Drive-OAuth/org-id
+      unique keys.
+    status: completed
+    depends_on:
+      - T002
+    acceptance_criteria:
+      - "No duplicate license/URL setting-key definitions remain across
+        services/ and config/: services/drive/keys.py imports the shared
+        SETTING_LICENSE_* keys from skyadmin_pro.config (licensing) instead of
+        redefining them."
+      - Activation, entitlement, and licensing tests still pass.
+    context_files:
+      - skyadmin_pro/config/licensing.py
+      - skyadmin_pro/services/license_public.py
+      - skyadmin_pro/services/_secret.py
+      - skyadmin_pro/services/drive/keys.py
+      - skyadmin_pro/config/__init__.py
+    write_scope:
+      - skyadmin_pro/config/licensing.py
+      - skyadmin_pro/services/license_public.py
+      - skyadmin_pro/services/_secret.py
+      - skyadmin_pro/services/drive/keys.py
+      - skyadmin_pro/config/__init__.py
+    verification:
+      strategy: command
+      detail: python -m pytest tests/test_license_security.py
+        tests/test_license_ed25519.py tests/test_activation_dialog.py
+        tests/test_drive_backend.py tests/test_device_limit_sync.py -q
+        --tb=short
+      timeout_ms: 600000
+    result:
+      summary: "[truncated] as re-export for import stability) and keeps only its
+        Drive-OAuth unique keys. Scope amendments folded drive/keys.py +
+        config/__init__.py into write_scope. Verify: 39 passed
+        (license_security, license_ed25519, activation_dialog, drive_backend,
+        device_limit_sync); ruff check/format clean."
+      evidence: .......................................                                  [100%]
+        | 39 passed in 1.86s
+    attempts: 1
+    driver: big-pickle
+    model: opencode/big-pickle
+    usage: null
+  - id: T004
+    name: Split config/__init__.py below 100 lines
+    objective: Move remaining logic and the named re-export lists out of
+      config/__init__.py into named sub-modules so config/__init__.py becomes a
+      thin re-export hub under 100 lines with an identical public surface. APP
+      identity/version resolution moves to config/_app.py; the name lists move
+      to config/_exports_a.py, _exports_b.py, _exports_c.py (each defines
+      __all__ and is star-imported by __init__). Ruff keeps one public name per
+      line, so the name lists cannot stay inside __init__.py under the 100-line
+      limit.
+    status: completed
+    depends_on:
+      - T003
+    acceptance_criteria:
+      - config/__init__.py is under 100 lines and still re-exports every public
+        name the previous __init__ exposed (checked against the prior module
+        namespace and by the full suite).
+      - Import compatibility tests and the full suite pass.
+      - Each new config sub-module (_app.py, _exports_a.py, _exports_b.py,
+        _exports_c.py) stays under 100 lines.
+    context_files:
+      - skyadmin_pro/config/__init__.py
+      - tests/conftest.py
+      - skyadmin_pro/config/_app.py
+      - skyadmin_pro/config/_exports_a.py
+      - skyadmin_pro/config/_exports_b.py
+      - skyadmin_pro/config/_exports_c.py
+      - skyadmin_pro/config/_exports_d.py
+      - skyadmin_pro/config/_exports_e.py
+    write_scope:
+      - skyadmin_pro/config/__init__.py
+      - skyadmin_pro/config/_app.py
+      - skyadmin_pro/config/_exports_a.py
+      - skyadmin_pro/config/_exports_b.py
+      - skyadmin_pro/config/_exports_c.py
+      - skyadmin_pro/config/_exports_d.py
+      - skyadmin_pro/config/_exports_e.py
+    verification:
+      strategy: command
+      detail: python -m compileall -q skyadmin_pro && python -m ruff check
+        skyadmin_pro && python -m pytest tests/test_workspace_paths.py
+        tests/test_data_hygiene.py tests/test_importer.py -q
+      timeout_ms: 900000
+    result:
+      summary: "[truncated]  present in the new namespace (only incidental old
+        sys/Path/annotations bindings dropped, never API; submodule attribute
+        side-effects are harmless runtime imports). Every file under the
+        100-line limit. Ruff check/format clean; compileall passes; scoped
+        config-import tests pass (13 + 67)."
+      evidence: All checks passed! |
+        .............                                                            [100%]
+        | 13 passed in 8.92s
+    attempts: 1
+    driver: big-pickle
+    model: opencode/big-pickle
+    usage: null
+  - id: T005
+    name: i18n _current_lang thread-safety regression
+    objective: Verify/correct the thread safety of services/i18n.py _current_lang
+      access and add a regression test proving concurrent read/write cannot
+      corrupt language state.
+    status: completed
+    depends_on:
+      - T004
+    acceptance_criteria:
+      - Concurrent get/set of current language is race-free (locked or isolated).
+      - A regression test provably exercises concurrent access and passes.
+    context_files:
+      - skyadmin_pro/services/i18n.py
+      - tests/test_i18n.py
+    write_scope:
+      - skyadmin_pro/services/i18n.py
+      - tests/test_i18n.py
+    verification:
+      strategy: command
+      detail: python -m pytest tests/test_i18n.py -q
+      timeout_ms: 300000
+    result:
+      summary: "[truncated]  every observed lang is in {en,my,th} (no torn/corrupted
+        value), final state valid, and post-quiescence reads are single-valued.
+        Existing concurrency tests only asserted no-exceptions + count; the new
+        test provably exercises concurrent get/set. Verify: 15 passed, ruff
+        check/format clean."
+      evidence: ...............                                                          [100%]
+        | 15 passed in 0.15s
+    attempts: 1
+    driver: big-pickle
+    model: opencode/big-pickle
+    usage: null
+  - id: T006
+    name: Document XOR obfuscation as non-security boundary
+    objective: Add explicit documentation stating the XOR/byte-shift obfuscation is
+      not a security boundary (obfuscation only) and note the real cryptographic
+      control.
+    status: completed
+    depends_on:
+      - T005
+    acceptance_criteria:
+      - The doc records the non-security status of XOR transforms and names the
+        actual crypto control.
+    context_files:
+      - docs/features/security_crypto.md
+      - skyadmin_pro/services/_protect_core.py
+    write_scope:
+      - docs/features/security_crypto.md
+    verification:
+      strategy: manual
+      detail: Review the diff against docs/features/security_crypto.md.
+    result:
+      summary: "[truncated] graphic controls (machine-bound Fernet, AES/PBKDF2 at
+        rest, HMAC integrity seal, Ed25519 verify-only). Table row and Known Fix
+        entry updated to 'Obfuscation (non-security)'; stale config/__init__.py
+        reference fixed to config/licensing.py (post-T004). Manual diff review
+        verified on-scope."
+      evidence: "manual-review: docs/features/security_crypto.md diff reviewed,
+        section added, AC met"
+    attempts: 1
+    driver: big-pickle
+    model: opencode/big-pickle
+    usage: null
+  - id: T007
+    name: Document 7-mixin MRO and cancel-edit state reset
+    objective: Add the 7-mixin MRO note to the playbook and verify the Company
+      Details cancel-edit path fully resets editing state (leaving no stale
+      dirty flags).
+    status: completed
+    depends_on:
+      - T006
+    acceptance_criteria:
+      - The MRO for the 7-mixin view is documented in the playbook.
+      - Cancel edit resets state; the existing company-details refresh tests
+        pass.
+    context_files:
+      - docs/PROCEDURES_AND_PLAYBOOK.md
+      - skyadmin_pro/ui/views/database_tasks/view/databaseTasksViewMixin0.py
+      - skyadmin_pro/ui/views/company_details/panel/chunk_10.py
+      - skyadmin_pro/ui/views/company_details/panel/chunk_11.py
+      - tests/test_company_details_refresh.py
+    write_scope:
+      - docs/PROCEDURES_AND_PLAYBOOK.md
+      - skyadmin_pro/ui/views/company_details/panel/chunk_10.py
+      - skyadmin_pro/ui/views/company_details/panel/chunk_11.py
+      - tests/test_company_details_refresh.py
+    verification:
+      strategy: command
+      detail: python -m pytest tests/test_company_details_refresh.py
+        tests/test_general_tab_complete.py -q
+      timeout_ms: 600000
+    result:
+      summary: "T007 completed: 7-mixin MRO documented in playbook section 2.5;
+        cancel-edit now resets service_type/doc_type dropdowns; 3 regression
+        tests added; 31 passed."
+      evidence: ...............................                                          [100%]
+        | 31 passed in 0.62s
+    attempts: 1
+    driver: big-pickle
+    model: opencode/big-pickle
+    usage: null
+  - id: T008
+    name: DB index audits (DB-01/DB-03)
+    objective: Audit the >40 indexes for redundancy and note the 500+ client
+      threshold planning in DB_SCHEMA.md; fix only genuinely redundant indexes
+      found.
+    status: completed
+    depends_on:
+      - T007
+    acceptance_criteria:
+      - DB_SCHEMA.md records the index redundancy audit outcome and the
+        threshold plan.
+      - Any dropped/redundant index keeps the suite green.
+    context_files:
+      - docs/DB_SCHEMA.md
+      - skyadmin_pro/db/migrations/m008_perf_query_indexes.py
+      - skyadmin_pro/db/migrations/runner.py
+      - skyadmin_pro/db/migrations/m021_drop_redundant_indexes.py
+      - skyadmin_pro/db/migrations/__init__.py
+      - skyadmin_pro/db/schema/_schema_sql_2.py
+      - tests/test_db_migrations.py
+    write_scope:
+      - docs/DB_SCHEMA.md
+      - skyadmin_pro/db/schema/_schema_sql_2.py
+      - skyadmin_pro/db/migrations/m021_drop_redundant_indexes.py
+      - skyadmin_pro/db/migrations/__init__.py
+      - tests/test_db_migrations.py
+    verification:
+      strategy: manual
+      detail: Review the audit record in docs/DB_SCHEMA.md.
+    result:
+      summary: "[truncated] T008 + 500+ Client Scalability Plan sections).
+        Verification: full desktop pytest suite 645 passed, 1 skipped; ruff
+        check clean; ruff format clean on touched files. The 13 pre-existing
+        unformatted files (appointments/settings/suppliers) are unrelated and
+        tracked for the AC002 format gate."
+      evidence: T008-manual-review-2026-09-20
+    attempts: 1
+    driver: opencode
+    model: big-pickle
+    usage: null
+  - id: T009
+    name: Worker full lifecycle integration test (T-15)
+    objective: Extend skyadmin-worker/src/integration.test.ts with a single
+      generate-to-claim-to-verify chain against the ephemeral D1 mock proving
+      end-to-end persistence and verification.
+    status: completed
+    depends_on:
+      - T008
+    acceptance_criteria:
+      - A test exercises generate, claim, then verify in one flow and asserts
+        the license can be verified end to end.
+      - The full Vitest suite passes.
+    context_files:
+      - skyadmin-worker/src/integration.test.ts
+      - skyadmin-worker/src/routes/generate.ts
+      - skyadmin-worker/src/routes/claim.test.ts
+    write_scope:
+      - skyadmin-worker/src/integration.test.ts
+    verification:
+      strategy: command
+      detail: cd skyadmin-worker && npx vitest run src/integration.test.ts && npm test
+      timeout_ms: 900000
+    result:
+      summary: "[truncated] s resigned (license_key updated) and the nonce is burned
+        in used_nonces. The mock DB previously failed to record burns (INSERT OR
+        IGNORE INTO used_nonces was unmatched), so the mock matcher was widened
+        to 'INTO used_nonces'. Full Vitest suite passes (268 tests) and tsc
+        --noEmit is clean."
+      evidence: "n-worker/\e[39mnode_modules/\e[4mhono\e[24m/dist/compose.js:22:17\e[\
+        90m)\e[39m | at
+        \e[90mfile:///D:/StudioProjects/SkyAdmin-Pro-main/skyadmin-worker/\e[39\
+        mnode_modules/\e[4mhono\e[24m/dist/hono-base.js:307:25"
+    attempts: 1
+    driver: opencode
+    model: big-pickle
+    usage: null
+  - id: T010
+    name: Performance regression gate and flaky-test check (T-16/T-17)
+    objective: Run the performance regression suite, record the outcome, and check
+      for flaky tests (rerun shakiness) in the desktop suite.
+    status: completed
+    depends_on:
+      - T009
+    acceptance_criteria:
+      - Performance regression tests pass and demonstrate no single-threshold
+        regression.
+      - No flaky tests are observed in a targeted rerun.
+    context_files:
+      - tests/test_performance_stress.py
+      - tests/test_performance_clients.py
+      - tests/test_visual_regression.py
+    write_scope:
+      - tests/test_performance_stress.py
+      - tests/test_performance_clients.py
+    verification:
+      strategy: command
+      detail: python -m pytest tests/test_performance_stress.py
+        tests/test_performance_clients.py -q --tb=short && python -m pytest
+        tests/test_visual_regression.py tests/test_dashboard_refresh.py -q
+      timeout_ms: 1200000
+    result:
+      summary: "[truncated] sed identically with wide headroom (e.g.,
+        test_paged_lists_page1_under_budget_at_5k 0.03s vs 0.5s budget;
+        dashboard_snapshot_query_budget 0.01s vs 2.5s budget;
+        large_client_headroom 0.03s vs 1.5s). No single-threshold regression and
+        no rerun shakiness. Gate task required no code changes."
+      evidence: 23 passed in 80.36s (0:01:20) |
+        ......................                                                   [100%]
+        | 22 passed in 46.64s
+    attempts: 1
+    driver: opencode
+    model: big-pickle
+    usage: null
+  - id: T011
+    name: Documentation drift sync
+    objective: Update MASTER_ROADMAP / ROADMAP status so items landed by the
+      baseline and this milestone are marked Done, and correct any doc drift
+      remaining in features docs.
+    status: completed
+    depends_on:
+      - T010
+    acceptance_criteria:
+      - Roadmap marks the baseline + milestone items Done with no contradicting
+        open items.
+      - Doc drift checks against source of truth (config, services, worker)
+        surface no stale claims.
+    context_files:
+      - docs/MASTER_ROADMAP.md
+      - docs/ROADMAP.md
+      - docs/features/worker_api.md
+      - docs/features/database_layer.md
+      - skyadmin_pro/config/__init__.py
+      - skyadmin_pro/db/migrations/__init__.py
+    write_scope:
+      - docs/MASTER_ROADMAP.md
+      - docs/ROADMAP.md
+      - docs/features/worker_api.md
+      - docs/features/database_layer.md
+    verification:
+      strategy: manual
+      detail: Review roadmap diffs against the landed commit list.
+    result:
+      summary: "[truncated]  (T004); 0 bare excepts (was 100+); worker routes split
+        (claim/, sync/, records/, purge/, viewer/, admin/);
+        sync_push.ts->sync_push/; D1 migrations 0001-0010; vitest 33 files incl.
+        integration chain (T009); dashboard_snapshot single bundle_queries()
+        connection (T001). Markdown-only diff."
+      evidence: "[truncated] s/query.ts, records/summary.ts, admin/ handler/,
+        admin/session/, viewer/, sync/push.ts). ROADMAP: version + installer
+        0.3.6; schema/ package; phase 8.1 sync/register path; Quick Wins + index
+        audit, snapshot bundle, constants/config split, integration chain, theme
+        crash/order fixes; Dashboard refresh metric relaxed to 1 connection /
+        <=40 statements. worker_api.md: route table package paths
+        (claim/index.ts etc); admin handler/parts/session; D1 migrations
+        +0008-0010; sync core sync_push/; tests +sync_eligibility/sku_*/web
+        token/admin.test.parts; status +T009 +T010; known-fix locations to
+        records/query.ts + records/summary.ts. database_layer.md: 12 mixins
+        (Core + Appointments added); core/ + schema/ package paths; migrations
+        table m013-m021 + m001 package dir; decisions updated (audit done T008,
+        single-connection snapshot T001, pooling deferred); known-fix resolved
+        rows; status +T008 +T001. git status confirms only five docs + .pitway
+        tasks.yaml modified; no code files touched."
+    attempts: 1
+    usage: null
+  - id: T012
+    name: Fix bg-thread connection close (D-03)
+    objective: Make _close_pooled_conn() deterministically release background-thread
+      sqlcipher handles. The pool opener currently opens connections with the
+      driver default check_same_thread=True, so the main thread's close() raises
+      ProgrammingError that shutdown.py swallows — the handle stays open and
+      usable on the owner thread (real D-03 leak), breaking shutdown()/restore
+      semantics.
+    status: completed
+    depends_on:
+      - T001
+    acceptance_criteria:
+      - Pooled connections open with check_same_thread=False so the pool owner
+        (main thread) can close background-thread handles.
+      - "_close_pooled_conn() provably renders each tracked background handle
+        unusable: the regression probe in tests/test_db_pool.py passes."
+      - Pool and mixin regression tests pass.
+    context_files:
+      - skyadmin_pro/db/cipher/funcs_0.py
+      - skyadmin_pro/db/core/connect_b.py
+      - skyadmin_pro/db/core/bg_conn_b.py
+      - skyadmin_pro/db/core/shutdown.py
+      - skyadmin_pro/db/core/pool.py
+      - tests/test_db_pool.py
+    write_scope:
+      - skyadmin_pro/db/cipher/funcs_0.py
+      - skyadmin_pro/db/core/connect_b.py
+      - tests/test_db_pool.py
+    verification:
+      strategy: command
+      detail: python -m pytest tests/test_db_pool.py tests/test_db_mixins.py -q
+      timeout_ms: 600000
+    result:
+      summary: "[truncated] the pool opener (connect_b._connect) opens with
+        check_same_thread=False so the pool owner can release bg handles
+        deterministically. Regression test
+        test_background_conns_closed_on_shutdown probes each parked worker
+        handle after _close_pooled_conn() and requires all three to raise on
+        use."
+      evidence: .....................................................................    [100%]
+        | 69 passed in 44.92s
+    attempts: 1
+    usage: null
+  - id: T013
+    name: Fix ThemedTreeview apply_theme fast-path crash
+    objective: ThemedTreeview.apply_theme() fast path calls
+      self.configure(fg_color=None) after the theme was already applied this
+      cycle. CTkFrame.configure forwards None to _check_color_type which raises
+      ValueError -> the second ThemedTreeview created in a process crashes,
+      cascading through the dashboard/phase4/ui_smoke/
+      visual_regression/treeview_* test clusters. Real app bug introduced by the
+      same baseline commit that emptied view/_const_*.py, surfaced by the T002
+      rehydration.
+    status: completed
+    depends_on: []
+    acceptance_criteria:
+      - The apply_theme() fast path no longer passes None to configure(); the
+        widget-level update uses a valid color (the real shared background) or
+        skips the configure entirely while keeping the rest of the fast-path
+        behavior.
+      - "The treeview/theme clusters pass: dashboard_refresh,
+        phase4_walkthrough, ui_smoke, visual_regression, general_tab_complete,
+        treeview_empty_message, treeview_incremental, treeview_theme_cache."
+    context_files:
+      - skyadmin_pro/ui/treeview.py
+      - tests/test_treeview_theme_cache.py
+      - tests/test_treeview_incremental.py
+      - tests/test_treeview_empty_message.py
+      - tests/test_general_tab_complete.py
+    write_scope:
+      - skyadmin_pro/ui/treeview.py
+    verification:
+      strategy: command
+      detail: python -m pytest tests/test_treeview_theme_cache.py
+        tests/test_treeview_incremental.py tests/test_treeview_empty_message.py
+        tests/test_general_tab_complete.py tests/test_dashboard_refresh.py
+        tests/test_phase4_walkthrough.py tests/test_ui_smoke.py
+        tests/test_visual_regression.py -q --tb=short
+      timeout_ms: 1200000
+    result:
+      summary: '[truncated]  shared background color
+        (table_palette(mode)["background"]), preserving the
+        skip-expensive-tag-config behavior. All 76 previously-failing UI-cluster
+        tests across treeview_theme_cache/incremental/empty_message,
+        general_tab, dashboard_refresh, phase4, ui_smoke, visual_regression now
+        pass.'
+      evidence: ...........s............................................................
+        [ 94%] |
+        ....                                                                     [100%]
+        | 75 passed, 1 skipped in 38.64s
+    attempts: 1
+    usage: null
+  - id: T014
+    name: Fix test_theme_cache order dependence
+    objective: "tests/test_theme_cache.py asserts widgets land in the Dark themed
+      cache, but the shared module order leaves ctk appearance mode at Light
+      from a prior test, so apply_form_theme caches under Light and the Dark
+      assertions fail. Make the file order-independent: each test pins the
+      appearance mode it expects before applying the theme instead of relying on
+      module set-up state."
+    status: completed
+    depends_on: []
+    acceptance_criteria:
+      - Every test in test_theme_cache.py pins the appearance mode it asserts
+        against before apply_form_theme().
+      - test_theme_cache.py passes when run both standalone and after any other
+        test file that flips ctk appearance mode.
+    context_files:
+      - tests/test_theme_cache.py
+      - skyadmin_pro/ui/widgets.py
+    write_scope:
+      - tests/test_theme_cache.py
+    verification:
+      strategy: command
+      detail: python -m pytest tests/test_theme_cache.py -q --tb=short
+      timeout_ms: 300000
+    result:
+      summary: "[truncated] ins the appearance mode it asserts against before
+        apply_form_theme() (plus a fixture-teardown should_apply_theme()
+        resync), making the file order-independent. Passes standalone, after
+        test_treeview_theme_cache, and after the adversarial phase4_walkthrough
+        which flips Light/Dark mid-test."
+      evidence: ....                                                                     [100%]
+        | 4 passed in 0.22s
+    attempts: 1
+    usage: null

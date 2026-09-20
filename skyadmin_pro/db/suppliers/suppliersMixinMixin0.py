@@ -5,7 +5,7 @@ from skyadmin_pro.db.cipher import INTEGRITY_ERRORS
 
 class SuppliersMixinMixin0:
     def list_suppliers(self, *, limit: int | None = None, offset: int = 0) -> list[dict]:
-        base = "SELECT * FROM suppliers WHERE deleted_at IS NULL" " ORDER BY name COLLATE NOCASE ASC"
+        base = "SELECT * FROM suppliers WHERE deleted_at IS NULL ORDER BY name COLLATE NOCASE ASC"
         if limit is not None and int(limit) > 0:
             return self._fetch_page(base, (), limit=limit, offset=offset)
         return self._fetch_all(base)

@@ -35,6 +35,8 @@ class CompanyDetailsPanelMixin10:
         self._editing_service_id = None
         if hasattr(self, "service_status_label"):
             self.service_status_label.configure(text="New service record")
+        if hasattr(self, "service_type"):
+            self.service_type.set(self.app.db.list_service_types()[0])
         if hasattr(self, "service_start"):
             self.service_start.set("")
             self.service_expiry.set("")

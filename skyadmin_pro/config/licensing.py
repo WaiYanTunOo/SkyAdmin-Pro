@@ -194,7 +194,8 @@ SETTING_DRIVE_FILES_ENABLED = "drive_files_enabled"
 SETTING_LICENSE_DRIVE_FILES = "license_drive_files"
 SETTING_LICENSE_SYNC = "license_sync"
 SETTING_LICENSE_WEB = "license_web"
-SETTING_LICENSE_MAX_DEVICES = "license_max_devices"
+SETTING_LICENSE_MAX_DEVICES = "license_max_devices"  # int; 0 = unlimited; empty = unknown
+SETTING_LICENSE_ORG_ID = "license_org_id"  # firm org_id from sync register
 
 # ---------------------------------------------------------------------------
 # Pricing tiers (activation dialog)

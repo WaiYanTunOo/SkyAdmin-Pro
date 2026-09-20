@@ -14,7 +14,7 @@ class ConnectMixinB:
     def _connect(self) -> DBConnection:
         from skyadmin_pro.db import cipher as _cipher
 
-        conn = _cipher.connect(self.db_file, timeout=10)
+        conn = _cipher.connect(self.db_file, timeout=10, check_same_thread=False)
         conn.row_factory = CipherRow
         try:
             # Fail-closed key check: PRAGMA key alone never verifies, so the
