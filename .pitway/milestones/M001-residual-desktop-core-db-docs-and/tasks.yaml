@@ -405,7 +405,7 @@ tasks:
     name: Performance regression gate and flaky-test check (T-16/T-17)
     objective: Run the performance regression suite, record the outcome, and check
       for flaky tests (rerun shakiness) in the desktop suite.
-    status: ready
+    status: completed
     depends_on:
       - T009
     acceptance_criteria:
@@ -425,14 +425,25 @@ tasks:
         tests/test_performance_clients.py -q --tb=short && python -m pytest
         tests/test_visual_regression.py tests/test_dashboard_refresh.py -q
       timeout_ms: 1200000
-    result: null
+    result:
+      summary: "[truncated] sed identically with wide headroom (e.g.,
+        test_paged_lists_page1_under_budget_at_5k 0.03s vs 0.5s budget;
+        dashboard_snapshot_query_budget 0.01s vs 2.5s budget;
+        large_client_headroom 0.03s vs 1.5s). No single-threshold regression and
+        no rerun shakiness. Gate task required no code changes."
+      evidence: 23 passed in 80.36s (0:01:20) |
+        ......................                                                   [100%]
+        | 22 passed in 46.64s
+    attempts: 1
+    driver: opencode
+    model: big-pickle
     usage: null
   - id: T011
     name: Documentation drift sync
     objective: Update MASTER_ROADMAP / ROADMAP status so items landed by the
       baseline and this milestone are marked Done, and correct any doc drift
       remaining in features docs.
-    status: waiting
+    status: ready
     depends_on:
       - T010
     acceptance_criteria:
