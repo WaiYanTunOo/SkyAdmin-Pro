@@ -261,7 +261,7 @@ tasks:
     objective: Add explicit documentation stating the XOR/byte-shift obfuscation is
       not a security boundary (obfuscation only) and note the real cryptographic
       control.
-    status: ready
+    status: completed
     depends_on:
       - T005
     acceptance_criteria:
@@ -275,14 +275,24 @@ tasks:
     verification:
       strategy: manual
       detail: Review the diff against docs/features/security_crypto.md.
-    result: null
+    result:
+      summary: "[truncated] graphic controls (machine-bound Fernet, AES/PBKDF2 at
+        rest, HMAC integrity seal, Ed25519 verify-only). Table row and Known Fix
+        entry updated to 'Obfuscation (non-security)'; stale config/__init__.py
+        reference fixed to config/licensing.py (post-T004). Manual diff review
+        verified on-scope."
+      evidence: "manual-review: docs/features/security_crypto.md diff reviewed,
+        section added, AC met"
+    attempts: 1
+    driver: big-pickle
+    model: opencode/big-pickle
     usage: null
   - id: T007
     name: Document 7-mixin MRO and cancel-edit state reset
     objective: Add the 7-mixin MRO note to the playbook and verify the Company
       Details cancel-edit path fully resets editing state (leaving no stale
       dirty flags).
-    status: waiting
+    status: ready
     depends_on:
       - T006
     acceptance_criteria:
