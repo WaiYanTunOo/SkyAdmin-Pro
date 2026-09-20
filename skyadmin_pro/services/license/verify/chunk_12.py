@@ -7,9 +7,27 @@ from skyadmin_pro.services.license.online import (
     _record_attempt,
 )
 
-from .chunk_2 import _payload_of, _read_license_payload
+from .chunk_2 import _parse_expiry, _payload_of, _read_license_payload
 from .chunk_3 import used_nonces
 from .chunk_8 import verify_key_text
+
+
+def _remaining_seconds() -> int:
+    """Seconds until current license expires (0 if none or expired)."""
+    data = _read_license_payload()
+    if not data:
+        return 0
+    exp = data.get("exp")
+    if not exp:
+        return 0
+    try:
+        exp_dt = _parse_expiry(exp)
+    except ValueError:
+        return 0
+    from datetime import datetime
+
+    secs = int((exp_dt - datetime.now()).total_seconds())
+    return max(secs, 0)
 
 
 def report_activation_claim(
@@ -38,7 +56,11 @@ def report_activation_claim(
     import urllib.request
 
     url = api_url.rstrip("/") + "/api/claim"
-    payload = json.dumps({"code": (code or "").strip()}).encode("utf-8")
+    body: dict = {"code": (code or "").strip()}
+    remaining = _remaining_seconds()
+    if remaining > 0:
+        body["existing_seconds"] = remaining
+    payload = json.dumps(body).encode("utf-8")
     req = urllib.request.Request(
         url,
         data=payload,

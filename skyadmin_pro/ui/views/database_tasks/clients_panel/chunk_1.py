@@ -59,7 +59,7 @@ class ClientsExpiryPanelMixin1:
                 eff = effective_expiry_date(item.get("expiry_date"), item.get("document_type"))
                 left = days_until(eff)
                 status = expiry_label(left) if left is not None else "—"
-                tag = classify_expiry(left) if left is not None else "odd"
+                tag = classify_expiry(left) if left is not None else None
                 rows.append(
                     (
                         item.get("client_name") or "—",
@@ -70,7 +70,7 @@ class ClientsExpiryPanelMixin1:
                     )
                 )
                 iids.append(str(item["id"]))
-                tags.append((tag,) if left is not None else ())
+                tags.append((tag,) if tag else ())
             self.doc_tree.set_rows(rows, iids=iids, tags=tags, empty_message="No expiring documents match this filter.")
             self.feedback.clear()
 

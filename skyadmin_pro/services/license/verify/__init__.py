@@ -9,7 +9,13 @@ from .chunk_1 import (
     find_license_file,
 )
 from .chunk_2 import _parse_expiry, _payload_of, _read_license_payload
-from .chunk_3 import _fetch_control_from_api, license_remaining_days, license_time_left_text, used_nonces
+from .chunk_3 import (
+    _fetch_control_from_api,
+    license_countdown_text,
+    license_remaining_days,
+    license_time_left_text,
+    used_nonces,
+)
 from .chunk_4 import (
     _control_paths,
     _parse_control_lines,

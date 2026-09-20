@@ -34,12 +34,19 @@ class LicenseMixinMixin2:
                 ok2, msg2, nonce2 = check_activation_usable(content)
                 if not ok2:
                     return False, msg2
-                claim_ok, claim_msg, license_key = report_activation_claim(
+                claim_ok, claim_msg, license_key, claim_data = report_activation_claim(
                     content,
                     allow_already_claimed=_is_repair_activation(content),
                 )
                 if not claim_ok:
                     return False, claim_msg
+                if claim_data and any(
+                    k in claim_data
+                    for k in ("sync_enabled", "web_enabled", "drive_files_enabled", "max_devices", "org_id")
+                ):
+                    from skyadmin_pro.services.data_sync.entitlements import apply_sku_flags_from_response
+
+                    apply_sku_flags_from_response(self.app.db, claim_data)
                 ok, msg, nonce = ok2, msg2, nonce2
             to_save = (license_key or "").strip() or content
             save_license_file(to_save)

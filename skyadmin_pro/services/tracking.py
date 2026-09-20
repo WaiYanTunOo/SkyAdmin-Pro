@@ -39,12 +39,12 @@ def effective_expiry_date(expiry_date: str | None, document_type: str | None = N
 
 def classify_expiry(days_left: int) -> str:
     """Return a treeview tag for the fixed expiry-alert color bands:
-    red at 7 or fewer days left, dark orange at 14 or fewer, yellow at 30
+    expired at negative days, red at 14 or fewer, yellow at 30
     or fewer, green at EXPIRY_ALERT_DAYS or fewer; otherwise empty (no alert)."""
-    if days_left <= 7:
-        return "red"
+    if days_left < 0:
+        return "expired"
     if days_left <= 14:
-        return "orange"
+        return "red"
     if days_left <= 30:
         return "yellow"
     if days_left <= EXPIRY_ALERT_DAYS:

@@ -91,3 +91,93 @@ describe("claim replay", () => {
     expect(res.status).toBe(400);
   });
 });
+
+function freshClaimEnv(): Env {
+  const bound = (sql: string) => ({
+    first: async () => {
+      if (sql.includes("rate_limits")) return { count: 1 };
+      if (sql.includes("SELECT nonce FROM used_nonces")) return null;
+      if (sql.includes("SELECT machine_id, package_days")) {
+        return {
+          machine_id: MID,
+          package_days: 30,
+          issued_at: "2026-01-01T00:00:00",
+          license_key: "SUPER-SECRET-KEY",
+          expires_at: "2099-01-01T00:00:00",
+        };
+      }
+      return null;
+    },
+    run: async () => ({ success: true }),
+    all: async () => ({ results: [] }),
+  });
+  return {
+    DB: {
+      prepare: (sql: string) => ({ bind: (..._a: unknown[]) => bound(sql), run: async () => ({ success: true }) }),
+      batch: async () => [{ success: true }],
+    } as unknown as D1Database,
+    LICENSE_SECRET: "test-license-secret",
+    API_TOKEN: "test-api-token",
+    ADMIN_PATH: "admin-test",
+    ADMIN_PASS: "admin-pass",
+    LICENSE_ED25519_PRIVATE_KEY_B64: DEV_ED25519_KEY_B64,
+  } as Env;
+}
+
+describe("claim stacking", () => {
+  it("clamps existing_seconds to MAX_STACKABLE_SECONDS", async () => {
+    const env = freshClaimEnv();
+
+    const code = await generatePasscode(MID, 90, DEV_ED25519_KEY_B64);
+    const res = await app.request(
+      "http://localhost/api/claim",
+      {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ code, existing_seconds: 999_999_999 }),
+      },
+      env,
+    );
+    expect(res.status).toBe(200);
+    const body = (await res.json()) as Record<string, unknown>;
+    expect(body.ok).toBe(true);
+    expect(body.already_used).toBe(false);
+    expect(typeof body.expires_at).toBe("string");
+    expect(typeof body.license_key).toBe("string");
+  });
+
+  it("ignores non-numeric existing_seconds gracefully", async () => {
+    const env = freshClaimEnv();
+    const code = await generatePasscode(MID, 30, DEV_ED25519_KEY_B64);
+    const res = await app.request(
+      "http://localhost/api/claim",
+      {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ code, existing_seconds: "not-a-number" }),
+      },
+      env,
+    );
+    expect(res.status).toBe(200);
+    const body = (await res.json()) as Record<string, unknown>;
+    expect(body.ok).toBe(true);
+    expect(body.already_used).toBe(false);
+  });
+
+  it("works without existing_seconds (backward compatible)", async () => {
+    const env = freshClaimEnv();
+    const code = await generatePasscode(MID, 30, DEV_ED25519_KEY_B64);
+    const res = await app.request(
+      "http://localhost/api/claim",
+      {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ code }),
+      },
+      env,
+    );
+    expect(res.status).toBe(200);
+    const body = (await res.json()) as Record<string, unknown>;
+    expect(body.ok).toBe(true);
+  });
+});

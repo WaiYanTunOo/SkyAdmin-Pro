@@ -2,6 +2,7 @@ import { Context } from "hono";
 import { Env } from "../../db";
 import { purgeStaleRateLimits } from "../../rate_limit";
 import { resignActivatedLicense } from "../../signing";
+import { licenseStackBase } from "../../license_policy";
 import { ClaimPayload } from "../../verification";
 import { licenseIatFromKey } from "./iat";
 import { IssuedLicenseRow } from "./lookup";
@@ -10,6 +11,7 @@ export async function finishClaim(
   c: Context<{ Bindings: Env }>,
   claim: ClaimPayload,
   row: IssuedLicenseRow | null,
+  existingSeconds: number = 0,
 ): Promise<Response> {
   const ed25519Key = (c.env.LICENSE_ED25519_PRIVATE_KEY_B64 || "").trim();
   if (!ed25519Key) {
@@ -28,10 +30,13 @@ export async function finishClaim(
       licenseIatFromKey(row.license_key) ||
       String(row.issued_at || "").trim() ||
       activatedAt.toISOString();
+    const base = existingSeconds > 0
+      ? licenseStackBase(new Date(activatedAt.getTime() + existingSeconds * 1000), activatedAt)
+      : activatedAt;
     const resigned = await resignActivatedLicense(row.machine_id, row.package_days, ed25519Key, {
       iat,
       nonce: claim.nonce,
-      activatedAt,
+      activatedAt: base,
     });
     licenseKey = resigned.key;
     expiresAt = resigned.exp;

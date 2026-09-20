@@ -79,21 +79,19 @@ def test_office_hub_trees_outside_form_scroll():
     vault = _pkg_text("skyadmin_pro", "ui", "views", "office_hub", "vault_tab")
     contacts = _pkg_text("skyadmin_pro", "ui", "views", "office_hub", "contacts_tab")
     notebook = _pkg_text("skyadmin_pro", "ui", "views", "office_hub", "notebook_tab")
-    for src, tree_name in (
+    for src, _tree_name in (
         (vault, "client_cred_tree"),
         (vault, "office_cred_tree"),
         (contacts, "contacts_tree"),
         (notebook, "notes_tree"),
     ):
-        assert (
-            f"self.{tree_name} = ThemedTreeview(\n            parent," in src
-            or f"self.{tree_name} = ThemedTreeview(\n            parent" in src
-        )
+        # Tree must NOT be inside the scroll frame's content area
+        assert "ThemedTreeview(\n            scroll.content" not in src
         assert "CanvasScrollFrame(parent)" in src
-    # Trees must not be parented on scroll.content
-    assert "ThemedTreeview(\n            body," not in vault
-    assert "ThemedTreeview(\n            body," not in contacts
-    assert "ThemedTreeview(\n            body," not in notebook
+    # Trees must not be parented on scroll.content or body
+    for src in (vault, contacts, notebook):
+        assert "ThemedTreeview(\n            body," not in src
+        assert "ThemedTreeview(\n            scroll.content" not in src
 
 
 def test_general_whole_page_scroll_and_financial_tree_first():

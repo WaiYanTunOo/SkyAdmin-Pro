@@ -53,6 +53,37 @@ def license_remaining_days() -> int | None:
     return int(seconds // 86400)
 
 
+def license_countdown_text() -> str:
+    """Second-precision countdown: '2d 5h 30m 15s left' or 'Expired ...'."""
+    data = _read_license_payload()
+    if not data:
+        return "Not activated"
+    exp = data.get("exp")
+    if not exp:
+        return "Active — permanent"
+    try:
+        exp_dt = _parse_expiry(exp)
+    except ValueError:
+        return "Active"
+    seconds = int((exp_dt - datetime.now()).total_seconds())
+    if seconds <= 0:
+        mins = abs(seconds) // 60
+        return f"Expired {mins // 60}h {mins % 60}m ago"
+    days, rem = divmod(seconds, 86400)
+    hours = rem // 3600
+    minutes = (rem % 3600) // 60
+    secs = seconds % 60
+    parts: list[str] = []
+    if days:
+        parts.append(f"{days}d")
+    if hours:
+        parts.append(f"{hours}h")
+    if minutes:
+        parts.append(f"{minutes}m")
+    parts.append(f"{secs}s")
+    return f"Active — {' '.join(parts)} left"
+
+
 def _fetch_control_from_api(api_url: str, timeout: float) -> tuple[bool, str | None]:
     """Fetch SKYCTRL2 text from the Cloudflare Worker API.
     Returns (ok, text_or_None). None means empty (no entries)."""

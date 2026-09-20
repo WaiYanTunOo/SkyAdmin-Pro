@@ -26,15 +26,22 @@ class NotebookTabMixinMixin1:
 
     def _NotebookTabMixin_build_notebook_tab_p1(self, parent):
         parent.grid_columnconfigure(0, weight=1)
-        parent.grid_rowconfigure(2, weight=1)
+        parent.grid_columnconfigure(1, weight=0, minsize=400)
+        parent.grid_rowconfigure(0, weight=1)
+
+        left = ctk.CTkFrame(parent, fg_color="transparent")
+        left.grid(row=0, column=0, sticky="nsew")
+        left.grid_columnconfigure(0, weight=1)
+        left.grid_rowconfigure(2, weight=1)
+
         ctk.CTkLabel(
-            parent,
+            left,
             text="Office instructions and follow-ups — not client expiry dates.",
             text_color=TEXT_MUTED,
             anchor="w",
         ).grid(row=0, column=0, sticky="ew", pady=(8, 0))
 
-        toolbar = ctk.CTkFrame(parent, fg_color="transparent")
+        toolbar = ctk.CTkFrame(left, fg_color="transparent")
         toolbar.grid(row=1, column=0, sticky="ew", pady=(8, 8))
         toolbar.grid_columnconfigure(0, weight=1)
         self.note_search_var = ctk.StringVar()
@@ -56,7 +63,7 @@ class NotebookTabMixinMixin1:
         ctk.CTkButton(toolbar, text="New note", width=100, command=self._new_note).grid(row=0, column=4)
 
         self.notes_tree = ThemedTreeview(
-            parent,
+            left,
             columns=(
                 ("date", "Date", 100),
                 ("type", "Type", 130),
@@ -72,11 +79,11 @@ class NotebookTabMixinMixin1:
         self.notes_tree.grid(row=2, column=0, sticky="nsew")
 
         scroll = CanvasScrollFrame(parent)
-        scroll.grid(row=3, column=0, sticky="ew")
+        scroll.grid(row=0, column=1, sticky="nsew", padx=(10, 0))
         scroll.content.grid_columnconfigure(0, weight=1)
         self._notebook_scroll = scroll
         form = ctk.CTkFrame(scroll.content, corner_radius=12, **card_style_kwargs())
-        form.grid(row=0, column=0, sticky="ew", pady=(10, 8), padx=4)
+        form.grid(row=0, column=0, sticky="nsew", padx=4, pady=(10, 8))
         form.grid_columnconfigure(0, weight=1, uniform="note_col")
         form.grid_columnconfigure(1, weight=1, uniform="note_col")
         ctk.CTkLabel(form, text="Notebook entry", font=ctk.CTkFont(size=CARD_TITLE_SIZE, weight="bold")).grid(

@@ -1,10 +1,15 @@
 from __future__ import annotations
 
+import tkinter as tk
+
 from skyadmin_pro.ui.theme import TEXT_MUTED
 
 
 class LicenseMixinMixin4:
+    _countdown_after_id: str | None = None
+
     def _refresh_license_label(self) -> None:
+        self._cancel_countdown()
         try:
             from skyadmin_pro.services.license import (
                 get_daily_sync_status,
@@ -19,6 +24,7 @@ class LicenseMixinMixin4:
                     text=f"✓ License active — {license_expiry_text()}  ·  Machine ID: {get_machine_id()}",
                     text_color=("#15803d", "#4ade80"),
                 )
+                self._start_countdown()
             else:
                 self.license_label.configure(
                     text=f"✗ No valid license  ·  Machine ID: {get_machine_id()}",
@@ -57,6 +63,34 @@ class LicenseMixinMixin4:
                 import logging
 
                 logging.error(f"UI Error: {e}")
+
+    def _start_countdown(self) -> None:
+        """Tick every 1 s to update the license-label with a live countdown."""
+        try:
+            if not self.winfo_exists():
+                return
+            from skyadmin_pro.services.license import license_countdown_text
+
+            text = license_countdown_text()
+            if not text.startswith("Active —"):
+                return
+            from skyadmin_pro.services.license import get_machine_id
+
+            self.license_label.configure(
+                text=f"✓ License active — {text}  ·  Machine ID: {get_machine_id()}",
+                text_color=("#15803d", "#4ade80"),
+            )
+            self._countdown_after_id = self.after(1000, self._start_countdown)
+        except tk.TclError:
+            pass
+
+    def _cancel_countdown(self) -> None:
+        if self._countdown_after_id is not None:
+            try:
+                self.after_cancel(self._countdown_after_id)
+            except (tk.TclError, ValueError):
+                pass
+            self._countdown_after_id = None
 
     def _check_for_updates(self) -> None:
         from skyadmin_pro.services.license import check_for_updates

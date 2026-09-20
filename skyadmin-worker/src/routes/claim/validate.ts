@@ -3,12 +3,14 @@ import { Env } from "../../db";
 import { checkActivationEligibility } from "../../sync_eligibility";
 import { ClaimPayload, MAX_ACTIVATION_CODE_LENGTH, parseActivationClaim } from "../../verification";
 
+import { MAX_STACKABLE_SECONDS } from "../../license_policy";
+
 export type ClaimRead =
   | { ok: false; response: Response }
-  | { ok: true; claim: ClaimPayload };
+  | { ok: true; claim: ClaimPayload; existingSeconds: number };
 
 export async function readClaim(c: Context<{ Bindings: Env }>): Promise<ClaimRead> {
-  let body: { code?: string };
+  let body: { code?: string; existing_seconds?: unknown };
   try {
     body = await c.req.json<{ code?: string }>();
   } catch {
@@ -37,5 +39,6 @@ export async function readClaim(c: Context<{ Bindings: Env }>): Promise<ClaimRea
   if (!eligible.ok) {
     return { ok: false, response: c.json({ ok: false, error: eligible.error }, 403) };
   }
-  return { ok: true, claim };
+  const existing_seconds = body.existing_seconds;
+  return { ok: true, claim, existingSeconds: Math.min(Math.max(0, Number(existing_seconds) || 0), MAX_STACKABLE_SECONDS) };
 }

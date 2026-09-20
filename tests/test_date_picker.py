@@ -125,3 +125,134 @@ def test_datepicker_rapid_multi_instance_switch_no_tcl_error(tk_root) -> None:
         assert not any(isinstance(err, tk.TclError) for err in errors), errors
     finally:
         root.report_callback_exception = prev
+
+
+def _month_label(top: ctk.CTkToplevel) -> str:
+    """Return the current month_label text from an open calendar popup."""
+    body = top.winfo_children()[0]
+    nav = body.winfo_children()[0]
+    for child in nav.winfo_children():
+        if isinstance(child, ctk.CTkLabel):
+            return child.cget("text")
+    raise AssertionError("month label not found in calendar nav")
+
+
+def _month_arrows(top: ctk.CTkToplevel) -> tuple[tk.Widget, tk.Widget]:
+    """Return (prev_arrow, next_arrow) CTkButtons from the month nav row."""
+    body = top.winfo_children()[0]
+    nav = body.winfo_children()[0]
+    right_nav = nav.winfo_children()[-1]
+    buttons = [w for w in right_nav.winfo_children() if isinstance(w, ctk.CTkButton)]
+    return buttons[0], buttons[1]
+
+
+def test_calendar_month_arrow_advances_month(tk_root) -> None:
+    """Clicking the month-right arrow advances the displayed month."""
+    field = DatePickerField(tk_root, var=ctk.StringVar(value="2026-09-15"))
+    field.pack()
+    tk_root.update()
+
+    field._open_calendar()
+    tk_root.update()
+    top = field._calendar_top
+    assert top is not None
+
+    label = _month_label(top)
+    assert "September" in label
+    assert "2026" in label
+
+    _prev, nxt = _month_arrows(top)
+    nxt.invoke()
+    tk_root.update()
+
+    label = _month_label(top)
+    assert "October" in label
+    assert "2026" in label
+
+    field._close_calendar()
+    tk_root.update()
+
+
+def test_calendar_month_arrow_wraps_year(tk_root) -> None:
+    """Clicking month-right from December rolls into January of the next year."""
+    field = DatePickerField(tk_root, var=ctk.StringVar(value="2026-12-10"))
+    field.pack()
+    tk_root.update()
+
+    field._open_calendar()
+    tk_root.update()
+    top = field._calendar_top
+    assert top is not None
+
+    label = _month_label(top)
+    assert "December" in label
+
+    _prev, nxt = _month_arrows(top)
+    nxt.invoke()
+    tk_root.update()
+
+    label = _month_label(top)
+    assert "January" in label
+    assert "2027" in label
+
+    field._close_calendar()
+    tk_root.update()
+
+
+def test_calendar_month_menu_select(tk_root) -> None:
+    """Selecting a month from the dropdown updates the calendar grid."""
+    field = DatePickerField(tk_root, var=ctk.StringVar(value="2026-06-01"))
+    field.pack()
+    tk_root.update()
+
+    field._open_calendar()
+    tk_root.update()
+    top = field._calendar_top
+    assert top is not None
+
+    body = top.winfo_children()[0]
+    nav = body.winfo_children()[0]
+    right_nav = nav.winfo_children()[-1]
+    month_menu = [w for w in right_nav.winfo_children() if isinstance(w, ctk.CTkOptionMenu)][0]
+    cmd = month_menu.cget("command")
+    cmd("March")
+    tk_root.update()
+
+    label = _month_label(top)
+    assert "March" in label
+    assert "2026" in label
+
+    field._close_calendar()
+    tk_root.update()
+
+
+def test_calendar_grid_renders_all_weeks(tk_root) -> None:
+    """After month change the day grid contains the correct number of day buttons."""
+    field = DatePickerField(tk_root, var=ctk.StringVar(value="2026-02-01"))
+    field.pack()
+    tk_root.update()
+
+    field._open_calendar()
+    tk_root.update()
+    top = field._calendar_top
+    assert top is not None
+
+    body = top.winfo_children()[0]
+    grid_frame = body.winfo_children()[1]
+    day_buttons = [w for w in grid_frame.winfo_children() if isinstance(w, ctk.CTkButton)]
+    # Feb 2026 has 28 days
+    assert len(day_buttons) == 28
+
+    # Navigate to March (31 days)
+    _prev, nxt = _month_arrows(top)
+    nxt.invoke()
+    tk_root.update()
+
+    day_buttons = [w for w in grid_frame.winfo_children() if isinstance(w, ctk.CTkButton)]
+    assert len(day_buttons) == 31
+
+    label = _month_label(top)
+    assert "March" in label
+
+    field._close_calendar()
+    tk_root.update()

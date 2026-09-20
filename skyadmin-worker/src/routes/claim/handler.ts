@@ -28,5 +28,5 @@ export async function claimHandler(c: Context<{ Bindings: Env }>) {
       already_used: true,
     });
   }
-  return finishClaim(c, parsed.claim, row);
+  return finishClaim(c, parsed.claim, row, parsed.existingSeconds);
 }

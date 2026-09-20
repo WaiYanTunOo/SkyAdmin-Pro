@@ -916,11 +916,14 @@ class DatePickerField(ctk.CTkFrame):
         top.resizable(False, False)
         top.transient(root)
         top.protocol("WM_DELETE_WINDOW", self._close_calendar)
+        top.grid_rowconfigure(0, weight=1)
+        top.grid_columnconfigure(0, weight=1)
         width, height = 360, 420
 
         body = ctk.CTkFrame(top, corner_radius=12)
-        body.grid(row=0, column=0, padx=12, pady=12)
+        body.grid(row=0, column=0, padx=12, pady=12, sticky="nsew")
         body.grid_columnconfigure(0, weight=1)
+        body.grid_rowconfigure(1, weight=1)
 
         nav = ctk.CTkFrame(body, fg_color="transparent")
         nav.grid(row=0, column=0, sticky="ew", padx=6, pady=(6, 4))
@@ -946,7 +949,7 @@ class DatePickerField(ctk.CTkFrame):
         ctk.CTkButton(right_nav, text="\u25b6", width=28, command=lambda: set_month(view.month + 1)).pack(side="left")
 
         grid_frame = ctk.CTkFrame(body, fg_color="transparent")
-        grid_frame.grid(row=1, column=0, padx=6, pady=(0, 6))
+        grid_frame.grid(row=1, column=0, padx=6, pady=(0, 6), sticky="nsew")
         for col in range(7):
             grid_frame.grid_columnconfigure(col, weight=1)
 
@@ -999,6 +1002,8 @@ class DatePickerField(ctk.CTkFrame):
                     padx=1,
                     pady=1,
                 )
+            if self._widget_alive(top):
+                top.update_idletasks()
 
         def _sync_year_menu() -> None:
             values = tuple(str(year) for year in range(view.year - 10, view.year + 11))
@@ -1024,7 +1029,8 @@ class DatePickerField(ctk.CTkFrame):
             draw()
 
         year_menu.configure(command=lambda choice: set_year(int(choice)))
-        month_menu.configure(command=lambda choice: set_month(calendar.month_name.index(choice)))
+        month_name_list = list(calendar.month_name)
+        month_menu.configure(command=lambda choice: set_month(month_name_list.index(choice)))
         _sync_year_menu()
         _sync_month_menu()
         draw()

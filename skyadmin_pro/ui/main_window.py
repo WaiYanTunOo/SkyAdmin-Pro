@@ -615,6 +615,7 @@ class MainWindow(dnd_base_class()):
 
     def refresh_sidebar_status(self) -> None:
         """Update sidebar version line (license expiry when active)."""
+        self._cancel_sidebar_countdown()
         from skyadmin_pro.services.license import (
             available_update,
             license_expiry_text,
@@ -634,8 +635,37 @@ class MainWindow(dnd_base_class()):
                 self.version_label.configure(text=f"v{APP_VERSION}  ·  Licensed")
             else:
                 self.version_label.configure(text=f"v{APP_VERSION}  ·  {expiry}")
+                self._start_sidebar_countdown()
         else:
             self.version_label.configure(text=f"v{APP_VERSION}")
+
+    def _start_sidebar_countdown(self) -> None:
+        """Tick every 1 s to update the sidebar version label with live countdown."""
+        try:
+            if not self.winfo_exists():
+                return
+            import tkinter as tk
+
+            from skyadmin_pro.services.license import license_countdown_text
+
+            text = license_countdown_text()
+            if not text.startswith("Active —"):
+                return
+            self.version_label.configure(text=f"v{APP_VERSION}  ·  {text}")
+            self._sidebar_countdown_id = self.after(1000, self._start_sidebar_countdown)
+        except tk.TclError:
+            pass
+
+    def _cancel_sidebar_countdown(self) -> None:
+        import tkinter as tk
+
+        aid = getattr(self, "_sidebar_countdown_id", None)
+        if aid is not None:
+            try:
+                self.after_cancel(aid)
+            except (tk.TclError, ValueError):
+                pass
+            self._sidebar_countdown_id = None
 
     def refresh_tagline(self, text: str | None = None) -> None:
         from skyadmin_pro.config import APP_TAGLINE

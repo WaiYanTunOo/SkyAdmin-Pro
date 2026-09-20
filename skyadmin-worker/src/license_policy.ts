@@ -16,3 +16,14 @@ export function activationDeadline(from: Date = new Date()): Date {
 export function licenseExpiryFromPackage(packageDays: number, from: Date = new Date()): Date {
   return new Date(from.getTime() + packageDays * 86400000);
 }
+
+/** Maximum stackable remaining seconds (365 days). */
+export const MAX_STACKABLE_SECONDS = 365 * 86400;
+
+/**
+ * Day-stacking base: if the desktop has an unexpired license, the new package
+ * starts from the later of (now, existingExpiry) so remaining days carry over.
+ */
+export function licenseStackBase(existingExp: Date, activatedAt: Date): Date {
+  return new Date(Math.max(activatedAt.getTime(), existingExp.getTime()));
+}

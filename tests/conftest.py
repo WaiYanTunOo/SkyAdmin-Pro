@@ -107,7 +107,10 @@ def db(tmp_path) -> Database:
 @pytest.fixture
 def tk_root():
     """Create a withdrawn CTk root for a test, properly destroyed afterwards."""
-    root = ctk.CTk()
+    try:
+        root = ctk.CTk()
+    except tk.TclError:
+        pytest.skip("tkinter/tcl/tk not available or corrupted on this environment")
     root.withdraw()
     yield root
     from skyadmin_pro.ui.widgets import DatePickerField
