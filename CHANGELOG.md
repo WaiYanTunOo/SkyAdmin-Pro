@@ -3,6 +3,19 @@
 All notable changes to SkyAdmin Pro are documented here.
 Format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 
+## [0.3.7] - 2026-09-20
+
+### Fixed
+
+- Form-theme cache was GC-unsafe: stale `id()` values could collide after widget GC, leaving newly created widgets un-themed. Cache now uses weak references.
+- Tag-release Windows build failed at the Cython step: `setup.py` referenced pre-split module paths (`license_crypto.py`, `license/machine.py`) that no longer exist. Build now compiles the split package layout.
+
+### Changed
+
+- CI: Python matrix consolidated to 3.12 (removed redundant 3.10/3.11 legs); signing certificate no longer mandatory for tag releases (warns instead).
+- Worker `API_TOKEN` rotated; `SKYADMIN_API_TOKEN`/`SKYADMIN_API_URL` configured as GitHub secrets for tag publish.
+- Version bump to 0.3.7.
+
 ## [0.3.5] - 2026-09-18
 
 ### Fixed
