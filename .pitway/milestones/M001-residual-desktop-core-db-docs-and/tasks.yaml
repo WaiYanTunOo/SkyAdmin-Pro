@@ -330,7 +330,7 @@ tasks:
     objective: Audit the >40 indexes for redundancy and note the 500+ client
       threshold planning in DB_SCHEMA.md; fix only genuinely redundant indexes
       found.
-    status: ready
+    status: completed
     depends_on:
       - T007
     acceptance_criteria:
@@ -341,19 +341,36 @@ tasks:
       - docs/DB_SCHEMA.md
       - skyadmin_pro/db/migrations/m008_perf_query_indexes.py
       - skyadmin_pro/db/migrations/runner.py
+      - skyadmin_pro/db/migrations/m021_drop_redundant_indexes.py
+      - skyadmin_pro/db/migrations/__init__.py
+      - skyadmin_pro/db/schema/_schema_sql_2.py
+      - tests/test_db_migrations.py
     write_scope:
       - docs/DB_SCHEMA.md
+      - skyadmin_pro/db/schema/_schema_sql_2.py
+      - skyadmin_pro/db/migrations/m021_drop_redundant_indexes.py
+      - skyadmin_pro/db/migrations/__init__.py
+      - tests/test_db_migrations.py
     verification:
       strategy: manual
       detail: Review the audit record in docs/DB_SCHEMA.md.
-    result: null
+    result:
+      summary: "[truncated] T008 + 500+ Client Scalability Plan sections).
+        Verification: full desktop pytest suite 645 passed, 1 skipped; ruff
+        check clean; ruff format clean on touched files. The 13 pre-existing
+        unformatted files (appointments/settings/suppliers) are unrelated and
+        tracked for the AC002 format gate."
+      evidence: T008-manual-review-2026-09-20
+    attempts: 1
+    driver: opencode
+    model: big-pickle
     usage: null
   - id: T009
     name: Worker full lifecycle integration test (T-15)
     objective: Extend skyadmin-worker/src/integration.test.ts with a single
       generate-to-claim-to-verify chain against the ephemeral D1 mock proving
       end-to-end persistence and verification.
-    status: waiting
+    status: ready
     depends_on:
       - T008
     acceptance_criteria:

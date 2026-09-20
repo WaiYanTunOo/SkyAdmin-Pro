@@ -125,6 +125,26 @@ Schema defined in `skyadmin_pro/db/schema.py`.
 - `idx_tasks_pipeline` — fast pipeline step lookup
 - `idx_clients_group` — client group filter (owned by migration m009, not base schema replay)
 
+### Index Redundancy Audit (T008, 2026-09)
+
+Inventory: **48 base-schema indexes** (`skyadmin_pro/db/schema/_schema_sql_*.py`) plus migration-owned indexes — `idx_clients_group` (m009), the per-table `idx_*_global_id` UNIQUE partials (m001 legacy sync, m011/m016/m017/m018), and `idx_appointments_date`/`idx_appointments_client` (m020). Migration m008 (perf query indexes) re-declares three partials that already exist in base schema (`idx_documents_unpaid_overdue`, `idx_documents_ongoing_service`, `idx_supplier_payments_unpaid_due`) so legacy databases are backfilled; because the statements are `IF NOT EXISTS`, no duplicate index is ever created on fresh installs.
+
+Verdict: **indexes are well-targeted** (aligns with `docs/MASTER_ROADMAP.md` P13), with exactly **one genuinely redundant index**:
+
+| Index | Why redundant | Action |
+|-------|---------------|--------|
+| `idx_clients_name` (`_schema_sql_2.py`) | `clients.name` is `NOT NULL UNIQUE COLLATE NOCASE`, so SQLite auto-creates `sqlite_autoindex_clients_1` (NOCASE) on the same column. Every app name lookup uses `COLLATE NOCASE` (`db/clients/names_a.py`, `services/client_commands/...`), which is satisfied by the auto-index. The binary-collation `idx_clients_name` is only selectable via an explicit `COLLATE BINARY`, which the app never issues (`EXPLAIN QUERY PLAN` confirms: normal lookups use the covering auto-index and ignore `idx_clients_name`). | **Dropped (T008)** — removed from base schema `_schema_sql_2.py`; migration m021 issues `DROP INDEX IF EXISTS idx_clients_name` for existing databases. NOCASE UNIQUE auto-index fully covers all lookups. |
+
+Not redundant (audited pairs): plain vs. partial indexes serve different scan scopes — `idx_documents_payment_date`/`idx_supplier_payments_due` cover unscoped `payment_date`/`due_date` scans, while the partials (`idx_documents_unpaid_overdue`, `idx_supplier_payments_unpaid_due`) are only usable under a `paid = 0` predicate; `idx_documents_type`/`idx_documents_progress` complement `idx_documents_ongoing_service` (partial on `progress = 'Ongoing'`). Single-column low-cardinality indexes (`idx_tasks_status`, `idx_documents_paid`, `idx_clients_status`) are kept intentionally for list/sidebar filters.
+
+### 500+ Client Scalability Plan
+
+Referenced from `docs/ROADMAP.md` ("Goal: Stay smooth at 500+ clients") and `docs/MASTER_ROADMAP.md` P13 ("Audit on 500+ client threshold"). When client volume approaches ~500 records (or the dashboard/task lists measurably degrade at scale):
+
+1. **Re-run the index audit** against real query patterns at scale before adding any new index (add an `EXPLAIN QUERY PLAN` harness + integration tests). The single originally confirmed redundancy (`idx_clients_name`) was dropped in T008 (base schema removal + migration m021) — keep the index inventory above honest when adding tables/columns; prefer partial indexes over broad single-column indexes for scoped scans (`paid = 0`, `progress = 'Ongoing'`).
+2. Confirm list/sidebar filters remain indexed (`idx_clients_status`, `idx_tasks_status`, `idx_documents_paid`); consider composite indexes only where query evidence shows two-column predicates that currently re-scan.
+3. Validate with the performance client suite (`tests/test_performance_clients.py`) and the full pytest suite before and after any index change.
+
 ---
 
 ## Worker — Cloudflare D1

@@ -23,6 +23,7 @@ from skyadmin_pro.db.migrations import (
     m018_wave2b_sync,
     m019_sync_conflict_actors,
     m020_appointments,
+    m021_drop_redundant_indexes,
 )
 from skyadmin_pro.db.migrations.runner import register_migrations, run_pending_migrations
 
@@ -99,6 +100,11 @@ register_migrations(
             m020_appointments.VERSION,
             m020_appointments.NAME,
             m020_appointments.upgrade,
+        ),
+        (
+            m021_drop_redundant_indexes.VERSION,
+            m021_drop_redundant_indexes.NAME,
+            m021_drop_redundant_indexes.upgrade,
         ),
     ]
 )
