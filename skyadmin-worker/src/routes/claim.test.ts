@@ -24,6 +24,10 @@ function replayEnv(): Env {
                 issued_at: "2026-01-01T00:00:00",
                 license_key: "SUPER-SECRET-KEY",
                 expires_at: "2099-01-01T00:00:00",
+                sync_enabled: 1,
+                web_enabled: 0,
+                drive_files_enabled: 1,
+                max_devices: 2,
               };
             }
             return null;
@@ -60,6 +64,27 @@ describe("claim replay", () => {
     expect(body.already_used).toBe(true);
     expect("license_key" in body).toBe(false);
     expect("expires_at" in body).toBe(false);
+  });
+
+  it("includes SKU flags in already_used response for desktop re-claim", async () => {
+    const code = await generatePasscode(MID, 30, DEV_ED25519_KEY_B64);
+    const res = await app.request(
+      "http://localhost/api/claim",
+      {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ code }),
+      },
+      replayEnv(),
+    );
+    expect(res.status).toBe(200);
+    const body = (await res.json()) as Record<string, unknown>;
+    expect(body.ok).toBe(true);
+    expect(body.already_used).toBe(true);
+    expect(body.drive_files_enabled).toBe(1);
+    expect(body.sync_enabled).toBe(1);
+    expect(body.web_enabled).toBe(0);
+    expect(body.max_devices).toBe(2);
   });
 
   it("rejects oversized codes before verification", async () => {
