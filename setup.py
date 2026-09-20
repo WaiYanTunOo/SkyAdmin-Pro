@@ -24,11 +24,20 @@ except ImportError as exc:  # pragma: no cover
 extensions = [
     Extension(
         "skyadmin_pro.services.license_crypto",
-        ["skyadmin_pro/services/license_crypto.py"],
+        [
+            "skyadmin_pro/services/license_crypto/__init__.py",
+            "skyadmin_pro/services/license_crypto/funcs_0.py",
+            "skyadmin_pro/services/license_crypto/funcs_1.py",
+        ],
     ),
     Extension(
         "skyadmin_pro.services.license.machine",
-        ["skyadmin_pro/services/license/machine.py"],
+        [
+            "skyadmin_pro/services/license/machine/__init__.py",
+            "skyadmin_pro/services/license/machine/_const_0.py",
+            "skyadmin_pro/services/license/machine/funcs_0.py",
+            "skyadmin_pro/services/license/machine/funcs_1.py",
+        ],
     ),
 ]
 
