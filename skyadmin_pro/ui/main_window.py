@@ -140,6 +140,8 @@ class MainWindow(dnd_base_class()):
         self.bind("<Control-Z>", lambda _e: self._shortcut_action("undo"))
         self.bind("<Control-d>", lambda _e: self._toggle_dark_light())
         self.bind("<Control-D>", lambda _e: self._toggle_dark_light())
+        self.bind("<Control-Shift-a>", lambda _e: self.open_skyagent())
+        self.bind("<Control-Shift-A>", lambda _e: self.open_skyagent())
 
     def _toggle_dark_light(self) -> None:
         """Toggle between Dark and Light mode (Ctrl+D, outside text inputs)."""
@@ -164,6 +166,21 @@ class MainWindow(dnd_base_class()):
         from skyadmin_pro.ui.views.global_search import GlobalSearchDialog
 
         GlobalSearchDialog(self)
+
+    def open_skyagent(self) -> None:
+        """Open the SkyAgent chat panel (Ctrl+Shift+A)."""
+        import tkinter as tk
+
+        if hasattr(self, "_skyagent_chat"):
+            try:
+                if self._skyagent_chat.winfo_exists():
+                    self._skyagent_chat.lift()
+                    return
+            except tk.TclError:
+                pass
+        from skyadmin_pro.ui.views.skyagent import SkyAgentChat
+
+        self._skyagent_chat = SkyAgentChat(self)
 
     def _shortcut_new(self) -> None:
         """Ctrl+N — new client via active view, else Database & Tasks → Clients."""
