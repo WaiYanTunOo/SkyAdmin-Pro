@@ -225,13 +225,13 @@ One-page view of what blocks “perfect on Windows” vs polish already in code.
 
 | Field | Value |
 |-------|-------|
-| Build version | 0.3.10 (`pyproject` + `APP_VERSION` + macOS spec aligned; `release_check` RELEASE OK) |
-| Installer SHA / date | `d4feb322…a9b359` (`dist/SHA256SUMS`, Setup 35.2 MB / exe 33.9 MB, built 2026-09-29 from current tree via `build-installer.cmd`; **unsigned** — no cert) |
-| Worker deploy date | Live at `skyadmin-worker.skyadmin-pro.workers.dev` (verified 2026-09-06: ping OK, signing key `matches_desktop`, pricing 4 pkgs, update channel `published: none`) |
+| Build version | 0.3.10 (`pyproject` + `APP_VERSION` + macOS spec aligned; `release_check` RELEASE OK incl. installer) |
+| Installer SHA / date | Setup `0cd7cc99…f371ca` / exe `1f5a6b39…5cf5c5` (`dist/SHA256SUMS`, Setup 35.2 MB / exe 33.9 MB, built 2026-09-30 via `build-installer.ps1` after Magic Search merge; **unsigned** — no cert) |
+| Worker deploy date | Live at `skyadmin-worker.skyadmin-pro.workers.dev` (redeployed 2026-09-30; ping OK, signing key matches desktop, pricing 5 pkgs, update `published: 0.3.10`) |
 | Tester | (automated gates: agent) + human sign-off still required for §2-auth, §3–§6 |
 | Machine (clean PC name) | dev PC only — clean-PC/VM pass still open |
-| Date | 2026-09-29 |
-| Result | ☐ Ship  ☐ Block — **partial**: §1 + unauthenticated §2/§4/§7 API checks green; credential-gated (A.2–A.6, C.1, D, E-mutations) and VM-gated (B, F, G) steps open — see Blockers |
+| Date | 2026-09-30 |
+| Result | ☐ Ship  ☐ Block — **partial**: installer+portable RELEASE OK; credential-gated and VM-gated steps open — see Blockers |
 
 **Blockers** (if any):
 

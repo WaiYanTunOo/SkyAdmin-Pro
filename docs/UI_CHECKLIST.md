@@ -18,7 +18,8 @@ Manual QA after UI/theme changes. Test at **1100×700** (minimum), **1920×1080*
 - [ ] Companies → Expiry — Status shows Expired / Ongoing / near Expiry under 45 days; Days left shows countdown
 - [ ] Tables — every ThemedTreeview has ⋮ Columns (also right-click); hide/show persists; Excel “visible columns only” follows matching sheets
 - [ ] Finance → Suppliers & AP / Payments (AP) — form and table span full content width
-- [ ] Daily Work — Tasks, Service Pipeline, Courier Tracker (sidebar pages, not Companies tabs)
+- [ ] Daily Work — Service Pipeline, Courier Tracker (sidebar pages, not Companies tabs)
+- [ ] **Magic Search** (Ctrl+F / Ctrl+K / Ctrl+Shift+A) — company / pipeline / `under 30 days` expiry hits; Enter opens first; Expiry filter works; Tasks tab gone from nav
 - [ ] Finance — Suppliers & AP, Monthly Service Close, Accounting Setup
 - [ ] Document Hub — all tabs open
 - [ ] Company Details → Tax IDs — edit DBD/RD/other portal logins (New/Save/Delete); Show/Copy password
