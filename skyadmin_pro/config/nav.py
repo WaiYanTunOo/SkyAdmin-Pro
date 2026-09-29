@@ -23,7 +23,6 @@ NAV_GROUP_OFFICE = "group_office"
 # Flat list kept for backward compatibility — all importers still work.
 NAV_ITEMS: tuple[tuple[str, str], ...] = (
     (NAV_DASHBOARD, "Dashboard"),
-    (NAV_TASKS, "Tasks"),
     (NAV_DATABASE_TASKS, "Companies"),
     (NAV_SUPPLIERS, "Suppliers & AP"),
     (NAV_TAX_STATUS, "Monthly Service Close"),
@@ -42,7 +41,7 @@ NAV_ITEMS: tuple[tuple[str, str], ...] = (
 # Group rows (group_*) are never passed to show_view — they expand/collapse only.
 NAV_GROUPS: tuple[tuple[str, str, tuple[str, ...]], ...] = (
     (NAV_DASHBOARD, "Dashboard", ()),
-    (NAV_GROUP_DAILY, "Daily Work", (NAV_TASKS, NAV_PIPELINE, NAV_COURIER)),
+    (NAV_GROUP_DAILY, "Daily Work", (NAV_PIPELINE, NAV_COURIER)),
     (NAV_DATABASE_TASKS, "Companies", ()),
     (NAV_GROUP_FINANCE, "Finance", (NAV_SUPPLIERS, NAV_TAX_STATUS, NAV_ACCOUNTING)),
     (NAV_GROUP_OFFICE, "Office", (NAV_DOCUMENT_HUB, NAV_OFFICE_HUB, NAV_UTILITIES)),

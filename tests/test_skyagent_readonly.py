@@ -53,6 +53,19 @@ def in_memory_db():
             deleted_at TEXT
         )
     """)
+    conn.execute("""
+        CREATE TABLE pipeline_items (
+            id INTEGER PRIMARY KEY,
+            client_id INTEGER,
+            service TEXT,
+            step INTEGER,
+            step_date TEXT,
+            notes TEXT,
+            created_at TEXT,
+            updated_at TEXT,
+            deleted_at TEXT
+        )
+    """)
     conn.execute(
         "INSERT INTO clients VALUES (1, 'ABC Corp', 'John', 'john@abc.com', 'active', 'accounting', 'paid', 'TAX001', '2024-01-01', NULL)"
     )
@@ -68,6 +81,18 @@ def in_memory_db():
     conn.execute("INSERT INTO tasks VALUES (1, 1, 'File VAT', 'pending', 'tax', '2026-10-01', NULL)")
     conn.execute("INSERT INTO tasks VALUES (2, 1, 'Submit report', 'completed', 'reporting', '2026-09-15', NULL)")
     conn.execute("INSERT INTO tasks VALUES (3, 2, 'Audit prep', 'pending', 'audit', '2026-11-01', NULL)")
+    conn.execute(
+        "INSERT INTO pipeline_items VALUES (1, 1, 'Work Permit', 8, '2026-09-01', NULL, '2026-01-01', '2026-09-01', NULL)"
+    )
+    conn.execute(
+        "INSERT INTO pipeline_items VALUES (2, 2, 'Visa', 4, '2026-09-01', NULL, '2026-01-01', '2026-09-01', NULL)"
+    )
+    conn.execute(
+        "INSERT INTO pipeline_items VALUES (3, 1, 'Done Svc', 9, '2026-09-01', NULL, '2026-01-01', '2026-09-01', NULL)"
+    )
+    conn.execute(
+        "INSERT INTO pipeline_items VALUES (4, 4, 'Inactive Svc', 2, '2026-09-01', NULL, '2026-01-01', '2026-09-01', NULL)"
+    )
     _svc = "Monthly Tax Filing Service"
     # Overdue unpaid service-type (payment_date in the past)
     conn.execute(
@@ -218,16 +243,20 @@ class TestGetDocumentsByClient:
 
 
 class TestGetPendingTasks:
-    def test_returns_only_pending(self, skyagent_db):
+    def test_returns_incomplete_pipeline(self, skyagent_db):
         results = skyagent_db.get_pending_tasks()
-        assert all(r["status"] == "pending" for r in results)
         assert len(results) == 2
+        assert all("step_label" in r for r in results)
+        assert all(int(r["step"]) < 9 for r in results)
 
-    def test_includes_client_name(self, skyagent_db):
+    def test_includes_client_and_service(self, skyagent_db):
         results = skyagent_db.get_pending_tasks()
         names = {r["client_name"] for r in results}
+        services = {r["service"] for r in results}
         assert "ABC Corp" in names
         assert "XYZ Ltd" in names
+        assert "Work Permit" in services
+        assert "Visa" in services
 
 
 class TestGetOverdueDocuments:

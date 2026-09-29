@@ -4,7 +4,7 @@ from __future__ import annotations
 
 import customtkinter as ctk
 
-from skyadmin_pro.config import NAV_SUPPLIERS, NAV_TASKS
+from skyadmin_pro.config import NAV_PIPELINE, NAV_SUPPLIERS
 from skyadmin_pro.ui.canvas_scroll import CanvasScrollFrame
 from skyadmin_pro.ui.theme import SURFACE_BG
 from skyadmin_pro.ui.widgets import themed_tabview
@@ -65,8 +65,10 @@ def _stat_cards(view) -> None:
     view._row1.grid(row=0, column=0, sticky="ew", pady=(0, 8))
     for i in range(5):
         view._row1.grid_columnconfigure(i, weight=1)
-    view.card_pending = view._stat_card(view._row1, 0, "Pending tasks", "0", lambda: view.app.show_view(NAV_TASKS))
-    view.card_done = view._stat_card(view._row1, 1, "Completed today", "0", lambda: view.app.show_view(NAV_TASKS))
+    view.card_pending = view._stat_card(
+        view._row1, 0, "Pending services", "0", lambda: view.app.show_view(NAV_PIPELINE)
+    )
+    view.card_done = view._stat_card(view._row1, 1, "Completed today", "0", lambda: view.app.show_view(NAV_PIPELINE))
     view.card_expiring = view._stat_card(view._row1, 2, "Expiry alerts", "0", lambda: open_expiry(view.app))
     view.card_overdue = view._stat_card(
         view._row1, 3, "Overdue payments", "0", lambda: open_company_details_tab(view.app)

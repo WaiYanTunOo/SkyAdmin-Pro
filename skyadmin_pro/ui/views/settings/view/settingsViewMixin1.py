@@ -82,7 +82,7 @@ class SettingsViewMixin1:
 
         ctk.CTkLabel(
             body,
-            text="Shortcuts:  Ctrl+F search   ·   Ctrl+E export   ·   "
+            text="Shortcuts:  Ctrl+F / Ctrl+K Magic Search   ·   Ctrl+E export   ·   "
             "Ctrl+N new client   ·   Ctrl+S save   ·   Ctrl+Z undo   ·   Ctrl+D theme",
             font=ctk.CTkFont(size=11),
             text_color=TEXT_MUTED,
