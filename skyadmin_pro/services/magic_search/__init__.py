@@ -33,6 +33,18 @@ def _sort_key(hit: dict, q: str) -> tuple:
     )
 
 
+def _dedupe(hits: list[dict]) -> list[dict]:
+    seen: set[tuple] = set()
+    out: list[dict] = []
+    for hit in hits:
+        key = (hit.get("type"), hit.get("title"), hit.get("subtitle"), hit.get("open"))
+        if key in seen:
+            continue
+        seen.add(key)
+        out.append(hit)
+    return out
+
+
 def magic_search(db: Any, query: str, *, kind: str = "all") -> list[dict]:
     """Return hits: type, title, subtitle, nav, open."""
     q = (query or "").strip().lower()
@@ -46,7 +58,7 @@ def magic_search(db: Any, query: str, *, kind: str = "all") -> list[dict]:
         out.extend(search_pipeline(db, q))
     if want_expiry:
         out.extend(search_expiry(db, q, default_window=int(EXPIRY_ALERT_DAYS)))
-    if kind in ("all", "docs") and not want_expiry or kind == "docs":
+    if kind == "docs" or (kind == "all" and not want_expiry):
         out.extend(search_documents(db, q))
     if kind in ("all", "contacts"):
         out.extend(search_contacts(db, q))
@@ -54,5 +66,7 @@ def magic_search(db: Any, query: str, *, kind: str = "all") -> list[dict]:
         out.extend(search_suppliers(db, q))
     if kind in ("all", "courier"):
         out.extend(search_courier(db, q))
+    out = [h for h in out if (h.get("title") or "").strip()]
+    out = _dedupe(out)
     out.sort(key=lambda h: _sort_key(h, q))
     return out[:80]

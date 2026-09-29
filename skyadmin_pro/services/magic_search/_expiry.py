@@ -17,11 +17,34 @@ from skyadmin_pro.services.tracking import (
 from ._sources import _PER, _rows, match
 
 _WITHIN = re.compile(
-    r"(?:under|within|less\s+than|in)\s+(\d+)\s+days?" r"|(\d+)\s+days?\s+left" r"|\bexpir(?:y|ing|es|ed)?\b",
+    r"(?:under|within|less\s+than|in)\s+(\d+)\s+days?"
+    r"|(\d+)\s+days?\s+left"
+    r"|\bexpir(?:y|ing|es|ed)?\b"
+    r"|\bdue\s+soon\b"
+    r"|\bnear\s+expir",
     re.I,
 )
 _DROP = frozenset(
-    "under within less than in days day left expiry expiring expires expired " "find show list due soon near".split()
+    [
+        "under",
+        "within",
+        "less",
+        "than",
+        "in",
+        "days",
+        "day",
+        "left",
+        "expiry",
+        "expiring",
+        "expires",
+        "expired",
+        "find",
+        "show",
+        "list",
+        "due",
+        "soon",
+        "near",
+    ]
 )
 
 

@@ -82,6 +82,7 @@ def test_magic_search_expiry_under_30_days():
 
 def test_magic_search_expiry_intent_on_all():
     assert has_expiry_intent("under 30 days left")
+    assert has_expiry_intent("due soon")
     hits = magic_search(_FakeDB(), "under 30 days left", kind="all")
     assert any(h["type"] == "Expiry" for h in hits)
     assert not any(h["type"] == "Document" for h in hits)

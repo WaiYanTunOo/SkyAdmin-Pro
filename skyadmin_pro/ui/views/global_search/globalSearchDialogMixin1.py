@@ -20,13 +20,13 @@ class GlobalSearchDialogMixin1:
         key = f"{filter_type}\0{query}"
         if key == self._last_query:
             return
-        self._last_query = key
         self._hits = []
 
         for widget in self._results_frame.winfo_children():
             widget.destroy()
 
         if not query or len(query) < 2:
+            self._last_query = key
             self.feedback.info("Type at least 2 characters to search.")
             return
 
@@ -45,11 +45,13 @@ class GlobalSearchDialogMixin1:
                     return
             except Exception:
                 return
+            self._last_query = key
             self._render_results(results, query)
 
         def on_error(msg: str) -> None:
             if seq != getattr(self, "_search_seq", 0):
                 return
+            self._last_query = ""
             try:
                 self.feedback.error(f"Search failed: {msg}")
             except Exception:
