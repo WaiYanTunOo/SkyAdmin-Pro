@@ -33,7 +33,7 @@ class SkyAgentChatMixin:
         self._history = build_history(self)
         self._input_var = tk.StringVar()
         build_input(self, self._input_var, self._send)
-        self.bind("<Escape>", lambda _e: self.destroy())
+        self.bind("<Escape>", self._on_escape)
         self._llm = self._init_llm()
         self._rag: Any = None
         self._messages: list[dict[str, str]] = []
@@ -98,6 +98,17 @@ class SkyAgentChatMixin:
             self._status.configure(text=self._ready_label())
 
         run_background(self, work=work, on_success=on_success, on_error=on_error)
+
+    def _on_escape(self, _event=None):
+        """Close chat on Escape unless a DatePicker calendar is open."""
+        from skyadmin_pro.ui.widgets import DatePickerField
+
+        if any(
+            DatePickerField._widget_alive(getattr(field, "_calendar_top", None))
+            for field in list(DatePickerField._open_fields)
+        ):
+            return "break"
+        self.destroy()
 
     def destroy(self) -> None:
         try:

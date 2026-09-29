@@ -72,18 +72,9 @@ class SkyAgentDB:
 
     def get_overdue_documents(self) -> list[dict]:
         """Unpaid docs past payment_date — mirrors dashboard list_overdue_services."""
-        sql = """
-            SELECT d.id, d.document_type, d.payment_date, d.amount, c.name AS client_name
-            FROM documents d
-            LEFT JOIN clients c ON c.id = d.client_id
-            WHERE d.deleted_at IS NULL AND d.client_id IS NOT NULL
-              AND c.deleted_at IS NULL AND COALESCE(c.status, 'active') != 'inactive'
-              AND d.payment_date IS NOT NULL AND trim(d.payment_date) != ''
-              AND date(d.payment_date) < date('now', 'localtime')
-              AND COALESCE(d.paid, 0) = 0
-            ORDER BY d.payment_date ASC
-        """
-        return self._safe_fetch_all(sql)
+        from ._overdue import query_overdue_documents
+
+        return query_overdue_documents(self._db, self._safe_fetch_all)
 
     def get_client_summary(self, client_id: int) -> dict | None:
         sql = """

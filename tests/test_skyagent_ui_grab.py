@@ -28,6 +28,17 @@ def test_skyagent_destroy_has_no_leftover_grab() -> None:
     assert "online configured" in mixin
 
 
+def test_skyagent_escape_respects_open_datepicker() -> None:
+    """Escape must not destroy chat while a DatePicker calendar is open."""
+    mixin = _src("skyadmin_pro", "ui", "views", "skyagent", "chat_mixin.py")
+    assert "def _on_escape" in mixin
+    assert 'bind("<Escape>", self._on_escape)' in mixin
+    assert "DatePickerField" in mixin
+    assert "_open_fields" in mixin
+    assert 'return "break"' in mixin
+    assert "grab_set" not in mixin
+
+
 def test_open_skyagent_shortcut_and_singleton_lift() -> None:
     """Ctrl+Shift+A opens SkyAgent; second invoke lifts existing toplevel."""
     main = _src("skyadmin_pro", "ui", "main_window.py")

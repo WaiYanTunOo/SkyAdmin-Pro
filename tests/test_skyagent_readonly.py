@@ -68,25 +68,30 @@ def in_memory_db():
     conn.execute("INSERT INTO tasks VALUES (1, 1, 'File VAT', 'pending', 'tax', '2026-10-01', NULL)")
     conn.execute("INSERT INTO tasks VALUES (2, 1, 'Submit report', 'completed', 'reporting', '2026-09-15', NULL)")
     conn.execute("INSERT INTO tasks VALUES (3, 2, 'Audit prep', 'pending', 'audit', '2026-11-01', NULL)")
-    # Overdue unpaid (payment_date in the past)
+    _svc = "Monthly Tax Filing Service"
+    # Overdue unpaid service-type (payment_date in the past)
     conn.execute(
-        "INSERT INTO documents VALUES (1, 1, 'invoice', '2026-09-30', '2020-01-01', 5000.0, 0, 'inv001.pdf', NULL)"
+        f"INSERT INTO documents VALUES (1, 1, '{_svc}', '2026-09-30', '2020-01-01', 5000.0, 0, 'inv001.pdf', NULL)"
     )
     # Paid — not overdue
     conn.execute(
-        "INSERT INTO documents VALUES (2, 1, 'receipt', '2026-12-31', '2020-02-01', 1200.0, 1, 'rec001.pdf', NULL)"
+        f"INSERT INTO documents VALUES (2, 1, '{_svc}', '2026-12-31', '2020-02-01', 1200.0, 1, 'rec001.pdf', NULL)"
     )
     # Future payment_date — not overdue
     conn.execute(
-        "INSERT INTO documents VALUES (3, 2, 'invoice', '2026-08-15', '2099-01-01', 3000.0, 0, 'inv002.pdf', NULL)"
+        f"INSERT INTO documents VALUES (3, 2, '{_svc}', '2026-08-15', '2099-01-01', 3000.0, 0, 'inv002.pdf', NULL)"
     )
     # Unpaid past payment but inactive client — excluded
     conn.execute(
-        "INSERT INTO documents VALUES (4, 4, 'invoice', '2026-01-01', '2020-03-01', 100.0, 0, 'inv003.pdf', NULL)"
+        f"INSERT INTO documents VALUES (4, 4, '{_svc}', '2026-01-01', '2020-03-01', 100.0, 0, 'inv003.pdf', NULL)"
     )
-    # NULL paid treated as unpaid overdue
+    # NULL paid treated as unpaid overdue (service type)
     conn.execute(
-        "INSERT INTO documents VALUES (5, 2, 'invoice', '2026-01-01', '2020-04-01', 200.0, NULL, 'inv004.pdf', NULL)"
+        f"INSERT INTO documents VALUES (5, 2, '{_svc}', '2026-01-01', '2020-04-01', 200.0, NULL, 'inv004.pdf', NULL)"
+    )
+    # Overdue unpaid but non-service document_type — excluded by service-type filter
+    conn.execute(
+        "INSERT INTO documents VALUES (6, 1, 'Other Document', '2026-01-01', '2020-05-01', 50.0, 0, 'other.pdf', NULL)"
     )
     conn.commit()
 
@@ -102,6 +107,9 @@ def in_memory_db():
                 yield self._conn
 
             return _ctx()
+
+        def list_service_types(self):
+            return ["Monthly Tax Filing Service", "Company Annual Accounting Service"]
 
     yield DBWrapper(conn)
     conn.close()
@@ -202,7 +210,7 @@ class TestGetClientTasks:
 class TestGetDocumentsByClient:
     def test_returns_documents(self, skyagent_db):
         results = skyagent_db.get_documents_by_client(1)
-        assert len(results) == 2
+        assert len(results) == 3
 
     def test_excludes_other_clients(self, skyagent_db):
         results = skyagent_db.get_documents_by_client(2)
@@ -226,14 +234,30 @@ class TestGetOverdueDocuments:
     def test_payment_date_semantics(self, skyagent_db):
         results = skyagent_db.get_overdue_documents()
         ids = {r["id"] for r in results}
-        assert 1 in ids  # unpaid past payment_date
+        assert 1 in ids  # unpaid past payment_date (service type)
         assert 5 in ids  # NULL paid coalesced to unpaid
         assert 2 not in ids  # paid
         assert 3 not in ids  # future payment_date
         assert 4 not in ids  # inactive client
+        assert 6 not in ids  # non-service document_type
         for r in results:
             assert "payment_date" in r
             assert r["client_name"] is not None
+
+    def test_includes_service_type_overdue(self, skyagent_db):
+        results = skyagent_db.get_overdue_documents()
+        by_id = {r["id"]: r for r in results}
+        assert 1 in by_id
+        assert by_id[1]["document_type"] == "Monthly Tax Filing Service"
+
+    def test_excludes_non_service_overdue(self, skyagent_db):
+        results = skyagent_db.get_overdue_documents()
+        assert all(r["document_type"] != "Other Document" for r in results)
+        assert 6 not in {r["id"] for r in results}
+
+    def test_empty_service_types_returns_empty(self, in_memory_db, skyagent_db):
+        in_memory_db.list_service_types = lambda: []
+        assert skyagent_db.get_overdue_documents() == []
 
 
 class TestGetClientSummary:
