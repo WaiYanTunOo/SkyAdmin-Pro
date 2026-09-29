@@ -8,17 +8,29 @@ from skyadmin_pro.services.skyagent.rag import RAGIndex
 
 
 class FakeDB:
-    def __init__(self, *, clients=None, pending=None, overdue=None, tasks=None, docs=None):
+    def __init__(
+        self,
+        *,
+        clients=None,
+        pending=None,
+        overdue=None,
+        tasks=None,
+        docs=None,
+        expiring=None,
+    ):
         self._clients = clients or []
         self._pending = pending or []
         self._overdue = overdue or []
         self._tasks = tasks or []
         self._docs = docs or []
+        self._expiring = expiring or []
         self.client_calls = 0
         self.pending_calls = 0
         self.overdue_calls = 0
         self.task_calls = 0
         self.doc_calls = 0
+        self.expiring_calls = 0
+        self.expiring_within: int | None = None
 
     def search_clients(self, query: str, limit: int = 20):
         self.client_calls += 1
@@ -31,6 +43,11 @@ class FakeDB:
     def get_overdue_documents(self):
         self.overdue_calls += 1
         return list(self._overdue)
+
+    def get_expiring_within(self, within_days: int):
+        self.expiring_calls += 1
+        self.expiring_within = within_days
+        return list(self._expiring)
 
     def get_client_tasks(self, client_id: int):
         self.task_calls += 1
@@ -101,11 +118,23 @@ def test_both_miss_returns_explicit_message():
 
 
 def test_pending_keyword_uses_pending_tasks():
-    db = FakeDB(pending=[{"id": 1, "title": "File VAT", "status": "pending"}])
+    db = FakeDB(
+        pending=[
+            {
+                "client_name": "ABC Corp",
+                "service": "Work Permit",
+                "step": 8,
+                "step_label": "8. Processing & follow-up",
+            }
+        ]
+    )
     out = answer("show pending tasks", db, RAGIndex())
-    assert "File VAT" in out
+    assert "ABC Corp" in out
+    assert "Work Permit" in out
+    assert "8. Processing" in out
     assert db.pending_calls == 1
     assert db.client_calls == 0
+    assert "id:" not in out
 
 
 def test_depending_does_not_match_pending():
@@ -121,6 +150,51 @@ def test_overdue_keyword_uses_overdue_docs():
     out = answer("list overdue invoices", db, RAGIndex())
     assert "invoice" in out
     assert db.overdue_calls == 1
+
+
+def test_under_days_left_uses_expiring_within():
+    db = FakeDB(
+        expiring=[
+            {
+                "client_name": "Sample",
+                "document_type": "Monthly Accounting",
+                "days_left": 29,
+            }
+        ]
+    )
+    out = answer("find under 30 days left", db, RAGIndex())
+    assert "Sample" in out
+    assert "29" in out or "Monthly Accounting" in out
+    assert db.expiring_calls == 1
+    assert db.expiring_within == 30
+    assert db.client_calls == 0
+    assert "id:" not in out
+    assert "•" in out
+
+
+def test_pending_formats_simple_and_filters_client():
+    db = FakeDB(
+        pending=[
+            {
+                "service": "Visa",
+                "step_label": "8. Processing & follow-up",
+                "client_name": "SECURE NETWORKS",
+            },
+            {
+                "service": "Other",
+                "step_label": "1. Client appoints service",
+                "client_name": "OTHER CO",
+            },
+        ]
+    )
+    out = answer("pending secure networks", db, RAGIndex())
+    assert "SECURE NETWORKS" in out
+    assert "Visa" in out
+    assert "8. Processing" in out
+    assert "OTHER CO" not in out
+    assert "id:" not in out
+    assert "status:" not in out
+    assert "service pipeline" in out.lower()
 
 
 def test_single_client_task_drill_down():

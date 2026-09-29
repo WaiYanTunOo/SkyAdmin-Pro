@@ -60,21 +60,38 @@ class SkyAgentDB:
         return self._safe_fetch_all(sql, (client_id,))
 
     def get_pending_tasks(self, limit: int = 50) -> list[dict]:
+        """Incomplete Service Pipeline rows (Tasks tab removed from nav)."""
+        from skyadmin_pro.config import PIPELINE_MAX_STEP, PIPELINE_STEPS
+
         sql = """
-            SELECT t.id, t.title, t.status, t.due_date, c.name AS client_name
-            FROM tasks t
-            LEFT JOIN clients c ON c.id = t.client_id AND c.deleted_at IS NULL
-            WHERE t.status = 'pending' AND t.deleted_at IS NULL
+            SELECT p.id, p.service, p.step, p.step_date, c.name AS client_name
+            FROM pipeline_items p
+            LEFT JOIN clients c ON c.id = p.client_id AND c.deleted_at IS NULL
+            WHERE p.deleted_at IS NULL AND p.step < ?
               AND (c.id IS NULL OR COALESCE(c.status, 'active') != 'inactive')
-            ORDER BY t.due_date LIMIT ?
+            ORDER BY p.step ASC, p.updated_at DESC
+            LIMIT ?
         """
-        return self._safe_fetch_all(sql, (limit,))
+        rows = self._safe_fetch_all(sql, (PIPELINE_MAX_STEP, limit))
+        for row in rows:
+            step = int(row.get("step") or 0)
+            if 1 <= step <= len(PIPELINE_STEPS):
+                row["step_label"] = PIPELINE_STEPS[step - 1]
+            else:
+                row["step_label"] = f"Step {step}"
+        return rows
 
     def get_overdue_documents(self) -> list[dict]:
         """Unpaid docs past payment_date — mirrors dashboard list_overdue_services."""
         from ._overdue import query_overdue_documents
 
         return query_overdue_documents(self._db, self._safe_fetch_all)
+
+    def get_expiring_within(self, within_days: int) -> list[dict]:
+        """Companies → Expiry style: 0..within_days left (effective dates)."""
+        from ._expiring import query_expiring_within
+
+        return query_expiring_within(self._db, within_days)
 
     def get_client_summary(self, client_id: int) -> dict | None:
         sql = """

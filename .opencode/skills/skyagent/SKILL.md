@@ -17,7 +17,7 @@ description: Use when working with SkyAgent — data-first SQLite+RAG answers, o
 
 ## Data-first cascade
 
-1. Bias DB: `pending` → `get_pending_tasks`; `overdue` → `get_overdue_documents`; else `search_clients`
+1. Bias DB: `pending` / `pipeline` → incomplete Service Pipeline (`client — service — step`); `overdue` → unpaid overdue; “under/within N days left” / expiry → `get_expiring_within(N)`; else `search_clients`
 2. If DB hits → local context bullets
 3. Else BM25 RAG on docs
 4. Else return `No matching data found in SkyAdmin` (never invent)

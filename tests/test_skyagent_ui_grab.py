@@ -39,11 +39,15 @@ def test_skyagent_escape_respects_open_datepicker() -> None:
     assert "grab_set" not in mixin
 
 
-def test_open_skyagent_shortcut_and_singleton_lift() -> None:
-    """Ctrl+Shift+A opens SkyAgent; second invoke lifts existing toplevel."""
+def test_magic_search_shortcuts() -> None:
+    """Ctrl+F / Ctrl+K / Ctrl+Shift+A open Magic Search (not SkyAgent chat)."""
     main = _src("skyadmin_pro", "ui", "main_window.py")
+    assert 'bind("<Control-f>"' in main
+    assert 'bind("<Control-k>"' in main
     assert 'bind("<Control-Shift-a>"' in main
     assert 'bind("<Control-Shift-A>"' in main
-    assert "open_skyagent" in main
-    assert "self._skyagent_chat.lift()" in main
-    assert "SkyAgentChat(self)" in main
+    assert "open_global_search" in main
+    # SkyAgent hotkey redirects to Magic Search
+    assert "def open_skyagent" in main
+    assert "self.open_global_search()" in main
+    assert "SkyAgentChat(self)" not in main
