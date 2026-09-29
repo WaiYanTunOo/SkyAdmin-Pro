@@ -3,14 +3,24 @@ import { Env } from "../../db";
 import { recordsDbError } from "./errors";
 import { IssuedLicenseRow, RecordsPage } from "./types";
 
+/** Machine-summary window for GET /api/records (P10 — was a hard LIMIT 2000). */
+export const SUMMARY_LIMIT_DEFAULT = 2000;
+export const SUMMARY_LIMIT_MIN = 100;
+export const SUMMARY_LIMIT_MAX = 5000;
+
+export function clampSummaryLimit(raw: number): number {
+  if (Number.isNaN(raw)) return SUMMARY_LIMIT_DEFAULT;
+  return Math.min(SUMMARY_LIMIT_MAX, Math.max(SUMMARY_LIMIT_MIN, raw));
+}
+
 export function parseRecordsQuery(c: Context<{ Bindings: Env }>): RecordsPage {
   const parsedPage = parseInt(c.req.query("page") || "1", 10);
   const parsedLimit = parseInt(c.req.query("limit") || "50", 10);
   const page = Math.max(1, Number.isNaN(parsedPage) ? 1 : parsedPage);
   const limit = Math.min(500, Math.max(1, Number.isNaN(parsedLimit) ? 50 : parsedLimit));
   const offset = (page - 1) * limit;
-  const parsedSummary = parseInt(c.req.query("summary_limit") || "1000", 10);
-  const summaryLimit = Math.min(1000, Math.max(100, Number.isNaN(parsedSummary) ? 1000 : parsedSummary));
+  const parsedSummary = parseInt(c.req.query("summary_limit") || String(SUMMARY_LIMIT_DEFAULT), 10);
+  const summaryLimit = clampSummaryLimit(Number.isNaN(parsedSummary) ? SUMMARY_LIMIT_DEFAULT : parsedSummary);
   return { page, limit, offset, summaryLimit };
 }
 

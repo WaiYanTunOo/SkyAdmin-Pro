@@ -10,3 +10,4 @@ import "./handlers/records_summary_reuse";
 import "./handlers/rate_limit";
 import "./handlers/invalid_json";
 import "./handlers/pagination";
+import "./handlers/generate_d1_fail";

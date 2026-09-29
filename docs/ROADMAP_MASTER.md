@@ -301,7 +301,7 @@ Consolidated roadmap organized by feature. Each row links to the feature detail 
 | 13 | P2 | String-based tab dispatch | `database_tasks/view.py`, `company_details/panel.py` | F2/F3 | U11 |
 | 14 | P2 | `__import__()` inline imports | `treeview.py:130–133`, 9+ files | F7 | Q5–6 |
 | 15 | P2 | Dynamic `import()` hot path | `routes/generate.ts:25–27` | F8 | P9 |
-| 16 | P2 | License returned before DB insert confirmed | `routes/generate.ts:53–55` | F8 | P11 |
+| 16 | P2 | License returned before DB insert confirmed | `routes/generate.ts` | F8 | ✅ P11 |
 | 17 | P2 | Duplicate license constants | `license/_constants.py` vs `machine.py` | F8 | Q3 |
 | 18 | P2 | SQL LIMIT interpolation | `routes/sync.ts:132` | F9 | S12 |
 | 19 | P2 | `translate.py` global socket timeout | `services/translate.py:41–56` | F13 | P6 |
