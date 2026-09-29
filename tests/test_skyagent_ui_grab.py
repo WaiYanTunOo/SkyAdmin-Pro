@@ -23,6 +23,9 @@ def test_skyagent_destroy_has_no_leftover_grab() -> None:
     assert "cancel_pump" in mixin
     assert "grab_release" not in mixin
     assert "grab_set" not in mixin
+    assert 'bind("<Escape>"' in mixin
+    assert "safe_error_text" in mixin
+    assert "online configured" in mixin
 
 
 def test_open_skyagent_shortcut_and_singleton_lift() -> None:

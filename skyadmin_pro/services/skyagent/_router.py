@@ -2,9 +2,14 @@
 
 from __future__ import annotations
 
+import re
 from typing import Any, Protocol
 
 MISS = "No matching data found in SkyAdmin"
+_PENDING = re.compile(r"\bpending\b", re.I)
+_OVERDUE = re.compile(r"\boverdue\b", re.I)
+_TASKS = re.compile(r"\b(?:tasks?|todos?)\b", re.I)
+_DOCS = re.compile(r"\b(?:documents?|docs?|invoices?)\b", re.I)
 
 
 class _LLMLike(Protocol):
@@ -30,14 +35,22 @@ def answer(query: str, db: Any, rag: Any, llm: _LLMLike | None = None) -> str:
 
 
 def _search_db(db: Any, query: str) -> list[dict]:
-    lower = query.lower()
-    if "pending" in lower:
-        rows = db.get_pending_tasks()
-    elif "overdue" in lower:
-        rows = db.get_overdue_documents()
-    else:
-        rows = db.search_clients(query)
-    return list(rows or [])
+    if _PENDING.search(query):
+        return list(db.get_pending_tasks() or [])
+    if _OVERDUE.search(query):
+        return list(db.get_overdue_documents() or [])
+    rows = list(db.search_clients(query) or [])
+    if len(rows) == 1:
+        cid = rows[0].get("id")
+        if cid is not None:
+            extra: list[dict] = []
+            if _TASKS.search(query) and hasattr(db, "get_client_tasks"):
+                extra.extend(db.get_client_tasks(cid) or [])
+            if _DOCS.search(query) and hasattr(db, "get_documents_by_client"):
+                extra.extend(db.get_documents_by_client(cid) or [])
+            if extra:
+                return rows + extra
+    return rows
 
 
 def _format_rows(rows: list[dict]) -> str:
@@ -60,8 +73,8 @@ def _format_chunks(chunks: list[dict]) -> str:
 
 
 def _maybe_refine(question: str, context: str, llm: _LLMLike | None) -> str:
-    if llm is None:
-        return context
+    if not context or context == MISS or llm is None:
+        return context if context else MISS
     try:
         if not llm.health_check():
             return context

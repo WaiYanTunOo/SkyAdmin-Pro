@@ -50,6 +50,14 @@ class TestHttpsLLM:
         monkeypatch.setenv("SKYAGENT_LLM_URL", "http://localhost:11434/v1")
         assert try_https_llm_from_env() is None
 
+    def test_from_env_rejects_loopback(self, monkeypatch):
+        monkeypatch.setenv("SKYAGENT_LLM_URL", "https://127.0.0.1/v1")
+        assert try_https_llm_from_env() is None
+
+    def test_provider_rejects_loopback_url(self):
+        with pytest.raises(LLMProviderError, match="failed"):
+            HttpsLLMProvider("https://127.0.0.1/v1")
+
     def test_from_env_builds_https(self, monkeypatch):
         monkeypatch.setenv("SKYAGENT_LLM_URL", "https://api.example.com/v1")
         monkeypatch.setenv("SKYAGENT_LLM_API_KEY", "sk-test")
@@ -57,21 +65,39 @@ class TestHttpsLLM:
         assert p is not None
         assert p.health_check() is True
 
+    def test_product_llm_none_without_env(self, monkeypatch):
+        monkeypatch.delenv("SKYAGENT_LLM_URL", raising=False)
+        provider = try_https_llm_from_env()
+        from skyadmin_pro.services.skyagent.llm_interface import SkyAgentLLM
+
+        llm = SkyAgentLLM(provider) if provider is not None else None
+        assert llm is None
+
     def test_query_parses_openai_payload(self):
         payload = {"choices": [{"message": {"content": "  hello  "}}]}
         mock_resp = MagicMock()
         mock_resp.read.return_value = json.dumps(payload).encode()
         mock_resp.__enter__ = lambda s: s
         mock_resp.__exit__ = MagicMock(return_value=False)
-        with patch("urllib.request.urlopen", return_value=mock_resp) as opener:
+        opener = MagicMock()
+        opener.open.return_value = mock_resp
+        with (
+            patch("skyadmin_pro.services.skyagent._https_llm.assert_public_https_url", side_effect=lambda u, **k: u),
+            patch("urllib.request.build_opener", return_value=opener),
+        ):
             p = HttpsLLMProvider("https://api.example.com/v1", api_key="sk-secret")
             assert p.query("hi", system="sys") == "hello"
-            req = opener.call_args[0][0]
+            req = opener.open.call_args[0][0]
             assert "Authorization" in req.headers
             assert "sk-secret" in req.headers["Authorization"]
 
     def test_query_fail_closed(self):
-        with patch("urllib.request.urlopen", side_effect=TimeoutError("t")):
+        opener = MagicMock()
+        opener.open.side_effect = TimeoutError("t")
+        with (
+            patch("skyadmin_pro.services.skyagent._https_llm.assert_public_https_url", side_effect=lambda u, **k: u),
+            patch("urllib.request.build_opener", return_value=opener),
+        ):
             p = HttpsLLMProvider("https://api.example.com/v1")
             with pytest.raises(LLMProviderError, match="failed"):
                 p.query("hi")

@@ -17,6 +17,11 @@ def _winfo_ok(widget: Any) -> bool:
         return False
 
 
+def safe_error_text(_err: str) -> str:
+    """User-facing error bubble; never echo raw paths/SQL/URLs/keys."""
+    return "Something went wrong. Try again."
+
+
 def add_bubble(history: Any, text: str, *, is_user: bool) -> None:
     """Append a chat bubble to the history frame."""
     try:

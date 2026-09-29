@@ -141,7 +141,8 @@ def test_readonly_db():
 
     summary = db.get_client_summary(1)
     assert summary["name"] == "ABC Corp"
-    assert summary["tax_id"] == "TAX001"
+    assert summary["tax_id"] == "***REDACTED***"
+    assert summary["email"] == "***REDACTED***"
     print(f"Client #1: {summary['name']}, tax_id={summary['tax_id']}")
 
     tasks = db.get_pending_tasks()

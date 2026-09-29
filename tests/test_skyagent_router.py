@@ -8,13 +8,17 @@ from skyadmin_pro.services.skyagent.rag import RAGIndex
 
 
 class FakeDB:
-    def __init__(self, *, clients=None, pending=None, overdue=None):
+    def __init__(self, *, clients=None, pending=None, overdue=None, tasks=None, docs=None):
         self._clients = clients or []
         self._pending = pending or []
         self._overdue = overdue or []
+        self._tasks = tasks or []
+        self._docs = docs or []
         self.client_calls = 0
         self.pending_calls = 0
         self.overdue_calls = 0
+        self.task_calls = 0
+        self.doc_calls = 0
 
     def search_clients(self, query: str, limit: int = 20):
         self.client_calls += 1
@@ -27,6 +31,14 @@ class FakeDB:
     def get_overdue_documents(self):
         self.overdue_calls += 1
         return list(self._overdue)
+
+    def get_client_tasks(self, client_id: int):
+        self.task_calls += 1
+        return list(self._tasks)
+
+    def get_documents_by_client(self, client_id: int):
+        self.doc_calls += 1
+        return list(self._docs)
 
 
 class SpyLLM:
@@ -96,11 +108,36 @@ def test_pending_keyword_uses_pending_tasks():
     assert db.client_calls == 0
 
 
+def test_depending_does_not_match_pending():
+    db = FakeDB(clients=[{"id": 1, "name": "Depending Corp"}])
+    out = answer("depending Corp", db, RAGIndex())
+    assert "Depending Corp" in out
+    assert db.pending_calls == 0
+    assert db.client_calls == 1
+
+
 def test_overdue_keyword_uses_overdue_docs():
     db = FakeDB(overdue=[{"id": 9, "document_type": "invoice", "client_name": "XYZ"}])
     out = answer("list overdue invoices", db, RAGIndex())
     assert "invoice" in out
     assert db.overdue_calls == 1
+
+
+def test_single_client_task_drill_down():
+    db = FakeDB(
+        clients=[{"id": 1, "name": "ABC Corp"}],
+        tasks=[{"id": 7, "title": "File VAT", "status": "pending"}],
+    )
+    out = answer("ABC Corp tasks", db, RAGIndex())
+    assert "File VAT" in out
+    assert db.task_calls == 1
+
+
+def test_miss_never_refines():
+    spy = SpyLLM(reply="hallucinated")
+    out = answer("zzz nonexistent", FakeDB(), RAGIndex(), llm=spy)
+    assert out == MISS
+    assert spy.summarize_calls == []
 
 
 def test_online_refine_uses_only_local_context():

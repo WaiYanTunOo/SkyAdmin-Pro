@@ -41,7 +41,7 @@ class SkyAgentLLM:
 
     def draft_reply(self, customer_message: str, *, context: str, tone: str = "professional") -> str:
         system = (
-            "You are SkyAgent, an AI co-pilot for account administrators. " "Be professional, empathetic, and concise."
+            "You are SkyAgent, an AI co-pilot for account administrators. Be professional, empathetic, and concise."
         )
         prompt = (
             f"Tone: {tone}\n"
@@ -66,7 +66,7 @@ class SkyAgentLLM:
             '"Billing|Technical|Inquiry|Other", "sentiment": '
             '"Positive|Neutral|Frustrated", "summary": "string"}'
         )
-        prompt = f"Extract from the following text.\n" f"JSON schema: {schema_hint}\n\n" f"Text:\n{text}"
+        prompt = f"Extract from the following text.\nJSON schema: {schema_hint}\n\nText:\n{text}"
         try:
             return self._provider.query(prompt, system=system)
         except Exception as e:
@@ -75,12 +75,11 @@ class SkyAgentLLM:
     def summarize(self, documents: str, *, question: str) -> str:
         system = (
             "You are a document retrieval assistant. "
-            "Answer using ONLY the provided context. "
-            "Cite sources. If not found, say so explicitly."
+            "Restate and organize ONLY facts from the provided context. "
+            "Do not invent data. Cite sources when present. "
+            "If the answer is not in the context, say so explicitly."
         )
-        prompt = (
-            f"Context:\n{documents}\n\n" f"Question: {question}\n\n" "Provide a concise answer based on the context."
-        )
+        prompt = f"Context:\n{documents}\n\nQuestion: {question}\n\nAnswer from the context only."
         try:
             return self._provider.query(prompt, system=system)
         except Exception as e:

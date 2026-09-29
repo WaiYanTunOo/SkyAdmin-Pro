@@ -46,6 +46,7 @@ def in_memory_db():
             client_id INTEGER,
             document_type TEXT,
             expiry_date TEXT,
+            payment_date TEXT,
             amount REAL,
             paid INTEGER,
             file_name TEXT,
@@ -61,12 +62,32 @@ def in_memory_db():
     conn.execute(
         "INSERT INTO clients VALUES (3, 'Deleted Corp', 'Bob', 'bob@del.com', 'inactive', 'accounting', 'paid', 'TAX003', '2024-03-01', '2024-06-01')"
     )
+    conn.execute(
+        "INSERT INTO clients VALUES (4, 'Inactive Inc', 'Ivy', 'ivy@in.com', 'inactive', 'tax', 'pending', 'TAX004', '2024-04-01', NULL)"
+    )
     conn.execute("INSERT INTO tasks VALUES (1, 1, 'File VAT', 'pending', 'tax', '2026-10-01', NULL)")
     conn.execute("INSERT INTO tasks VALUES (2, 1, 'Submit report', 'completed', 'reporting', '2026-09-15', NULL)")
     conn.execute("INSERT INTO tasks VALUES (3, 2, 'Audit prep', 'pending', 'audit', '2026-11-01', NULL)")
-    conn.execute("INSERT INTO documents VALUES (1, 1, 'invoice', '2026-09-30', 5000.0, 0, 'inv001.pdf', NULL)")
-    conn.execute("INSERT INTO documents VALUES (2, 1, 'receipt', '2026-12-31', 1200.0, 1, 'rec001.pdf', NULL)")
-    conn.execute("INSERT INTO documents VALUES (3, 2, 'invoice', '2026-08-15', 3000.0, 0, 'inv002.pdf', NULL)")
+    # Overdue unpaid (payment_date in the past)
+    conn.execute(
+        "INSERT INTO documents VALUES (1, 1, 'invoice', '2026-09-30', '2020-01-01', 5000.0, 0, 'inv001.pdf', NULL)"
+    )
+    # Paid — not overdue
+    conn.execute(
+        "INSERT INTO documents VALUES (2, 1, 'receipt', '2026-12-31', '2020-02-01', 1200.0, 1, 'rec001.pdf', NULL)"
+    )
+    # Future payment_date — not overdue
+    conn.execute(
+        "INSERT INTO documents VALUES (3, 2, 'invoice', '2026-08-15', '2099-01-01', 3000.0, 0, 'inv002.pdf', NULL)"
+    )
+    # Unpaid past payment but inactive client — excluded
+    conn.execute(
+        "INSERT INTO documents VALUES (4, 4, 'invoice', '2026-01-01', '2020-03-01', 100.0, 0, 'inv003.pdf', NULL)"
+    )
+    # NULL paid treated as unpaid overdue
+    conn.execute(
+        "INSERT INTO documents VALUES (5, 2, 'invoice', '2026-01-01', '2020-04-01', 200.0, NULL, 'inv004.pdf', NULL)"
+    )
     conn.commit()
 
     class DBWrapper:
@@ -185,7 +206,7 @@ class TestGetDocumentsByClient:
 
     def test_excludes_other_clients(self, skyagent_db):
         results = skyagent_db.get_documents_by_client(2)
-        assert len(results) == 1
+        assert len(results) == 2
 
 
 class TestGetPendingTasks:
@@ -202,19 +223,26 @@ class TestGetPendingTasks:
 
 
 class TestGetOverdueDocuments:
-    def test_returns_unpaid_overdue(self, skyagent_db):
+    def test_payment_date_semantics(self, skyagent_db):
         results = skyagent_db.get_overdue_documents()
-        assert len(results) > 0
+        ids = {r["id"] for r in results}
+        assert 1 in ids  # unpaid past payment_date
+        assert 5 in ids  # NULL paid coalesced to unpaid
+        assert 2 not in ids  # paid
+        assert 3 not in ids  # future payment_date
+        assert 4 not in ids  # inactive client
         for r in results:
+            assert "payment_date" in r
             assert r["client_name"] is not None
 
 
 class TestGetClientSummary:
-    def test_returns_client(self, skyagent_db):
+    def test_returns_client_redacted(self, skyagent_db):
         result = skyagent_db.get_client_summary(1)
         assert result is not None
         assert result["name"] == "ABC Corp"
-        assert result["tax_id"] == "TAX001"
+        assert result["email"] == "***REDACTED***"
+        assert result["tax_id"] == "***REDACTED***"
 
     def test_returns_none_for_missing(self, skyagent_db):
         result = skyagent_db.get_client_summary(999)

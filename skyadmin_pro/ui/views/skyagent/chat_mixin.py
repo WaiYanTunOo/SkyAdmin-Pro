@@ -10,7 +10,7 @@ from typing import Any
 from skyadmin_pro.ui.async_ui import cancel_pump, run_background
 
 from ._chat_build import build_header, build_history, build_input
-from ._msg_helpers import _winfo_ok, add_bubble, trim_messages
+from ._msg_helpers import _winfo_ok, add_bubble, safe_error_text, trim_messages
 
 logger = logging.getLogger(__name__)
 
@@ -33,10 +33,12 @@ class SkyAgentChatMixin:
         self._history = build_history(self)
         self._input_var = tk.StringVar()
         build_input(self, self._input_var, self._send)
+        self.bind("<Escape>", lambda _e: self.destroy())
         self._llm = self._init_llm()
         self._rag: Any = None
         self._messages: list[dict[str, str]] = []
         self._send_seq = 0
+        self._busy = False
         self._status.configure(text=self._ready_label())
 
     def _init_llm(self) -> Any:
@@ -55,10 +57,13 @@ class SkyAgentChatMixin:
         return self._rag
 
     def _ready_label(self) -> str:
-        mode = "online" if self._llm is not None and self._llm.is_available else "offline"
-        return f"Ready ({mode})"
+        if self._llm is not None:
+            return "Ready (online configured)"
+        return "Ready (offline)"
 
     def _send(self) -> None:
+        if self._busy:
+            return
         text = self._input_var.get().strip()
         if not text:
             return
@@ -67,6 +72,7 @@ class SkyAgentChatMixin:
         self._messages.append({"role": "user", "content": text})
         self._send_seq += 1
         seq = self._send_seq
+        self._busy = True
         self._status.configure(text="Thinking\u2026")
 
         def work() -> str:
@@ -76,6 +82,7 @@ class SkyAgentChatMixin:
             return answer(text, SkyAgentDB(self.app.db), self._get_rag(), llm=self._llm)
 
         def on_success(response: str) -> None:
+            self._busy = False
             if seq != self._send_seq or not _winfo_ok(self):
                 return
             add_bubble(self._history, response, is_user=False)
@@ -84,9 +91,10 @@ class SkyAgentChatMixin:
             self._status.configure(text=self._ready_label())
 
         def on_error(err: str) -> None:
+            self._busy = False
             if seq != self._send_seq or not _winfo_ok(self):
                 return
-            add_bubble(self._history, f"Error: {err}", is_user=False)
+            add_bubble(self._history, safe_error_text(err), is_user=False)
             self._status.configure(text=self._ready_label())
 
         run_background(self, work=work, on_success=on_success, on_error=on_error)
