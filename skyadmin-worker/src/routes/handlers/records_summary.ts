@@ -42,6 +42,6 @@ describe("records machine summary", () => {
       expect(m.status).toBe("pending");
       expect(m.license_count).toBe(1);
     }
-    expect(body.pagination).toEqual({ page: 1, limit: 10, total: 3, pages: 1 });
+    expect(body.pagination).toEqual({ page: 1, limit: 10, total: 3, pages: 1, summary_limit: 2000 });
   });
 });

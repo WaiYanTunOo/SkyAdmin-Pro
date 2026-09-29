@@ -137,6 +137,6 @@ Cloudflare Worker backend: license generation/claim, sync API, control list, adm
 | Issue | File:Line | Priority |
 |-------|-----------|----------|
 | `recordsHandler` full table scan of revocations + used_nonces | `routes/records/query.ts` | P1 |
-| Hardcoded LIMIT 2000 in `summarizeMachines` | `routes/records/summary.ts` | P3 |
+| Configurable `summary_limit` (default 2000, max 5000) for machine summaries | `routes/records/query.ts` | ✅ |
 | Dynamic `import()` in hot path | `routes/generate.ts` | P2 |
 | D1 query error handling in most routes | `routes/generate.ts` | P2 |

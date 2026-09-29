@@ -16,7 +16,13 @@ describe("records machine summary", () => {
     expect(body.licenses).toHaveLength(3);
     expect(body.machines).toHaveLength(3);
     expect(body.machines.map((m) => m.machine_id).sort()).toEqual(["M1", "M2", "M3"]);
-    expect(body.pagination).toEqual({ page: 1, limit: 500, total: 3, pages: 1 });
+    expect(body.pagination).toEqual({
+      page: 1,
+      limit: 500,
+      total: 3,
+      pages: 1,
+      summary_limit: 500,
+    });
     // Deduped: the summary scan must NOT be issued as a separate query.
     expect(seen.some((s) => s.startsWith("SELECT l.machine_id"))).toBe(false);
     expect(seen.some((s) => s.startsWith("SELECT l.id"))).toBe(true);

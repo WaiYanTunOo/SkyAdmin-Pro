@@ -123,8 +123,8 @@ Comprehensive analysis of **features, security, code quality, optimization, load
 |---|-------|-----------|--------|-----|
 | P8 | **`recordsHandler` full table scan of revocations + used_nonces** | `routes/records/query.ts` | **HIGH** — O(N) per request as lists grow | Use JOINs or EXISTS subqueries |
 | P9 | **Dynamic `import()` in hot path** | `routes/generate.ts:25-27` | ✅ Fixed |
-| P10 | **`summarizeMachines` hardcoded LIMIT 2000** | `routes/records/summary.ts` | **LOW** — incomplete summaries for large installs | Make configurable or paginate |
-| P11 | **No D1 query error handling in most routes** | `routes/generate.ts:53-55` | **MEDIUM** — license returned before DB insert confirmed | Move return after DB write succeeds |
+| P10 | **`summarizeMachines` hardcoded LIMIT 2000** | `routes/records/query.ts` | ✅ Fixed — `summary_limit` query param (default 2000, max 5000) exposed in pagination |
+| P11 | **License returned before DB insert confirmed** | `routes/generate.ts` | ✅ Fixed — success JSON only after `insertIssuedLicense`; D1 failure → 500 (Vitest) |
 
 ### 3.3 Database
 

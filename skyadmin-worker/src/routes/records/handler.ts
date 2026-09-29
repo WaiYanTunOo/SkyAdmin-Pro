@@ -31,6 +31,7 @@ export async function recordsHandler(c: Context<{ Bindings: Env }>) {
       limit,
       total,
       pages: Math.ceil(total / limit),
+      summary_limit: summaryLimit,
     },
   });
 }
