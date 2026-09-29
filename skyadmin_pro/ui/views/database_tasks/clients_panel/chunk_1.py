@@ -7,6 +7,7 @@ from skyadmin_pro.services.tracking import (
     days_left_label,
     days_until,
     effective_expiry_date,
+    expiry_default_sort_key,
     expiry_label,
 )
 from skyadmin_pro.ui.combo_utils import fill_combo
@@ -54,10 +55,14 @@ class ClientsExpiryPanelMixin1:
             self._group_filter_var.set(cur if cur in group_names else "All")
             names = [item["name"] for item in payload["clients"]]
             fill_combo(self.expiry_client, names, payload["current_expiry"])
-            rows, iids, tags = [], [], []
+            prepared = []
             for item in payload["documents"]:
                 eff = effective_expiry_date(item.get("expiry_date"), item.get("document_type"))
                 left = days_until(eff)
+                prepared.append((expiry_default_sort_key(left), item, eff, left))
+            prepared.sort(key=lambda row: row[0])
+            rows, iids, tags = [], [], []
+            for _key, item, eff, left in prepared:
                 status = expiry_label(left) if left is not None else "—"
                 tag = classify_expiry(left) if left is not None else None
                 rows.append(

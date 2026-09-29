@@ -3,7 +3,11 @@
 from __future__ import annotations
 
 from skyadmin_pro.config import EXPIRY_ALERT_DAYS
-from skyadmin_pro.services.tracking import classify_expiry, expiry_label
+from skyadmin_pro.services.tracking import (
+    classify_expiry,
+    expiry_default_sort_key,
+    expiry_label,
+)
 
 
 def test_expiry_label_three_bands():
@@ -35,3 +39,14 @@ def test_classify_expiry_bands():
     assert classify_expiry(31) == "green"
     assert classify_expiry(EXPIRY_ALERT_DAYS) == "green"
     assert classify_expiry(EXPIRY_ALERT_DAYS + 1) == ""
+
+
+def test_expiry_default_sort_key_urgency_order():
+    """Soonest upcoming first; most days-ago expired last; None after both."""
+    days = [30, -30, 1, None, 0, -1]
+    ordered = sorted(days, key=expiry_default_sort_key)
+    assert ordered == [0, 1, 30, -1, -30, None]
+    assert expiry_default_sort_key(0) < expiry_default_sort_key(1)
+    assert expiry_default_sort_key(1) < expiry_default_sort_key(-1)
+    assert expiry_default_sort_key(-1) < expiry_default_sort_key(-30)
+    assert expiry_default_sort_key(-30) < expiry_default_sort_key(None)
