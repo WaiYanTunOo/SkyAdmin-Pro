@@ -45,7 +45,7 @@ You should receive a response within 48 hours.
 - **Export redaction**: Sensitive columns excluded from Excel exports
 - **Secret fields**: `SECRET_FIELDS` list prevents accidental exposure
 - **Atomic writes**: Temp-file + rename pattern prevents corruption
-- **Client groups**: `client_groups` / `group_id` are local-only (not synced across devices)
+- **Client groups**: Wave C syncs `client_groups` via stable `global_id` and remaps with `group_global_id`; numeric `clients.group_id` stays a local FK (not synced)
 
 ### Transport Security
 

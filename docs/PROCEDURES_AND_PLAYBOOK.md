@@ -7,7 +7,7 @@
 ## 1. Core Architecture & Scope Boundaries
 
 - **Desktop UI**: Python 3.12+ / CustomTkinter.
-- **Database**: SQLite with SQLCipher (`skyadmin_pro/db/`).
+- **Database**: SQLite (`skyadmin_pro/db/`) — DB file is not SQLCipher-encrypted at rest; sensitive columns use field-level encryption via `secret_fields` / vault helpers.
 - **Edge Backend**: TypeScript Cloudflare Worker + D1 (`skyadmin-worker/`).
 - **Packaging**: PyInstaller on Windows.
 - **Scope Invariant**: **STRICTLY NO FRAMEWORK REWRITES** (no Kotlin/Swift mobile native, no Qt/Electron rewrite). All UI issues are CustomTkinter layout or event-dispatch challenges.

@@ -533,22 +533,17 @@ Tag v* → Release (build + sign + installer + release_check + GitHub Release + 
 
 ```mermaid
 flowchart LR
-    done[Phases7-11 + S1 landed] --> residual[ResidualUX]
-    residual --> releaseCI[ReleaseWorkerGate]
-    residual --> core[DesktopCoreCleanup]
-    releaseCI --> workerGap[ExpiredRegisterVitest]
-    core --> workerGap
-    workerGap --> qa[QAVerifier]
+    done[Phases7-11 + S1 + release gate + expired-register Vitest landed] --> residual[OptionalUX]
+    residual --> qa[Wave A human QA]
     qa --> ship[ShipReady]
-    ship --> F1[F1: Features later]
 ```
 
 **Current priority order (post P0–P3 — see [AGENTS.md](../AGENTS.md)):**
 1. Optional UX polish (Filing history weight, Settings lazy tabs)
-2. `deploy.yml` concurrency / staging
+2. Optional GitHub Environment on Worker deploy (`deploy.yml` concurrency already set)
 3. Docs — architecture diagram / CONTRIBUTING if desired
-4. **QA** — pytest + Vitest + `release_check` before ship
-5. **Defer** — deeper SQLite pooling; Feature pack F1; framework rewrite
+4. **QA** — Wave A human MANUAL_QA (automated gates already green)
+5. **Defer** — deeper SQLite pooling; framework rewrite
 6. **Do not re-do** — timing oracles, sync TTL, CSP, trees-out-of-scroll, release Worker gate
    (numeric `group_id` still excluded; Wave C syncs groups via `global_id` / `group_global_id`)
 
