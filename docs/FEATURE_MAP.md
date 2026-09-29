@@ -2,7 +2,7 @@
 
 Master reference: every feature's code files, tests, docs, and fix locations.
 
-**Version:** `0.3.3` · **Updated:** 2026-09-11
+**Version:** `0.3.10` · **Updated:** 2026-09-29
 
 ---
 

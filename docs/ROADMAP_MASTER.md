@@ -1,6 +1,6 @@
 # SkyAdmin Pro — Master Roadmap (Feature-Tracked)
 
-**Version:** `0.3.3` · **Updated:** 2026-09-11
+**Version:** `0.3.10` · **Updated:** 2026-09-29
 
 Consolidated roadmap organized by feature. Each row links to the feature detail file.
 
