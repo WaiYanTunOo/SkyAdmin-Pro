@@ -50,7 +50,7 @@ Open your admin URL (`https://<worker>/<ADMIN_PATH>`).
 Optional CLI publish (point URL at your hosted **installer** or exe):
 
 ```bash
-python scripts/publish_update.py --version 0.3.3 --url https://your-cdn/SkyAdminPro-Setup-0.3.3.exe --token YOUR_API_TOKEN
+python scripts/publish_update.py --version 0.3.10 --url https://your-cdn/SkyAdminPro-Setup-0.3.10.exe --token YOUR_API_TOKEN
 ```
 
 ---
@@ -140,6 +140,8 @@ Run on a **clean Windows PC** at **125%** and **150%** display scaling.
 
 Run on a **fresh Windows 10/11 VM** with no Python installed. Requires a configured code-signing cert (see `packaging/SIGNING.md`).
 
+**N/A (no certificate):** §G signing / `--require-signature` ship path is skipped until a cert is available. Clean-PC install checkboxes below stay open for human.
+
 **Build machine (with cert):**
 
 ```powershell
@@ -154,7 +156,7 @@ python scripts\release_check.py --skip-pytest --require-signature
 
 ```powershell
 Get-AuthenticodeSignature dist\SkyAdminPro.exe
-Get-AuthenticodeSignature dist\SkyAdminPro-Setup-0.3.3.exe
+Get-AuthenticodeSignature dist\SkyAdminPro-Setup-0.3.10.exe
 ```
 
 Both should show `Status: Valid`.
@@ -163,13 +165,13 @@ Copy `dist\SkyAdminPro-Setup-<version>.exe` to the VM (USB or shared folder).
 
 | Step | Action | Pass? |
 |------|--------|-------|
-| G.1 | `Get-AuthenticodeSignature .\SkyAdminPro-Setup-*.exe` → **Valid** (publisher name matches cert) | ☐ |
-| G.2 | Double-click installer — **no** “Unknown publisher” block (EV cert) or only SmartScreen “Run anyway” once (OV cert) | ☐ |
-| G.3 | Install completes; Start Menu shortcut launches app | ☐ |
-| G.4 | No console window flash; activation dialog appears on first run | ☐ |
-| G.5 | Uninstall from Settings → Apps removes Program Files; `%USERPROFILE%\.skyadmin_pro` remains | ☐ |
+| G.1 | `Get-AuthenticodeSignature .\SkyAdminPro-Setup-*.exe` → **Valid** (publisher name matches cert) | N/A (no certificate) |
+| G.2 | Double-click installer — **no** “Unknown publisher” block (EV cert) or only SmartScreen “Run anyway” once (OV cert) | N/A (no certificate) |
+| G.3 | Install completes; Start Menu shortcut launches app | ☐ (human / clean PC) |
+| G.4 | No console window flash; activation dialog appears on first run | ☐ (human / clean PC) |
+| G.5 | Uninstall from Settings → Apps removes Program Files; `%USERPROFILE%\.skyadmin_pro` remains | ☐ (human / clean PC) |
 
-**With a cert (ship path):** `release_check.py --require-signature` must print **RELEASE OK** on the signed exe + installer. Without a cert (dev only) it correctly **blocks** with `NotSigned`.
+**With a cert (ship path):** `release_check.py --require-signature` must print **RELEASE OK** on the signed exe + installer. Without a cert (dev only) it correctly **blocks** with `NotSigned`. **N/A (no certificate)** for current 0.3.10 local artifacts.
 
 ---
 
@@ -181,8 +183,8 @@ One-page view of what blocks “perfect on Windows” vs polish already in code.
 
 | # | Item | Owner | Status |
 |---|------|-------|--------|
-| A.1 | Code-signed **exe + installer** (`SKYADMIN_SIGN_*` → `build-installer.cmd`) | You + cert | ☐ Needs cert |
-| A.2 | `python scripts\release_check.py --require-signature` → **RELEASE OK** | Dev PC | ☐ |
+| A.1 | Code-signed **exe + installer** (`SKYADMIN_SIGN_*` → `build-installer.cmd`) | You + cert | N/A (no certificate) |
+| A.2 | `python scripts\release_check.py --require-signature` → **RELEASE OK** | Dev PC | N/A (no certificate) |
 | A.3 | Clean VM install smoke (§3 + §6.2 G.1–G.5) | VM | ☐ |
 | A.4 | Manual UI spot-check (§6.1 F.1–F.7) at 125%/150% DPI | Clean PC | ☐ |
 | A.5 | Monthly incentive export matches your Excel (`SkyAdmin_Export_YYYYMM01.xlsx`, Pipeline sheet) | You | ☐ Verify one real month |
@@ -223,24 +225,23 @@ One-page view of what blocks “perfect on Windows” vs polish already in code.
 
 | Field | Value |
 |-------|-------|
-| Build version | 0.3.3 (`pyproject` + `APP_VERSION` + macOS spec aligned; `release_check` RELEASE OK) |
-| Installer SHA / date | `1a2743f9…c96a1` (`dist/SHA256SUMS`, 55.0 MB, built 2026-09-06 11:24 UTC from current tree via `build-installer.cmd`; exe 54.3 MB with sqlcipher3 bundled; **unsigned** — no cert) |
+| Build version | 0.3.10 (`pyproject` + `APP_VERSION` + macOS spec aligned; `release_check` RELEASE OK) |
+| Installer SHA / date | `d4feb322…a9b359` (`dist/SHA256SUMS`, Setup 35.2 MB / exe 33.9 MB, built 2026-09-29 from current tree via `build-installer.cmd`; **unsigned** — no cert) |
 | Worker deploy date | Live at `skyadmin-worker.skyadmin-pro.workers.dev` (verified 2026-09-06: ping OK, signing key `matches_desktop`, pricing 4 pkgs, update channel `published: none`) |
 | Tester | (automated gates: agent) + human sign-off still required for §2-auth, §3–§6 |
 | Machine (clean PC name) | dev PC only — clean-PC/VM pass still open |
-| Date | 2026-09-06 |
+| Date | 2026-09-29 |
 | Result | ☐ Ship  ☐ Block — **partial**: §1 + unauthenticated §2/§4/§7 API checks green; credential-gated (A.2–A.6, C.1, D, E-mutations) and VM-gated (B, F, G) steps open — see Blockers |
 
 **Blockers** (if any):
 
-*Needs human with secrets + VM (2026-09-06; authenticated pass done 8/8, see below):*
+*Needs human with secrets + VM (2026-09-29; authenticated pass done 8/8 historically, see below):*
 - DONE 2026-09-06 via script (prod-safe, no mutations): login+session+CSRF;
   A.1 signing `matches_desktop` + banner; A.2 pricing no-op re-save (4 pkgs,
   persist verified); A.3 records (13 licenses, 3 machines) + filter JS;
   A.4 machines/bans section; A.5/A.6 endpoint validation only (published
   version untouched at `none`, nothing minted).
-- DONE 2026-09-06: `--require-signature` correctly BLOCKS the unsigned local
-  build (NotSigned on exe + installer) — gate proven, needs cert to pass.
+- **N/A (no certificate):** `--require-signature` / Authenticode / §G.1–G.5 signed-installer smoke — no code-signing cert in this environment; leave clean-PC checkboxes open for human.
 - `ADMIN_PASS` verified working; `API_TOKEN` is NOT exposed in the admin DOM
   (good — S5 holds): fetch it from wrangler/Cloudflare secrets for CLI steps.
 - Deliberately NOT run on prod (owner decision each): A.5 real publish
@@ -248,10 +249,10 @@ One-page view of what blocks “perfect on Windows” vs polish already in code.
   A.2 edited-price save (changes live prices), D Sync Now against prod
   (needs device activation = consumes a license).
 - Clean VM required: B.1–B.9 install/activation, F.1–F.7 (125%/150% DPI),
-  G.1–G.5 signed-installer smoke, C.2–C.5 desktop update-banner flow
+  G.1–G.5 signed-installer smoke (**N/A until cert**), C.2–C.5 desktop update-banner flow
   (needs a published version first).
 - Current installer **unsigned** (`SKYADMIN_SIGN_*` unset);
-  `--require-signature` correctly blocks.
+  `--require-signature` correctly blocks when run (gate proven).
 
 ---
 

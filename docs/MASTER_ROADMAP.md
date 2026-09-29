@@ -4,7 +4,7 @@
 
 Comprehensive analysis of **features, security, code quality, optimization, loading, UI/UX, testing, documentation, and architecture**.
 
-**Current version:** `0.3.7` · **Primary platform:** Windows desktop · **Stack:** Python 3 + CustomTkinter + SQLite + TypeScript Cloudflare Worker
+**Current version:** `0.3.10` · **Primary platform:** Windows desktop · **Stack:** Python 3 + CustomTkinter + SQLite + TypeScript Cloudflare Worker
 
 ---
 
@@ -73,11 +73,11 @@ Comprehensive analysis of **features, security, code quality, optimization, load
 
 | # | Issue | File:Line | Fix |
 |---|-------|-----------|-----|
-| S7 | No rate limiting on admin login endpoint | `admin/handler/` | Add per-IP rate limit (use `claim/` pattern) |
-| S8 | No rate limiting on pricing/update POST | `routes/pricing.ts`, `routes/update.ts` | Add per-IP rate limits |
-| S9 | Hardcoded Ed25519 dev key in `.dev.vars.example` | `.dev.vars.example:11` | Label as "TEST KEY ONLY" with warning |
-| S10 | `rate_limits` table grows unbounded (no cleanup) | `routes/claim/`, `routes/sync/` | Add periodic cleanup on every Nth request |
-| S11 | `login_attempts` cleanup only on failed login | `admin/session/` | Clean on successful login too |
+| S7 | No rate limiting on admin login endpoint | `admin/handler/` | ~~Add per-IP rate limit~~ — ✅ **Landed (S1)**; do not re-open |
+| S8 | No rate limiting on pricing/update POST | `routes/pricing.ts`, `routes/update.ts` | ~~Add per-IP rate limits~~ — ✅ **Landed (S1 / control rate limits)** |
+| S9 | Hardcoded Ed25519 dev key in `.dev.vars.example` | `.dev.vars.example:11` | ~~Label as TEST KEY ONLY~~ — ✅ **Landed (S1)** |
+| S10 | `rate_limits` table grows unbounded (no cleanup) | `routes/claim/`, `routes/sync/` | ~~Add periodic cleanup~~ — ✅ **Landed (S1)** |
+| S11 | `login_attempts` cleanup only on failed login | `admin/session/` | ~~Clean on success too~~ — ✅ **Landed (S1)** |
 | S12 | SQL interpolation of LIMIT in sync pull | `routes/sync/pull.ts` | Cast to integer before interpolation; use parameterized query |
 | S13 | `subprocess.Popen` with user-influenced paths | `services/file_ops.py:196-198` | ✅ Fixed |
 
@@ -124,7 +124,7 @@ Comprehensive analysis of **features, security, code quality, optimization, load
 | P8 | **`recordsHandler` full table scan of revocations + used_nonces** | `routes/records/query.ts` | **HIGH** — O(N) per request as lists grow | Use JOINs or EXISTS subqueries |
 | P9 | **Dynamic `import()` in hot path** | `routes/generate.ts:25-27` | ✅ Fixed |
 | P10 | **`summarizeMachines` hardcoded LIMIT 2000** | `routes/records/query.ts` | ✅ Fixed — `summary_limit` query param (default 2000, max 5000) exposed in pagination |
-| P11 | **License returned before DB insert confirmed** | `routes/generate.ts` | ✅ Fixed — success JSON only after `insertIssuedLicense`; D1 failure → 500 (Vitest) |
+| P11 | **License returned before DB insert confirmed** | `routes/generate.ts` | ✅ Fixed — generate-after-D1 lock + success JSON only after `insertIssuedLicense`; D1 failure → 500 (Vitest) — **do not re-open** |
 
 ### 3.3 Database
 
@@ -145,10 +145,10 @@ Comprehensive analysis of **features, security, code quality, optimization, load
 
 | # | Issue | File:Line | Fix |
 |---|-------|-----------|-----|
-| U1 | Root-level `<Button-1>` and `<Escape>` bindings conflict with multiple instances | `widgets.py:635-638` | Track all open popups at class level; single root binding dispatches correctly |
-| U2 | `_try_grab` after 80ms is fragile | `widgets.py:803-814` | Use `update()` + immediate grab after Toplevel creation |
-| U3 | `-topmost` flicker (set then cleared after 200ms) | `widgets.py:798-799` | Use transient relationship with parent instead of `-topmost` |
-| U4 | Scroll position not accounted for in popup anchor | `widgets.py:527-546` | Toplevels are already above parent; verify with CanvasScrollFrame |
+| U1 | Root-level `<Button-1>` and `<Escape>` bindings conflict with multiple instances | `widgets.py` | ~~Track open popups~~ — ✅ **Landed** (class-level `_open_fields`; do not re-open) |
+| U2 | `_try_grab` after 80ms is fragile | `widgets.py` | ~~`after(80)` grab~~ — ✅ **Landed** (immediate grab / no `-topmost`) |
+| U3 | `-topmost` flicker (set then cleared after 200ms) | `widgets.py` | ~~`-topmost`~~ — ✅ **Landed** (transient Toplevel) |
+| U4 | Scroll position not accounted for in popup anchor | `widgets.py` | Toplevels are already above parent; verify with CanvasScrollFrame |
 
 ### 4.2 Dashboard
 

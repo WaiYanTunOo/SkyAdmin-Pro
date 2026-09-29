@@ -95,7 +95,7 @@ Treat as **done** unless regressions appear:
 |----|------|-------|-----------|
 | A1 | Manual QA on clean PC (`MANUAL_QA.md` + `UI_CHECKLIST.md`) | Human + `qa-verifier` | ⚠️ Automated gates green; **manual checklist still human** |
 | A2 | Tag release dry-run with secrets present | `packaging-release` | ⚠️ `release_check` RELEASE OK; **no `SKYADMIN_API_TOKEN` in local env**; next tag after shipped `0.3.10` (see §6) |
-| A3 | Optional GitHub Environment `production` on `deploy.yml` | Ops | Concurrency landed; Environment remains optional |
+| A3 | Optional GitHub Environment `production` on `deploy.yml` | Ops | `environment: production` already set in `deploy.yml`; **ops confirm** protection rules (required reviewers / wait timer) in GitHub Settings |
 | A4 | Measure Dashboard first interactive paint | `ui-performance` | ✅ `tests/test_dashboard_paint.py` (+ `SKYADMIN_DASHBOARD_PAINT=1`) |
 
 ### Wave B — Product features F1 (2–3 weeks) · **landed in tree**
