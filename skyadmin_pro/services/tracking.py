@@ -72,3 +72,17 @@ def days_left_label(days_left: int | None) -> str:
     if days_left == 0:
         return "Expires today"
     return f"{days_left} day(s) left"
+
+
+def expiry_default_sort_key(days_left: int | None) -> tuple[int, int]:
+    """Companies → Expiry default order: soonest upcoming first, oldest expired last.
+
+    Non-negative days ascend (0 / least left at top). Expired follow, ordered by
+    ascending urgency so recently expired precede long-overdue (most days ago last).
+    Missing dates sort after both groups.
+    """
+    if days_left is None:
+        return (2, 0)
+    if days_left >= 0:
+        return (0, days_left)
+    return (1, -days_left)
