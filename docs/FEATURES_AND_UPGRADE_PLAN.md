@@ -1,6 +1,6 @@
 # SkyAdmin Pro — Features & Upgrade Plan
 
-**Version baseline:** `0.3.3`
+**Version baseline:** `0.3.10`
 **Stack:** Python 3 + CustomTkinter + SQLite · Cloudflare Worker (TypeScript/Hono) + D1
 **Status:** Phases 7–11, S1 hardening, and residual sprint **P0–P3** are landed. This document inventories **what the product does today** and the **ordered plan to upgrade** next.
 
@@ -94,7 +94,7 @@ Treat as **done** unless regressions appear:
 | ID | Item | Owner | Done when |
 |----|------|-------|-----------|
 | A1 | Manual QA on clean PC (`MANUAL_QA.md` + `UI_CHECKLIST.md`) | Human + `qa-verifier` | ⚠️ Automated gates green; **manual checklist still human** |
-| A2 | Tag release dry-run with secrets present | `packaging-release` | ⚠️ `release_check` RELEASE OK; **no `SKYADMIN_API_TOKEN` in local env**; commit dirty tree then tag `v0.3.3` (see §6) |
+| A2 | Tag release dry-run with secrets present | `packaging-release` | ⚠️ `release_check` RELEASE OK; **no `SKYADMIN_API_TOKEN` in local env**; next tag after shipped `0.3.10` (see §6) |
 | A3 | Optional GitHub Environment `production` on `deploy.yml` | Ops | Concurrency landed; Environment remains optional |
 | A4 | Measure Dashboard first interactive paint | `ui-performance` | ✅ `tests/test_dashboard_paint.py` (+ `SKYADMIN_DASHBOARD_PAINT=1`) |
 
@@ -150,15 +150,15 @@ These were proposed as next work and conflict with what the app already is. Do n
 
 ## 6. Versioning & release cadence
 
-1. Commit the dirty tree (P0–P3 + Waves A–C product work). Exclude `.qa_smoke_shots/`, local profile backups, and secrets.
-2. Version is already `0.3.3`. Do not treat `0.3.3` as the next unreleased tag.
+1. Commit the dirty tree intended for the next ship. Exclude `.qa_smoke_shots/`, local profile backups, and secrets.
+2. Shipped baseline is **`0.3.10`** (and later patch tags on the same cadence). Bump `pyproject.toml` / `APP_VERSION` together before cutting a new tag; do not re-tag `v0.3.10` or treat older `0.3.3` docs as current.
 3. `python scripts/release_check.py` → RELEASE OK (needs network for Worker smoke).
 4. Ensure GitHub secret `SKYADMIN_API_TOKEN` is set (release job is **fail-closed** if empty).
-5. Tag and push:
+5. Tag and push the **new** version (example for the next patch after `0.3.10`):
    ```bash
-   git tag -a v0.3.3 -m "SkyAdmin Pro 0.3.3"
+   git tag -a v0.3.11 -m "SkyAdmin Pro 0.3.11"
    git push origin HEAD
-   git push origin v0.3.3
+   git push origin v0.3.11
    ```
 6. After Worker migrations that rebuild `sync_devices`, plan a **re-register** support note.
 7. Run `docs/MANUAL_QA.md` on a clean PC before treating the publish as final.
