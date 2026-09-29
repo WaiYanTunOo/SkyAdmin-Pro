@@ -119,9 +119,18 @@ def test_readonly_db():
         "CREATE TABLE tasks (id INTEGER PRIMARY KEY, client_id INTEGER, title TEXT, status TEXT, category TEXT, due_date TEXT, deleted_at TEXT)"
     )
     conn.execute(
+        """
+        CREATE TABLE pipeline_items (
+            id INTEGER PRIMARY KEY, client_id INTEGER, service TEXT, step INTEGER,
+            step_date TEXT, updated_at TEXT, deleted_at TEXT
+        )
+        """
+    )
+    conn.execute(
         "INSERT INTO clients VALUES (1, 'ABC Corp', 'John', 'john@abc.com', 'active', 'accounting', 'paid', 'TAX001', '2024-01-01', NULL)"
     )
     conn.execute("INSERT INTO tasks VALUES (1, 1, 'File VAT', 'pending', 'tax', '2026-10-01', NULL)")
+    conn.execute("INSERT INTO pipeline_items VALUES (1, 1, 'Work Permit', 8, '2026-09-01', '2026-09-01', NULL)")
     conn.commit()
 
     class FakeDB:
@@ -147,7 +156,8 @@ def test_readonly_db():
 
     tasks = db.get_pending_tasks()
     assert len(tasks) == 1
-    print(f"Pending tasks: {tasks[0]['title']}")
+    assert tasks[0]["service"] == "Work Permit"
+    print(f"Pending pipeline: {tasks[0]['service']} ({tasks[0].get('step_label')})")
 
     # Test SELECT-only enforcement
     try:

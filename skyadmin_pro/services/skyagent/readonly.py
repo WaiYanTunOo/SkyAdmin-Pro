@@ -20,10 +20,15 @@ class SkyAgentDB:
         self._decrypt = decrypt_secrets
 
     def _safe_fetch_all(self, sql: str, params: tuple = ()) -> list[dict]:
+        import sqlite3
+
         validate_select_only(sql)
         validate_no_multiple_statements(sql)
-        with self._db.read_connection() as conn:
-            rows = conn.execute(sql, params).fetchall()
+        try:
+            with self._db.read_connection() as conn:
+                rows = conn.execute(sql, params).fetchall()
+        except sqlite3.OperationalError:
+            return []
         return [dict(row) for row in rows]
 
     def _safe_fetch_one(self, sql: str, params: tuple = ()) -> dict | None:
